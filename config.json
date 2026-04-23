@@ -158,7 +158,19 @@
   },
   "notifications": {
     "enabled": true,
-    "feishu_open_id": "YOUR_FEISHU_OPEN_ID",
-    "push_script": "/path/to/feishu-push.sh"
+    "feishu_open_id": "ou_f95ee559a38a607c5f312e7b64304143",
+    "push_script": "/Users/lin/.openclaw/workspace/scripts/feishu-push.sh"
+  },
+  "projects": {
+    "chiralium": {
+      "dev_root": "/Users/lin/Desktop/work/chiralium",
+      "prod_root": "/Users/lin/Desktop/prod/chiralium",
+      "deploy_script": "/Users/lin/Desktop/work/chiralium/scripts/deploy.sh"
+    },
+    "my-agent-teams": {
+      "dev_root": "/Users/lin/Desktop/work/my-agent-teams",
+      "prod_root": "/Users/lin/Desktop/prod/my-agent-teams",
+      "deploy_script": null
+    }
   }
 }

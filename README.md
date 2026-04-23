@@ -50,7 +50,7 @@ SCAN_INTERVAL=3 ./scripts/task-watcher.sh >> /tmp/agent-teams-watcher.log 2>&1 &
 ### 2. 创建任务
 
 ```bash
-./scripts/create-task.sh T-001 "实现用户登录页" fe-1 frontend
+./scripts/create-task.sh T-001 "实现用户登录页" fe-1 frontend chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
 ```
 
 这会创建 `tasks/T-001/` 目录，包含：
@@ -130,7 +130,7 @@ pending → dispatched → working → ready_for_merge → merged → archived
 
 ```
 my-agent-teams/
-├── config.json                      # 全局配置（团队拓扑、权限、通知）
+├── config.json                      # 全局配置（团队拓扑、项目注册表、权限、通知）
 ├── tasks/                           # 所有任务
 │   ├── _system/                     # watcher 运行时状态
 │   │   ├── notifications.jsonl      # 通知记录
@@ -158,6 +158,15 @@ my-agent-teams/
     ├── OpenClaw-tmux协作方案优化.md   # 主方案（v10）
     └── 分层PM演进方案.md             # 分层 PM 演进
 ```
+
+
+### 环境隔离（Phase 1）
+
+- `config.json.projects` 明确定义每个项目的 `dev_root` / `prod_root`
+- `task.json` 需声明：`project`、`execution_mode`、`target_environment`
+- `create-task.sh` 和 `dispatch-task.sh` 都会做前置校验：
+  - 开发任务只能落在 `project.dev_root`
+  - `prod` 路径和 `deploy` 任务在 Phase 1 仅允许 `pm-chief`
 
 ## 核心文件说明
 

@@ -56,9 +56,9 @@ errors: list[str] = []
 notes: list[str] = []
 
 required_task = [
-    'id', 'title', 'status', 'task_level', 'owner_pm', 'assigned_agent',
+    'id', 'title', 'project', 'execution_mode', 'target_environment', 'status', 'task_level', 'owner_pm', 'assigned_agent',
     'domain', 'write_scope', 'depends_on', 'blocks', 'artifacts',
-    'review_required', 'reviewer', 'test_required'
+    'review_required', 'review_authority', 'reviewer', 'review_round', 'max_review_rounds', 'test_required'
 ]
 for key in required_task:
     if key not in task:
@@ -98,6 +98,18 @@ for changed in files_modified:
 
 if task.get('review_required') and not (task.get('reviewer') or '').strip():
     errors.append('review_required=true but reviewer missing')
+if task.get('review_authority') not in {'reviewer', 'owner'}:
+    errors.append('review_authority invalid')
+if task.get('execution_mode') not in {'dev', 'deploy'}:
+    errors.append('execution_mode invalid')
+if task.get('target_environment') not in {'dev', 'prod'}:
+    errors.append('target_environment invalid')
+if not isinstance(task.get('project'), str) or not task.get('project'):
+    errors.append('project missing')
+if not isinstance(task.get('review_round'), int) or task.get('review_round') < 0:
+    errors.append('review_round invalid')
+if not isinstance(task.get('max_review_rounds'), int) or task.get('max_review_rounds') < 1:
+    errors.append('max_review_rounds invalid')
 
 ok = not errors
 if ok:

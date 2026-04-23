@@ -139,7 +139,10 @@
   "title": "实现 users CRUD API",
   "assigned_agent": "dcai",
   "review_required": true,
+  "review_authority": "reviewer",
   "reviewer": "xke",
+  "review_round": 0,
+  "max_review_rounds": 3,
   "test_required": true,
   "status": "working",
   "created_at": "2026-04-22T09:35:00+08:00",
@@ -178,6 +181,57 @@ PM → assigned_agent → (可选 reviewer) → (可选 tester) → PM 验收
 - `review_required=true`：任务必须进入审查链，`reviewer` 可在 task.json 明确写死；若为空则按 config.json 中该 domain 的 `default_reviewer` 解析
 - `test_required=true`：任务必须进入测试链；Phase 1 为保持 schema 最小，默认不单独落 `tester` 字段，而是按 config.json 中该 domain 的 `default_tester` 解析
 - 审查和测试都是**按需参与**，不是所有任务都必须经过全部角色
+
+#### 双轨审查机制（Phase 1 落地版）
+
+为避免“所有任务都走同一套审查闭环”导致流程过重，Phase 1 引入 **双轨审查机制**。通过 `task.json.review_authority` 区分两条路径：
+
+- `review_authority = "reviewer"`（默认）
+  - 适用于：代码任务、测试任务、配置实现任务
+  - 审查者拥有终审权
+- `review_authority = "owner"`
+  - 适用于：设计文档、方案稿、方向文档等需要林总工拍板的任务
+  - 审查者只提意见，不做终审；最终由 owner 决策
+
+##### A. reviewer 闭环（代码 / 测试）
+
+```text
+agent 提交 result.json
+→ reviewer 审查
+→ 若有意见：PM 打回给 agent 修改
+→ agent 再提交
+→ reviewer 再审
+→ approved → 合入 / 进入 integration
+```
+
+约束：
+- `max_review_rounds = 3`，默认不超过 3 轮
+- `review_round` 记录当前第几轮审查
+- 若超过 3 轮仍未通过，任务升级给 PM，由 PM 决定是否拆任务、降级目标或人工介入
+
+##### B. owner 决策（设计文档）
+
+```text
+agent 提交 result.json
+→ reviewer 审查并给出意见
+→ PM 汇总 reviewer 意见，写 review-summary.md
+→ watcher 检测到 review-summary.md 且 review_authority=owner
+→ 飞书推送给林总工
+→ 林总工决策
+→ 开罗尔传达 PM
+→ PM 再传达给 agent 修改
+```
+
+约束：
+- 审查者在 owner 轨道中只输出意见，不直接给 approved/reject 终态
+- `review-summary.md` 是 PM 面向 owner 的汇总稿，不是 reviewer 原始意见本体
+- owner 轨道默认不由 watcher 自动推进到 done，必须等 owner 决策回流后由 PM 决定下一步
+
+##### Phase 1 的最小字段
+
+- `review_authority`: `reviewer | owner`，默认 `reviewer`
+- `review_round`: 当前轮次，初始为 `0`
+- `max_review_rounds`: 默认 `3`
 
 #### Phase 1 复用原则：不新增 review/test 独立 JSON
 
@@ -406,6 +460,7 @@ LLM agent 不一定会遵守协议——可能忘记写 ack、写出格式错误
 | 校验失败 | `verify.json.ok=false` 且签名变化 | ❌ 校验失败：原因 |
 | 任务超时 | `task.json.status=timeout` | ⚠️ 任务超时，请关注 |
 | 任务阻塞 | `task.json.status=blocked` | 🚫 任务阻塞：原因 |
+| Owner 审查汇总 | `review-summary.md` 出现且 `review_authority=owner` | 📝 设计审查意见待林总工决策 |
 | Agent 离线 | tmux session 不存在（4.1 健康检查触发） | 🔴 xxx 的 session 已丢失，相关任务标记为 failed |
 
 这里的关键变化是：**不是只看“文件是否存在”，而是看“事件签名是否变化”。**
@@ -597,6 +652,7 @@ agent 只需要继续遵守已有约定：
 - 写 `ack.json`
 - 写 `result.json`
 - 由开罗尔写 `verify.json`
+- 若是 owner 审查轨道，PM 会额外写 `review-summary.md`
 - 所有 JSON 文件都采用 **`.tmp + mv` 原子写入**
 
 不要求 agent 输出任何特定格式的屏幕文本。
@@ -1071,6 +1127,70 @@ cp config.example.json config.json
 - `~/.openclaw/workspace/tasks/` — 运行时任务数据（gitignore 或独立管理）
 
 ---
+
+## 十二点九、环境隔离（Phase 1）
+
+当前本机同时存在：
+- 开发目录：`~/Desktop/work/chiralium/`
+- 生产目录：`~/Desktop/prod/chiralium/`
+- 协作系统目录：`~/Desktop/work/my-agent-teams/`
+
+如果不显式建模环境，agent 很容易把“开发任务”和“生产任务”混写到同一套 write_scope 中。因此，Phase 1 先把环境隔离收敛到三个点：
+
+### 12.9.1 projects 注册表
+
+`config.json` 新增 `projects`，显式登记项目边界：
+
+```json
+{
+  "projects": {
+    "chiralium": {
+      "dev_root": "/Users/lin/Desktop/work/chiralium",
+      "prod_root": "/Users/lin/Desktop/prod/chiralium"
+    },
+    "my-agent-teams": {
+      "dev_root": "/Users/lin/Desktop/work/my-agent-teams",
+      "prod_root": "/Users/lin/Desktop/prod/my-agent-teams"
+    }
+  }
+}
+```
+
+### 12.9.2 task.json 新增环境字段
+
+Phase 1 新增：
+- `project`
+- `execution_mode`: `dev | deploy`
+- `target_environment`: `dev | prod`
+
+语义：
+- `execution_mode=dev`：普通开发任务，只能落在项目 `dev_root`
+- `execution_mode=deploy`：部署任务，允许触达 `prod_root`，但 Phase 1 仅 `pm-chief` 可执行
+- `target_environment=prod`：即使 write_scope 解析到 prod，也必须是 `pm-chief`
+
+### 12.9.3 前置校验：create-task.sh + dispatch-task.sh
+
+环境隔离不能只靠 verify 兜底，必须前移：
+
+1. **create-task.sh**
+   - 校验 `project` 是否已注册
+   - 校验 `write_scope` 是否在项目边界内
+   - 开发任务只允许落在 `dev_root`
+   - prod 路径只有 `pm-chief` 可写
+
+2. **dispatch-task.sh**
+   - 派发前再校验一次，防止 task.json 被手工篡改
+   - 若 `execution_mode=deploy` 且 `assigned_agent != pm-chief`，直接拒绝
+   - 若 `target_environment=prod` 且 write_scope 落到 prod_root，也直接拒绝
+
+### 12.9.4 部署约束（Phase 1）
+
+Phase 1 先约束到：
+- 生产目录不作为普通开发任务 write_scope
+- 生产变更只允许部署类任务触发
+- 部署统一走 `deploy.sh`（项目脚本），不允许 agent 自己拼 prod 命令乱改目录
+
+> `source_commit`、回滚策略、deploy_runner 等更细设计，留到 Phase 2 再补。
 
 ## 十三、安全与权限控制
 

@@ -126,10 +126,12 @@ write_state() {
   local ack_sig="$3"
   local result_sig="$4"
   local verify_sig="$5"
-  local last_notified_status="$6"
-  local last_notified_ack_sig="$7"
-  local last_notified_result_sig="$8"
-  local last_notified_verify_sig="$9"
+  local review_summary_sig="$6"
+  local last_notified_status="$7"
+  local last_notified_ack_sig="$8"
+  local last_notified_result_sig="$9"
+  local last_notified_verify_sig="${10}"
+  local last_notified_review_summary_sig="${11}"
   python3 - <<PY > "$state_file.tmp"
 import json
 print(json.dumps({
@@ -137,10 +139,12 @@ print(json.dumps({
   "ack_sig": "$ack_sig",
   "result_sig": "$result_sig",
   "verify_sig": "$verify_sig",
+  "review_summary_sig": "$review_summary_sig",
   "last_notified_status": "$last_notified_status",
   "last_notified_ack_sig": "$last_notified_ack_sig",
   "last_notified_result_sig": "$last_notified_result_sig",
-  "last_notified_verify_sig": "$last_notified_verify_sig"
+  "last_notified_verify_sig": "$last_notified_verify_sig",
+  "last_notified_review_summary_sig": "$last_notified_review_summary_sig"
 }, ensure_ascii=False, indent=2))
 PY
   mv "$state_file.tmp" "$state_file"
@@ -204,9 +208,10 @@ reconcile_task() {
   local task_file="$task_dir/task.json"
   [ -f "$task_file" ] || return 0
 
-  local task_id state_file status title ack_sig result_sig verify_sig
-  local last_notified_status last_notified_ack_sig last_notified_result_sig last_notified_verify_sig
-  local agent summary
+  local task_id state_file status title review_authority
+  local ack_sig result_sig verify_sig review_summary_sig
+  local last_notified_status last_notified_ack_sig last_notified_result_sig last_notified_verify_sig last_notified_review_summary_sig
+  local agent summary old_status
 
   task_id=$(json_get "$task_file" '.id // empty')
   [ -n "$task_id" ] || return 0
@@ -214,14 +219,17 @@ reconcile_task() {
 
   status=$(json_get "$task_file" '.status // empty')
   title=$(json_get "$task_file" '.title // "unnamed-task"')
+  review_authority=$(json_get "$task_file" '.review_authority // "reviewer"')
   ack_sig=$(file_sig "$task_dir/ack.json")
   result_sig=$(file_sig "$task_dir/result.json")
   verify_sig=$(file_sig "$task_dir/verify.json")
+  review_summary_sig=$(file_sig "$task_dir/review-summary.md")
 
   last_notified_status=$(json_get "$state_file" '.last_notified_status // empty')
   last_notified_ack_sig=$(json_get "$state_file" '.last_notified_ack_sig // empty')
   last_notified_result_sig=$(json_get "$state_file" '.last_notified_result_sig // empty')
   last_notified_verify_sig=$(json_get "$state_file" '.last_notified_verify_sig // empty')
+  last_notified_review_summary_sig=$(json_get "$state_file" '.last_notified_review_summary_sig // empty')
 
   if [ -n "$ack_sig" ] && [ "$ack_sig" != "$last_notified_ack_sig" ]; then
     if validate_ack "$task_file" "$task_dir/ack.json" >/dev/null 2>&1; then
@@ -257,6 +265,12 @@ reconcile_task() {
     fi
   fi
 
+  if [ "$review_authority" = "owner" ] && [ -n "$review_summary_sig" ] && [ "$review_summary_sig" != "$last_notified_review_summary_sig" ]; then
+    if notify_pm "$task_id" "owner_review" "$task_id 的 review-summary.md 已生成，请林总工决策"; then
+      last_notified_review_summary_sig="$review_summary_sig"
+    fi
+  fi
+
   if [ -n "$verify_sig" ] && [ "$verify_sig" != "$last_notified_verify_sig" ]; then
     if [ "$(json_get "$task_dir/verify.json" '.ok // false')" = "true" ]; then
       if [ "$status" = "done" ]; then
@@ -275,7 +289,7 @@ reconcile_task() {
     fi
   fi
 
-  write_state "$state_file" "$status" "$ack_sig" "$result_sig" "$verify_sig" "$last_notified_status" "$last_notified_ack_sig" "$last_notified_result_sig" "$last_notified_verify_sig"
+  write_state "$state_file" "$status" "$ack_sig" "$result_sig" "$verify_sig" "$review_summary_sig" "$last_notified_status" "$last_notified_ack_sig" "$last_notified_result_sig" "$last_notified_verify_sig" "$last_notified_review_summary_sig"
 }
 
 reconcile_once() {

@@ -5,3 +5,7 @@ tasks/_system/
 .DS_Store
 *.swp
 *.tmp
+
+.omc/
+.omx/
+.watcher-lock/

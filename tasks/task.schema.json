@@ -7,9 +7,15 @@
   "required": [
     "id",
     "title",
+    "project",
+    "execution_mode",
+    "target_environment",
     "assigned_agent",
     "review_required",
+    "review_authority",
     "reviewer",
+    "review_round",
+    "max_review_rounds",
     "test_required",
     "status",
     "task_level",
@@ -233,6 +239,42 @@
         {
           "type": "null"
         }
+      ]
+    },
+    "review_authority": {
+      "type": "string",
+      "enum": [
+        "reviewer",
+        "owner"
+      ],
+      "default": "reviewer"
+    },
+    "review_round": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "max_review_rounds": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 3
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "deploy"
+      ]
+    },
+    "target_environment": {
+      "type": "string",
+      "enum": [
+        "dev",
+        "prod"
       ]
     }
   },

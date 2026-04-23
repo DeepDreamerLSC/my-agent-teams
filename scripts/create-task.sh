@@ -2,44 +2,106 @@
 set -euo pipefail
 
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
-TASKS_DIR="$WORKSPACE_ROOT/tasks"
+TASKS_DIR="${TASKS_DIR:-$WORKSPACE_ROOT/tasks}"
 TASK_ID="${1:-}"
 TITLE="${2:-}"
 ASSIGNED_AGENT="${3:-}"
 DOMAIN="${4:-}"
-WRITE_SCOPE_CSV="${5:-}"
-REVIEW_REQUIRED="${6:-false}"
-TEST_REQUIRED="${7:-false}"
+PROJECT="${5:-}"
+WRITE_SCOPE_CSV="${6:-}"
+REVIEW_REQUIRED="${7:-false}"
+TEST_REQUIRED="${8:-false}"
+REVIEW_AUTHORITY="${9:-reviewer}"
+EXECUTION_MODE="${10:-dev}"
+TARGET_ENVIRONMENT="${11:-dev}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 
-if [ -z "$TASK_ID" ] || [ -z "$TITLE" ] || [ -z "$ASSIGNED_AGENT" ] || [ -z "$DOMAIN" ]; then
-  echo "usage: create-task.sh <task-id> <title> <assigned-agent> <domain> [write-scope-csv] [review-required] [test-required]" >&2
+if [ -z "$TASK_ID" ] || [ -z "$TITLE" ] || [ -z "$ASSIGNED_AGENT" ] || [ -z "$DOMAIN" ] || [ -z "$PROJECT" ]; then
+  echo "usage: create-task.sh <task-id> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]" >&2
   exit 2
 fi
 
 TASK_DIR="$TASKS_DIR/$TASK_ID"
 mkdir -p "$TASK_DIR"
 
-python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$TASK_DIR" <<'PY'
+python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" <<'PY'
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
 
 cfg_path = Path(sys.argv[1])
-task_id, title, assigned_agent, domain, write_scope_csv, review_required_raw, test_required_raw, task_dir = sys.argv[2:10]
+(
+    task_id,
+    title,
+    assigned_agent,
+    domain,
+    project,
+    write_scope_csv,
+    review_required_raw,
+    test_required_raw,
+    review_authority,
+    execution_mode,
+    target_environment,
+    task_dir,
+) = sys.argv[2:14]
+
 cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
 review_required = review_required_raw.lower() == 'true'
 test_required = test_required_raw.lower() == 'true'
+review_authority = review_authority if review_authority in {'reviewer', 'owner'} else 'reviewer'
+execution_mode = execution_mode if execution_mode in {'dev', 'deploy'} else 'dev'
+target_environment = target_environment if target_environment in {'dev', 'prod'} else 'dev'
 write_scope = [item.strip() for item in write_scope_csv.split(',') if item.strip()] if write_scope_csv else []
+
+agents = cfg.get('agents', {})
+if assigned_agent not in agents:
+    raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
+
+projects = cfg.get('projects', {})
+if project not in projects:
+    raise SystemExit(f'unknown project: {project}')
+project_cfg = projects[project]
+dev_root = Path(project_cfg['dev_root']).expanduser().resolve()
+prod_root_raw = project_cfg.get('prod_root')
+prod_root = Path(prod_root_raw).expanduser().resolve() if prod_root_raw else None
+
+if execution_mode == 'dev' and target_environment != 'dev':
+    raise SystemExit('execution_mode=dev requires target_environment=dev')
+
+if execution_mode == 'deploy' and assigned_agent != 'pm-chief':
+    raise SystemExit('deploy tasks can only be assigned to pm-chief in Phase 1')
+
+if target_environment == 'prod' and assigned_agent != 'pm-chief':
+    raise SystemExit('prod tasks can only be assigned to pm-chief in Phase 1')
+
+for raw_path in write_scope:
+    p = Path(raw_path).expanduser()
+    if p.is_absolute():
+        resolved = p.resolve()
+    else:
+        base = prod_root if target_environment == 'prod' and prod_root is not None else dev_root
+        resolved = (base / p).resolve()
+    if prod_root is not None and str(resolved).startswith(str(prod_root)):
+        if assigned_agent != 'pm-chief':
+            raise SystemExit(f'prod write_scope requires pm-chief: {raw_path}')
+    elif not str(resolved).startswith(str(dev_root)):
+        raise SystemExit(f'write_scope outside project dev_root: {raw_path}')
+
 reviewer = cfg.get('domain_policies', {}).get(domain, {}).get('default_reviewer') if review_required else None
 created_at = datetime.now().astimezone().isoformat(timespec='seconds')
 obj = {
     'id': task_id,
     'title': title,
+    'project': project,
+    'execution_mode': execution_mode,
+    'target_environment': target_environment,
     'assigned_agent': assigned_agent,
     'review_required': review_required,
+    'review_authority': review_authority,
     'reviewer': reviewer,
+    'review_round': 0,
+    'max_review_rounds': 3,
     'test_required': test_required,
     'status': 'pending',
     'task_level': cfg.get('defaults', {}).get('task_level', 'execution'),
