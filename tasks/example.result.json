@@ -1,0 +1,19 @@
+{
+  "task_id": "T-20260423-001",
+  "agent": "fe-1",
+  "status": "ready_for_merge",
+  "summary": "已实现聊天页搜索高亮与消息跳转。",
+  "files_modified": [
+    "frontend/src/components/ChatSidebar.tsx",
+    "frontend/src/components/MessageBubble.tsx"
+  ],
+  "artifacts": [
+    {
+      "type": "summary",
+      "path": "tasks/T-20260423-001/summary.md",
+      "description": "实现摘要"
+    }
+  ],
+  "next_action": "review_and_verify",
+  "reported_at": "2026-04-23T14:25:00+08:00"
+}

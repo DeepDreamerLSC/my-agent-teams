@@ -1,0 +1,164 @@
+{
+  "version": 1,
+  "phase": "phase1_minimal_closure",
+  "workspace_root": "/Users/lin/Desktop/work/my-agent-teams",
+  "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
+  "prompts_root": "/Users/lin/Desktop/work/my-agent-teams/prompts",
+  "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts",
+  "orchestration": {
+    "mode": "single_pm",
+    "hierarchy_ready": true,
+    "root_pm": "pm-chief",
+    "integration_owner": "review-1",
+    "escalation_policy": {
+      "cross_domain_conflict": "pm-chief",
+      "retries_exhausted": "pm-chief",
+      "integration_failure": "pm-chief"
+    },
+    "domains": {
+      "frontend": [
+        "fe-1"
+      ],
+      "backend": [
+        "be-1"
+      ],
+      "quality": [
+        "qa-1",
+        "review-1"
+      ]
+    }
+  },
+  "agents": {
+    "pm-chief": {
+      "name": "PM",
+      "role": "pm",
+      "tmux_session": "pm-chief",
+      "home_team": "coordination",
+      "domains": [
+        "frontend",
+        "backend",
+        "quality"
+      ],
+      "permissions": {
+        "task_dispatch": true,
+        "task_reassign": true,
+        "task_cancel": true,
+        "integration_gate": false,
+        "cross_domain_coordination": true
+      }
+    },
+    "fe-1": {
+      "name": "Frontend Dev",
+      "role": "frontend_dev",
+      "tmux_session": "fe-1",
+      "home_team": "frontend",
+      "domains": [
+        "frontend"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      }
+    },
+    "be-1": {
+      "name": "Backend Dev",
+      "role": "backend_dev",
+      "tmux_session": "be-1",
+      "home_team": "backend",
+      "domains": [
+        "backend"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      }
+    },
+    "qa-1": {
+      "name": "QA",
+      "role": "qa",
+      "tmux_session": "qa-1",
+      "home_team": "quality",
+      "domains": [
+        "quality"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      },
+      "can_support": [
+        "frontend",
+        "backend"
+      ],
+      "borrow_policy": "borrowed_by_task"
+    },
+    "review-1": {
+      "name": "Reviewer / Integrator",
+      "role": "reviewer",
+      "tmux_session": "review-1",
+      "home_team": "quality",
+      "domains": [
+        "quality"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": true,
+        "cross_domain_coordination": false
+      },
+      "can_support": [
+        "frontend",
+        "backend"
+      ],
+      "borrow_policy": "borrowed_by_task"
+    }
+  },
+  "defaults": {
+    "timeout_minutes": 30,
+    "workspace_mode": "main",
+    "target_branch": "integration",
+    "task_level": "execution"
+  },
+  "protected_paths": [
+    "tasks/**",
+    "scripts/**",
+    "prompts/**",
+    "config.json"
+  ],
+  "domain_policies": {
+    "frontend": {
+      "default_reviewer": "review-1",
+      "default_tester": "qa-1"
+    },
+    "backend": {
+      "default_reviewer": "review-1",
+      "default_tester": "qa-1"
+    },
+    "quality": {
+      "default_reviewer": "review-1",
+      "default_tester": "qa-1"
+    }
+  },
+  "dispatch_policy": {
+    "steps": [
+      "domain_match",
+      "idle_first",
+      "write_scope_no_conflict",
+      "fallback_manual_review"
+    ]
+  },
+  "notifications": {
+    "enabled": true,
+    "feishu_open_id": "YOUR_FEISHU_OPEN_ID",
+    "push_script": "/path/to/feishu-push.sh"
+  }
+}

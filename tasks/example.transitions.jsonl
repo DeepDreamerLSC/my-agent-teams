@@ -1,0 +1,3 @@
+{"from":"pending","to":"dispatched","at":"2026-04-23T14:00:10+08:00","reason":"pm dispatch"}
+{"from":"dispatched","to":"working","at":"2026-04-23T14:01:00+08:00","reason":"ack received"}
+{"from":"working","to":"ready_for_merge","at":"2026-04-23T14:25:00+08:00","reason":"result received"}

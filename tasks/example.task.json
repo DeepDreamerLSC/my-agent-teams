@@ -1,0 +1,41 @@
+{
+  "id": "T-20260423-001",
+  "title": "实现聊天页搜索高亮",
+  "assigned_agent": "fe-1",
+  "review_required": true,
+  "reviewer": "review-1",
+  "test_required": true,
+  "status": "pending",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "frontend/src/components/ChatSidebar.tsx",
+    "frontend/src/components/MessageBubble.tsx"
+  ],
+  "depends_on": [],
+  "blocks": [
+    "T-20260423-002"
+  ],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/T-20260423-001/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "R-20260423-001",
+  "parent_task_id": null,
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-23T14:00:00+08:00",
+  "lease_expires_at": "2026-04-23T22:00:00+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-04-23T14:00:00+08:00",
+  "updated_at": "2026-04-23T14:00:00+08:00"
+}
