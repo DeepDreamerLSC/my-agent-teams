@@ -1,5 +1,5 @@
 {
-  "task_id": "T-20260423-001",
+  "task_id": "聊天页搜索高亮",
   "agent": "fe-1",
   "status": "ready_for_merge",
   "summary": "已实现聊天页搜索高亮与消息跳转。",
@@ -10,7 +10,7 @@
   "artifacts": [
     {
       "type": "summary",
-      "path": "tasks/T-20260423-001/summary.md",
+      "path": "tasks/聊天页搜索高亮/summary.md",
       "description": "实现摘要"
     }
   ],

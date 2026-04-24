@@ -26,8 +26,9 @@
 ## create-task.sh 参数
 
 ```bash
-./scripts/create-task.sh <task-id> <title> <assigned-agent> <domain> [write-scope-csv] [review-required] [test-required] [review-authority]
+/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]
 ```
 
+- `task-id-title` 必须使用不含空格且包含中文的标题式名称，例如：`修复Word生成质量问题`
 - `review-authority` 默认 `reviewer`
 - 若是设计文档 / 方案稿等需要 owner 决策的任务，可传 `owner`

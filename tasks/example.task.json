@@ -1,5 +1,5 @@
 {
-  "id": "T-20260423-001",
+  "id": "聊天页搜索高亮",
   "title": "实现聊天页搜索高亮",
   "project": "chiralium",
   "execution_mode": "dev",
@@ -21,16 +21,16 @@
   ],
   "depends_on": [],
   "blocks": [
-    "T-20260423-002"
+    "消息跳转增强"
   ],
   "artifacts": [
     {
       "type": "instruction",
-      "path": "tasks/T-20260423-001/instruction.md",
+      "path": "tasks/聊天页搜索高亮/instruction.md",
       "description": "PM 生成的任务指令"
     }
   ],
-  "root_request_id": "R-20260423-001",
+  "root_request_id": "聊天搜索体验优化",
   "parent_task_id": null,
   "integration_owner": "review-1",
   "priority": "high",

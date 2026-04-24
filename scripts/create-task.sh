@@ -17,7 +17,8 @@ TARGET_ENVIRONMENT="${11:-dev}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 
 if [ -z "$TASK_ID" ] || [ -z "$TITLE" ] || [ -z "$ASSIGNED_AGENT" ] || [ -z "$DOMAIN" ] || [ -z "$PROJECT" ]; then
-  echo "usage: create-task.sh <task-id> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]" >&2
+  echo "usage: create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]" >&2
+  echo "example: create-task.sh 修复Word生成质量问题 \"修复 Word 生成功能质量问题\" be-1 backend chiralium" >&2
   exit 2
 fi
 
@@ -26,6 +27,7 @@ mkdir -p "$TASK_DIR"
 
 python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" <<'PY'
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +47,22 @@ cfg_path = Path(sys.argv[1])
     target_environment,
     task_dir,
 ) = sys.argv[2:14]
+
+invalid_chars = set('/\\')
+if any(ch in invalid_chars for ch in task_id) or any(ch.isspace() for ch in task_id):
+    raise SystemExit(
+        "invalid task id: 请使用不含空格和路径分隔符的中文标题式名称，例如 '修复Word生成质量问题' 或 'Agent目录隔离方案'"
+    )
+
+if task_id.upper().startswith("T-") and any(ch.isdigit() for ch in task_id):
+    raise SystemExit(
+        f"invalid task id: '{task_id}' 属于旧编号风格。新任务必须使用中文标题式名称，例如 '修复Word生成质量问题' 或 'Agent目录隔离方案'"
+    )
+
+if not re.search(r"[\u4e00-\u9fff]", task_id):
+    raise SystemExit(
+        f"invalid task id: '{task_id}' 不包含中文。新任务必须使用中文标题式名称，例如 '修复Word生成质量问题' 或 'Agent目录隔离方案'"
+    )
 
 cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
 review_required = review_required_raw.lower() == 'true'

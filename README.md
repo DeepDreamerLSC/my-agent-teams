@@ -21,11 +21,23 @@ Agent 之间不直接对话。
 
 ```
 PM（pm-chief）— 需求分析、任务拆解、进度跟踪
+├── 架构师（arch-1）— 方案设计、接口契约、技术选型
 ├── 前端开发（fe-1）— 页面、组件、样式
 ├── 后端开发（be-1）— API、数据库、业务逻辑
 ├── 测试（qa-1）— 功能验证、回归测试
 └── 审查（review-1）— 代码审查、文档审阅
 ```
+
+### 工作目录隔离（当前方案）
+
+- 每个 agent 都从独立工作目录启动：`agents/<agent-id>/`
+- Claude Code 读取当前工作目录下的 `CLAUDE.md`
+- Codex agent 目录读取当前工作目录下的 `AGENT.md`
+- 根目录 `CLAUDE.md` / `AGENTS.md` 只保留**通用规则**
+- `instruction.md` 回归纯任务描述：只写做什么、改哪些文件、验收标准，不再注入角色身份
+- `tasks/`、`scripts/`、`config.json`、`prompts/` 等共享资源统一通过**绝对路径**访问
+- 新任务 ID 必须使用中文标题式名称，例如：`修复Word生成质量问题`、`Agent目录隔离方案`
+- `T-001` 这类旧编号和纯英文 slug 不允许用于新建任务
 
 ## 快速开始
 
@@ -37,44 +49,70 @@ PM（pm-chief）— 需求分析、任务拆解、进度跟踪
 - Python 3
 - 至少 2 个 tmux session 运行 Claude Code 或 Codex（一个当 PM，一个当执行 agent）
 
-### 1. 启动 watcher
+### 1. 启动 agent（进入独立工作目录）
+
+```bash
+# PM（Claude Code）
+cd /Users/lin/Desktop/work/my-agent-teams/agents/pm-chief
+
+# 架构师（Codex）
+cd /Users/lin/Desktop/work/my-agent-teams/agents/arch-1
+
+# 前端
+cd /Users/lin/Desktop/work/my-agent-teams/agents/fe-1
+
+# 后端
+cd /Users/lin/Desktop/work/my-agent-teams/agents/be-1
+
+# QA
+cd /Users/lin/Desktop/work/my-agent-teams/agents/qa-1
+
+# Reviewer
+cd /Users/lin/Desktop/work/my-agent-teams/agents/review-1
+```
+
+各 agent 启动后先读取各自目录下的角色文件再按其中规则工作：
+- Claude Code：`CLAUDE.md`（`pm-chief`、`fe-1`、`qa-1`）
+- Codex：`AGENT.md`（`arch-1`、`be-1`、`review-1`）
+
+### 2. 启动 watcher
 
 ```bash
 # 前台运行（调试用）
-SCAN_INTERVAL=3 ./scripts/task-watcher.sh
+SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh
 
 # 后台运行（生产用）
-SCAN_INTERVAL=3 ./scripts/task-watcher.sh >> /tmp/agent-teams-watcher.log 2>&1 &
+SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh >> /tmp/agent-teams-watcher.log 2>&1 &
 ```
 
-### 2. 创建任务
+### 3. 创建任务
 
 ```bash
-./scripts/create-task.sh T-001 "实现用户登录页" fe-1 frontend chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
+/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh 实现用户登录页 "实现用户登录页" fe-1 frontend chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
 ```
 
-这会创建 `tasks/T-001/` 目录，包含：
+这会创建 `tasks/实现用户登录页/` 目录，包含：
 - `task.json` — 任务定义（状态=pending）
-- `instruction.md` — 任务指令模板（需 PM 填充）
+- `instruction.md` — 纯任务指令模板（需 PM 填充任务目标、write_scope、验收标准等）
 - `transitions.jsonl` — 状态变更日志
 
-### 3. 派发任务
+### 4. 派发任务
 
 ```bash
-./scripts/dispatch-task.sh T-001
+/Users/lin/Desktop/work/my-agent-teams/scripts/dispatch-task.sh /Users/lin/Desktop/work/my-agent-teams/tasks/实现用户登录页/task.json
 ```
 
 - 将 `task.json.status` 改为 `dispatched`
 - 通过 `tmux send-keys` 将 instruction.md 内容发送给目标 agent 的 tmux session
 
-### 4. Agent 确认
+### 5. Agent 确认
 
 Agent 收到任务后写 `ack.json`：
 
 ```json
 {
   "agent": "fe-1",
-  "task_id": "T-001",
+  "task_id": "实现用户登录页",
   "status": "acknowledged",
   "timestamp": "2026-04-23T10:00:00+08:00"
 }
@@ -82,14 +120,14 @@ Agent 收到任务后写 `ack.json`：
 
 watcher 检测到 ack.json 后自动将状态改为 `working`，并推送飞书通知。
 
-### 5. Agent 完成任务
+### 6. Agent 完成任务
 
 Agent 写 `result.json`：
 
 ```json
 {
   "agent": "fe-1",
-  "task_id": "T-001",
+  "task_id": "实现用户登录页",
   "status": "done",
   "summary": "登录页已实现，包含手机号和微信扫码两种方式",
   "display_type": "text",
@@ -98,7 +136,7 @@ Agent 写 `result.json`：
 }
 ```
 
-### 6. 验证
+### 7. 验证
 
 watcher 自动调用 `verify.sh`，检查：
 - ack.json 格式是否正确
@@ -131,6 +169,21 @@ pending → dispatched → working → ready_for_merge → merged → archived
 ```
 my-agent-teams/
 ├── config.json                      # 全局配置（团队拓扑、项目注册表、权限、通知）
+├── CLAUDE.md                        # 根共享规则（Claude Code）
+├── AGENTS.md                        # 根共享规则（Codex）
+├── agents/                          # agent 独立工作目录
+│   ├── pm-chief/
+│   │   └── CLAUDE.md                # PM 角色身份与特化规则
+│   ├── arch-1/
+│   │   └── AGENT.md                 # 架构师角色身份与特化规则（Codex）
+│   ├── fe-1/
+│   │   └── CLAUDE.md
+│   ├── be-1/
+│   │   └── AGENT.md
+│   ├── qa-1/
+│   │   └── CLAUDE.md
+│   └── review-1/
+│       └── AGENT.md
 ├── tasks/                           # 所有任务
 │   ├── _system/                     # watcher 运行时状态
 │   │   ├── notifications.jsonl      # 通知记录
@@ -138,7 +191,7 @@ my-agent-teams/
 │   ├── _templates/                  # 任务模板
 │   └── {task-id}/                   # 单个任务
 │       ├── task.json                # 任务定义
-│       ├── instruction.md           # PM 生成的指令
+│       ├── instruction.md           # PM 生成的纯任务指令
 │       ├── ack.json                 # Agent 确认
 │       ├── result.json              # Agent 结果
 │       ├── verify.json              # 校验结果
@@ -150,6 +203,7 @@ my-agent-teams/
 │   └── task-watcher.sh              # 状态监控 + 通知
 ├── prompts/                         # 角色 Prompt
 │   ├── pm-base.md                   # PM
+│   ├── architect-base.md            # 架构师
 │   ├── frontend-dev-base.md         # 前端开发
 │   ├── backend-dev-base.md          # 后端开发
 │   ├── qa-base.md                   # 测试
@@ -163,6 +217,7 @@ my-agent-teams/
 ### 环境隔离（Phase 1）
 
 - `config.json.projects` 明确定义每个项目的 `dev_root` / `prod_root`
+- `config.json.agents[*].workdir` 定义每个 agent 的独立启动目录
 - `task.json` 需声明：`project`、`execution_mode`、`target_environment`
 - `create-task.sh` 和 `dispatch-task.sh` 都会做前置校验：
   - 开发任务只能落在 `project.dev_root`
@@ -178,6 +233,11 @@ my-agent-teams/
 {
   "version": 1,
   "phase": "phase1_minimal_closure",
+  "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
+  "shared_paths": {
+    "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
+    "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts"
+  },
   "orchestration": {
     "mode": "single_pm",
     "hierarchy_ready": true,
@@ -202,7 +262,7 @@ my-agent-teams/
 
 ```json
 {
-  "id": "T-001",
+  "id": "实现用户登录页",
   "title": "实现用户登录页",
   "status": "pending",
   "task_level": "execution",
@@ -214,7 +274,7 @@ my-agent-teams/
   "test_required": false,
   "write_scope": ["frontend/src/pages/login/**"],
   "depends_on": [],
-  "blocks": ["T-002"],
+  "blocks": ["补充登录页测试"],
   "timeout_minutes": 30
 }
 ```
@@ -235,6 +295,7 @@ my-agent-teams/
 - **write_scope**：agent 只能修改 task.json 中声明的文件范围
 - **verify 硬检查**：watcher 校验 agent 的实际 diff 是否越界
 - **角色不交叉**：审查者不改代码，开发不做架构决策
+- **角色来源固定**：角色身份来自 `agents/<agent-id>/CLAUDE.md` / `AGENT.md`，不再由 `instruction.md` 注入
 
 ## 设计参考
 

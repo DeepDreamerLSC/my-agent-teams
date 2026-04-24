@@ -45,7 +45,11 @@
         "task_cancel": true,
         "integration_gate": false,
         "cross_domain_coordination": true
-      }
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/pm-chief",
+      "runtime": "claude_code",
+      "guidance_file": "CLAUDE.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/pm-chief/CLAUDE.md"
     },
     "fe-1": {
       "name": "Frontend Dev",
@@ -61,7 +65,11 @@
         "task_cancel": false,
         "integration_gate": false,
         "cross_domain_coordination": false
-      }
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/fe-1",
+      "runtime": "claude_code",
+      "guidance_file": "CLAUDE.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/fe-1/CLAUDE.md"
     },
     "be-1": {
       "name": "Backend Dev",
@@ -77,7 +85,11 @@
         "task_cancel": false,
         "integration_gate": false,
         "cross_domain_coordination": false
-      }
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/be-1",
+      "runtime": "codex",
+      "guidance_file": "AGENT.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/be-1/AGENT.md"
     },
     "qa-1": {
       "name": "QA",
@@ -98,7 +110,11 @@
         "frontend",
         "backend"
       ],
-      "borrow_policy": "borrowed_by_task"
+      "borrow_policy": "borrowed_by_task",
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/qa-1",
+      "runtime": "claude_code",
+      "guidance_file": "CLAUDE.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/qa-1/CLAUDE.md"
     },
     "review-1": {
       "name": "Reviewer / Integrator",
@@ -119,7 +135,33 @@
         "frontend",
         "backend"
       ],
-      "borrow_policy": "borrowed_by_task"
+      "borrow_policy": "borrowed_by_task",
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/review-1",
+      "runtime": "codex",
+      "guidance_file": "AGENT.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/review-1/AGENT.md"
+    },
+    "arch-1": {
+      "name": "Architect",
+      "role": "architect",
+      "tmux_session": "arch-1",
+      "home_team": "coordination",
+      "domains": [
+        "frontend",
+        "backend",
+        "quality"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1",
+      "runtime": "codex",
+      "guidance_file": "AGENT.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1/AGENT.md"
     }
   },
   "defaults": {
@@ -172,5 +214,16 @@
       "prod_root": "/Users/lin/Desktop/prod/my-agent-teams",
       "deploy_script": null
     }
+  },
+  "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
+  "shared_paths": {
+    "workspace_root": "/Users/lin/Desktop/work/my-agent-teams",
+    "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
+    "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
+    "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts",
+    "prompts_root": "/Users/lin/Desktop/work/my-agent-teams/prompts",
+    "config_path": "/Users/lin/Desktop/work/my-agent-teams/config.json",
+    "root_claude_path": "/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md",
+    "root_agents_path": "/Users/lin/Desktop/work/my-agent-teams/AGENTS.md"
   }
 }

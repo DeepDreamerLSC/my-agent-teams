@@ -30,7 +30,15 @@
     "id": {
       "type": "string",
       "minLength": 1,
-      "pattern": "^[A-Za-z0-9._:-]+$"
+      "description": "必须使用不含空格且包含中文的标题式名称，例如 修复Word生成质量问题。",
+      "allOf": [
+        {
+          "pattern": "^[^/\\\\\\s]+$"
+        },
+        {
+          "pattern": ".*[\u4e00-\u9fff].*"
+        }
+      ]
     },
     "title": {
       "type": "string",
