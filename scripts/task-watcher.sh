@@ -20,6 +20,9 @@ log() {
 # 通知 PM（通过 tmux send-keys）
 notify_pm() {
     local msg="$1"
+    # PM 是 Codex（omx），需要先按 i 进入插入模式
+    tmux send-keys -t "$PM_SESSION" i 2>/dev/null
+    sleep 0.3
     tmux send-keys -t "$PM_SESSION" -l -- "$msg" 2>/dev/null
     sleep 0.1
     tmux send-keys -t "$PM_SESSION" Enter 2>/dev/null
@@ -98,9 +101,15 @@ except: print(0)
             now=$(date +%s)
             if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt 60 ]; then
                 resend_key="${task_id}_resend"
+                # 检查 agent 是否正在工作（pane 输出含 Working），工作中不重发
+                agent_session=$(python3 -c "import json; print(json.load(open('$task_dir/task.json')).get('assigned_agent',''))" 2>/dev/null)
+                is_working=0
+                if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
+                    is_working=$(tmux capture-pane -t "$agent_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
+                fi
+                [ "$is_working" -gt 0 ] && continue
                 last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
-                if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt 120 ]; then
-                    agent_session=$(python3 -c "import json; print(json.load(open('$task_dir/task.json')).get('assigned_agent',''))" 2>/dev/null)
+                if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt 300 ]; then
                     if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
                         # Codex 需要 i 进入输入模式
                         is_codex=$(python3 -c "
