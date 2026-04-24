@@ -8,4 +8,14 @@ tasks/_system/
 
 .omc/
 .omx/
-.watcher-lock/
+.watcher-lock/# Agent task symlinks (point to shared tasks/)
+agents/*/tasks
+# Runtime task data
+tasks/T-*/
+tasks/修复*/
+tasks/反馈*/
+tasks/合入*/
+tasks/清理*/
+tasks/部署*/
+tasks/验证*/
+tasks/任务看板*/

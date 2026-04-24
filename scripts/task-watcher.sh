@@ -1,5 +1,5 @@
 #!/bin/bash
-# task-watcher.sh - 监控 tasks/ 目录下的任务状态变更，通知 PM
+# task-watcher.sh - 监控 tasks/ 目录下的任务状态变更，通知 PM，并同步任务看板 SQLite 数据。
 # 检测 result.json 新增 → 通知 PM 验收
 # 检测 ack.json 新增 → 更新 task.json 状态为 working
 # 检测 verify.json 新增 → 通知 PM 或推进下游任务
@@ -9,6 +9,7 @@ PM_SESSION="pm-chief"
 PUSH_SCRIPT="/Users/lin/.openclaw/workspace/scripts/feishu-push.sh"
 USER_ID="ou_f95ee559a38a607c5f312e7b64304143"
 STATE_DIR="/Users/lin/.openclaw/workspace/.task-watcher"
+BOARD_SYNC_SCRIPT="/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py"
 INTERVAL=5
 
 mkdir -p "$STATE_DIR"
@@ -17,16 +18,63 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
 }
 
-# 通知 PM（通过 tmux send-keys）
+# 安全截断 UTF-8 字符串（按字符数，避免截断多字节字符）
+truncate_utf8() {
+    local str="$1"
+    local max_len="${2:-60}"
+    python3 -c "import sys; s=sys.stdin.read(); print(s[:$max_len] if len(s)>$max_len else s)" <<< "$str" 2>/dev/null
+}
+
+# 通知 PM（通过 tmux send-keys，带 timeout 防阻塞）
 notify_pm() {
     local msg="$1"
     # PM 是 Codex（omx），需要先按 i 进入插入模式
-    tmux send-keys -t "$PM_SESSION" i 2>/dev/null
+    tmux send-keys -t "$PM_SESSION" i 2>/dev/null &
+    local pid=$!
     sleep 0.3
-    tmux send-keys -t "$PM_SESSION" -l -- "$msg" 2>/dev/null
-    sleep 0.1
-    tmux send-keys -t "$PM_SESSION" Enter 2>/dev/null
+    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+
+    tmux send-keys -t "$PM_SESSION" -l -- "$msg" 2>/dev/null &
+    pid=$!
+    sleep 2
+    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+
+    tmux send-keys -t "$PM_SESSION" Enter 2>/dev/null &
+    pid=$!
+    sleep 0.5
+    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+
     log "通知 PM: $msg"
+}
+
+# 通知 agent（带 timeout 防阻塞）
+notify_agent() {
+    local session="$1"
+    local msg="$2"
+    # 判断是否 Codex
+    local is_codex=0
+    case "$session" in
+        arch-1|be-1|be-2|review-1|pm-chief) is_codex=1 ;;
+    esac
+
+    if [ "$is_codex" = "1" ]; then
+        tmux send-keys -t "$session" i 2>/dev/null &
+        local pid=$!
+        sleep 0.3
+        kill $pid 2>/dev/null; wait $pid 2>/dev/null
+    fi
+
+    tmux send-keys -t "$session" -l -- "$msg" 2>/dev/null &
+    local pid=$!
+    sleep 2
+    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+
+    tmux send-keys -t "$session" Enter 2>/dev/null &
+    pid=$!
+    sleep 0.5
+    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+
+    log "通知 $session: $msg"
 }
 
 # 飞书推送（给林总工）
@@ -47,19 +95,95 @@ get_task_status() {
     python3 -c "import json; print(json.load(open('$task_dir/task.json')).get('status','unknown'))" 2>/dev/null
 }
 
-# 更新 task.json status
+json_pick() {
+    local json_file="$1"
+    shift
+    python3 - "$json_file" "$@" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+json_path = Path(sys.argv[1])
+keys = sys.argv[2:]
+if not json_path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(json_path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+
+for key in keys:
+    value = payload.get(key)
+    if value not in (None, ''):
+        print(value)
+        raise SystemExit(0)
+PY
+}
+
+sync_task_board() {
+    local task_dir="$1"
+    local source="${2:-watcher}"
+    if [ -f "$BOARD_SYNC_SCRIPT" ]; then
+        python3 "$BOARD_SYNC_SCRIPT" sync-task --task-dir "$task_dir" --source "$source" >/dev/null 2>&1 || \
+            log "任务看板同步失败: $task_dir ($source)"
+    fi
+}
+
+sync_if_changed() {
+    local task_dir="$1"
+    local artifact_path="$2"
+    local label="$3"
+    [ -f "$artifact_path" ] || return
+
+    local state_key="$(basename "$task_dir")_${label}_mtime"
+    local state_file="$STATE_DIR/$state_key"
+    local current_mtime
+    current_mtime=$(stat -f %m "$artifact_path" 2>/dev/null || echo "")
+    local last_mtime
+    last_mtime=$(cat "$state_file" 2>/dev/null)
+
+    if [ -n "$current_mtime" ] && [ "$current_mtime" != "$last_mtime" ]; then
+        sync_task_board "$task_dir" "${label}-mtime-change"
+        echo "$current_mtime" > "$state_file"
+    fi
+}
+
+# 更新 task.json status，并追加 transitions.jsonl 记录
 set_task_status() {
     local task_dir="$1"
     local new_status="$2"
-    python3 -c "
-import json, sys
-f = '$task_dir/task.json'
-d = json.load(open(f))
-old = d.get('status','')
-d['status'] = '$new_status'
-json.dump(d, open(f,'w'), indent=2, ensure_ascii=False)
-print(f'status: {old} -> $new_status')
-" 2>/dev/null
+    local reason="${3:-watcher status update}"
+    python3 - "$task_dir" "$new_status" "$reason" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+new_status = sys.argv[2]
+reason = sys.argv[3]
+task_path = task_dir / 'task.json'
+transitions_path = task_dir / 'transitions.jsonl'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+old_status = task.get('status', '')
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+if old_status == new_status:
+    print(f'status unchanged: {new_status}')
+    raise SystemExit(0)
+
+task['status'] = new_status
+task['updated_at'] = now
+task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with transitions_path.open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': old_status,
+        'to': new_status,
+        'at': now,
+        'reason': reason,
+    }, ensure_ascii=False) + '\n')
+print(f'status: {old_status} -> {new_status}')
+PY
 }
 
 # 记录已处理的事件（避免重复通知）
@@ -90,13 +214,15 @@ while true; do
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
             dispatch_time=$(python3 -c "
 import json
+from datetime import datetime
+
 d = json.load(open('$task_dir/task.json'))
 t = d.get('lease_acquired_at','') or d.get('updated_at','')
-from datetime import datetime
 try:
     dt = datetime.fromisoformat(t)
     print(int(dt.timestamp()))
-except: print(0)
+except Exception:
+    print(0)
 " 2>/dev/null)
             now=$(date +%s)
             if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt 60 ]; then
@@ -111,25 +237,10 @@ except: print(0)
                 last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
                 if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt 300 ]; then
                     if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
-                        # Codex 需要 i 进入输入模式
-                        is_codex=$(python3 -c "
-import json
-cfg = json.load(open('/Users/lin/Desktop/work/my-agent-teams/config.json'))
-agents = cfg.get('agents', {})
-a = agents.get('$agent_session', {})
-# Codex agents: arch-1, be-1, review-1
-print('1' if '$agent_session' in ('arch-1','be-1','review-1') else '0')
-" 2>/dev/null)
-                        if [ "$is_codex" = "1" ]; then
-                            tmux send-keys -t "$agent_session" i 2>/dev/null
-                            sleep 0.5
-                        fi
                         instruction="$task_dir/instruction.md"
                         if [ -f "$instruction" ]; then
                             msg="请读取 ${task_dir}instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
-                            tmux send-keys -t "$agent_session" -l -- "$msg" 2>/dev/null
-                            sleep 0.1
-                            tmux send-keys -t "$agent_session" Enter 2>/dev/null
+                            notify_agent "$agent_session" "$msg"
                             log "$task_id: 兜底重发指令给 $agent_session"
                             push_feishu "🔄 $task_id 超时未确认，已重新发送给 $agent_session"
                         fi
@@ -143,9 +254,10 @@ print('1' if '$agent_session' in ('arch-1','be-1','review-1') else '0')
         if [ -f "$task_dir/ack.json" ] && [ "$current_status" = "dispatched" ]; then
             ack_key="${task_id}_ack"
             if ! is_notified "$ack_key"; then
-                agent=$(python3 -c "import json; print(json.load(open('$task_dir/ack.json')).get('agent','?'))" 2>/dev/null)
-                set_task_status "$task_dir" "working"
-                log "$task_id: agent $agent 已确认，状态 working"
+                agent=$(json_pick "$task_dir/ack.json" agent agent_id)
+                set_task_status "$task_dir" "working" "watcher observed ack.json"
+                log "$task_id: agent ${agent:-?} 已确认，状态 working"
+                sync_task_board "$task_dir" "ack-detected"
                 mark_notified "$ack_key"
             fi
         fi
@@ -154,22 +266,23 @@ print('1' if '$agent_session' in ('arch-1','be-1','review-1') else '0')
         if [ -f "$task_dir/result.json" ]; then
             result_key="${task_id}_result"
             if ! is_notified "$result_key"; then
-                agent=$(python3 -c "import json; print(json.load(open('$task_dir/result.json')).get('agent','?'))" 2>/dev/null)
-                result_status=$(python3 -c "import json; print(json.load(open('$task_dir/result.json')).get('status','?'))" 2>/dev/null)
-                summary=$(python3 -c "import json; print(json.load(open('$task_dir/result.json')).get('summary','')[:100])" 2>/dev/null)
+                agent=$(json_pick "$task_dir/result.json" agent agent_id)
+                result_status=$(json_pick "$task_dir/result.json" status)
+                summary=$(json_pick "$task_dir/result.json" summary)
 
                 if [ "$result_status" = "done" ]; then
-                    set_task_status "$task_dir" "ready_for_merge"
-                    notify_pm "[task-watcher] $task_id 已完成（agent: $agent）。摘要：$summary。请验收并决定是否推进下游任务。"
-                    push_feishu "📋 $task_id 完成: $summary"
+                    set_task_status "$task_dir" "ready_for_merge" "watcher observed result.json status=done"
+                    notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 60)。请验收并决定是否推进下游任务。"
+                    push_feishu "📋 $task_id 完成: $(truncate_utf8 "$summary" 60)"
                 elif [ "$result_status" = "blocked" ]; then
-                    set_task_status "$task_dir" "blocked"
-                    notify_pm "[task-watcher] $task_id 被 agent $agent 标记为 blocked。摘要：$summary。请处理。"
-                    push_feishu "⚠️ $task_id 阻塞: $summary"
+                    set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
+                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 60)。请处理。"
+                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 60)"
                 else
                     notify_pm "[task-watcher] $task_id 有 result.json（status=$result_status），请检查。"
                 fi
 
+                sync_task_board "$task_dir" "result-detected"
                 mark_notified "$result_key"
             fi
         fi
@@ -178,17 +291,18 @@ print('1' if '$agent_session' in ('arch-1','be-1','review-1') else '0')
         if [ -f "$task_dir/review.md" ]; then
             review_key="${task_id}_review"
             if ! is_notified "$review_key"; then
-                review_pass=$(grep -qi '通过\|approve' "$task_dir/review.md" && echo "pass" || echo "fail")
-                review_fail=$(grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受' "$task_dir/review.md" && echo "fail" || echo "")
+                review_pass=$(grep -qi '通过\|approve' "$task_dir/review.md" && echo "pass" || echo "")
+                review_fail=$(grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$task_dir/review.md" && echo "fail" || echo "")
                 if [ "$review_pass" = "pass" ] && [ -z "$review_fail" ]; then
                     review_conclusion=$(grep -i '通过\|approve' "$task_dir/review.md" | head -1)
                     notify_pm "[task-watcher] $task_id 审查已完成（通过），请验收并决定是否推进下游任务。"
                     push_feishu "✅ $task_id 审查通过: $review_conclusion"
                 else
-                    review_conclusion=$(grep -i '不通过\|未通过\|驳回\|reject\|block\|不接受' "$task_dir/review.md" | head -1)
+                    review_conclusion=$(grep -i '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$task_dir/review.md" | head -1)
                     notify_pm "[task-watcher] $task_id 审查未通过，需要修改。请安排修复。"
                     push_feishu "❌ $task_id 审查未通过: $review_conclusion"
                 fi
+                sync_task_board "$task_dir" "review-detected"
                 mark_notified "$review_key"
             fi
         fi
@@ -197,15 +311,23 @@ print('1' if '$agent_session' in ('arch-1','be-1','review-1') else '0')
         if [ -f "$task_dir/verify.json" ]; then
             verify_key="${task_id}_verify"
             if ! is_notified "$verify_key"; then
-                verify_pass=$(python3 -c "import json; print(json.load(open('$task_dir/verify.json')).get('pass', False))" 2>/dev/null)
-                if [ "$verify_pass" = "True" ]; then
+                verify_pass=$(json_pick "$task_dir/verify.json" ok pass)
+                if [ "$verify_pass" = "True" ] || [ "$verify_pass" = "true" ] || [ "$verify_pass" = "1" ]; then
                     notify_pm "[task-watcher] $task_id verify 通过，可以合并。"
                 else
                     notify_pm "[task-watcher] $task_id verify 未通过，请检查 verify.json。"
                 fi
+                sync_task_board "$task_dir" "verify-detected"
                 mark_notified "$verify_key"
             fi
         fi
+
+        sync_if_changed "$task_dir" "$task_dir/task.json" "taskjson"
+        sync_if_changed "$task_dir" "$task_dir/transitions.jsonl" "transitions"
+        sync_if_changed "$task_dir" "$task_dir/ack.json" "ack"
+        sync_if_changed "$task_dir" "$task_dir/result.json" "result"
+        sync_if_changed "$task_dir" "$task_dir/review.md" "review"
+        sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
     done
 
     sleep "$INTERVAL"
