@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 ACTIVE_DISPATCH_STATUSES = {'dispatched', 'working', 'ready_for_merge', 'blocked'}
+AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
 
 
 def parse_bool(raw: str) -> bool:
@@ -115,21 +116,26 @@ if project not in projects:
 
 agents = config.get('agents', {})
 assigned_agent = task.get('assigned_agent')
+if assigned_agent in AUTO_ASSIGNED_AGENTS:
+    raise SystemExit(f'auto-assigned pending task must be claimed by watcher, not dispatch-task: {assigned_agent}')
 if assigned_agent not in agents:
     raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
 
 execution_mode = task.get('execution_mode')
 target_environment = task.get('target_environment')
+task_level = str(task.get('task_level') or '').strip().lower()
 if execution_mode not in {'dev', 'deploy'}:
     raise SystemExit('execution_mode invalid')
 if target_environment not in {'dev', 'prod'}:
     raise SystemExit('target_environment invalid')
 if execution_mode == 'dev' and target_environment != 'dev':
     raise SystemExit('execution_mode=dev requires target_environment=dev')
-if execution_mode == 'deploy' and assigned_agent != 'pm-chief':
-    raise SystemExit('deploy tasks can only be assigned to pm-chief in Phase 1')
-if target_environment == 'prod' and assigned_agent != 'pm-chief':
-    raise SystemExit('prod tasks can only be assigned to pm-chief in Phase 1')
+if execution_mode == 'deploy' and assigned_agent != 'arch-1':
+    raise SystemExit('deploy tasks can only be assigned to arch-1')
+if target_environment == 'prod' and assigned_agent != 'arch-1':
+    raise SystemExit('prod tasks can only be assigned to arch-1')
+if task_level == 'integration' and assigned_agent != 'arch-1':
+    raise SystemExit('integration tasks must be assigned to arch-1')
 
 project_cfg = projects[project]
 dev_root = Path(project_cfg['dev_root']).expanduser().resolve()
@@ -160,7 +166,11 @@ else:
     if existing_reviewers:
         reviewers = dedupe([str(item).strip() for item in existing_reviewers if str(item).strip()])
     else:
-        primary_reviewer = task.get('reviewer') or config.get('domain_policies', {}).get(task.get('domain'), {}).get('default_reviewer')
+        primary_reviewer = (
+            task.get('reviewer')
+            or config.get('domain_policies', {}).get(task.get('domain'), {}).get('default_reviewer')
+            or config.get('domain_policies', {}).get('development', {}).get('default_reviewer')
+        )
         reviewers = [primary_reviewer] if review_level == 'standard' and primary_reviewer else dedupe([primary_reviewer or 'review-1', 'arch-1'])
     if review_level == 'complex' and len(reviewers) < 2:
         raise SystemExit('review_level=complex requires at least two reviewers before dispatch')

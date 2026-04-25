@@ -57,9 +57,11 @@ cfg_path = Path(sys.argv[1])
     reviewers_csv,
     review_deadline_raw,
     strict_conflict_raw,
-) = sys.argv[2:18]
+) = sys.argv[2:19]
 
 ACTIVE_CREATE_STATUSES = {'pending', 'dispatched', 'working', 'ready_for_merge', 'blocked'}
+AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
+VALID_TASK_LEVELS = {'epic', 'domain', 'execution', 'review', 'integration', 'coordination'}
 
 
 def parse_bool(raw: str) -> bool:
@@ -168,11 +170,13 @@ test_required = parse_bool(test_required_raw)
 review_authority = review_authority if review_authority in {'reviewer', 'owner'} else 'reviewer'
 execution_mode = execution_mode if execution_mode in {'dev', 'deploy'} else 'dev'
 target_environment = target_environment if target_environment in {'dev', 'prod'} else 'dev'
+normalized_task_level = task_level_raw.strip().lower() if task_level_raw.strip().lower() in VALID_TASK_LEVELS else cfg.get('defaults', {}).get('task_level', 'execution')
 write_scope = [item.strip() for item in write_scope_csv.split(',') if item.strip()] if write_scope_csv else []
 strict_conflict = parse_bool(strict_conflict_raw)
 
 agents = cfg.get('agents', {})
-if assigned_agent not in agents:
+assigned_agent_is_auto = assigned_agent in AUTO_ASSIGNED_AGENTS
+if assigned_agent not in agents and not (assigned_agent_is_auto and execution_mode == 'dev' and target_environment == 'dev' and normalized_task_level == 'execution'):
     raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
 
 projects = cfg.get('projects', {})
@@ -186,11 +190,14 @@ prod_root = Path(prod_root_raw).expanduser().resolve() if prod_root_raw else Non
 if execution_mode == 'dev' and target_environment != 'dev':
     raise SystemExit('execution_mode=dev requires target_environment=dev')
 
-if execution_mode == 'deploy' and assigned_agent != 'pm-chief':
-    raise SystemExit('deploy tasks can only be assigned to pm-chief in Phase 1')
+if execution_mode == 'deploy' and assigned_agent != 'arch-1':
+    raise SystemExit('deploy tasks can only be assigned to arch-1')
 
-if target_environment == 'prod' and assigned_agent != 'pm-chief':
-    raise SystemExit('prod tasks can only be assigned to pm-chief in Phase 1')
+if target_environment == 'prod' and assigned_agent != 'arch-1':
+    raise SystemExit('prod tasks can only be assigned to arch-1')
+
+if normalized_task_level == 'integration' and assigned_agent != 'arch-1':
+    raise SystemExit('integration tasks must be assigned to arch-1')
 
 resolved_scope = validate_and_resolve_scope(
     write_scope,
@@ -204,7 +211,11 @@ review_level = review_level_raw.strip().lower() if review_level_raw.strip() else
 if review_level not in {'skip', 'standard', 'complex'}:
     review_level = 'standard' if legacy_review_required else 'skip'
 review_required = review_level != 'skip'
-reviewer = cfg.get('domain_policies', {}).get(domain, {}).get('default_reviewer') if review_required else None
+domain_policies = cfg.get('domain_policies', {})
+reviewer = (
+    domain_policies.get(domain, {}).get('default_reviewer')
+    or domain_policies.get('development', {}).get('default_reviewer')
+) if review_required else None
 
 explicit_reviewers = dedupe([item.strip() for item in reviewers_csv.split(',') if item.strip()]) if reviewers_csv.strip() else []
 for reviewer_id in explicit_reviewers:
@@ -254,7 +265,7 @@ obj = {
     'max_review_rounds': 3,
     'test_required': test_required,
     'status': 'pending',
-    'task_level': task_level_raw.strip().lower() if task_level_raw.strip() and task_level_raw.strip().lower() in {'epic', 'domain', 'execution', 'review', 'integration', 'coordination'} else cfg.get('defaults', {}).get('task_level', 'execution'),
+    'task_level': normalized_task_level,
     'owner_pm': cfg.get('orchestration', {}).get('root_pm', 'pm-chief'),
     'domain': domain,
     'write_scope': write_scope,

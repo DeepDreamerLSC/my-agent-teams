@@ -16,6 +16,10 @@ STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
 BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py}"
 SEND_SCRIPT="${SEND_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh}"
+CONFIG_PATH="${CONFIG_PATH:-/Users/lin/Desktop/work/my-agent-teams/config.json}"
+AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
+ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
+DEV_AUTO_CLAIM="${DEV_AUTO_CLAIM:-1}"
 INTERVAL="${INTERVAL:-5}"
 
 mkdir -p "$STATE_DIR"
@@ -158,6 +162,136 @@ if not reviewers:
 for reviewer in reviewers:
     print(reviewer)
 PY
+}
+
+list_dev_agents() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+agents = config.get('agents') or {}
+
+for agent_id, payload in agents.items():
+    role = str((payload or {}).get('role') or '').strip().lower()
+    if role == 'fullstack_dev' or agent_id.startswith('dev-'):
+        print(agent_id)
+PY
+}
+
+matches_auto_assign_marker() {
+    local value="$1"
+    [ -z "$value" ] && return 0
+    python3 - "$value" "$AUTO_ASSIGN_MARKERS" <<'PY'
+import sys
+
+value = sys.argv[1].strip().lower()
+markers = {item.strip().lower() for item in sys.argv[2].split(',') if item.strip()}
+raise SystemExit(0 if value in markers else 1)
+PY
+}
+
+dependencies_ready() {
+    local task_dir="$1"
+    python3 - "$task_dir" "$TASKS_ROOT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+tasks_root = Path(sys.argv[2])
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+depends_on = task.get('depends_on') or []
+allowed = {'done', 'ready_for_merge', 'cancelled'}
+
+for dep in depends_on:
+    dep_path = tasks_root / dep / 'task.json'
+    if not dep_path.exists():
+        print(f'missing:{dep}')
+        raise SystemExit(1)
+    dep_task = json.loads(dep_path.read_text(encoding='utf-8'))
+    if str(dep_task.get('status') or '') not in allowed:
+        print(f'blocked:{dep}:{dep_task.get("status")}')
+        raise SystemExit(1)
+
+print('ready')
+PY
+}
+
+active_task_count_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+active = {'dispatched', 'working'}
+count = 0
+
+for task_path in tasks_root.glob('*/task.json'):
+    task = json.loads(task_path.read_text(encoding='utf-8'))
+    if str(task.get('assigned_agent') or '') == agent_id and str(task.get('status') or '') in active:
+        count += 1
+
+print(count)
+PY
+}
+
+is_idle_agent() {
+    local agent_id="$1"
+    local active_count
+    active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    if [ "${active_count:-0}" -gt 0 ]; then
+        return 1
+    fi
+    if tmux has-session -t "$agent_id" 2>/dev/null; then
+        local is_working
+        is_working=$(tmux capture-pane -t "$agent_id" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
+        [ "${is_working:-0}" -eq 0 ]
+        return $?
+    fi
+    return 1
+}
+
+select_idle_dev_agent() {
+    local dev_file="$STATE_DIR/.dev-candidates.tmp"
+    local order_file="$STATE_DIR/.dev-order.tmp"
+    list_dev_agents > "$dev_file"
+    [ -s "$dev_file" ] || { rm -f "$dev_file" "$order_file"; return 1; }
+
+    local state_file="$STATE_DIR/auto_claim_last_dev"
+    local last_dev
+    last_dev=$(cat "$state_file" 2>/dev/null || true)
+
+    python3 - "$last_dev" "$dev_file" <<'PY' > "$order_file"
+import sys
+from pathlib import Path
+
+last_dev = sys.argv[1].strip()
+devs = [line.strip() for line in Path(sys.argv[2]).read_text(encoding='utf-8').splitlines() if line.strip()]
+if last_dev in devs:
+    idx = devs.index(last_dev)
+    devs = devs[idx + 1:] + devs[:idx + 1]
+for dev in devs:
+    print(dev)
+PY
+
+    local dev
+    while IFS= read -r dev; do
+        [ -n "$dev" ] || continue
+        if is_idle_agent "$dev"; then
+            echo "$dev" > "$state_file"
+            rm -f "$dev_file" "$order_file"
+            echo "$dev"
+            return 0
+        fi
+    done < "$order_file"
+
+    rm -f "$dev_file" "$order_file"
+    return 1
 }
 
 sync_task_board() {
@@ -374,6 +508,96 @@ verify_summary() {
     json_pick "$verify_file" summary notes message conclusion
 }
 
+dispatch_task_to_agent() {
+    local task_dir="$1"
+    local assigned_agent="$2"
+    local reason="$3"
+    python3 - "$task_dir" "$assigned_agent" "$reason" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+assigned_agent = sys.argv[2]
+reason = sys.argv[3]
+task_path = task_dir / 'task.json'
+transitions_path = task_dir / 'transitions.jsonl'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+old_status = str(task.get('status') or '')
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+task['assigned_agent'] = assigned_agent
+task['status'] = 'dispatched'
+task['updated_at'] = now
+task['lease_owner'] = task.get('owner_pm')
+task['lease_acquired_at'] = now
+task['lease_expires_at'] = now
+
+task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with transitions_path.open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': old_status,
+        'to': 'dispatched',
+        'at': now,
+        'reason': reason,
+    }, ensure_ascii=False) + '\n')
+PY
+}
+
+auto_dispatch_pending_arch() {
+    local task_dir="$1"
+    local task_id="$2"
+    local assigned_agent="$3"
+    local task_level="$4"
+
+    [ "$ARCH_AUTO_DISPATCH" = "1" ] || return 1
+    [ "$assigned_agent" = "arch-1" ] || return 1
+    case "$task_level" in
+        domain|epic) ;;
+        *) return 1 ;;
+    esac
+
+    if ! dependencies_ready "$task_dir" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    dispatch_task_to_agent "$task_dir" "arch-1" "watcher auto dispatch domain/epic task to arch-1"
+    notify_agent "arch-1" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。"
+    sync_task_board "$task_dir" "auto-dispatch-arch"
+    log "$task_id: 自动派发给 arch-1（domain/epic 并行）"
+    return 0
+}
+
+auto_claim_pending_dev() {
+    local task_dir="$1"
+    local task_id="$2"
+    local assigned_agent="$3"
+    local task_level="$4"
+
+    [ "$DEV_AUTO_CLAIM" = "1" ] || return 1
+    [ "$task_level" = "execution" ] || return 1
+
+    if ! dependencies_ready "$task_dir" >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local target_agent=""
+    if matches_auto_assign_marker "$assigned_agent"; then
+        target_agent=$(select_idle_dev_agent 2>/dev/null || true)
+    elif [[ "$assigned_agent" == dev-* ]] && is_idle_agent "$assigned_agent"; then
+        target_agent="$assigned_agent"
+    fi
+
+    [ -n "$target_agent" ] || return 1
+
+    dispatch_task_to_agent "$task_dir" "$target_agent" "watcher auto-claimed pending execution task"
+    notify_agent "$target_agent" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。"
+    sync_task_board "$task_dir" "auto-claim-dev"
+    log "$task_id: 自动认领并派发给 $target_agent"
+    return 0
+}
+
 auto_dispatch_review() {
     local task_dir="$1"
     local task_id="$2"
@@ -409,8 +633,11 @@ auto_close_task() {
     if [ -n "$verify_msg" ]; then
         result_summary="${result_summary} QA 结论：$(truncate_utf8 "$verify_msg" 80)"
     fi
-    "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1 && \
+    if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1; then
         log "$task_id: QA 通过，已自动收口"
+        return 0
+    fi
+    return 1
 }
 
 log "task-watcher 启动，间隔 ${INTERVAL}s"
@@ -437,6 +664,15 @@ while true; do
                 continue
                 ;;
         esac
+
+        if [ "$current_status" = "pending" ]; then
+            task_level=$(task_json_pick "$task_dir" task_level)
+            assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
+            if ! auto_dispatch_pending_arch "$task_dir" "$task_id" "$assigned_agent" "$task_level"; then
+                auto_claim_pending_dev "$task_dir" "$task_id" "$assigned_agent" "$task_level" || true
+            fi
+            current_status=$(get_task_status "$task_dir")
+        fi
 
         # 兜底：dispatched 状态超 60 秒无 ack → 重新发送指令
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
