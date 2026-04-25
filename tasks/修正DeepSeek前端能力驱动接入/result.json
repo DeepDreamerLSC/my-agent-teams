@@ -1,0 +1,39 @@
+{
+  "task_id": "修正DeepSeek前端能力驱动接入",
+  "agent_id": "fe-1",
+  "status": "done",
+  "completed_at": "2026-04-25T11:30:00+08:00",
+  "summary": "修正 Chat.tsx 真实接线传递 supportsThinking/supportsWebSearch，修正 Models.tsx provider 展示文案使用 getProviderLabel，补真实接线测试。",
+  "fixes": [
+    {
+      "issue": "Chat.tsx 只传 supportsZhipuTools，未传 supportsThinking/supportsWebSearch",
+      "fix": "Chat.tsx 从 useChatOptions 解构 supportsThinking/supportsWebSearch 并传递给 ChatToolbar，supportsZhipuTools 保留为兼容 fallback"
+    },
+    {
+      "issue": "Models.tsx 列表和卡片直接显示原始 provider 字符串（如 'deepseek' 而非 'DeepSeek'）",
+      "fix": "导入 getProviderLabel，table column render 和卡片视图均使用 getProviderLabel(record.provider) 展示"
+    }
+  ],
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+      "action": "modified",
+      "description": "解构 supportsThinking/supportsWebSearch，传递给 ChatToolbar"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+      "action": "modified",
+      "description": "导入 getProviderLabel；table column render 和卡片视图使用 getProviderLabel 展示 provider 文案"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx",
+      "action": "modified",
+      "description": "新增 6 条真实接线测试：only-thinking/only-websearch/both/legacy-fallback/no-caps/granular-override"
+    }
+  ],
+  "test_commands": [
+    "npx vitest run src/test/capabilityDrivenToolbar.test.tsx — 20 tests passed",
+    "npx vitest run src/test/capabilityDrivenToolbar.test.tsx src/test/chatOptions.test.tsx src/test/chatStreaming.test.tsx src/test/chatThinking.test.ts src/test/adminConfigNavigation.test.tsx — 5 files, 33 tests passed",
+    "npx tsc --noEmit — 无错误"
+  ]
+}

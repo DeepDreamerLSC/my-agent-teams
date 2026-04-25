@@ -1,0 +1,119 @@
+{
+  "task_id": "实现DeepSeek固定供应商注册表与能力输出",
+  "agent_id": "be-1",
+  "status": "done",
+  "completed_at": "2026-04-25T11:09:28+08:00",
+  "summary": "已打通 DeepSeek 固定 provider registry 与模型 capability 输出契约：新增 /api/meta/model-providers，并为 /api/models/available 与 /api/admin/models 补充 provider_label + capabilities。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
+      "action": "created",
+      "description": "新增固定 provider registry，纳入 deepseek / zhipu / openai / anthropic / google / custom，并提供 provider 元数据与基础能力矩阵。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "action": "modified",
+      "description": "新增 provider/api_type 校验、provider label/capability 派生逻辑，并在 create/update/clone 路径复用 registry。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+      "action": "modified",
+      "description": "新增 GET /api/meta/model-providers，输出固定 provider registry。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/models.py",
+      "action": "modified",
+      "description": "GET /api/models/available 现在返回 provider_label 与 capabilities。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py",
+      "action": "modified",
+      "description": "GET /api/admin/models 及 create/update/clone 响应现在返回 provider_label 与 capabilities。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py",
+      "action": "modified",
+      "description": "新增 provider registry / capability 响应 schema，并为 provider 字段增加固定 registry 校验。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
+      "action": "modified",
+      "description": "补充 DeepSeek capability、provider 校验、available models 输出 contract 测试。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "action": "modified",
+      "description": "新增 provider registry 元数据接口测试。"
+    }
+  ],
+  "interfaces_and_fields": {
+    "new_endpoint": {
+      "path": "/api/meta/model-providers",
+      "fields": [
+        "providers[].key",
+        "providers[].label",
+        "providers[].default_base_url",
+        "providers[].supported_api_types",
+        "providers[].recommended_models",
+        "providers[].legacy_models",
+        "providers[].capabilities"
+      ]
+    },
+    "changed_endpoints": [
+      {
+        "path": "/api/models/available",
+        "added_fields": [
+          "provider_label",
+          "capabilities"
+        ]
+      },
+      {
+        "path": "/api/admin/models",
+        "added_fields": [
+          "provider_label",
+          "capabilities"
+        ]
+      }
+    ]
+  },
+  "capability_contract": {
+    "deepseek": {
+      "thinking": {
+        "supported": true,
+        "mode": "native_toggle"
+      },
+      "web_search": {
+        "supported": true,
+        "mode": "tool_call"
+      },
+      "function_calling": {
+        "supported": true
+      }
+    },
+    "zhipu": {
+      "thinking": {
+        "supported": true,
+        "mode": "native_toggle"
+      },
+      "web_search": {
+        "supported": true,
+        "mode": "native_provider_tool"
+      }
+    }
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pycache python3 -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/api/models.py /Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py /Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py -q",
+      "result": "24 passed, 4 warnings"
+    }
+  ],
+  "notes": [
+    "本任务仅实现 provider registry 与 capability 输出契约，未提前接入完整 DeepSeek chat tool-call 执行链路。",
+    "非 DeepSeek provider 未误报 thinking/web_search；旧 provider 仍保留在固定 registry 中，不会因为 registry 上线失效。",
+    "pytest 中的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次改动无关。"
+  ]
+}

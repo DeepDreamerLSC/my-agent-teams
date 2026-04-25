@@ -1,0 +1,54 @@
+{
+  "id": "补齐DeepSeek前端真实组件接线测试",
+  "title": "补齐 DeepSeek 前端真实组件接线测试",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "fe-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "ready_for_merge",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+  ],
+  "depends_on": [
+    "实现DeepSeek固定供应商注册表与能力输出"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/补齐DeepSeek前端真实组件接线测试/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "DeepSeek供应商与能力支持",
+  "parent_task_id": "修正DeepSeek前端能力驱动接入",
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T12:59:30+08:00",
+  "lease_expires_at": "2026-04-25T12:59:30+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-04-25T12:59:00+08:00",
+  "updated_at": "2026-04-25T13:04:55+08:00"
+}

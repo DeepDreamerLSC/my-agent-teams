@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-24T19:48:53+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-04-24T19:50:13+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-24T19:56:25+08:00", "reason": "PM accepted result.json and API/status mapping now aligns with backend contract"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-25T08:55:07+08:00", "reason": "pm closed after review and dashboard validation"}

@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-25T10:54:51+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-04-25T10:56:03+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-25T11:05:42+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-25T11:21:03+08:00", "reason": "review request changes: missing Chat.tsx wiring and provider label display"}

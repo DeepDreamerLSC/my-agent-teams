@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐DeepSeek前端真实组件接线测试",
+  "agent_id": "fe-1",
+  "acknowledged_at": "2026-04-25T13:00:00+08:00",
+  "status": "accepted",
+  "notes": "补真实组件级接线测试：render ChatToolbar + render Models 页验证 provider 文案"
+}

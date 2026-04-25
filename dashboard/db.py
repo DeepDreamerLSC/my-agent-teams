@@ -72,7 +72,11 @@ def resolve_db_path(db_path: str | os.PathLike[str] | None = None) -> Path:
     return path.resolve()
 
 
-def connect_db(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connection:
+def connect_db(
+    db_path: str | os.PathLike[str] | None = None,
+    *,
+    initialize: bool = True,
+) -> sqlite3.Connection:
     path = resolve_db_path(db_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
@@ -80,7 +84,12 @@ def connect_db(db_path: str | os.PathLike[str] | None = None) -> sqlite3.Connect
     conn.execute('PRAGMA foreign_keys = ON')
     conn.execute('PRAGMA journal_mode = WAL')
     conn.execute('PRAGMA busy_timeout = 5000')
-    initialize_db(conn)
+    if initialize:
+        try:
+            initialize_db(conn)
+        except sqlite3.OperationalError as exc:
+            if 'readonly' not in str(exc).lower() or not path.exists():
+                raise
     return conn
 
 

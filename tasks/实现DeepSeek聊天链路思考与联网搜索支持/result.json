@@ -1,0 +1,80 @@
+{
+  "task_id": "实现DeepSeek聊天链路思考与联网搜索支持",
+  "agent_id": "be-1",
+  "status": "done",
+  "completed_at": "2026-04-25T11:34:29+08:00",
+  "summary": "已为聊天主链路接入 DeepSeek thinking 与平台级 web_search tool-call 补轮能力，并改为基于 capability 做 thinking/web_search gating；Zhipu 原生 thinking/web_search 路径保持不回归。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "action": "modified",
+      "description": "扩展 build_model_chat_request_body：DeepSeek 也支持 native thinking；tool_call 模式下可注入函数工具定义与 system prompt；同时继续保留 Zhipu native web_search。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+      "action": "modified",
+      "description": "聊天主链路与 skill-backed model 路径改为 capability-based gating；当 web_search.mode=tool_call 时，切换到平台级 tool-call runtime。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+      "action": "created",
+      "description": "新增平台级 web_search 服务，统一输出 {query, results, provider} 结构；未配置 provider 时安全返回空结果。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py",
+      "action": "created",
+      "description": "新增 DeepSeek tool-call runtime：解析 tool_calls、执行 web_search、回填 tool result、多轮补偿，并带重复调用/死循环保护。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
+      "action": "modified",
+      "description": "补充 DeepSeek thinking + tool_call web_search 请求体测试，并保留 Zhipu 原生 web_search 断言。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "action": "modified",
+      "description": "补充 capability-based gating 测试：DeepSeek 可开启 thinking/web_search，OpenAI 等不支持 provider 会安全降级。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py",
+      "action": "created",
+      "description": "新增 tool-call runtime 单测：正常补轮返回最终答案，以及重复 tool_call 死循环保护。"
+    }
+  ],
+  "implemented_contracts": {
+    "thinking": {
+      "deepseek": "native_toggle",
+      "zhipu": "native_toggle",
+      "others": "unsupported unless capability registry says otherwise"
+    },
+    "web_search": {
+      "deepseek": "tool_call",
+      "zhipu": "native_provider_tool",
+      "others": "safe degrade to disabled"
+    },
+    "tool_call_runtime": {
+      "tool_name": "web_search",
+      "max_turns": 4,
+      "guards": [
+        "重复 tool_call signature 拒绝",
+        "超过最大补轮次数拒绝"
+      ]
+    }
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pycache python3 -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py -q",
+      "result": "66 passed, 4 warnings"
+    }
+  ],
+  "notes": [
+    "本次未修改 app/core/config.py（不在 write_scope）；平台级 web_search 服务改为直接从环境变量读取 CHAT_WEB_SEARCH_PROVIDER / CHAT_WEB_SEARCH_API_KEY / CHAT_WEB_SEARCH_BASE_URL / CHAT_WEB_SEARCH_TIMEOUT_MS。",
+    "当前 tool-call runtime 以 DeepSeek web_search 为首个支持目标，但实现本身是 provider-agnostic 的，只要后续 capability.mode=tool_call 的 provider 提供相同工具契约即可复用。",
+    "若 CHAT_WEB_SEARCH_PROVIDER 未配置，web_search_service 会返回空结果而不是抛致命异常；这样 DeepSeek 仍能走完 tool-call 补轮，并明确说明没有足够联网结果。",
+    "pytest 中的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次改动无关。"
+  ]
+}

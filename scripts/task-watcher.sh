@@ -198,6 +198,21 @@ mark_notified() {
     echo "$(date +%s)" > "$STATE_DIR/$key"
 }
 
+# Check if a file has been updated since last notification
+is_file_newer_than_notified() {
+    local key="$1"
+    local file="$2"
+    local flag="$STATE_DIR/$key"
+    [ -f "$flag" ] || return 0
+    local notified_ts
+    notified_ts=$(cat "$flag" 2>/dev/null)
+    [ -n "$notified_ts" ] || return 0
+    local file_ts
+    file_ts=$(stat -f %m "$file" 2>/dev/null)
+    [ -n "$file_ts" ] || return 0
+    [ "$file_ts" -gt "$notified_ts" ]
+}
+
 log "task-watcher 启动，间隔 ${INTERVAL}s"
 
 while true; do
@@ -209,6 +224,11 @@ while true; do
         [ -f "$task_dir/task.json" ] || continue
 
         current_status=$(get_task_status "$task_dir")
+
+        # 跳过已关闭的任务，不再通知
+        case "$current_status" in
+            done|cancelled|archived) continue ;;
+        esac
 
         # 兜底：dispatched 状态超 60 秒无 ack → 重新发送指令
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
@@ -265,7 +285,7 @@ except Exception:
         # 检测 result.json → 通知 PM
         if [ -f "$task_dir/result.json" ]; then
             result_key="${task_id}_result"
-            if ! is_notified "$result_key"; then
+            if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json"; then
                 agent=$(json_pick "$task_dir/result.json" agent agent_id)
                 result_status=$(json_pick "$task_dir/result.json" status)
                 summary=$(json_pick "$task_dir/result.json" summary)
@@ -290,7 +310,7 @@ except Exception:
         # 检测 review.md → 通知 PM 审查完成
         if [ -f "$task_dir/review.md" ]; then
             review_key="${task_id}_review"
-            if ! is_notified "$review_key"; then
+            if ! is_notified "$review_key" || is_file_newer_than_notified "$review_key" "$task_dir/review.md"; then
                 review_pass=$(grep -qi '通过\|approve' "$task_dir/review.md" && echo "pass" || echo "")
                 review_fail=$(grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$task_dir/review.md" && echo "fail" || echo "")
                 if [ "$review_pass" = "pass" ] && [ -z "$review_fail" ]; then

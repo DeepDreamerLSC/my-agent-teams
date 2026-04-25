@@ -1,0 +1,54 @@
+{
+  "task_id": "修正任务看板主页模板接入",
+  "agent_id": "be-1",
+  "status": "done",
+  "completed_at": "2026-04-24T19:54:07+08:00",
+  "summary": "已将 Flask 根路由 `/` 改为渲染 dashboard 模板，并保持 `/api/health`、`/api/board`、`/api/gantt`、`/api/agents` 不回归；同时补了当前模板脚本所需的兼容 API 别名。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
+      "action": "modified",
+      "description": "将 `/` 从 JSON 改为 `render_template(\"index.html\")`，显式配置 template/static 目录，并保留原 `/api/health|board|gantt|agents`。另外新增 `/api/tasks`、`/api/tasks/gantt`、`/api/agents/stats` 兼容别名，匹配现有 dashboard.js 调用。"
+    }
+  ],
+  "template_integration": {
+    "root_route": "/",
+    "behavior": "returns HTML template",
+    "template": "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html",
+    "static_prefix": "/static"
+  },
+  "api_status": {
+    "preserved": [
+      "/api/health",
+      "/api/board",
+      "/api/gantt",
+      "/api/agents"
+    ],
+    "compatibility_aliases_added": [
+      "/api/tasks",
+      "/api/tasks/gantt",
+      "/api/agents/stats"
+    ]
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/my-agent-teams-pycache python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/app.py /Users/lin/Desktop/work/my-agent-teams/dashboard/__init__.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONPATH=/tmp/task-board-pkgs:/Users/lin/Desktop/work/my-agent-teams python3 内联脚本：create_app(test_db) + Flask test_client 校验 GET / 返回 HTML、GET /static/css/style.css 返回 CSS、GET /api/health|board|gantt|agents 及兼容别名全部 200",
+      "result": "passed"
+    }
+  ],
+  "verification_evidence": {
+    "index_content_type": "text/html; charset=utf-8",
+    "static_css_content_type": "text/css; charset=utf-8",
+    "api_paths_ok": 7,
+    "board_working_column": "working"
+  },
+  "notes": [
+    "本次 write_scope 仅允许修改 dashboard/app.py 与 dashboard/__init__.py，因此未调整前端模板或 JS 文件。",
+    "现有 dashboard.js 仍调用旧接口命名；为避免页面空白，本次在后端补了兼容别名，而没有改动前端文件。",
+    "dashboard/__init__.py 无需改动，继续导出 create_app 即可。"
+  ]
+}

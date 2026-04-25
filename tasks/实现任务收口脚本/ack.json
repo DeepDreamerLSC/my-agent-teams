@@ -1,0 +1,7 @@
+{
+  "task_id": "实现任务收口脚本",
+  "agent_id": "be-1",
+  "acknowledged_at": "2026-04-25T08:40:26+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md，开始实现单任务 ready_for_merge 收口脚本，并将用临时任务目录验证正常关闭、非法状态拒绝和 dry-run 不落盘。"
+}

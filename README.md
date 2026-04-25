@@ -144,6 +144,142 @@ watcher 自动调用 `verify.sh`，检查：
 - write_scope 内的文件是否有变更
 - 结果写入 `verify.json`
 
+## 任务看板使用说明
+
+项目内置了一个轻量任务看板，基于：
+- SQLite（任务状态库）
+- Flask（本地服务）
+- ECharts（页面图表）
+
+支持三个视图：
+1. 看板视图：按 `pending / working / ready_for_merge / blocked / done` 分列
+2. 甘特图：展示任务生命周期时间线
+3. Agent 统计：展示工作时长、完成任务数、当前负载
+
+### 数据库位置
+
+默认 SQLite 文件：
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3
+```
+
+如需覆盖，可设置环境变量：
+
+```bash
+export TASK_BOARD_DB_PATH=/your/path/task-board.sqlite3
+```
+
+### 首次使用
+
+#### 1. 安装依赖
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 -m pip install -r dashboard/requirements.txt
+```
+
+#### 2. 首次回填历史任务
+
+把 `tasks/` 目录里的历史任务导入 SQLite：
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 scripts/task-board-sync.py backfill --tasks-root ./tasks
+```
+
+#### 3. 启动看板服务
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 -m dashboard.app
+```
+
+默认监听：
+- Host: `127.0.0.1`
+- Port: `5001`
+
+访问地址：
+
+```text
+http://127.0.0.1:5001/
+```
+
+### 后续增量同步
+
+如果 `task-watcher.sh` 正在运行，任务状态变化会自动触发增量写库，不需要手工重复 backfill。
+
+如需手工同步某个任务目录：
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 scripts/task-board-sync.py sync-task --task-dir ./tasks/<task-id> --source manual
+```
+
+### 常用环境变量
+
+```bash
+TASK_BOARD_HOST=0.0.0.0
+TASK_BOARD_PORT=5001
+TASK_BOARD_DB_PATH=/custom/path/task-board.sqlite3
+```
+
+例如局域网访问：
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+TASK_BOARD_HOST=0.0.0.0 TASK_BOARD_PORT=5001 python3 -m dashboard.app
+```
+
+然后访问：
+
+```text
+http://<你的机器IP>:5001/
+```
+
+### API 一览
+
+- `GET /`：任务看板页面
+- `GET /api/health`：健康检查
+- `GET /api/board`：看板数据
+- `GET /api/gantt`：甘特图数据
+- `GET /api/agents`：Agent 统计数据
+
+兼容别名（保留旧路径）：
+- `GET /api/tasks`
+- `GET /api/tasks/gantt`
+- `GET /api/agents/stats`
+
+### 故障排查
+
+#### 页面打开但没有数据
+
+先确认 SQLite 有数据：
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 scripts/task-board-sync.py backfill --tasks-root ./tasks
+curl http://127.0.0.1:5001/api/board
+```
+
+#### 页签点击无反应 / 页面无交互
+
+检查前端脚本是否有语法错误：
+
+```bash
+cd /Users/lin/Desktop/work/my-agent-teams
+node --check dashboard/static/js/dashboard.js
+```
+
+#### 端口占用或需要重启
+
+```bash
+lsof -nP -iTCP:5001 -sTCP:LISTEN
+kill <PID>
+cd /Users/lin/Desktop/work/my-agent-teams
+python3 -m dashboard.app
+```
+
 ## 任务生命周期
 
 ```

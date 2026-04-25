@@ -1,0 +1,56 @@
+{
+  "task_id": "修正任务看板前端接口契约",
+  "agent_id": "fe-1",
+  "status": "done",
+  "completed_at": "2026-04-24T19:55:00+08:00",
+  "summary": "修正前端 API 端点、五列状态映射、payload shape 对齐后端 /api/board|gantt|agents 实现。",
+  "fixes": [
+    {
+      "issue": "前端调用 /api/tasks, /api/tasks/gantt, /api/agents/stats",
+      "fix": "改为 /api/board, /api/gantt, /api/agents，对齐 app.py 路由"
+    },
+    {
+      "issue": "看板 6 列（含独立 dispatched）",
+      "fix": "改为 5 列（pending/working/ready_for_merge/blocked/done），dispatched 映射到 pending 列，卡片显示 current_status=dispatched badge"
+    },
+    {
+      "issue": "前端假设裸数组响应",
+      "fix": "消费后端结构化 payload：board → columns[].tasks，gantt → items[].milestones，agents → agents[]"
+    }
+  ],
+  "modified_files": [
+    {
+      "path": "dashboard/static/js/dashboard.js",
+      "action": "rewritten",
+      "description": "API 端点改为 /api/board|gantt|agents；renderKanban 消费 payload.columns + current_status badge；renderGantt 消费 items[].milestones；renderAgentStats 消费 agents[] 字段名"
+    },
+    {
+      "path": "dashboard/static/js/helpers.js",
+      "action": "rewritten",
+      "description": "5 列 BOARD_COLUMNS、STATUS_TO_BOARD 映射、transformBoardPayload/transformAgentPayload 转换函数"
+    },
+    {
+      "path": "dashboard/static/js/test/helpers.test.js",
+      "action": "rewritten",
+      "description": "23 条测试：5 列映射、board/agent payload 转换、dispatched→pending、failed→blocked、null 容错"
+    },
+    {
+      "path": "dashboard/static/css/style.css",
+      "action": "modified",
+      "description": "移除 .col-dispatched，新增 .card-badge 样式和各 current_status badge 颜色"
+    }
+  ],
+  "status_mapping": {
+    "dispatched": "pending（badge 显示"已派发"）",
+    "failed/cancelled/timeout": "blocked（badge 显示原始状态）",
+    "merged/archived": "done（badge 显示原始状态）"
+  },
+  "api_contract_aligned": {
+    "GET /api/board": "消费 payload.columns[key].tasks，每 task 含 board_status + current_status",
+    "GET /api/gantt": "消费 payload.items[].milestones{created,dispatched,ack,completed,review_completed}，null 容错",
+    "GET /api/agents": "消费 payload.agents[].completed_task_count / current_load_count / ready_for_merge_count / total_tracked_work_seconds"
+  },
+  "test_commands": [
+    "node dashboard/static/js/test/helpers.test.js — 23 tests passed"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "task_id": "实现任务收口脚本",
+  "agent_id": "be-1",
+  "status": "done",
+  "completed_at": "2026-04-25T08:43:30+08:00",
+  "summary": "已实现 scripts/close-task.sh，支持单任务 ready_for_merge -> done 收口、result_summary 补写、transitions.jsonl 追加以及 dry-run 预演。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh",
+      "action": "created",
+      "description": "单任务收口脚本；校验状态必须为 ready_for_merge，支持 --task-dir / --summary / --reason / --dry-run。"
+    }
+  ],
+  "script_parameters": {
+    "--task-dir": "必填，任务目录绝对路径，目录内必须存在 task.json",
+    "--summary": "可选，写入 task.json.result_summary；若未提供则复用现有 result_summary，若仍为空则报错",
+    "--reason": "可选，写入 transitions.jsonl 的 reason，默认 manual close via close-task.sh",
+    "--dry-run": "可选，仅输出将要执行的变更，不落盘"
+  },
+  "dry_run_example": {
+    "command": "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh --task-dir /abs/path/to/task --summary \"准备收口\" --reason \"pm accepted\" --dry-run",
+    "effect": "输出 status/result_summary/transition 预览，不修改 task.json，也不追加 transitions.jsonl"
+  },
+  "test_commands": [
+    {
+      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh",
+      "result": "passed"
+    },
+    {
+      "command": "python3 内联临时夹具测试：验证 dry-run 不落盘、working 状态拒绝关闭、ready_for_merge 正常关闭后 task.json.status=done 且 transitions.jsonl 追加 ready_for_merge -> done",
+      "result": "passed"
+    }
+  ],
+  "verification_evidence": {
+    "dry_run_status_after": "done (preview only)",
+    "reject_returncode": 1,
+    "final_status": "done",
+    "transition_reason": "pm accepted and closed"
+  },
+  "notes": [
+    "脚本不会批量扫描任务；仅处理 --task-dir 指定的单个任务目录。",
+    "若未传 --summary，则要求 task.json 现有 result_summary 非空，以满足“写回/补充 result_summary”要求。"
+  ]
+}

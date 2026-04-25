@@ -1,0 +1,37 @@
+{
+  "task_id": "补齐DeepSeek前端真实组件接线测试",
+  "agent_id": "fe-1",
+  "status": "done",
+  "completed_at": "2026-04-25T13:04:00+08:00",
+  "summary": "新增 11 条真实组件级接线测试：render ChatToolbar 验证 capability-driven 按钮状态 + render Ant Design Table 验证 provider 文案展示。不再使用函数模拟。",
+  "new_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx",
+      "action": "created",
+      "description": "11 条真实组件级测试，分两组"
+    }
+  ],
+  "test_groups": {
+    "ChatToolbar_real_render": [
+      "render ChatToolbar(supportsThinking=true, supportsWebSearch=false) → 深度思考 enabled, 联网搜索 disabled",
+      "render ChatToolbar(supportsThinking=false, supportsWebSearch=true) → 联网搜索 enabled, 深度思考 disabled",
+      "render ChatToolbar(both=true) → both enabled",
+      "render ChatToolbar(both=false) → both disabled",
+      "render ChatToolbar(supportsZhipuTools=true) → legacy backward compat, both enabled",
+      "click enabled thinking button → fires onToggleThinking",
+      "disabled thinking button → title='当前模型暂不支持该能力', enabled search → title='联网搜索'"
+    ],
+    "Models_provider_label_real_Table_render": [
+      "render Table with provider='deepseek' → 显示 'DeepSeek'，不显示裸字符串 'deepseek'",
+      "render Table with provider='zhipu' → 显示 '智谱 AI'",
+      "render Table with provider='openai' → 显示 'OpenAI'",
+      "card view getProviderLabel('deepseek') + model_name → 'DeepSeek · deepseek-v4-flash'"
+    ]
+  },
+  "why_real_component_tests": "ChatToolbar 测试使用 render(<ChatToolbar />) + screen.getByText + button.disabled 断言；Models 测试使用 render(<Table columns={...} dataSource={...}>) 验证 getProviderLabel render 函数的真实 DOM 输出。非函数模拟或源码字符串断言。",
+  "test_commands": [
+    "npx vitest run src/test/deepSeekComponentWiring.test.tsx — 11 tests passed",
+    "npx vitest run src/test/deepSeekComponentWiring.test.tsx src/test/capabilityDrivenToolbar.test.tsx src/test/chatOptions.test.tsx src/test/chatThinking.test.ts src/test/chatStreaming.test.tsx — 5 files, 43 tests passed",
+    "npx tsc --noEmit — 无错误"
+  ]
+}

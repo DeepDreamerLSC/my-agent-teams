@@ -1,0 +1,7 @@
+{
+  "task_id": "实现DeepSeek固定供应商注册表与能力输出",
+  "agent_id": "be-1",
+  "acknowledged_at": "2026-04-25T11:08:47+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与方案文档，开始实现固定 provider registry、DeepSeek provider 校验、/api/meta/model-providers，以及 /api/models/available 和 /api/admin/models 的 capability 输出契约。"
+}

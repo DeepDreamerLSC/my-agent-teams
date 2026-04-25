@@ -1,0 +1,7 @@
+{
+  "task_id": "修正DeepSeek前端能力驱动接入",
+  "agent_id": "fe-1",
+  "acknowledged_at": "2026-04-25T11:23:00+08:00",
+  "status": "accepted",
+  "notes": "修正 Chat.tsx 接线、Models.tsx provider 展示文案、补真实接线测试"
+}

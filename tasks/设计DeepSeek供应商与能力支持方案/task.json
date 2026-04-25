@@ -1,0 +1,49 @@
+{
+  "id": "设计DeepSeek供应商与能力支持方案",
+  "title": "设计 DeepSeek 供应商接入与能力支持技术方案",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "arch-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "ready_for_merge",
+  "task_level": "domain",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/设计DeepSeek供应商与能力支持方案/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "DeepSeek供应商与能力支持",
+  "parent_task_id": null,
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T10:37:16+08:00",
+  "lease_expires_at": "2026-04-25T10:37:16+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-04-25T10:36:46+08:00",
+  "updated_at": "2026-04-25T10:50:23+08:00"
+}

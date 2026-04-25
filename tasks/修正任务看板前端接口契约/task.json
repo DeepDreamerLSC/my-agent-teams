@@ -1,0 +1,50 @@
+{
+  "id": "修正任务看板前端接口契约",
+  "title": "修正任务看板前端接口契约与五列状态映射",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "fe-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static"
+  ],
+  "depends_on": [
+    "任务看板系统架构设计",
+    "任务看板采集与后端实现"
+  ],
+  "blocks": [
+    "任务看板联调验证"
+  ],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/修正任务看板前端接口契约/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "任务看板系统",
+  "parent_task_id": "任务看板前端可视化实现",
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-24T19:48:53+08:00",
+  "lease_expires_at": "2026-04-24T19:48:53+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "任务看板前端接口契约修正已通过审查，并在联调中确认与后端契约完全对齐，现予收口。",
+  "last_error": null,
+  "created_at": "2026-04-24T19:47:01+08:00",
+  "updated_at": "2026-04-25T08:55:07+08:00"
+}

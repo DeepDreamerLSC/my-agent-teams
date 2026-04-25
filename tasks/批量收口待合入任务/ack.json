@@ -1,0 +1,9 @@
+{
+  "task_id": "批量收口待合入任务",
+  "agent": "pm-chief",
+  "agent_id": "pm-chief",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-04-25T08:51:31+08:00",
+  "acked_at": "2026-04-25T08:51:31+08:00",
+  "summary": "已读取 instruction.md，开始筛选符合条件的 ready_for_merge 任务并使用 close-task.sh 批量收口。"
+}

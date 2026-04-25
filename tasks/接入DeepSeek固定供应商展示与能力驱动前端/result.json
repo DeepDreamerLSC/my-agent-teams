@@ -1,0 +1,44 @@
+{
+  "task_id": "接入DeepSeek固定供应商展示与能力驱动前端",
+  "agent_id": "fe-1",
+  "status": "done",
+  "completed_at": "2026-04-25T11:05:00+08:00",
+  "summary": "前端接入 DeepSeek 固定 provider 展示，聊天工具栏改为基于后端 capabilities 字段驱动，不再硬编码 provider === 'zhipu'。保持 Chat.tsx 向后兼容。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+      "action": "modified",
+      "description": "提供商下拉新增 DeepSeek 选项"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+      "action": "modified",
+      "description": "ModelOption 接口新增 capabilities 字段；新增 supportsThinking/supportsWebSearch 基于 capabilities.thinking/web_search.supported 计算；保留 supportsZhipuTools 作为向后兼容别名"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+      "action": "modified",
+      "description": "props 支持 supportsThinking?/supportsWebSearch?（优先）和 supportsZhipuTools?（向后兼容回退）；深度思考和联网搜索按钮各自独立判断能力"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts",
+      "action": "modified",
+      "description": "getProviderLabel 新增 deepseek → 'DeepSeek' 映射"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx",
+      "action": "created",
+      "description": "14 条测试：provider label 展示、capability 驱动按钮状态、image_generation 禁用、无 capabilities 降级、向后兼容"
+    }
+  ],
+  "capability_driven_logic": {
+    "before": "supportsZhipuTools = provider === 'zhipu' && api_type === 'text_generation'",
+    "after": "supportsThinking = api_type === 'text_generation' && capabilities.thinking.supported; supportsWebSearch = api_type === 'text_generation' && capabilities.web_search.supported",
+    "backward_compat": "supportsZhipuTools = supportsThinking || supportsWebSearch，Chat.tsx 无需修改"
+  },
+  "test_commands": [
+    "npx vitest run src/test/capabilityDrivenToolbar.test.tsx — 14 tests passed",
+    "npx vitest run src/test/capabilityDrivenToolbar.test.tsx src/test/chatOptions.test.tsx src/test/chatStreaming.test.tsx src/test/chatThinking.test.ts — 4 files, 26 tests passed",
+    "npx tsc --noEmit — 无错误"
+  ]
+}

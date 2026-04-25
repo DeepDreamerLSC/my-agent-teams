@@ -1,0 +1,77 @@
+{
+  "task_id": "设计DeepSeek供应商与能力支持方案",
+  "agent": "arch-1",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-25T10:50:10+08:00",
+  "summary": "已完成 DeepSeek 供应商接入与能力支持技术方案，明确固定 provider registry、能力矩阵输出、DeepSeek thinking 支持、DeepSeek web_search 的 tool-call 实现路径，以及 PM 可直接拆分给 be-1 / fe-1 的 execution 子任务边界。",
+  "design_doc": "/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md",
+  "key_decisions": [
+    "Phase 1 不做数据库 schema 迁移，优先用代码级 provider registry + 模型能力派生解决问题",
+    "DeepSeek 作为固定 provider 接入模型管理，默认 base URL 为 https://api.deepseek.com/，默认推荐模型为 deepseek-v4-flash / deepseek-v4-pro",
+    "聊天页与后端都不再使用 provider==zhipu 的硬编码能力判定，统一改为 capability-driven",
+    "DeepSeek 深度思考走官方 thinking 参数",
+    "DeepSeek 联网搜索不复用智谱 native web_search，而走平台级 web_search tool-call 运行时"
+  ],
+  "recommended_execution_tasks": [
+    {
+      "title": "实现 DeepSeek 固定供应商注册表与模型能力输出",
+      "assigned_agent": "be-1",
+      "depends_on": [],
+      "scope": "provider registry / admin models / models available / meta contract"
+    },
+    {
+      "title": "实现 DeepSeek 聊天链路的 thinking 与联网搜索 tool-call 支持",
+      "assigned_agent": "be-1",
+      "depends_on": [
+        "实现 DeepSeek 固定供应商注册表与模型能力输出"
+      ],
+      "scope": "chat runtime / model service / web search service / tool-call loop"
+    },
+    {
+      "title": "接入 DeepSeek 固定供应商展示与模型能力驱动的聊天工具栏",
+      "assigned_agent": "fe-1",
+      "depends_on": [
+        "实现 DeepSeek 固定供应商注册表与模型能力输出"
+      ],
+      "scope": "admin model UI / chat toolbar / provider labels / model capability consumption"
+    }
+  ],
+  "write_scope_recommendation": {
+    "backend": [
+      "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/api/models.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+      "/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py"
+    ],
+    "frontend": [
+      "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+      "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+      "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+      "/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts"
+    ]
+  },
+  "evidence_sources": [
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案/instruction.md",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "https://api-docs.deepseek.com/",
+    "https://api-docs.deepseek.com/guides/thinking_mode",
+    "https://api-docs.deepseek.com/guides/function_calling",
+    "https://api-docs.deepseek.com/quick_start/pricing"
+  ],
+  "risks_and_notes": [
+    "当前项目没有现成的平台级 web search backend，DeepSeek 联网搜索 execution 阶段需要新增 search adapter",
+    "DeepSeek tool-call 多轮需要正确处理 reasoning_content 续传，否则可能出现空响应或 tool-call 死循环",
+    "旧模型 deepseek-chat / deepseek-reasoner 应兼容但不再默认推荐，避免踩到 2026-08-28 退役窗口"
+  ]
+}

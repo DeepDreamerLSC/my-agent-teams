@@ -1,0 +1,7 @@
+{
+  "task_id": "接入DeepSeek固定供应商展示与能力驱动前端",
+  "agent_id": "fe-1",
+  "acknowledged_at": "2026-04-25T10:55:00+08:00",
+  "status": "accepted",
+  "notes": "读取方案文档和当前代码，开始实现 provider 展示与 capability 驱动工具栏"
+}

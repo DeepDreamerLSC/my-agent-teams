@@ -1,0 +1,51 @@
+{
+  "id": "实现任务收口脚本",
+  "title": "实现 ready_for_merge 任务收口脚本",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "be-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh"
+  ],
+  "depends_on": [],
+  "blocks": [
+    "批量收口待合入任务"
+  ],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/实现任务收口脚本/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "任务系统与看板优化",
+  "parent_task_id": null,
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T08:38:30+08:00",
+  "lease_expires_at": "2026-04-25T08:38:30+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "close-task.sh 已通过审查，可作为 my-agent-teams 的正式收口工具使用。",
+  "last_error": null,
+  "created_at": "2026-04-25T08:37:41+08:00",
+  "updated_at": "2026-04-25T09:18:43+08:00"
+}

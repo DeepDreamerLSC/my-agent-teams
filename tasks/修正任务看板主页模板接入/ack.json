@@ -1,0 +1,7 @@
+{
+  "task_id": "修正任务看板主页模板接入",
+  "agent_id": "be-1",
+  "acknowledged_at": "2026-04-24T19:52:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md，开始把 Flask 根路由切换为模板渲染，并验证现有 /api/* 路由不回归；同时补齐当前 dashboard 前端脚本依赖的兼容 API 别名。"
+}

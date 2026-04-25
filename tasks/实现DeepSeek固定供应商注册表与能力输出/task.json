@@ -1,0 +1,56 @@
+{
+  "id": "实现DeepSeek固定供应商注册表与能力输出",
+  "title": "实现 DeepSeek 固定供应商注册表与能力输出",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "be-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "complex",
+  "reviewers": [
+    "review-1",
+    "arch-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "ready_for_merge",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/models.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/实现DeepSeek固定供应商注册表与能力输出/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "DeepSeek供应商与能力支持",
+  "parent_task_id": "设计DeepSeek供应商与能力支持方案",
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T10:54:51+08:00",
+  "lease_expires_at": "2026-04-25T10:54:51+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-04-25T10:54:16+08:00",
+  "updated_at": "2026-04-25T11:09:45+08:00"
+}
