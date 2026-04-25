@@ -136,13 +136,29 @@ Agent 写 `result.json`：
 }
 ```
 
-### 7. 验证
+### 7. QA 验证与自动收口
 
-watcher 自动调用 `verify.sh`，检查：
-- ack.json 格式是否正确
-- result.json 格式是否正确
-- write_scope 内的文件是否有变更
-- 结果写入 `verify.json`
+QA 任务完成时，`qa-1` 必须额外写 `verify.json`。  
+`task-watcher` 会读取 QA 结论并自动流转：
+
+- `verify.json.status=pass`（或 `pass=true`）→ 自动执行 `close-task.sh` 收口
+- `verify.json.status=fail`（或 `pass=false`）→ 自动通知 PM 仲裁
+
+当前推荐的 `verify.json` 最小结构：
+
+```json
+{
+  "task_id": "验证DeepSeek联网搜索生产异常修复",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-25T22:40:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 已完成，核心场景通过，可自动收口。"
+}
+```
+
+`scripts/verify.sh` 目前仅保留为手工协议校验/调试脚本，不再作为 watcher 主流程的 QA 结论来源。
 
 ## 任务看板使用说明
 
@@ -330,12 +346,12 @@ my-agent-teams/
 │       ├── instruction.md           # PM 生成的纯任务指令
 │       ├── ack.json                 # Agent 确认
 │       ├── result.json              # Agent 结果
-│       ├── verify.json              # 校验结果
+│       ├── verify.json              # QA 结论 / 自动收口依据
 │       └── transitions.jsonl        # 状态变更日志
 ├── scripts/                         # 运行时脚本
 │   ├── create-task.sh               # 创建任务
 │   ├── dispatch-task.sh             # 派发任务
-│   ├── verify.sh                    # 校验任务
+│   ├── verify.sh                    # 手工协议校验脚本（非 watcher 主流程）
 │   └── task-watcher.sh              # 状态监控 + 通知
 ├── prompts/                         # 角色 Prompt
 │   ├── pm-base.md                   # PM

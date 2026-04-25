@@ -616,7 +616,7 @@ auto_dispatch_review() {
 
 auto_dispatch_qa() {
     local task_id="$1"
-    notify_agent "$QA_SESSION" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行 QA 验证。读取 instruction.md、result.json、review.md、design-review.md（若存在）并将验证结论写入 verify.json；通过请标记 pass/ok=true，失败请明确失败原因与复现步骤。"
+    notify_agent "$QA_SESSION" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行 QA 验证。读取 instruction.md、result.json、review.md、design-review.md（若存在）并将验证结论写入 verify.json。verify.json 至少包含 task_id、agent/agent_id、verified_at、status(pass|fail)、pass(true|false)、summary；通过请标记 status=pass 且 pass=true，失败请标记 status=fail 且 pass=false，并写明失败原因与复现步骤。"
 }
 
 auto_close_task() {

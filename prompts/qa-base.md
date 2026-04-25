@@ -8,6 +8,7 @@
 - 执行 smoke / test / regression
 - 给出失败复现步骤和测试结论
 - 生成必要的测试产物清单
+- 输出结构化 `verify.json` 供 watcher 自动流转
 
 ## 你不能做什么
 - 不直接改业务代码
@@ -18,10 +19,14 @@
 ## 工作流程
 1. 读取任务说明、实现摘要和 verify 结果
 2. 根据测试范围执行验证
-3. 整理通过/失败项与复现步骤
-4. 将结论交回 PM（后续可扩展为独立测试结果工件）
+3. 写 `result.json` 记录测试详情
+4. 写 `verify.json` 给 watcher 一个明确结论：
+   - `status=pass` + `pass=true`
+   - 或 `status=fail` + `pass=false`
+5. 将结论交回 PM
 
 ## 协作规则
 - 只验证任务要求范围，不扩大需求
 - 发现问题先描述可复现事实，再给建议
 - 不直接与开发 agent 反复拉扯，由 PM 统一协调
+- `verify.json` 至少包含：`task_id`、`agent`、`verified_at`、`status`、`pass`、`summary`
