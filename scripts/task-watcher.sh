@@ -1,15 +1,21 @@
 #!/bin/bash
-# task-watcher.sh - 监控 tasks/ 目录下的任务状态变更，通知 PM，并同步任务看板 SQLite 数据。
-# 检测 result.json 新增 → 通知 PM 验收
-# 检测 ack.json 新增 → 更新 task.json 状态为 working
-# 检测 verify.json 新增 → 通知 PM 或推进下游任务
+# task-watcher.sh - 监控 tasks/ 目录下的任务状态变更，执行事件驱动自动流转，并同步任务看板 SQLite 数据。
+# 关键职责：
+# - ack.json 新增 → 更新 task.json 状态为 working
+# - result.json 新增 → 根据任务类型自动通知 PM / reviewer
+# - review 通过 → 自动通知 qa-1
+# - verify 通过 → 自动执行 close-task.sh 收口
+# - review 驳回 / QA 失败 → 通知 PM 仲裁
 
 TASKS_ROOT="${TASKS_ROOT:-/Users/lin/Desktop/work/my-agent-teams/tasks}"
 PM_SESSION="${PM_SESSION:-pm-chief}"
+QA_SESSION="${QA_SESSION:-qa-1}"
 PUSH_SCRIPT="${PUSH_SCRIPT:-/Users/lin/.openclaw/workspace/scripts/feishu-push.sh}"
 USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
 STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
 BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py}"
+SEND_SCRIPT="${SEND_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh}"
+CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh}"
 INTERVAL="${INTERVAL:-5}"
 
 mkdir -p "$STATE_DIR"
@@ -25,62 +31,64 @@ truncate_utf8() {
     python3 -c "import sys; s=sys.stdin.read(); print(s[:$max_len] if len(s)>$max_len else s)" <<< "$str" 2>/dev/null
 }
 
-# 通知 PM（通过 tmux send-keys，带 timeout 防阻塞）
-notify_pm() {
-    local msg="$1"
-    # PM 是 Codex（omx），需要先按 i 进入插入模式
-    tmux send-keys -t "$PM_SESSION" i 2>/dev/null &
-    local pid=$!
-    sleep 0.3
-    kill $pid 2>/dev/null; wait $pid 2>/dev/null
-
-    tmux send-keys -t "$PM_SESSION" -l -- "$msg" 2>/dev/null &
-    pid=$!
-    sleep 2
-    kill $pid 2>/dev/null; wait $pid 2>/dev/null
-
-    tmux send-keys -t "$PM_SESSION" Enter 2>/dev/null &
-    pid=$!
-    sleep 0.5
-    kill $pid 2>/dev/null; wait $pid 2>/dev/null
-
-    log "通知 PM: $msg"
-}
-
-# 通知 agent（带 timeout 防阻塞）
-notify_agent() {
+legacy_send_tmux() {
     local session="$1"
     local msg="$2"
-    # 判断是否 Codex
     local is_codex=0
     case "$session" in
-        arch-1|be-1|be-2|review-1|pm-chief) is_codex=1 ;;
+        arch-1|dev-1|dev-2|review-1|pm-chief) is_codex=1 ;;
     esac
 
     if [ "$is_codex" = "1" ]; then
         tmux send-keys -t "$session" i 2>/dev/null &
         local pid=$!
         sleep 0.3
-        kill $pid 2>/dev/null; wait $pid 2>/dev/null
+        kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
     fi
 
     tmux send-keys -t "$session" -l -- "$msg" 2>/dev/null &
     local pid=$!
     sleep 2
-    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
 
     tmux send-keys -t "$session" Enter 2>/dev/null &
     pid=$!
     sleep 0.5
-    kill $pid 2>/dev/null; wait $pid 2>/dev/null
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
+}
 
+send_session_message() {
+    local session="$1"
+    local msg="$2"
+
+    if [ -x "$SEND_SCRIPT" ]; then
+        if "$SEND_SCRIPT" "$session" "$msg" >/dev/null 2>&1; then
+            log "通知 $session: $msg"
+            return 0
+        fi
+        log "send-to-agent.sh 发送失败，回退 legacy tmux: $session"
+    fi
+
+    legacy_send_tmux "$session" "$msg"
     log "通知 $session: $msg"
+}
+
+notify_pm() {
+    local msg="$1"
+    send_session_message "$PM_SESSION" "$msg"
+}
+
+notify_agent() {
+    local session="$1"
+    local msg="$2"
+    send_session_message "$session" "$msg"
 }
 
 # 飞书推送（给林总工）
 push_feishu() {
     local msg="$1"
     if [ -x "$PUSH_SCRIPT" ]; then
+        local tmpfile
         tmpfile=$(mktemp)
         echo "$msg" > "$tmpfile"
         FEISHU_RECEIVE_ID="$USER_ID" "$PUSH_SCRIPT" < "$tmpfile" 2>/dev/null &
@@ -117,6 +125,38 @@ for key in keys:
     if value not in (None, ''):
         print(value)
         raise SystemExit(0)
+PY
+}
+
+task_json_pick() {
+    local task_dir="$1"
+    shift
+    json_pick "$task_dir/task.json" "$@"
+}
+
+task_reviewers() {
+    local task_dir="$1"
+    python3 - "$task_dir/task.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding='utf-8'))
+review_level = str(payload.get('review_level') or '').strip().lower()
+reviewers = payload.get('reviewers') if isinstance(payload.get('reviewers'), list) else []
+reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
+if not reviewers:
+    reviewer = str(payload.get('reviewer') or '').strip()
+    if reviewer:
+        reviewers = [reviewer]
+if not reviewers:
+    if review_level == 'complex':
+        reviewers = ['review-1', 'arch-1']
+    elif review_level == 'standard':
+        reviewers = ['review-1']
+for reviewer in reviewers:
+    print(reviewer)
 PY
 }
 
@@ -213,6 +253,166 @@ is_file_newer_than_notified() {
     [ "$file_ts" -gt "$notified_ts" ]
 }
 
+review_signature() {
+    local task_dir="$1"
+    local review_mtime="0"
+    local design_review_mtime="0"
+    [ -f "$task_dir/review.md" ] && review_mtime=$(stat -f %m "$task_dir/review.md" 2>/dev/null || echo 0)
+    [ -f "$task_dir/design-review.md" ] && design_review_mtime=$(stat -f %m "$task_dir/design-review.md" 2>/dev/null || echo 0)
+    echo "${review_mtime}:${design_review_mtime}"
+}
+
+is_signature_newer_than_notified() {
+    local key="$1"
+    local signature="$2"
+    local flag="$STATE_DIR/$key"
+    [ -f "$flag" ] || return 0
+    local last_sig
+    last_sig=$(cat "$flag" 2>/dev/null)
+    [ "$last_sig" != "$signature" ]
+}
+
+mark_signature_notified() {
+    local key="$1"
+    local signature="$2"
+    echo "$signature" > "$STATE_DIR/$key"
+}
+
+review_file_state() {
+    local review_file="$1"
+    [ -f "$review_file" ] || { echo "missing"; return 0; }
+    local pass=""
+    local fail=""
+    grep -qi '通过\|approve' "$review_file" && pass="pass" || true
+    grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$review_file" && fail="fail" || true
+    if [ -n "$fail" ]; then
+        echo "fail"
+    elif [ -n "$pass" ]; then
+        echo "pass"
+    else
+        echo "pending"
+    fi
+}
+
+review_state() {
+    local task_dir="$1"
+    local review_level="$2"
+
+    local review_main_state
+    review_main_state=$(review_file_state "$task_dir/review.md")
+
+    if [ "$review_level" = "complex" ]; then
+        local design_state
+        design_state=$(review_file_state "$task_dir/design-review.md")
+        if [ "$review_main_state" = "fail" ] || [ "$design_state" = "fail" ]; then
+            echo "fail"
+        elif [ "$review_main_state" = "pass" ] && [ "$design_state" = "pass" ]; then
+            echo "pass"
+        else
+            echo "pending"
+        fi
+    else
+        if [ "$review_main_state" = "fail" ]; then
+            echo "fail"
+        elif [ "$review_main_state" = "pass" ]; then
+            echo "pass"
+        else
+            echo "pending"
+        fi
+    fi
+}
+
+first_review_conclusion() {
+    local task_dir="$1"
+    local line
+    line=$(grep -i '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes\|通过\|approve' "$task_dir/review.md" "$task_dir/design-review.md" 2>/dev/null | head -1)
+    echo "$line"
+}
+
+verify_state() {
+    local verify_file="$1"
+    python3 - "$verify_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+if not path.exists():
+    print('missing')
+    raise SystemExit(0)
+
+payload = json.loads(path.read_text(encoding='utf-8'))
+values = [
+    payload.get('pass'),
+    payload.get('ok'),
+    payload.get('result'),
+    payload.get('status'),
+    payload.get('verdict'),
+    payload.get('conclusion'),
+]
+
+for value in values:
+    if isinstance(value, bool):
+        print('pass' if value else 'fail')
+        raise SystemExit(0)
+    if value is None:
+        continue
+    normalized = str(value).strip().lower()
+    if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
+        print('pass')
+        raise SystemExit(0)
+    if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
+        print('fail')
+        raise SystemExit(0)
+
+print('pending')
+PY
+}
+
+verify_summary() {
+    local verify_file="$1"
+    json_pick "$verify_file" summary notes message conclusion
+}
+
+auto_dispatch_review() {
+    local task_dir="$1"
+    local task_id="$2"
+    local review_level="$3"
+    local summary="$4"
+
+    while IFS= read -r reviewer; do
+        [ -n "$reviewer" ] || continue
+        if [ "$review_level" = "complex" ] && [ "$reviewer" = "arch-1" ]; then
+            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行设计审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 design-review.md。摘要：$(truncate_utf8 "$summary" 80)"
+        else
+            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行代码审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 review.md。摘要：$(truncate_utf8 "$summary" 80)"
+        fi
+    done <<< "$(task_reviewers "$task_dir")"
+}
+
+auto_dispatch_qa() {
+    local task_id="$1"
+    notify_agent "$QA_SESSION" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行 QA 验证。读取 instruction.md、result.json、review.md、design-review.md（若存在）并将验证结论写入 verify.json；通过请标记 pass/ok=true，失败请明确失败原因与复现步骤。"
+}
+
+auto_close_task() {
+    local task_dir="$1"
+    local task_id="$2"
+    local verify_msg="$3"
+    local result_summary
+    result_summary=$(json_pick "$task_dir/result.json" summary)
+    if [ -z "$result_summary" ]; then
+        result_summary="${task_id} QA 已通过并自动收口。"
+    else
+        result_summary="${result_summary}（QA 已通过自动收口）"
+    fi
+    if [ -n "$verify_msg" ]; then
+        result_summary="${result_summary} QA 结论：$(truncate_utf8 "$verify_msg" 80)"
+    fi
+    "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1 && \
+        log "$task_id: QA 通过，已自动收口"
+}
+
 log "task-watcher 启动，间隔 ${INTERVAL}s"
 
 while true; do
@@ -225,13 +425,14 @@ while true; do
 
         current_status=$(get_task_status "$task_dir")
 
-        # 已关闭任务不再通知，但仍需在文件变更后同步到任务看板 SQLite，避免 ready_for_merge -> done 后数据库残留旧状态
+        # 已关闭任务不再触发自动流转，但仍需在文件变更后同步到任务看板 SQLite
         case "$current_status" in
             done|cancelled|archived)
                 sync_if_changed "$task_dir" "$task_dir/task.json" "taskjson"
                 sync_if_changed "$task_dir" "$task_dir/transitions.jsonl" "transitions"
                 sync_if_changed "$task_dir" "$task_dir/result.json" "result"
                 sync_if_changed "$task_dir" "$task_dir/review.md" "review"
+                sync_if_changed "$task_dir" "$task_dir/design-review.md" "designreview"
                 sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
                 continue
                 ;;
@@ -254,8 +455,7 @@ except Exception:
             now=$(date +%s)
             if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt 60 ]; then
                 resend_key="${task_id}_resend"
-                # 检查 agent 是否正在工作（pane 输出含 Working），工作中不重发
-                agent_session=$(python3 -c "import json; print(json.load(open('$task_dir/task.json')).get('assigned_agent',''))" 2>/dev/null)
+                agent_session=$(task_json_pick "$task_dir" assigned_agent)
                 is_working=0
                 if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
                     is_working=$(tmux capture-pane -t "$agent_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
@@ -263,11 +463,10 @@ except Exception:
                 [ "$is_working" -gt 0 ] && continue
                 last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
                 if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt 300 ]; then
-                    if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
+                    if [ -n "$agent_session" ]; then
                         instruction="$task_dir/instruction.md"
                         if [ -f "$instruction" ]; then
-                            msg="请读取 ${task_dir}instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
-                            notify_agent "$agent_session" "$msg"
+                            notify_agent "$agent_session" "请读取 ${task_dir}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
                             log "$task_id: 兜底重发指令给 $agent_session"
                             push_feishu "🔄 $task_id 超时未确认，已重新发送给 $agent_session"
                         fi
@@ -286,25 +485,36 @@ except Exception:
                 log "$task_id: agent ${agent:-?} 已确认，状态 working"
                 sync_task_board "$task_dir" "ack-detected"
                 mark_notified "$ack_key"
+                current_status="working"
             fi
         fi
 
-        # 检测 result.json → 通知 PM
+        # 检测 result.json → 自动流转到 PM / reviewer
         if [ -f "$task_dir/result.json" ]; then
-            result_key="${task_id}_result"
+            result_key="${task_id}_result_route"
             if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json"; then
                 agent=$(json_pick "$task_dir/result.json" agent agent_id)
                 result_status=$(json_pick "$task_dir/result.json" status)
                 summary=$(json_pick "$task_dir/result.json" summary)
+                task_level=$(task_json_pick "$task_dir" task_level)
+                assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
+                review_level=$(task_json_pick "$task_dir" review_level)
 
                 if [ "$result_status" = "done" ]; then
                     set_task_status "$task_dir" "ready_for_merge" "watcher observed result.json status=done"
-                    notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 60)。请验收并决定是否推进下游任务。"
-                    push_feishu "📋 $task_id 完成: $(truncate_utf8 "$summary" 60)"
+                    current_status="ready_for_merge"
+                    if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
+                        notify_pm "[task-watcher] $task_id 技术方案已完成（agent: ${agent:-arch-1}）。请整理摘要并通过飞书推送林总工确认。摘要：$(truncate_utf8 "$summary" 80)"
+                    elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
+                        auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
+                        log "$task_id: 已自动通知 reviewer，review_level=$review_level"
+                    else
+                        notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 80)。请验收并决定是否推进下游任务。"
+                    fi
                 elif [ "$result_status" = "blocked" ]; then
                     set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
-                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 60)。请处理。"
-                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 60)"
+                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 80)。请处理。"
+                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 80)"
                 else
                     notify_pm "[task-watcher] $task_id 有 result.json（status=$result_status），请检查。"
                 fi
@@ -314,35 +524,50 @@ except Exception:
             fi
         fi
 
-        # 检测 review.md → 通知 PM 审查完成
-        if [ -f "$task_dir/review.md" ]; then
-            review_key="${task_id}_review"
-            if ! is_notified "$review_key" || is_file_newer_than_notified "$review_key" "$task_dir/review.md"; then
-                review_pass=$(grep -qi '通过\|approve' "$task_dir/review.md" && echo "pass" || echo "")
-                review_fail=$(grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$task_dir/review.md" && echo "fail" || echo "")
-                if [ "$review_pass" = "pass" ] && [ -z "$review_fail" ]; then
-                    review_conclusion=$(grep -i '通过\|approve' "$task_dir/review.md" | head -1)
-                    notify_pm "[task-watcher] $task_id 审查已完成（通过），请验收并决定是否推进下游任务。"
-                    push_feishu "✅ $task_id 审查通过: $review_conclusion"
-                else
-                    review_conclusion=$(grep -i '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$task_dir/review.md" | head -1)
-                    notify_pm "[task-watcher] $task_id 审查未通过，需要修改。请安排修复。"
-                    push_feishu "❌ $task_id 审查未通过: $review_conclusion"
+        # 检测 review 结果 → 自动通知 QA 或通知 PM 仲裁
+        if [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ]; then
+            review_level=$(task_json_pick "$task_dir" review_level)
+            review_sig=$(review_signature "$task_dir")
+            review_key="${task_id}_review_route"
+            if ! is_notified "$review_key" || is_signature_newer_than_notified "$review_key" "$review_sig"; then
+                state=$(review_state "$task_dir" "$review_level")
+                if [ "$state" = "pass" ]; then
+                    test_required=$(task_json_pick "$task_dir" test_required)
+                    if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
+                        auto_dispatch_qa "$task_id"
+                        log "$task_id: review 通过，已自动通知 qa-1"
+                    else
+                        notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请验收并决定是否收口。"
+                    fi
+                elif [ "$state" = "fail" ]; then
+                    notify_pm "[task-watcher] $task_id 审查未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 100)"
+                    push_feishu "❌ $task_id 审查未通过，需要 PM 仲裁"
                 fi
                 sync_task_board "$task_dir" "review-detected"
-                mark_notified "$review_key"
+                mark_signature_notified "$review_key" "$review_sig"
             fi
         fi
 
-        # 检测 verify.json → 通知 PM 审查结果
+        # 检测 verify.json → QA 通过自动收口；QA 失败通知 PM 仲裁
         if [ -f "$task_dir/verify.json" ]; then
-            verify_key="${task_id}_verify"
-            if ! is_notified "$verify_key"; then
-                verify_pass=$(json_pick "$task_dir/verify.json" ok pass)
-                if [ "$verify_pass" = "True" ] || [ "$verify_pass" = "true" ] || [ "$verify_pass" = "1" ]; then
-                    notify_pm "[task-watcher] $task_id verify 通过，可以合并。"
-                else
-                    notify_pm "[task-watcher] $task_id verify 未通过，请检查 verify.json。"
+            verify_key="${task_id}_verify_route"
+            if ! is_notified "$verify_key" || is_file_newer_than_notified "$verify_key" "$task_dir/verify.json"; then
+                vstate=$(verify_state "$task_dir/verify.json")
+                vsummary=$(verify_summary "$task_dir/verify.json")
+                if [ "$vstate" = "pass" ]; then
+                    current_status=$(get_task_status "$task_dir")
+                    if [ "$current_status" = "ready_for_merge" ]; then
+                        if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
+                            notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败，请检查 close-task.sh 与任务状态。"
+                            continue
+                        fi
+                    else
+                        notify_pm "[task-watcher] $task_id QA 已通过，但当前状态为 $current_status，未自动收口，请检查。"
+                        continue
+                    fi
+                elif [ "$vstate" = "fail" ]; then
+                    notify_pm "[task-watcher] $task_id QA 未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$vsummary" 100)"
+                    push_feishu "❌ $task_id QA 未通过，需要 PM 仲裁"
                 fi
                 sync_task_board "$task_dir" "verify-detected"
                 mark_notified "$verify_key"
@@ -354,6 +579,7 @@ except Exception:
         sync_if_changed "$task_dir" "$task_dir/ack.json" "ack"
         sync_if_changed "$task_dir" "$task_dir/result.json" "result"
         sync_if_changed "$task_dir" "$task_dir/review.md" "review"
+        sync_if_changed "$task_dir" "$task_dir/design-review.md" "designreview"
         sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
     done
 
