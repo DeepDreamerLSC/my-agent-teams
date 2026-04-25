@@ -1,0 +1,7 @@
+{
+  "task_id": "排查看板任务统计后端口径",
+  "agent_id": "be-1",
+  "acknowledged_at": "2026-04-25T15:08:07+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md，开始核对 tasks 事实源、SQLite tasks 表与 /api/board /api/agents /api/health 统计口径，并修复若存在的状态残留或收口后未同步问题。"
+}

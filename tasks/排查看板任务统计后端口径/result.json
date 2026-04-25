@@ -1,0 +1,105 @@
+{
+  "task_id": "排查看板任务统计后端口径",
+  "agent_id": "be-1",
+  "status": "done",
+  "completed_at": "2026-04-25T15:17:21+08:00",
+  "summary": "已核对 SQLite tasks 表与 /api/board /api/health /api/agents 的统计口径。当前后端三者彼此一致，并与 task.json 事实源一致；用户给出的 ready_for_merge=6 / done=25 快照对应的是排查任务创建前的任务集合。另外修复了一个真实后端隐患：终态任务(done/cancelled/archived)此前会被 watcher 提前跳过，可能导致 ready_for_merge -> done 收口后未同步到 SQLite。",
+  "root_cause": {
+    "primary": "当前看到的“7 个 ready_for_merge + 1 个 working”不是 /api/board 或 SQLite 统计错误，而是因为用户给出口径之后又新增/推进了两张排查任务：`排查看板任务统计前端展示` 已进入 ready_for_merge，`排查看板任务统计后端口径` 当前处于 working。",
+    "secondary_fixed": "task-watcher.sh 存在潜在同步漏洞：终态任务(done/cancelled/archived)在同步逻辑前就 continue，未来若使用 close-task.sh 进行 ready_for_merge -> done 收口，SQLite 可能残留旧状态。该问题已修复。"
+  },
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "action": "modified",
+      "description": "终态任务在 watcher 跳过通知前，先执行 task.json / transitions / result / review / verify 的 mtime 驱动同步，避免 ready_for_merge -> done 收口后 SQLite 残留旧状态；同时允许通过环境变量覆盖 TASKS_ROOT / STATE_DIR / BOARD_SYNC_SCRIPT / INTERVAL 以便受控验证。"
+    }
+  ],
+  "backend_findings": {
+    "task_json_current_counts": {
+      "pending": 3,
+      "blocked": 2,
+      "ready_for_merge": 7,
+      "working": 1,
+      "done": 25
+    },
+    "sqlite_tasks_current_counts": {
+      "pending": 3,
+      "blocked": 2,
+      "ready_for_merge": 7,
+      "working": 1,
+      "done": 25
+    },
+    "api_consistency": {
+      "/api/board.summary.column_counts": {
+        "pending": 3,
+        "blocked": 2,
+        "ready_for_merge": 7,
+        "working": 1,
+        "done": 25
+      },
+      "/api/health.board_status_counts": {
+        "pending": 3,
+        "blocked": 2,
+        "ready_for_merge": 7,
+        "working": 1,
+        "done": 25
+      },
+      "/api/agents aggregate": {
+        "ready_for_merge_total": 7,
+        "blocked_total": 2,
+        "active_total": 6
+      }
+    },
+    "snapshot_alignment": {
+      "user_reported_snapshot": {
+        "pending": 3,
+        "blocked": 2,
+        "ready_for_merge": 6,
+        "done": 25
+      },
+      "matching_exclusion": [
+        "排查看板任务统计前端展示",
+        "排查看板任务统计后端口径"
+      ],
+      "counts_after_exclusion": {
+        "pending": 3,
+        "blocked": 2,
+        "ready_for_merge": 6,
+        "done": 25
+      }
+    }
+  },
+  "fix_after_counts": {
+    "current_backend_counts": {
+      "pending": 3,
+      "blocked": 2,
+      "ready_for_merge": 7,
+      "working": 1,
+      "done": 25
+    },
+    "note": "修复的是终态收口后的 SQLite 同步隐患；当前 API 口径本身未被改写。"
+  },
+  "test_commands": [
+    {
+      "command": "python3 内联脚本：读取 tasks/*/task.json、SQLite tasks 表，并对比 current_status / board_status / updated_at",
+      "result": "passed；SQLite current_status / board_status 与 task.json 一致，无残留旧状态"
+    },
+    {
+      "command": "python3 内联脚本：调用 dashboard.query.build_board_payload / build_health_payload / build_agent_stats_payload 聚合 SQLite 数据",
+      "result": "passed；/api/board /api/health /api/agents 后端统计口径一致"
+    },
+    {
+      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "result": "passed"
+    },
+    {
+      "command": "python3 内联临时夹具测试：构造 done 终态任务 + 假同步脚本，运行 task-watcher 一轮并断言终态任务仍会触发 sync-task",
+      "result": "passed；terminal_sync_calls=2，证明终态任务文件变更会同步到 SQLite"
+    }
+  ],
+  "notes": [
+    "本次未修改 dashboard/query.py、dashboard/ingest.py、dashboard/db.py、dashboard/app.py、scripts/task-board-sync.py，因为它们当前输出与 SQLite/task.json 已一致，未发现统计口径计算 bug。",
+    "用户投诉中的 ready_for_merge=6 / done=25 与当前后端 7 ready_for_merge + 1 working 的差异，来自排查工单创建后的时间点变化，而不是同一时间点下的后端统计错误。"
+  ]
+}

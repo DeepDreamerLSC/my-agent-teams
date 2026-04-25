@@ -16,7 +16,7 @@
   "review_round": 0,
   "max_review_rounds": 3,
   "test_required": true,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "frontend",
@@ -47,8 +47,8 @@
   "lease_expires_at": "2026-04-25T12:59:30+08:00",
   "workspace_mode": "main",
   "target_branch": "integration",
-  "result_summary": null,
+  "result_summary": "DeepSeek 前端真实组件级接线测试补齐已通过审查，并支撑整条链路完成 QA 与集成。",
   "last_error": null,
   "created_at": "2026-04-25T12:59:00+08:00",
-  "updated_at": "2026-04-25T13:04:55+08:00"
+  "updated_at": "2026-04-25T15:21:04+08:00"
 }

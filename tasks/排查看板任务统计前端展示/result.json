@@ -1,0 +1,32 @@
+{
+  "task_id": "排查看板任务统计前端展示",
+  "agent_id": "fe-1",
+  "status": "done",
+  "completed_at": "2026-04-25T15:07:00+08:00",
+  "summary": "前端未修改，根因在后端。前端如实展示后端返回数据，无字段映射错误、无额外过滤、无 board_status/current_status 混用。",
+  "root_cause": "后端数据层",
+  "evidence": [
+    {
+      "check": "看板列计数来源",
+      "finding": "renderKanban 使用 payload.columns[].tasks.length 显示每列计数，直接来自 /api/board 响应，前端不做二次计算或过滤"
+    },
+    {
+      "check": "字段名映射",
+      "finding": "Agent 统计使用的字段名（completed_task_count, current_load_count, ready_for_merge_count, total_tracked_work_seconds）与后端 API 契约一致，无错配"
+    },
+    {
+      "check": "board_status vs current_status 混用",
+      "finding": "看板列使用 payload.columns[].key（即后端已映射的 board_status），卡片 badge 使用 task.current_status，二者职责清晰无混淆"
+    },
+    {
+      "check": "总任务数",
+      "finding": "header '共 X 个任务' 由 5 列 items.length 求和得出，与后端 summary.task_count 口径一致"
+    },
+    {
+      "check": "额外过滤/聚合",
+      "finding": "前端无额外过滤逻辑，不丢任务、不重复计数"
+    }
+  ],
+  "modified_files": [],
+  "conclusion": "前端展示层正确消费后端数据。若看板显示的任务统计与用户预期不符（pending:3, blocked:2, ready_for_merge:6, done:25），根因在后端数据采集或 board_status 映射逻辑，需由后端排查。"
+}

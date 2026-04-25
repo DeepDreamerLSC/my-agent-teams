@@ -7,7 +7,7 @@
 - 每个 agent 的当前工作目录必须是：`/Users/lin/Desktop/work/my-agent-teams/agents/<agent-id>`。
 - Claude Code 只自动读取当前工作目录下的 `CLAUDE.md`。
 - Codex agent 目录使用当前工作目录下的 `AGENT.md`。
-- 当前约定：`pm-chief`、`fe-1`、`qa-1` 使用 `CLAUDE.md`；`arch-1`、`be-1`、`review-1` 使用 `AGENT.md`。
+- 当前约定：`pm-chief`、`dev-1`、`qa-1` 使用 `CLAUDE.md`；`arch-1`、`dev-2`、`review-1` 使用 `AGENT.md`。
 - 不再通过 tmux session 名、环境变量或 `instruction.md` 注入来识别角色。
 - `instruction.md` 现在只承担**任务描述**职责：做什么、改哪些文件、验收标准、交付物；不再承担角色注入。
 - agent 目录下的角色文件负责“你是谁”；本文件只负责“所有人都要遵守什么”。
@@ -89,7 +89,7 @@ tasks/{task-id}/
 - `id`：任务 ID
 - `title`：任务标题
 - `status`：当前状态
-- `domain`：frontend / backend / quality
+- `domain`：development / quality
 - `assigned_agent`：唯一执行者
 - `review_required`：是否需要审查
 - `review_authority`：reviewer（审查者闭环）或 owner（林总工决策）

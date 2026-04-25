@@ -113,7 +113,7 @@
   "domain": "frontend",
   "status": "working",
   "owner_pm": "pm-chief",
-  "assigned_agent": "fe-1",
+  "assigned_agent": "dev-1",
   "depends_on": [],
   "blocks": [],
   "write_scope": ["frontend/src/pages/admin/**"],
@@ -183,8 +183,8 @@
       "integration_failure": "pm-chief"
     },
     "domains": {
-      "frontend": ["fe-1", "fe-2"],
-      "backend": ["be-1", "be-2"],
+      "frontend": ["dev-1", "fe-2"],
+      "backend": ["dev-2", "be-2"],
       "quality": ["review-1"]
     }
   },
@@ -194,9 +194,9 @@
       "tmux_session": "pm-chief",
       "responsibility": ["planning", "dispatch", "tracking", "triage"]
     },
-    "fe-1": {
+    "dev-1": {
       "role": "frontend_dev",
-      "tmux_session": "fe-1",
+      "tmux_session": "dev-1",
       "domain": "frontend"
     },
     "fe-2": {
@@ -204,9 +204,9 @@
       "tmux_session": "fe-2",
       "domain": "frontend"
     },
-    "be-1": {
+    "dev-2": {
       "role": "backend_dev",
-      "tmux_session": "be-1",
+      "tmux_session": "dev-2",
       "domain": "backend"
     },
     "be-2": {
@@ -242,7 +242,7 @@
   "title": "为聊天页增加搜索跳转高亮",
   "domain": "frontend",
   "owner_pm": "pm-chief",
-  "assigned_agent": "fe-1",
+  "assigned_agent": "dev-1",
   "status": "working",
   "lease_owner": "pm-chief",
   "lease_acquired_at": "2026-04-23T10:00:00+08:00",
@@ -328,11 +328,11 @@
   ▼
 PM-chief（总 PM）
   ├── PM-frontend（子 PM）
-  │     ├── fe-1
+  │     ├── dev-1
   │     ├── fe-2
   │     └── fe-3
   ├── PM-backend（子 PM）
-  │     ├── be-1
+  │     ├── dev-2
   │     ├── be-2
   │     └── be-3
   └── PM-quality / Integrator
@@ -403,14 +403,14 @@ PM-chief（总 PM）
       "frontend": {
         "pm": "pm-frontend",
         "reports_to": "pm-chief",
-        "agents": ["fe-1", "fe-2", "fe-3"],
+        "agents": ["dev-1", "fe-2", "fe-3"],
         "domains": ["frontend"],
         "max_active_tasks": 6
       },
       "backend": {
         "pm": "pm-backend",
         "reports_to": "pm-chief",
-        "agents": ["be-1", "be-2", "be-3"],
+        "agents": ["dev-2", "be-2", "be-3"],
         "domains": ["backend", "data", "api"],
         "max_active_tasks": 6
       },
@@ -443,10 +443,10 @@ PM-chief（总 PM）
       "domain": "quality",
       "tmux_session": "pm-quality"
     },
-    "fe-1": { "role": "frontend_dev", "domain": "frontend", "tmux_session": "fe-1" },
+    "dev-1": { "role": "frontend_dev", "domain": "frontend", "tmux_session": "dev-1" },
     "fe-2": { "role": "frontend_dev", "domain": "frontend", "tmux_session": "fe-2" },
     "fe-3": { "role": "frontend_dev", "domain": "frontend", "tmux_session": "fe-3" },
-    "be-1": { "role": "backend_dev", "domain": "backend", "tmux_session": "be-1" },
+    "dev-2": { "role": "backend_dev", "domain": "backend", "tmux_session": "dev-2" },
     "be-2": { "role": "backend_dev", "domain": "backend", "tmux_session": "be-2" },
     "be-3": { "role": "backend_dev", "domain": "backend", "tmux_session": "be-3" },
     "qa-1": { "role": "qa", "domain": "quality", "tmux_session": "qa-1", "home_team": "quality" },
@@ -883,7 +883,7 @@ Program PM（全局项目/需求组合管理）
       "pod-chat": {
         "pm": "pm-pod-chat",
         "reports_to": "pm-domain-product",
-        "agents": ["fe-1", "fe-2", "qa-1"],
+        "agents": ["dev-1", "fe-2", "qa-1"],
         "domains": ["chat_ui", "chat_interaction"],
         "max_active_tasks": 6
       },
@@ -912,7 +912,7 @@ Program PM（全局项目/需求组合管理）
     "pm-program": { "role": "pm_program", "tmux_session": "pm-program" },
     "pm-domain-product": { "role": "pm_domain", "tmux_session": "pm-domain-product" },
     "pm-pod-chat": { "role": "pm_pod", "tmux_session": "pm-pod-chat" },
-    "fe-1": { "role": "frontend_dev", "tmux_session": "fe-1" },
+    "dev-1": { "role": "frontend_dev", "tmux_session": "dev-1" },
     "qa-1": { "role": "qa", "tmux_session": "qa-1" }
   }
 }
@@ -948,12 +948,12 @@ Program PM（全局项目/需求组合管理）
   "owner_pm": "pm-pod-chat",
   "report_to": "pm-domain-product",
   "escalation_to": "pm-program",
-  "assigned_agent": "fe-1",
+  "assigned_agent": "dev-1",
   "status": "working",
   "priority": "high",
   "depends_on": ["T-20260423-901"],
   "blocks": ["T-20260423-950"],
-  "routing_path": ["pm-program", "pm-domain-product", "pm-pod-chat", "fe-1"],
+  "routing_path": ["pm-program", "pm-domain-product", "pm-pod-chat", "dev-1"],
   "coordination_scope": "cross_pod",
   "integration_owner": "pm-release",
   "release_lane": "release-train-A",
@@ -1195,7 +1195,7 @@ PM 状态变更 → 立即推送
   T-003 数据库迁移 → 端口冲突，已重试 2 次均失败，需人工介入
 
 ⏳ 进行中（4）：
-  T-002 前端接口定义（fe-1，预计 11:30 完成）
+  T-002 前端接口定义（dev-1，预计 11:30 完成）
   T-006 前后端联调（blocked，等待 T-005 集成）
   T-009 审查任务（review-1，进行中）
   T-010 通知服务改造（be-2，进行中）

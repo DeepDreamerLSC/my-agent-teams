@@ -16,11 +16,9 @@
       "integration_failure": "pm-chief"
     },
     "domains": {
-      "frontend": [
-        "fe-1"
-      ],
-      "backend": [
-        "be-1"
+      "development": [
+        "dev-1",
+        "dev-2"
       ],
       "quality": [
         "qa-1",
@@ -35,8 +33,7 @@
       "tmux_session": "pm-chief",
       "home_team": "coordination",
       "domains": [
-        "frontend",
-        "backend",
+        "development",
         "quality"
       ],
       "permissions": {
@@ -50,46 +47,6 @@
       "runtime": "claude_code",
       "guidance_file": "CLAUDE.md",
       "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/pm-chief/CLAUDE.md"
-    },
-    "fe-1": {
-      "name": "Frontend Dev",
-      "role": "frontend_dev",
-      "tmux_session": "fe-1",
-      "home_team": "frontend",
-      "domains": [
-        "frontend"
-      ],
-      "permissions": {
-        "task_dispatch": false,
-        "task_reassign": false,
-        "task_cancel": false,
-        "integration_gate": false,
-        "cross_domain_coordination": false
-      },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/fe-1",
-      "runtime": "claude_code",
-      "guidance_file": "CLAUDE.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/fe-1/CLAUDE.md"
-    },
-    "be-1": {
-      "name": "Backend Dev",
-      "role": "backend_dev",
-      "tmux_session": "be-1",
-      "home_team": "backend",
-      "domains": [
-        "backend"
-      ],
-      "permissions": {
-        "task_dispatch": false,
-        "task_reassign": false,
-        "task_cancel": false,
-        "integration_gate": false,
-        "cross_domain_coordination": false
-      },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/be-1",
-      "runtime": "codex",
-      "guidance_file": "AGENT.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/be-1/AGENT.md"
     },
     "qa-1": {
       "name": "QA",
@@ -147,6 +104,7 @@
       "tmux_session": "arch-1",
       "home_team": "coordination",
       "domains": [
+        "development",
         "frontend",
         "backend",
         "quality"
@@ -162,6 +120,50 @@
       "runtime": "codex",
       "guidance_file": "AGENT.md",
       "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1/AGENT.md"
+    },
+    "dev-1": {
+      "name": "Full-stack Dev 1",
+      "role": "fullstack_dev",
+      "tmux_session": "dev-1",
+      "home_team": "development",
+      "domains": [
+        "development",
+        "frontend",
+        "backend"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1",
+      "runtime": "claude_code",
+      "guidance_file": "CLAUDE.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1/CLAUDE.md"
+    },
+    "dev-2": {
+      "name": "Full-stack Dev 2",
+      "role": "fullstack_dev",
+      "tmux_session": "dev-2",
+      "home_team": "development",
+      "domains": [
+        "development",
+        "frontend",
+        "backend"
+      ],
+      "permissions": {
+        "task_dispatch": false,
+        "task_reassign": false,
+        "task_cancel": false,
+        "integration_gate": false,
+        "cross_domain_coordination": false
+      },
+      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-2",
+      "runtime": "codex",
+      "guidance_file": "AGENT.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-2/AGENT.md"
     }
   },
   "defaults": {
@@ -177,11 +179,7 @@
     "config.json"
   ],
   "domain_policies": {
-    "frontend": {
-      "default_reviewer": "review-1",
-      "default_tester": "qa-1"
-    },
-    "backend": {
+    "development": {
       "default_reviewer": "review-1",
       "default_tester": "qa-1"
     },

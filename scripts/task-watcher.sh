@@ -4,13 +4,13 @@
 # 检测 ack.json 新增 → 更新 task.json 状态为 working
 # 检测 verify.json 新增 → 通知 PM 或推进下游任务
 
-TASKS_ROOT="/Users/lin/Desktop/work/my-agent-teams/tasks"
-PM_SESSION="pm-chief"
-PUSH_SCRIPT="/Users/lin/.openclaw/workspace/scripts/feishu-push.sh"
-USER_ID="ou_f95ee559a38a607c5f312e7b64304143"
-STATE_DIR="/Users/lin/.openclaw/workspace/.task-watcher"
-BOARD_SYNC_SCRIPT="/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py"
-INTERVAL=5
+TASKS_ROOT="${TASKS_ROOT:-/Users/lin/Desktop/work/my-agent-teams/tasks}"
+PM_SESSION="${PM_SESSION:-pm-chief}"
+PUSH_SCRIPT="${PUSH_SCRIPT:-/Users/lin/.openclaw/workspace/scripts/feishu-push.sh}"
+USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
+STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
+BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py}"
+INTERVAL="${INTERVAL:-5}"
 
 mkdir -p "$STATE_DIR"
 
@@ -225,9 +225,16 @@ while true; do
 
         current_status=$(get_task_status "$task_dir")
 
-        # 跳过已关闭的任务，不再通知
+        # 已关闭任务不再通知，但仍需在文件变更后同步到任务看板 SQLite，避免 ready_for_merge -> done 后数据库残留旧状态
         case "$current_status" in
-            done|cancelled|archived) continue ;;
+            done|cancelled|archived)
+                sync_if_changed "$task_dir" "$task_dir/task.json" "taskjson"
+                sync_if_changed "$task_dir" "$task_dir/transitions.jsonl" "transitions"
+                sync_if_changed "$task_dir" "$task_dir/result.json" "result"
+                sync_if_changed "$task_dir" "$task_dir/review.md" "review"
+                sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
+                continue
+                ;;
         esac
 
         # 兜底：dispatched 状态超 60 秒无 ack → 重新发送指令

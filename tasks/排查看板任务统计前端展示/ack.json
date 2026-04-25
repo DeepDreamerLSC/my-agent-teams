@@ -1,0 +1,7 @@
+{
+  "task_id": "排查看板任务统计前端展示",
+  "agent_id": "fe-1",
+  "acknowledged_at": "2026-04-25T15:04:00+08:00",
+  "status": "accepted",
+  "notes": "排查看板任务统计前端展示是否正确消费后端数据"
+}
