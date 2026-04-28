@@ -21,12 +21,125 @@ AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
 DEV_AUTO_CLAIM="${DEV_AUTO_CLAIM:-1}"
 INTERVAL="${INTERVAL:-5}"
+PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
+HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
+RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.txt}"
+LOG_DIR="${LOG_DIR:-/Users/lin/.openclaw/workspace/logs}"
+LOG_FILE="${LOG_FILE:-$LOG_DIR/task-watcher.log}"
+LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
+DISPATCH_RESEND_AFTER_SECONDS="${DISPATCH_RESEND_AFTER_SECONDS:-300}"
+RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
+WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
+
+LAST_LOG_ROTATE_DAY=""
 
 mkdir -p "$STATE_DIR"
 
-log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+rotate_watcher_log_if_needed() {
+    local today file_day archive_file retention_days
+    today=$(date '+%Y-%m-%d')
+    [ "$LAST_LOG_ROTATE_DAY" = "$today" ] && return 0
+    LAST_LOG_ROTATE_DAY="$today"
+
+    mkdir -p "$LOG_DIR" 2>/dev/null || return 0
+
+    if [ -f "$LOG_FILE" ]; then
+        file_day=$(python3 - "$LOG_FILE" <<'PY'
+import os
+import sys
+from datetime import datetime
+
+try:
+    ts = os.path.getmtime(sys.argv[1])
+except Exception:
+    raise SystemExit(1)
+print(datetime.fromtimestamp(ts).strftime('%Y-%m-%d'))
+PY
+)
+        if [ -n "$file_day" ] && [ "$file_day" != "$today" ]; then
+            archive_file="$LOG_DIR/task-watcher.${file_day}.log"
+            if [ -f "$archive_file" ]; then
+                cat "$LOG_FILE" >> "$archive_file" 2>/dev/null || true
+                : > "$LOG_FILE"
+            else
+                mv "$LOG_FILE" "$archive_file" 2>/dev/null || true
+            fi
+        fi
+    fi
+
+    retention_days="$LOG_RETENTION_DAYS"
+    [ -n "$retention_days" ] || retention_days=7
+    if [ "$retention_days" -gt 0 ] 2>/dev/null; then
+        find "$LOG_DIR" -maxdepth 1 -type f -name 'task-watcher.*.log' -mtime "+$((retention_days - 1))" -delete 2>/dev/null || true
+    fi
 }
+
+log() {
+    local line
+    line="$(date '+%Y-%m-%d %H:%M:%S') $*"
+    echo "$line"
+    rotate_watcher_log_if_needed
+    printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+ensure_single_instance() {
+    local existing_pid=""
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "task-watcher 已在运行（pid=$existing_pid），当前实例退出"
+        exit 0
+    fi
+}
+
+write_pid_file() {
+    printf '%s\n' "$$" > "$PID_FILE"
+}
+
+write_heartbeat() {
+    local phase="${1:-running}"
+    python3 - "$HEARTBEAT_FILE" "$$" "$phase" "$INTERVAL" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+heartbeat_path = Path(sys.argv[1])
+payload = {
+    "pid": int(sys.argv[2]),
+    "phase": sys.argv[3],
+    "interval_seconds": int(sys.argv[4]),
+    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "updated_ts": int(datetime.now(timezone.utc).timestamp()),
+}
+heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.NamedTemporaryFile("w", delete=False, dir=str(heartbeat_path.parent), encoding="utf-8") as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write("\n")
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, heartbeat_path)
+PY
+}
+
+cleanup_task_watcher_runtime() {
+    local existing_pid=""
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ "$existing_pid" = "$$" ]; then
+        rm -f "$PID_FILE"
+    fi
+}
+
+stop_task_watcher() {
+    cleanup_task_watcher_runtime
+    exit 0
+}
+
+trap cleanup_task_watcher_runtime EXIT
+trap stop_task_watcher INT TERM
+
+ensure_single_instance
+write_pid_file
 
 # 安全截断 UTF-8 字符串（按字符数，避免截断多字节字符）
 truncate_utf8() {
@@ -105,6 +218,58 @@ push_feishu() {
 get_task_status() {
     local task_dir="$1"
     python3 -c "import json; print(json.load(open('$task_dir/task.json')).get('status','unknown'))" 2>/dev/null
+}
+
+task_timestamp_epoch() {
+    local task_dir="$1"
+    shift
+    python3 - "$task_dir/task.json" "$@" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+path = Path(sys.argv[1])
+keys = sys.argv[2:]
+payload = json.loads(path.read_text(encoding='utf-8'))
+for key in keys:
+    value = payload.get(key)
+    if not value:
+        continue
+    try:
+        print(int(datetime.fromisoformat(str(value)).timestamp()))
+        raise SystemExit(0)
+    except Exception:
+        continue
+print(0)
+PY
+}
+
+task_dispatch_reference_epoch() {
+    local task_dir="$1"
+    task_timestamp_epoch "$task_dir" lease_acquired_at updated_at
+}
+
+task_working_reference_epoch() {
+    local task_dir="$1"
+    if [ -f "$task_dir/ack.json" ]; then
+        stat -f %m "$task_dir/ack.json" 2>/dev/null && return 0
+    fi
+    task_timestamp_epoch "$task_dir" updated_at
+}
+
+task_has_progress_artifact() {
+    local task_dir="$1"
+    [ -f "$task_dir/result.json" ] || [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ] || [ -f "$task_dir/verify.json" ]
+}
+
+agent_has_working_signal() {
+    local agent_session="$1"
+    local is_working=0
+    if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
+        is_working=$(tmux capture-pane -t "$agent_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
+    fi
+    printf '%s\n' "${is_working:-0}"
 }
 
 json_pick() {
@@ -327,7 +492,8 @@ set_task_status() {
     local task_dir="$1"
     local new_status="$2"
     local reason="${3:-watcher status update}"
-    python3 - "$task_dir" "$new_status" "$reason" <<'PY'
+    local output=""
+    output=$(python3 - "$task_dir" "$new_status" "$reason" <<'PY'
 import json
 import sys
 from datetime import datetime
@@ -358,6 +524,12 @@ with transitions_path.open('a', encoding='utf-8') as fp:
     }, ensure_ascii=False) + '\n')
 print(f'status: {old_status} -> {new_status}')
 PY
+)
+    local status_rc=$?
+    if [ -n "$output" ]; then
+        log "$(basename "$task_dir"): $output | reason=$reason"
+    fi
+    return $status_rc
 }
 
 # 记录已处理的事件（避免重复通知）
@@ -607,9 +779,9 @@ auto_dispatch_review() {
     while IFS= read -r reviewer; do
         [ -n "$reviewer" ] || continue
         if [ "$review_level" = "complex" ] && [ "$reviewer" = "arch-1" ]; then
-            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行设计审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 design-review.md。摘要：$(truncate_utf8 "$summary" 80)"
+            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行设计审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 design-review.md。摘要：$(truncate_utf8 "$summary" 300)"
         else
-            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行代码审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 review.md。摘要：$(truncate_utf8 "$summary" 80)"
+            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行代码审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 review.md。摘要：$(truncate_utf8 "$summary" 300)"
         fi
     done <<< "$(task_reviewers "$task_dir")"
 }
@@ -631,18 +803,28 @@ auto_close_task() {
         result_summary="${result_summary}（QA 已通过自动收口）"
     fi
     if [ -n "$verify_msg" ]; then
-        result_summary="${result_summary} QA 结论：$(truncate_utf8 "$verify_msg" 80)"
+        result_summary="${result_summary} QA 结论：$(truncate_utf8 "$verify_msg" 300)"
     fi
     if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1; then
         log "$task_id: QA 通过，已自动收口"
+        notify_pm "[task-watcher] $task_id QA 已通过并自动收口（done）。摘要：$(truncate_utf8 "$result_summary" 500)。如需部署请联系林总工。"
+        push_feishu "✅ $task_id 已完成并自动收口。$result_summary"
         return 0
     fi
+    log "$task_id: close-task.sh 执行失败，未自动收口"
     return 1
 }
 
+restart_cause=$(cat "$RESTART_CAUSE_FILE" 2>/dev/null || true)
+if [ -n "$restart_cause" ]; then
+    log "检测到 watchdog 重启原因: $restart_cause"
+fi
+
+write_heartbeat "startup"
 log "task-watcher 启动，间隔 ${INTERVAL}s"
 
 while true; do
+    write_heartbeat "running"
     [ -d "$TASKS_ROOT" ] || { sleep "$INTERVAL"; continue; }
 
     for task_dir in "$TASKS_ROOT"/*/; do
@@ -674,39 +856,29 @@ while true; do
             current_status=$(get_task_status "$task_dir")
         fi
 
-        # 兜底：dispatched 状态超 60 秒无 ack → 重新发送指令
+        # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
-            dispatch_time=$(python3 -c "
-import json
-from datetime import datetime
-
-d = json.load(open('$task_dir/task.json'))
-t = d.get('lease_acquired_at','') or d.get('updated_at','')
-try:
-    dt = datetime.fromisoformat(t)
-    print(int(dt.timestamp()))
-except Exception:
-    print(0)
-" 2>/dev/null)
+            dispatch_time=$(task_dispatch_reference_epoch "$task_dir")
             now=$(date +%s)
-            if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt 60 ]; then
+            if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt "$DISPATCH_RESEND_AFTER_SECONDS" ]; then
                 resend_key="${task_id}_resend"
                 agent_session=$(task_json_pick "$task_dir" assigned_agent)
-                is_working=0
-                if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
-                    is_working=$(tmux capture-pane -t "$agent_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
-                fi
-                [ "$is_working" -gt 0 ] && continue
-                last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
-                if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt 300 ]; then
-                    if [ -n "$agent_session" ]; then
-                        instruction="$task_dir/instruction.md"
-                        if [ -f "$instruction" ]; then
-                            notify_agent "$agent_session" "请读取 ${task_dir}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
-                            log "$task_id: 兜底重发指令给 $agent_session"
-                            push_feishu "🔄 $task_id 超时未确认，已重新发送给 $agent_session"
+                if task_has_progress_artifact "$task_dir"; then
+                    log "$task_id: dispatched 超时检查跳过，已发现后续工件，优先按显式工件继续流转"
+                else
+                    is_working=$(agent_has_working_signal "$agent_session")
+                    [ "$is_working" -gt 0 ] && continue
+                    last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
+                    if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt "$RESEND_COOLDOWN_SECONDS" ]; then
+                        if [ -n "$agent_session" ]; then
+                            instruction="$task_dir/instruction.md"
+                            if [ -f "$instruction" ]; then
+                                notify_agent "$agent_session" "请读取 ${task_dir}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
+                                log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，兜底重发指令给 $agent_session"
+                                push_feishu "🔄 $task_id 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已重新发送给 $agent_session"
+                            fi
+                            echo "$now" > "$STATE_DIR/$resend_key"
                         fi
-                        echo "$now" > "$STATE_DIR/$resend_key"
                     fi
                 fi
             fi
@@ -740,23 +912,38 @@ except Exception:
                     set_task_status "$task_dir" "ready_for_merge" "watcher observed result.json status=done"
                     current_status="ready_for_merge"
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
-                        notify_pm "[task-watcher] $task_id 技术方案已完成（agent: ${agent:-arch-1}）。请整理摘要并通过飞书推送林总工确认。摘要：$(truncate_utf8 "$summary" 80)"
+                        notify_pm "[task-watcher] $task_id 技术方案已完成（agent: ${agent:-arch-1}）。请整理摘要并通过飞书推送林总工确认。摘要：$(truncate_utf8 "$summary" 300)"
                     elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
                         auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                         log "$task_id: 已自动通知 reviewer，review_level=$review_level"
                     else
-                        notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 80)。请验收并决定是否推进下游任务。"
+                        notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 300)。请验收并决定是否推进下游任务。"
                     fi
                 elif [ "$result_status" = "blocked" ]; then
                     set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
-                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 80)。请处理。"
-                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 80)"
+                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 300)。请处理。"
+                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 300)"
                 else
                     notify_pm "[task-watcher] $task_id 有 result.json（status=$result_status），请检查。"
                 fi
 
                 sync_task_board "$task_dir" "result-detected"
                 mark_notified "$result_key"
+            fi
+        fi
+
+        if [ "$current_status" = "working" ] && [ ! -f "$task_dir/result.json" ]; then
+            working_since=$(task_working_reference_epoch "$task_dir")
+            now=$(date +%s)
+            if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
+                working_timeout_key="${task_id}_working_timeout_notice"
+                if ! is_notified "$working_timeout_key" || is_file_newer_than_notified "$working_timeout_key" "$task_dir/task.json"; then
+                    agent_session=$(task_json_pick "$task_dir" assigned_agent)
+                    notify_pm "[task-watcher] $task_id 持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟（agent: ${agent_session:-?}），请 PM 介入检查；本次不自动重发。"
+                    push_feishu "⏱️ $task_id 持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟，请 PM 介入"
+                    log "$task_id: working 超时已通知 PM 介入，未触发重发"
+                    mark_notified "$working_timeout_key"
+                fi
             fi
         fi
 
@@ -776,7 +963,7 @@ except Exception:
                         notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请验收并决定是否收口。"
                     fi
                 elif [ "$state" = "fail" ]; then
-                    notify_pm "[task-watcher] $task_id 审查未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 100)"
+                    notify_pm "[task-watcher] $task_id 审查未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)"
                     push_feishu "❌ $task_id 审查未通过，需要 PM 仲裁"
                 fi
                 sync_task_board "$task_dir" "review-detected"
@@ -802,7 +989,7 @@ except Exception:
                         continue
                     fi
                 elif [ "$vstate" = "fail" ]; then
-                    notify_pm "[task-watcher] $task_id QA 未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$vsummary" 100)"
+                    notify_pm "[task-watcher] $task_id QA 未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$vsummary" 300)"
                     push_feishu "❌ $task_id QA 未通过，需要 PM 仲裁"
                 fi
                 sync_task_board "$task_dir" "verify-detected"

@@ -31,7 +31,11 @@ while true; do
     # 获取所有 session 的 id 和 name
     my_session_name="$(tmux display-message -p '#{session_name}' 2>/dev/null)"
 
+    SESSIONS_FILE=$(mktemp)
+    tmux list-sessions -F '#{session_id}|#{session_name}' 2>/dev/null > "$SESSIONS_FILE"
     while IFS='|' read -r sid sname; do
+        # 跳过空行
+        [ -z "$sname" ] && continue
         # 跳过自己
         [ "$sname" = "$my_session_name" ] && continue
         # 跳过 omx-detached 残留
@@ -65,7 +69,8 @@ while true; do
 
         # 新的确认项，静默自动确认
         tmux send-keys -t "$sname" Enter
-    done < <(tmux list-sessions -F '#{session_id}|#{session_name}' 2>/dev/null)
+    done < "$SESSIONS_FILE"
+    rm -f "$SESSIONS_FILE"
 
     sleep "$INTERVAL"
 done

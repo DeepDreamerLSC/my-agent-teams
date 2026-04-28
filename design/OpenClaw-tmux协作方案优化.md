@@ -1,9 +1,13 @@
 # OpenClaw + tmux 协作方案优化
 
 > 创建时间:2026-04-22
-> 修订时间:2026-04-23 v10
+> 修订时间:2026-04-27 v12
 > 实施主目录: `~/Desktop/work/my-agent-teams/`
 > 文档定位:面向当前 OpenClaw + tmux + Claude Code / Codex 的**实操优化方案**,优先解决任务追踪、消息可靠性、选择性隔离开发、真实校验与联调成功率问题。
+
+**2026-04-27 v13：** 新增 15.5 公共消息区（Chat Hub）——从星形中转升级为共享空间。chat/ 目录与 tasks/ 平级，支持公共频道、任务讨论、agent 私聊。消息格式 JSONL 按天归档。task_announce / task_claim 替代 4.6 共享任务池，chat/tasks/ 替代 15.2 Scratchpad。PM 从中转站变成参与者，agent 之间可直接通信。
+
+**2026-04-24 v11：** 补充监听服务能力文档
 
 **2026-04-23 v10：** 新增第二十一章"分层 PM 演进方案"——覆盖 3-5 / 8-10 / 12-15 三个 agent 数量级的组织架构、config.json 与 task.json schema 演进、协调机制、通知汇报机制。核心结论：现在就做 schema hierarchy-ready，8+ agent 时启动两层 PM，12+ 时升级为 Program/Domain/Pod 三层。完整草案见 [分层PM演进方案.md](./分层PM演进方案.md)。
 
@@ -360,6 +364,168 @@ Phase 1 需要固化以下矩阵，避免实现时各脚本作者各自猜测导
 → 可合则进入 integration 验证
 → 通过则 done,失败则 blocked / failed
 ```
+
+---
+
+### 4.6 共享任务池与主动认领机制
+
+> **设计参考**：Claude Code Agent Teams 的共享任务列表 + 主动认领模式。
+> **动机**：当前方案中任务只能由 PM 手动派发（dispatch），dev 处于被动等待状态。
+> 当 PM 上下文繁忙或离线时，空闲的 dev 无法推进工作，造成资源浪费。
+> 引入共享任务池后，PM 只需将任务投入池中，dev 可主动认领，大幅降低 PM 的调度瓶颈。
+
+#### 4.6.1 任务目录结构变更
+
+在现有 `tasks/` 目录下新增 `pool/` 子目录：
+
+```text
+tasks/
+├── pool/                          # 待认领任务池（新增）
+│   ├── 20260427-pool-001/         # 已入池但未被认领
+│   │   ├── task.json              # status = "pooled"
+│   │   ├── instruction.md
+│   │   └── claim.json             # （认领后生成）
+│   └── 20260427-pool-002/
+│       ├── task.json
+│       └── instruction.md
+├── 20260422-001/                  # 已认领 / 已派发 / 已完成（现有流程不变）
+│   ├── task.json
+│   ├── ack.json
+│   └── result.json
+└── ...
+```
+
+#### 4.6.2 新增状态：`pooled`
+
+在 4.3 状态机中新增 `pooled` 状态，作为 `pending` 的子状态：
+
+```text
+pending ──(PM 放入池中)──→ pooled ──(agent 认领)──→ dispatched ──(watcher 检测 ack)──→ working
+                              │
+                              └──(PM 直接派发，跳过池)──→ dispatched
+```
+
+**状态转换补充（追加到 4.3 矩阵）：**
+
+| 当前状态 | 可转到 | 触发者 | 前置条件 |
+|----------|--------|--------|----------|
+| `pending` | `pooled` | 开罗尔/PM | task.json + instruction.md 创建完成，放入 pool/ |
+| `pooled` | `dispatched` | agent（主动认领） | agent 写入合规的 claim.json |
+| `pooled` | `dispatched` | PM（强制指派） | PM 指定 assignee，走现有 dispatch 流程 |
+| `pooled` | `cancelled` | 开罗尔/PM | 人工取消 |
+
+**关键设计决策：**
+
+1. **`pooled` 不是独立终态**：它只是 `pending → dispatched` 之间的等待状态，agent 认领后立即进入 `dispatched`。
+2. **PM 仍可强制指派**：紧急任务 PM 可以直接 dispatch，跳过池子。池子是"默认路径"，不是"唯一路径"。
+3. **认领后走现有流程**：`claim.json` 生成后，后续的 ack.json / result.json / verify.json 流程完全不变。
+
+#### 4.6.3 `claim.json` 格式
+
+```json
+{
+  "task_id": "20260427-pool-001",
+  "agent": "dev-2",
+  "claimed_at": "2026-04-27T11:00:00+08:00",
+  "reason": "该任务涉及后端 API 修改，在我的能力范围内"
+}
+```
+
+- `reason` 是可选字段，但建议 agent 填写，方便 PM 了解认领动机。
+- watcher 检测到 `claim.json` 后，将任务从 `pool/` 移出到 `tasks/` 根目录，更新 `status=dispatched`，并通知 PM。
+
+#### 4.6.4 认领规则
+
+1. **单认领**：一个任务只能被一个 agent 认领。watcher 以 `claim.json` 的 `claimed_at` 时间戳判断先到先得。
+2. **角色匹配**：task.json 中的 `suggested_roles`（新增字段）列出建议角色，非建议角色也可认领但需要 PM 确认。
+3. **并发冲突**：如果两个 agent 同时写 claim.json，watcher 只认第一个（flock 文件锁保证原子性）。
+4. **超时回收**：`pooled` 任务超过 `pool_timeout_minutes`（默认 60 分钟，可配置）未被认领，watcher 通知 PM 决定是否强制指派。
+
+#### 4.6.5 task.json 新增字段
+
+```json
+{
+  "task_id": "20260427-pool-001",
+  "title": "修复 DeepSeek 聊天接口超时",
+  "status": "pooled",
+  "assignee": null,
+  "suggested_roles": ["dev-2"],
+  "suggested_reason": "涉及后端 API，dev-2 更熟悉该模块",
+  "pool_timeout_minutes": 60,
+  "created_at": "2026-04-27T10:55:00+08:00",
+  "pooled_at": "2026-04-27T10:55:00+08:00",
+  "priority": "high",
+  "write_scope": ["backend/app/api/"],
+  "depends_on": []
+}
+```
+
+新增字段说明：
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `suggested_roles` | 否 | 建议认领角色列表，PM 可在入池时指定 |
+| `suggested_reason` | 否 | 建议理由，帮助 agent 判断是否认领 |
+| `pool_timeout_minutes` | 否 | 池中等待超时，默认 60，0 表示不限 |
+| `pooled_at` | 入池时填写 | 入池时间戳 |
+| `priority` | 否 | `low / medium / high / critical`，影响池中排序 |
+
+#### 4.6.6 watcher 变更
+
+task-watcher.sh 新增以下职责：
+
+1. **轮询 `pool/` 目录**：检测新入池任务和 claim.json
+2. **认领处理**：
+   - 发现 `claim.json` → 验证格式 → flock 锁 → 检查是否已被认领 → 移动到 tasks/ 根目录 → 更新 status=dispatched → 通知 PM
+   - 已被认领 → 通知后来的 agent（通过 tmux send-keys）
+3. **超时检查**：`pooled` 任务超时 → 通知 PM
+4. **优先级排序**：agent 查看池中任务时，按 priority 排序
+
+#### 4.6.7 Agent 如何查看和认领池中任务
+
+Agent 通过以下方式与任务池交互：
+
+**查看池中任务：**
+```bash
+# Agent 在自己的 session 中执行
+ls ~/Desktop/work/my-agent-teams/tasks/pool/
+# 或读取任务摘要
+cat ~/Desktop/work/my-agent-teams/tasks/pool/*/task.json | jq '{id, title, priority, suggested_roles}'
+```
+
+**认领任务：**
+```bash
+# Agent 写入 claim.json
+echo '{"task_id":"20260427-pool-001","agent":"dev-2","claimed_at":"'$(date -Iseconds)'","reason":"后端 API 修改"}' > ~/Desktop/work/my-agent-teams/tasks/pool/20260427-pool-001/claim.json
+```
+
+**Agent 的 CLAUDE.md / AGENT.md 新增指引：**
+```markdown
+## 任务池
+- 当你完成当前任务后，检查 `tasks/pool/` 目录是否有可认领的任务
+- 认领前确认：任务在你的能力范围内、与你当前工作不冲突
+- 写入 claim.json 后，等待 watcher 确认认领成功
+- 不要认领你无法完成的任务
+```
+
+#### 4.6.8 与现有流程的兼容性
+
+| 现有流程 | 变更 |
+|---------|------|
+| PM 直接 dispatch | **不变**，PM 可以跳过池直接派发 |
+| create-task.sh | **不变**，新增可选参数 `--pool` 入池 |
+| dispatch-task.sh | **不变**，认领后自动走 dispatch 流程 |
+| task-watcher.sh | **扩展**，增加 pool/ 轮询和 claim 处理 |
+| 看板系统 | **扩展**，新增 pooled 列 |
+| agent CLAUDE.md | **扩展**，新增池交互指引 |
+
+#### 4.6.9 Phase 分期
+
+| Phase | 内容 |
+|-------|------|
+| **Phase 1（立即）** | pool/ 目录 + pooled 状态 + claim.json + watcher 轮询 + agent 手动查看认领 |
+| **Phase 2** | agent prompt 自动引导检查池 + 飞书通知池中任务 + 看板 pooled 列 |
+| **Phase 3** | Scratchpad 集成（agent 认领前可在 scratchpad 讨论方案）+ 认领协商（多 agent 竞争同一任务时） |
 
 ---
 
@@ -1690,7 +1856,193 @@ tasks/.scratchpad/REQ-20260422-001/
 - 归档保留 7 天后自动删除（由 task-cleanup.sh 处理）
 - 活跃需求的 scratchpad 不做自动清理
 
-### 15.3 场景分析
+### 15.3 Scratchpad 消息通知触发机制
+
+> Scratchpad 解决了"agent 之间如何共享信息"，但还需要解决"agent 如何知道有新信息"。
+
+#### 设计选择：三路并行，统一去重
+
+同时实施三种通知机制，覆盖不同场景，并通过统一的去重文件防止重复打扰 agent：
+
+| 机制 | 实时性 | 触发条件 | 覆盖场景 |
+|------|--------|---------|---------|
+| **Agent 主动检查** | 低 | 任务间隙（agent 自觉） | agent 正在活跃工作时 |
+| **tmux-watcher 空闲提醒** | 中 | session 空闲 60s + 有新 scratchpad | agent 空闲但忘了检查 |
+| **task-watcher 轮询通知** | 高 | 每 5s 轮询 + 发现新文件 | 确保不漏，兜底保障 |
+
+**三路之间的关系：不是互为 backup，而是互补。** Agent 主动检查最快但不可靠（依赖 LLM 记得）；tmux-watcher 在 agent 空闲时补位；task-watcher 作为兜底确保 100% 不漏。
+
+#### 统一去重机制
+
+三路通知共享同一个去重状态文件，防止同一个文件被多次推送给同一个 agent：
+
+```text
+.omx/scratchpad-notified.json
+```
+
+**去重规则：**
+
+1. **每个通知源在发送前必须先检查此文件**：如果目标文件已存在于该 agent 的已通知列表中，**跳过通知**。
+2. **写入时使用 flock 文件锁**：防止 tmux-watcher 和 task-watcher 同时读写产生竞态。
+3. **写入后立即生效**：下一个通知源读到的就是最新状态。
+4. **Agent 主动检查不算"通知"**：agent 自己读到文件不算被通知，不写入去重文件。只有 watcher 发送了 tmux 消息才记录。
+
+```json
+{
+  "_meta": {
+    "version": 1,
+    "updated_at": "2026-04-27T11:20:00+08:00"
+  },
+  "dev-2": {
+    "REQ-20260422-001_arch-1_api-schema.json": {
+      "notified_at": "2026-04-27T11:00:00+08:00",
+      "notified_by": "tmux-watcher"
+    }
+  },
+  "dev-1": {
+    "REQ-20260422-001_arch-1_db-design.md": {
+      "notified_at": "2026-04-27T11:05:00+08:00",
+      "notified_by": "task-watcher"
+    }
+  }
+}
+```
+
+字段说明：
+- `_meta.version`：格式版本号，便于未来迁移
+- `notified_at`：通知时间
+- `notified_by`：`tmux-watcher` / `task-watcher`，便于调试
+
+**去重检查伪代码（所有通知源共用）：**
+
+```bash
+should_notify() {
+  local agent_id="$1"
+  local file_key="$2"   # 格式: {task-group-id}_{source-agent}_{filename}
+  local notifier="$3"   # 调用者标识
+
+  # flock 防竞态
+  (
+    flock -x 200
+    # 检查是否已通知
+    if jq -e ".\"$agent_id\".\"$file_key\"" "$NOTIFIED_JSON" > /dev/null 2>&1; then
+      echo "SKIP: already notified"
+      return 1
+    fi
+    # 写入通知记录
+    jq --arg agent "$agent_id" \
+       --arg key "$file_key" \
+       --arg time "$(date -Iseconds)" \
+       --arg by "$notifier" \
+       '.[$agent][$key] = {"notified_at": $time, "notified_by": $by}' \
+       "$NOTIFIED_JSON" > "${NOTIFIED_JSON}.tmp" && mv "${NOTIFIED_JSON}.tmp" "$NOTIFIED_JSON"
+    echo "NOTIFY"
+    return 0
+  ) 200>"${NOTIFIED_JSON}.lock"
+}
+```
+
+#### 机制一：Agent 主动检查
+
+在每个 agent 的 CLAUDE.md / AGENT.md 中新增规则：
+
+```markdown
+## Scratchpad 检查
+- 每次完成当前任务后（写出 result.json 之后），检查 `tasks/.scratchpad/` 是否有给你的新文件
+- 检查方式：`ls tasks/.scratchpad/*/{其他agent-id}_*`，查看是否有你不认识的文件
+- 如果发现新文件，读取内容并判断是否需要响应
+- 如果需要响应，在你的目录下写入回复文件（以自己的 agent-id 为前缀）
+- 注意：主动检查不算"被通知"，不需要写入 scratchpad-notified.json
+```
+
+**特点：** 最轻量，零基础设施，但依赖 LLM 遵守 prompt。适合 agent 正在活跃工作时，任务间隙自然检查。
+
+#### 机制二：tmux-watcher 空闲提醒
+
+扩展 tmux-watcher.sh，在现有职责基础上新增 scratchpad 检查：
+
+```text
+现有职责：检测确认提示 → 自动按 Enter
+新增职责：检测 session 空闲 → 检查 scratchpad → 去重 → 有新消息则提醒
+
+触发条件（全部满足才触发）：
+- agent session 连续 60 秒无新输出（空闲状态）
+- tasks/.scratchpad/ 下存在该 agent 所属 task-group 的新文件
+- 新文件未被去重文件记录为已通知
+
+提醒方式：
+- tmux send-keys 发送："📋 Scratchpad 有新消息，请检查 tasks/.scratchpad/{task-group-id}/"
+- 调用 should_notify() 写入去重记录
+```
+
+**特点：** 复用现有 tmux-watcher 进程，不新增常驻服务。只在 agent 空闲时提醒，避免打断正在工作的 agent。
+
+#### 机制三：task-watcher 轮询通知
+
+扩展 task-watcher.sh，在现有任务状态轮询基础上新增 scratchpad 轮询：
+
+```text
+现有职责：轮询 tasks/*/ 状态文件 → 自动状态流转 → 通知 PM
+新增职责：轮询 tasks/.scratchpad/ → 发现新文件 → 去重 → 通知目标 agent
+
+轮询逻辑（每 5 秒）：
+1. 扫描 tasks/.scratchpad/*/ 下所有文件
+2. 对每个文件，根据文件名前缀排除写入者自身（arch-1 写的文件不需要通知 arch-1）
+3. 根据 config.json 的 task-group → agent 分配关系，确定应该通知哪些 agent
+4. 对每个目标 agent，调用 should_notify() 检查去重
+5. 未通知过的 → tmux send-keys 通知 + 写入去重记录
+
+通知消息格式：
+"📋 [{source-agent}] 在 {task-group-id} 中写入了新文件: {filename}"
+```
+
+**特点：** 最可靠，确保不漏。task-watcher 已经在 5s 轮询，加一个目录扫描的开销很小。
+
+#### 三路时序关系示例
+
+```text
+T+0s   arch-1 写入 tasks/.scratchpad/REQ-001/arch-1_api-schema.json
+
+T+3s   dev-2 正好完成任务，主动检查 scratchpad → 发现新文件 → 直接读取 ✅
+       （不需要任何 watcher 通知）
+
+T+30s  task-watcher 轮询发现新文件
+       → should_notify(dev-2, ...) → 检查去重文件 → dev-2 还没被通知过
+       → 通知 dev-2 → 写入去重记录 ✅
+
+T+45s  tmux-watcher 检测到 dev-2 session 空闲 + 有新 scratchpad
+       → should_notify(dev-2, ...) → 检查去重文件 → 已被 task-watcher 通知过
+       → 跳过 ✅（不重复打扰）
+
+T+60s  task-watcher 下一轮轮询
+       → should_notify(dev-2, ...) → 已通知 → 跳过 ✅
+```
+
+**去重保障：** 无论哪个 watcher 先到，去重文件确保同一个文件只被通知一次。三路并行 = 三个机会窗口，但 agent 只被打扰一次。
+
+#### 通信流程示例
+
+```text
+1. arch-1 完成 API 设计，写入 scratchpad
+   tasks/.scratchpad/REQ-20260422-001/arch-1_api-schema.json
+
+2. task-watcher 在 5s 内检测到新文件
+   → 通知 dev-2（tmux send-keys）+ 写入去重记录
+
+3. dev-2 读取 api-schema.json → 开始基于 schema 开发后端 API
+
+4. dev-2 开发中遇到问题，写入 scratchpad
+   tasks/.scratchpad/REQ-20260422-001/dev-2_db-question.md
+
+5. task-watcher 检测到新文件 → 通知 arch-1 + 写入去重记录
+
+6. arch-1 读取问题 → 回复
+   tasks/.scratchpad/REQ-20260422-001/arch-1_db-answer.md
+
+7. task-watcher 检测到回复 → 通知 dev-2（如 dev-2 之前已主动检查则跳过）
+```
+
+### 15.4 场景分析
 
 #### 场景一：延迟容忍
 
@@ -1716,6 +2068,279 @@ tasks/.scratchpad/REQ-20260422-001/
 - **PM 中转**：新增 agent 只需在 config.json 注册，PM 的通信通道从 3 条增加到 5 条，线性增长。
 - **Scratchpad**：新 agent 自动获得所属 task-group 的 scratchpad 读写权限，无需额外配置。
 - **结论**：星形架构的扩展成本远低于全连接。
+
+---
+
+## 十五点五、公共消息区（Chat Hub）——从星形中转到共享空间
+
+> **设计动机**：v12 及之前的方案中，所有 agent 间通信必须经过 PM 中转（第十五章"PM 中转 + Scratchpad 为辅"）。
+> 实践发现：PM 中转是整个协作链路的**最大瓶颈**——PM 忙时消息积压、PM 不主动时流程停滞、
+> Scratchpad 机制复杂但未落地。需要一种更简单、更直接的通信方式。
+>
+> **核心转变**：先从"PM 中转"升级为"共享空间"。  
+> 第一阶段只解决**直接沟通**问题，不立刻把任务认领状态机迁入 chat。PM 从中转站变成参与者（有调度权限），agent 之间可以直接通信，PM 可见所有消息但不需要参与每一条；任务状态事实源仍保持在 `tasks/`。
+
+### 15.5.1 架构对比
+
+```
+v12（星形中转）：
+  agent-A → PM → agent-B     （每条消息都要 PM 转发）
+  林总工 → 开罗尔 → PM → dev  （指令链路长）
+
+v13 A-Lite（共享空间 Lite 版）：
+  agent-A → chat/ → agent-B     （直接通信，PM 可见）
+  林总工 → 开罗尔 → chat/      （所有 agent 可见）
+  PM → chat/tasks/ 发任务公告   （仅公告/讨论，真实派发仍走 task.json）
+```
+
+### 15.5.2 目录结构
+
+```text
+my-agent-teams/
+├── chat/                       # 公共消息区（与 tasks/ scripts/ 平级）
+│   ├── general/                # 公共频道，所有 agent 可见可发
+│   │   └── 2026-04-27.jsonl   # 按天分文件，便于归档和追溯
+│   ├── tasks/                  # 任务相关讨论
+│   │   └── {task-id}.jsonl     # 每个任务一个讨论串
+```
+
+> 注意：**A-Lite 阶段不做私聊目录 `chat/agents/`，也不把真实任务目录物理迁入 `features/` 或 `chat/`**。  
+> `tasks/` 继续作为状态事实源，`chat/` 只承载消息流；二者通过 `task_id` / `feature_id` 关联。
+
+### 15.5.3 消息格式
+
+每条消息为 JSONL 格式，追加写入（原子写入 `.tmp + mv`）：
+
+```json
+{
+  "msg_id": "general-2026-04-27-000001",
+  "ts": "2026-04-27T15:00:00+08:00",
+  "from": "pm-chief",
+  "to": "all",
+  "source_type": "human",
+  "type": "task_announce",
+  "msg": "新建任务：修复 DeepSeek 联网搜索配置，@dev-2 认领？",
+  "task_id": "修复DeepSeek联网搜索配置",
+  "priority": "high"
+}
+```
+
+**字段说明：**
+
+| 字段 | 必填 | 说明 |
+|------|------|------|
+| `msg_id` | 是 | 消息唯一 ID。用于去重、已读游标、回复关联，不能只靠时间戳 |
+| `ts` | 是 | ISO 8601 时间戳 |
+| `from` | 是 | 发送者 agent-id 或 `kael`（开罗尔）/ `linsceo`（林总工） |
+| `to` | 是 | `all`（公共频道）/ agent-id（定向）/ `pm-chief`（给 PM） |
+| `source_type` | 是 | `human` / `system`。区分人工意图与系统确认事实 |
+| `type` | 否 | 消息类型：`text`（默认）/ `task_announce` / `task_done` / `question` / `answer` / `decision` |
+| `msg` | 是 | 消息内容 |
+| `task_id` | 否 | 关联任务 ID |
+| `priority` | 否 | 消息优先级：`low` / `medium` / `high` / `critical` |
+| `reply_to` | 否 | 被回复消息的 `msg_id`，用于 question/answer/讨论串关联 |
+| `thread_id` | 否 | 线程 ID；默认可取 `task_id` 或 `msg_id` |
+
+**type 枚举：**
+
+| type | 触发场景 | 说明 |
+|------|---------|------|
+| `text` | 任意对话 | 默认类型 |
+| `task_announce` | PM/开罗尔发布任务 | A-Lite 阶段只表示“任务公告 / 讨论入口”，不直接驱动状态机 |
+| `task_done` | agent 完成任务 | 只是“我已写 result.json”的通知，不直接等于任务终态 |
+| `question` | agent 提问 | 任何人可回答 |
+| `answer` | 回答问题 | 必须带 `reply_to` 指向原始 question |
+| `decision` | PM/林总工做决策 | 需要所有人知晓的决策 |
+
+> 关键约束：  
+> **`task_done` 不是状态事实源。**  
+> 真实状态仍然只能由 `task.json`、`ack.json`、`result.json`、`verify.json`、`transitions.jsonl` 决定。
+>
+> `task_claim / task_claim_confirmed` **保留为后续 Phase B/C 预留类型**，A-Lite 阶段不启用。
+
+### 15.5.4 消息发送方式
+
+**方式一：agent 主动写入（推荐，零依赖）**
+
+agent 在任务间隙或被唤醒时，直接往 chat 文件追加消息：
+
+```bash
+# dev-1 在公共频道发言
+echo '{"ts":"'$(date -Iseconds)'","from":"dev-1","to":"all","type":"text","msg":"这个接口我改完了，arch-1 帮忙看看"}' >> /Users/lin/Desktop/work/my-agent-teams/chat/general/$(date +%Y-%m-%d).jsonl
+```
+
+**方式二：通过 send-chat.sh 脚本（封装，带格式校验）**
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh general "这个接口我改完了，arch-1 帮忙看看"
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task "修复DeepSeek联网搜索配置" "这条任务我先看一下上下文"
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh agent dev-2 "你的任务卡住了，需要帮忙吗？"
+```
+
+脚本自动处理：
+- JSON 格式化和校验
+- `msg_id` 生成
+- 写入正确的文件（A-Lite 阶段仅 `general / tasks`）
+- flock + 原子写入（.tmp + mv）
+- 通知 watcher 有新消息
+
+> 建议默认使用 `send-chat.sh`，不要直接 `echo >>`。  
+> 直接追加适合临时调试，但正式实现必须统一由脚本负责：
+> - `msg_id` 生成
+> - 私聊文件名排序
+> - flock 原子写
+> - JSON 校验
+
+### 15.5.5 消息通知机制（A-Lite 先收缩）
+
+A-Lite 阶段先不引入新的 chat 通知状态机，先用**最小可运行模式**验证“agent 是否会主动使用共享消息区”：
+
+| 机制 | 职责 |
+|------|------|
+| **agent 主动检查** | 任务间隙主动读取 `chat/general` 与自己任务的 `chat/tasks/{task-id}.jsonl` |
+| **PM / 关键任务定向唤醒** | 关键事项仍通过 `send-to-agent.sh` 强制唤醒目标 agent |
+| **PM 主动查阅** | PM 定期查看 `chat/general/`，只在需要决策时介入 |
+
+> 也就是说，A-Lite 阶段先验证“共享消息区有没有用”，而不是立刻把 watcher / tmux-watcher / 去重 / 已读游标一整套全做出来。
+
+**PM 通知规则：**
+- PM 不需要被每条消息打扰
+- A-Lite 阶段仅以下消息建议显式通知 PM：
+  - `decision`
+  - `@pm-chief` 定向消息
+  - 生产故障 / critical 任务的 task thread 变化
+- 普通对话（`text`、`question`、`answer`）不主动通知 PM，PM 可主动查阅
+
+**紧急任务补充规则：**
+- `priority=critical` 的 `task_announce` 不能只依赖 chat 提醒
+- 必须同时通过 `send-to-agent.sh` 对目标 agent 做强制唤醒
+- 生产故障 / 安全风险 / 明确点名修复任务，仍保留“chat 共享 + 定向唤醒”双通道
+
+### 15.5.6 任务池与 chat 的融合
+
+Lite 版阶段**暂不做任务池与 chat 的融合**。  
+任务仍然由现有 `task.json + create-task.sh + dispatch-task.sh` 驱动，chat 只承担：
+- 任务公告
+- 任务讨论
+- 问答澄清
+- 简短完成同步
+
+也就是说，A-Lite 阶段里：
+- `task_announce` = “任务公告 / 讨论入口”
+- **不是**“可以直接认领并改变状态机”
+
+```text
+当前（Lite 版）：
+  PM → create-task.sh / dispatch-task.sh → tasks/{task-id}
+  PM → chat/tasks/{task-id}.jsonl 发 task_announce 作为讨论入口
+  dev / arch / qa / review 在 chat/tasks/{task-id}.jsonl 中交流
+```
+
+**A-Lite 阶段示例：**
+
+```jsonl
+{"msg_id":"tasks-修复登录页样式-000001","ts":"...","from":"pm-chief","to":"all","source_type":"human","type":"task_announce","msg":"新建任务：修复登录页样式，@dev-1 认领？","task_id":"修复登录页样式","priority":"medium"}
+{"msg_id":"tasks-修复登录页样式-000002","ts":"...","from":"dev-1","to":"all","source_type":"human","type":"question","msg":"arch-1，登录页的按钮颜色应该用哪个？","task_id":"修复登录页样式"}
+{"msg_id":"tasks-修复登录页样式-000003","ts":"...","from":"arch-1","to":"all","source_type":"human","type":"answer","reply_to":"tasks-修复登录页样式-000002","msg":"用 primary-blue，跟导航栏一致","task_id":"修复登录页样式"}
+{"msg_id":"tasks-修复登录页样式-000004","ts":"...","from":"dev-1","to":"all","source_type":"human","type":"task_done","msg":"完成，已写 result.json","task_id":"修复登录页样式"}
+```
+
+**好处：**
+- 任务讨论和任务状态在同一个地方，不用在 pool/ 和 scratchpad/ 之间跳转
+- PM 发布任务时就能同步发一条消息，降低“状态在 tasks/，上下文在脑子里”的割裂
+- 所有人能看到任务从发布到完成的完整讨论记录
+
+> **后移说明：**  
+> `task_claim` 原子绑定 `task.json`、`task_claim_confirmed`、任务池迁移到 chat —— 全部延后到验证期之后，再决定是否值得把 chat 接入状态机中枢。
+
+### 15.5.7 Agent 行为准则更新
+
+各角色模板中新增 chat 相关规则：
+
+**PM：**
+- 发布任务时，在 chat/tasks/ 中发 task_announce 消息
+- 定期查阅 chat/general/ 了解团队动态
+- 只在需要决策时回复，不需要参与每条讨论
+- 仍保留最终调度仲裁权；chat 自由交流不等于放弃任务状态裁决
+
+**开发（dev-1/dev-2）：**
+- 任务间隙检查 chat/ 新消息
+- 遇到问题优先在 chat/ 中提问（@对应 agent），而不是等 PM 转达
+- 生产故障/critical 任务被 `send-to-agent.sh` 定向唤醒时，应优先处理，不等普通 chat 轮询
+- chat 中形成的关键结论必须回写 `features/<feature-id>/decisions.log` 或 `notes/dev.md`
+
+**架构师（arch-1）：**
+- 在 chat/ 中回答技术问题
+- 方案设计中的讨论记录保留在 chat/tasks/ 中
+- 对关键设计结论，同样需要回写 `CONTEXT.md` / `notes/arch.md`，不能只留在聊天里
+
+**QA（qa-1）：**
+- 测试结果在 chat/tasks/ 中简要同步
+- 关键回归结论必须回写 `notes/qa.md` 或 `verify.json`
+
+**审查（review-1）：**
+- 审查意见在 chat/tasks/ 中简要同步
+- 审查结论仍以 `review.md / design-review.md` 为准，chat 只作沟通补充
+
+### 15.5.8 与现有方案的兼容
+
+| 现有机制 | 变更 |
+|---------|------|
+| task.json / ack.json / result.json / verify.json | **不变**，仍然是任务状态的事实源 |
+| task-watcher | **A-Lite 暂不改状态机**，先观察是否需要新增 chat 通知逻辑 |
+| tmux-watcher | **A-Lite 暂不扩展**，紧急事项继续用 `send-to-agent.sh` |
+| Scratchpad（15.2） | **暂不废弃**，先让 chat/tasks 与其并存，验证后再决定是否平滑迁移 |
+| 共享任务池（4.6） | **A-Lite 不合并**，任务认领仍保持现有方案或现有 PM 派发方式 |
+| send-to-agent.sh | **保留**，用于需要 tmux send-keys 唤醒的场景 |
+| config.json | **不变** |
+| features/<feature-id>/ | **保留并强化**，稳定上下文仍放 BRIEF/CONTEXT/notes；chat 只承载过程讨论 |
+| 保护路径 | **扩展**，chat/ 目录所有 agent 可写，但不能删除他人消息 |
+
+### 15.5.9 Phase 分期（先 Lite 验证，再决定是否接入状态机）
+
+| Phase | 内容 |
+|-------|------|
+| **Phase A-Lite（先做）** | 仅做 `chat/general/` + `chat/tasks/` + `send-chat.sh` + `msg_id/source_type/reply_to` 基础协议 + PM 发 `task_announce` + agent 主动检查；**不碰任务认领状态机，不做私聊，不做已读游标** |
+| **验证期（1-2 周）** | 观察 agent 是否主动使用、PM 中转次数是否下降、关键结论是否能稳定回写 feature 上下文；只验证通信价值，不改任务事实源 |
+| **Phase B（验证通过后）** | 再评估是否值得引入 `task_claim` 原子绑定 `task.json`、`task_claim_confirmed`、chat-notified / read-pointers、紧急任务自动唤醒联动 |
+| **Phase C（再扩）** | 私聊线程、失败重试/死信、历史搜索、看板集成 chat 记录、Scratchpad 平滑废弃等重型能力 |
+
+### 15.5.10 验证期目标与验收标准
+
+**验证周期：** 先跑 **1-2 周**，只验证 Lite 版是否真能减少 PM 中转负担并被 agent 主动使用。
+
+**验证目标：**
+1. agent 是否会主动在 `chat/general/` 与 `chat/tasks/{task-id}.jsonl` 中交流，而不是继续完全依赖 PM 中转
+2. PM 的中转次数是否明显下降
+3. 任务讨论是否更容易被后续 agent 看见
+4. chat 中形成的关键结论是否能被回写到 `features/<feature-id>/decisions.log` / `notes/*`
+
+**核心观察指标：**
+- PM 每天手工中转消息次数是否下降
+- `task_announce` 发出后，agent 是否会在 task thread 中主动跟进
+- agent 是否主动在 chat 里提问 / 回答，而不是继续等 PM 转达
+- 每周抽样检查：关键结论是否有回写上下文
+
+**通过标准（建议）：**
+1. 连续 1-2 周内，PM 手工中转次数有明显下降（至少能观察到趋势性减少）
+2. 至少有若干真实任务（建议 5 个以上）在 `chat/tasks/` 中产生实际讨论记录
+3. 关键讨论不是只停留在 chat 里，能看到回写 `decisions.log` / `notes/*`
+4. 没有因为 A-Lite 引入新的任务状态错乱、假认领或消息系统级阻塞
+
+若以上标准不成立，则应先迭代 Lite 版使用方式，而不是贸然推进 B 阶段状态机改造。
+
+### 15.5.11 已知限制与待讨论
+
+1. **消息顺序与唯一性**：JSONL 追加写入天然近似有序，但必须依赖 `msg_id + flock`，不能只靠时间戳。
+2. **A-Lite 不碰认领状态机**：`task_claim` 原子绑定、`task_claim_confirmed`、任务池迁移到 chat，全部后移到验证期之后。
+3. **A-Lite 不做已读游标**：`chat-read-pointers.json` 与系统级“未读/已读/已处理”区分后移到验证期之后。
+4. **A-Lite 不做私聊目录**：`chat/agents/` 与私聊线程规范后移，先验证公共频道 + 任务讨论串是否足够。
+5. **紧急任务不能只靠 chat 提醒**：生产故障、critical 任务、林总工直接点名任务，仍必须通过 `send-to-agent.sh` 强制唤醒。
+6. **关键结论必须回写 feature 上下文**：chat 里形成的关键约束/决策，必须回写 `features/<feature-id>/decisions.log` 或 `notes/*`；否则仍会出现“改了东边不知道西边会塌”。
+7. **失败重试 / 死信尚未设计完整**：若 chat 写入成功但 watcher 未通知、或通知失败、或目标 session 不在线，需要后续补重试与 dead-letter 机制。
+8. **PM 仍需保留最终仲裁权**：共享空间不是去中心化调度，任务优先级冲突、长期无人认领、认领后卡住等情况，最终仍由 PM 收束。
+9. **林总工参与方式**：通过开罗尔代发消息到 chat/，或者直接在飞书上指示开罗尔发。
+10. **消息量与归档**：按天分文件短期足够；若后续引入私聊与历史搜索，再统一设计 general / tasks / agents 的归档与清理策略。
 
 ---
 
@@ -2510,4 +3135,3 @@ Program PM（全局优先级和仲裁）
 **12+ agent 时再做：**
 1. 引入 Pod 视角，升级为三层组织
 2. 通知升级为看板 + 异常驱动
-
