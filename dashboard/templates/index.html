@@ -40,6 +40,20 @@
     </section>
   </main>
 
+  <div id="task-detail-backdrop" class="detail-backdrop hidden"></div>
+  <aside id="task-detail-drawer" class="task-detail-drawer hidden" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <h2 id="detail-title">任务详情</h2>
+        <div id="detail-subtitle" class="drawer-subtitle"></div>
+      </div>
+      <button id="detail-close" class="drawer-close" type="button">关闭</button>
+    </div>
+    <div id="detail-body" class="drawer-body">
+      <div class="empty-state">请选择任务查看详情</div>
+    </div>
+  </aside>
+
   <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

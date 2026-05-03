@@ -17,6 +17,7 @@ from .query import (
     build_board_payload,
     build_gantt_payload,
     build_health_payload,
+    build_task_detail_payload,
 )
 
 
@@ -125,6 +126,15 @@ def create_app(db_path: str | None = None):
                 'current_status_at': milestones.get('current_status'),
             })
         return jsonify(items)
+
+    @app.get('/api/tasks/<task_id>/detail')
+    def api_task_detail(task_id: str):
+        payload = _with_connection(
+            lambda conn: build_task_detail_payload(conn, task_id)
+        )
+        if payload.get('task') is None:
+            return jsonify({'error': 'task not found', 'task_id': task_id}), 404
+        return jsonify(payload)
 
     @app.get('/api/agents/stats')
     def api_agents_stats_compat():

@@ -29,6 +29,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')
 
 
+def _duration_hours(seconds: float | None) -> float | None:
+    if seconds is None:
+        return None
+    return round(seconds / 3600, 3)
+
+
 def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
     write_scope = json.loads(row['write_scope_json'] or '[]')
     artifacts = json.loads(row['artifacts_json'] or '[]')
@@ -43,6 +49,8 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'assigned_agent': row['assigned_agent'],
         'reviewer': row['reviewer'],
         'owner_pm': row['owner_pm'],
+        'parent_task_id': row['parent_task_id'],
+        'root_request_id': row['root_request_id'],
         'current_status': row['current_status'],
         'board_status': row['board_status'],
         'summary': row['summary'],
@@ -60,6 +68,53 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'task_dir': row['task_dir'],
         'last_synced_at': row['last_synced_at'],
         'active_work_seconds': active_work_seconds,
+    }
+
+
+def _row_to_task_event(row: sqlite3.Row) -> dict[str, Any]:
+    payload = json.loads(row['payload_json'] or '{}')
+    happened_at = row['event_at'] or row['observed_at']
+    return {
+        'event_id': row['event_key'],
+        'event_kind': 'task_event',
+        'task_id': row['task_id'],
+        'event_type': row['event_type'],
+        'source': row['source'],
+        'status_from': row['status_from'],
+        'status_to': row['status_to'],
+        'artifact_path': row['artifact_path'],
+        'happened_at': happened_at,
+        'observed_at': row['observed_at'],
+        'payload': payload,
+        'summary': payload.get('reason') or payload.get('summary') or payload.get('status'),
+    }
+
+
+def _row_to_communication_event(row: sqlite3.Row) -> dict[str, Any]:
+    payload = json.loads(row['payload_json'] or '{}')
+    return {
+        'event_id': row['event_id'],
+        'event_kind': 'communication',
+        'task_id': row['task_id'],
+        'thread_id': row['thread_id'],
+        'channel': row['channel'],
+        'event_type': row['event_type'],
+        'event_class': row['event_class'],
+        'source_type': row['source_type'],
+        'from_actor': row['from_actor'],
+        'to_actor': row['to_actor'],
+        'priority': row['priority'],
+        'severity': row['severity'],
+        'message_text': row['message_text'],
+        'reply_to': row['reply_to'],
+        'source_file': row['source_file'],
+        'source_line': row['source_line'],
+        'source_msg_id': row['source_msg_id'],
+        'source_name': row['source_name'],
+        'related_artifact_path': row['related_artifact_path'],
+        'happened_at': row['happened_at'],
+        'observed_at': row['observed_at'],
+        'payload': payload,
     }
 
 
@@ -91,7 +146,138 @@ def _fetch_tasks(
         ''',
         values,
     ).fetchall()
-    return [_row_to_task(row) for row in rows]
+    tasks = [_row_to_task(row) for row in rows]
+    if not tasks:
+        return []
+    task_ids = [task['task_id'] for task in tasks]
+    placeholders = ','.join('?' for _ in task_ids)
+    counts = {
+        row['task_id']: row['comm_count']
+        for row in conn.execute(
+            f'''
+            SELECT task_id, COUNT(*) AS comm_count
+            FROM communication_events
+            WHERE task_id IN ({placeholders})
+            GROUP BY task_id
+            ''',
+            task_ids,
+        ).fetchall()
+    }
+    for task in tasks:
+        task['communication_count'] = int(counts.get(task['task_id'], 0))
+    return tasks
+
+
+def _fetch_single_task(conn: sqlite3.Connection, task_id: str) -> dict[str, Any] | None:
+    rows = conn.execute('SELECT * FROM tasks WHERE task_id = ? LIMIT 1', (task_id,)).fetchall()
+    if not rows:
+        return None
+    task = _row_to_task(rows[0])
+    task['communication_count'] = conn.execute(
+        'SELECT COUNT(*) FROM communication_events WHERE task_id = ?',
+        (task_id,),
+    ).fetchone()[0]
+    return task
+
+
+def _fetch_task_events(conn: sqlite3.Connection, task_id: str) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        '''
+        SELECT *
+        FROM task_events
+        WHERE task_id = ?
+        ORDER BY COALESCE(event_at, observed_at) ASC, event_key ASC
+        ''',
+        (task_id,),
+    ).fetchall()
+    return [_row_to_task_event(row) for row in rows]
+
+
+def fetch_communication_events(
+    conn: sqlite3.Connection,
+    *,
+    task_id: str | None = None,
+    agent_id: str | None = None,
+    start_at: str | None = None,
+    end_at: str | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    clauses: list[str] = []
+    values: list[Any] = []
+    if task_id:
+        clauses.append('task_id = ?')
+        values.append(task_id)
+    if agent_id:
+        clauses.append('(from_actor = ? OR to_actor = ?)')
+        values.extend([agent_id, agent_id])
+    if start_at:
+        clauses.append('COALESCE(happened_at, observed_at) >= ?')
+        values.append(start_at)
+    if end_at:
+        clauses.append('COALESCE(happened_at, observed_at) <= ?')
+        values.append(end_at)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ''
+    sql = f'''
+        SELECT *
+        FROM communication_events
+        {where}
+        ORDER BY COALESCE(happened_at, observed_at) ASC, event_id ASC
+    '''
+    if limit is not None:
+        sql += f' LIMIT {max(int(limit), 1)}'
+    rows = conn.execute(sql, values).fetchall()
+    return [_row_to_communication_event(row) for row in rows]
+
+
+def _build_stage_durations(task: dict[str, Any]) -> dict[str, Any]:
+    durations = {
+        'create_to_dispatch_seconds': _seconds_between(task.get('created_at'), task.get('dispatched_at')),
+        'dispatch_to_ack_seconds': _seconds_between(task.get('dispatched_at'), task.get('ack_at')),
+        'ack_to_result_seconds': _seconds_between(task.get('ack_at'), task.get('completed_at')),
+        'result_to_review_seconds': _seconds_between(task.get('completed_at'), task.get('review_completed_at')),
+        'review_to_verify_seconds': _seconds_between(task.get('review_completed_at'), task.get('verify_completed_at')),
+        'verify_to_close_seconds': _seconds_between(task.get('verify_completed_at'), task.get('current_status_at')),
+        'total_cycle_seconds': _seconds_between(task.get('created_at'), task.get('current_status_at')),
+    }
+    durations_hours = {
+        key.replace('_seconds', '_hours'): _duration_hours(value)
+        for key, value in durations.items()
+    }
+    return {**durations, **durations_hours}
+
+
+def _merge_timelines(task_events: list[dict[str, Any]], communication_events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged = [*task_events, *communication_events]
+
+    def _sort_key(item: dict[str, Any]):
+        ts = item.get('happened_at') or item.get('observed_at') or ''
+        return (ts, item.get('event_kind') or '', item.get('event_id') or '')
+
+    merged.sort(key=_sort_key)
+    return merged
+
+
+def build_task_detail_payload(conn: sqlite3.Connection, task_id: str) -> dict[str, Any]:
+    task = _fetch_single_task(conn, task_id)
+    if task is None:
+        return {
+            'generated_at': _now_iso(),
+            'task': None,
+            'status_timeline': [],
+            'communication_timeline': [],
+            'timeline': [],
+            'durations': {},
+        }
+    status_timeline = _fetch_task_events(conn, task_id)
+    communication_timeline = fetch_communication_events(conn, task_id=task_id)
+    return {
+        'generated_at': _now_iso(),
+        'task': task,
+        'status_timeline': status_timeline,
+        'communication_timeline': communication_timeline,
+        'timeline': _merge_timelines(status_timeline, communication_timeline),
+        'durations': _build_stage_durations(task),
+    }
 
 
 def build_board_payload(
@@ -161,6 +347,7 @@ def build_gantt_payload(
             'display_start_at': span_start,
             'display_end_at': span_end,
             'duration_seconds': _seconds_between(span_start, span_end),
+            'communication_count': task.get('communication_count', 0),
             'milestones': {
                 'created': milestone_created,
                 'dispatched': milestone_dispatched,
@@ -195,9 +382,11 @@ def build_agent_stats_payload(conn: sqlite3.Connection, *, project: str | None =
                 'completed_task_count': 0,
                 'current_load_count': 0,
                 'total_tracked_work_seconds': 0.0,
+                'total_communication_count': 0,
                 'active_tasks': [],
             },
         )
+        agent_entry['total_communication_count'] += int(task.get('communication_count', 0))
         if task['current_status'] in ACTIVE_LOAD_STATUSES:
             agent_entry['active_task_count'] += 1
             agent_entry['current_load_count'] += 1
@@ -229,6 +418,7 @@ def build_agent_stats_payload(conn: sqlite3.Connection, *, project: str | None =
 def build_health_payload(conn: sqlite3.Connection, *, db_path: str) -> dict[str, Any]:
     task_count = conn.execute('SELECT COUNT(*) FROM tasks').fetchone()[0]
     event_count = conn.execute('SELECT COUNT(*) FROM task_events').fetchone()[0]
+    communication_count = conn.execute('SELECT COUNT(*) FROM communication_events').fetchone()[0]
     last_synced_at = conn.execute('SELECT MAX(last_synced_at) FROM tasks').fetchone()[0]
     status_rows = conn.execute(
         'SELECT board_status, COUNT(*) AS count FROM tasks GROUP BY board_status ORDER BY board_status'
@@ -239,6 +429,7 @@ def build_health_payload(conn: sqlite3.Connection, *, db_path: str) -> dict[str,
         'db_path': db_path,
         'task_count': task_count,
         'event_count': event_count,
+        'communication_event_count': communication_count,
         'last_synced_at': last_synced_at,
         'board_status_counts': {row['board_status']: row['count'] for row in status_rows},
     }
