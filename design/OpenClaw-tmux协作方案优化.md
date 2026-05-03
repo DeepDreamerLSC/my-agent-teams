@@ -3532,7 +3532,219 @@ Program PM（全局优先级和仲裁）
 - **验收标准**：
   - 每次自动确认都可解释、可追踪。
 
-### 22.5 建议实施顺序（可直接排期）
+### 22.5 Chat Hub 验证期指标跑起来（P2）
+
+> A-Lite 不是“只要消息能写入就算成功”。P2 的目标是把验证期真正跑起来，用每日指标判断：共享消息区到底有没有降低 PM 中转负担、有没有被 agent 主动使用、是否引入了新的噪音。
+
+#### 22.5.1 指标范围
+
+建议先固化以下最小指标：
+
+| 指标 | 含义 | 目标用途 |
+|------|------|---------|
+| `task_announce_count` | 每日 `task_announce` 数 | 判断任务公告是否稳定走 Chat Hub |
+| `question_answer_ratio` | `question` 与 `answer` 的比例 | 判断问答是否形成闭环 |
+| `pm_mention_count` | `@pm-chief` 或 `to=pm-chief` 数 | 判断 PM 是否仍然被过度中转 |
+| `critical_dual_channel_count` | `priority=critical` 且同时触发定向唤醒的次数 | 判断关键任务双通道是否被正确执行 |
+| `decision_backfill_count` | `decision/task_done/answer` 之后是否有上下文回写 | 判断关键结论是否只停留在 chat |
+| `unanswered_question_count` | 超过阈值未被回答的 `question` 数 | 判断共享消息区是否真的被消费 |
+
+#### 22.5.2 开发步骤拆解（可直接分派）
+
+##### Step P2-1：定义验证期指标字典
+- **目标**：统一指标口径，避免后续统计结果无法比较。
+- **修改文件**：
+  - `chat/README.md`
+  - `design/Chat-Hub-验证记录模板.md`
+  - `design/Chat-Hub-验证复盘模板.md`
+- **具体动作**：
+  1. 为每个指标给出定义、统计口径、时间窗口。
+  2. 明确哪些指标是自动统计，哪些允许人工补记。
+- **测试/校验**：
+  - 文档评审。
+- **验收标准**：
+  - 任一 PM/dev/qa 对同一个指标的理解一致。
+
+##### Step P2-2：新增每日统计脚本
+- **目标**：从 `chat/general/*.jsonl` 和 `chat/tasks/*.jsonl` 自动统计验证期指标。
+- **修改文件**：
+  - 新增 `scripts/chat-metrics.sh` 或 `scripts/chat-metrics.py`
+  - 如有必要：`scripts/lint-chat.sh`（复用协议校验逻辑）
+- **具体动作**：
+  1. 读取指定日期范围内的 chat JSONL。
+  2. 统计上述指标。
+  3. 输出 machine-readable JSON 和 human-readable summary 两种格式。
+- **测试/校验**：
+  - 用现有 `chat/tasks/*.jsonl` 历史数据跑一遍。
+- **验收标准**：
+  - 能对单日/多日区间输出一致的指标摘要。
+
+##### Step P2-3：把 critical 双通道纳入可观测性
+- **目标**：不只知道 `priority=critical` 消息被写了，还知道是否真的触发了 `send-to-agent.sh`。
+- **修改文件**：
+  - `scripts/dispatch-task.sh`
+  - `scripts/task-watcher.sh`
+  - `scripts/send-to-agent.sh`（如需加轻量日志）
+- **具体动作**：
+  1. 给 critical 派发/重发写可统计标记。
+  2. 让 chat-metrics 能识别“critical 公告 + 定向唤醒”是否同时发生。
+- **测试/校验**：
+  - 构造一条 `priority=critical` 任务派发，检查是否同时留下两类事件痕迹。
+- **验收标准**：
+  - `critical_dual_channel_count` 可自动统计，而不是人工猜。
+
+##### Step P2-4：把指标接入 PM 巡检/复盘流程
+- **目标**：验证期不是只写脚本，还要真正被 PM 使用。
+- **修改文件**：
+  - `scripts/pm-chat-check.sh`
+  - `design/Chat-Hub-A-Lite-验证使用说明.md`
+- **具体动作**：
+  1. `pm-chat-check.sh` 增加最近 24h 指标摘要模式。
+  2. 在验证说明里明确 PM 每天/每周要看哪些指标。
+- **测试/校验**：
+  - 运行一次脚本，输出“近期 actionable + 指标摘要”。
+- **验收标准**：
+  - PM 不需要手工翻 JSONL 才能判断 A-Lite 是否有效。
+
+### 22.6 分层 PM 先做只读聚合视图（P2）
+
+> 当前 `config.json` 已经是 `hierarchy_ready`，但运行时仍是单 PM。P2 的正确做法不是立刻上子 PM，而是先做**只读聚合视图**，让 PM 能按 `owner_pm / domain / task_level / parent_task_id` 看到任务树与拥塞点。
+
+#### 22.6.1 目标
+
+- 不引入新的分层 PM runtime。
+- 只提供一个聚合视图，帮助判断：
+  - 哪些 domain 任务最多
+  - 哪些 parent/root request 下任务膨胀
+  - 哪些 task_level（execution/review/integration/coordination）开始失衡
+  - `owner_pm` 是否已经接近单点瓶颈
+
+#### 22.6.2 开发步骤拆解（可直接分派）
+
+##### Step P2-5：定义聚合视图字段与输出格式
+- **目标**：明确“只读聚合视图”长什么样。
+- **修改文件**：
+  - `design/分层PM演进方案.md`
+  - 如有必要：`README.md` 看板/巡检部分
+- **具体动作**：
+  1. 约定至少支持四个维度：`owner_pm`、`domain`、`task_level`、`parent_task_id/root_request_id`。
+  2. 明确输出既要有汇总表，也要有任务明细 drill-down。
+- **测试/校验**：
+  - 文档评审。
+- **验收标准**：
+  - 团队对聚合视图的口径一致，不会误以为这是新的状态事实源。
+
+##### Step P2-6：新增任务聚合脚本
+- **目标**：从 `tasks/*/task.json` 自动生成只读汇总。
+- **修改文件**：
+  - 新增 `scripts/task-aggregate.sh` 或 `scripts/task-aggregate.py`
+- **具体动作**：
+  1. 扫描 `tasks/` 下所有有效任务。
+  2. 输出：
+     - 每个 `owner_pm` 的任务数/状态分布
+     - 每个 `domain` 的任务数/阻塞数
+     - 每个 `task_level` 的数量分布
+     - 每个 `root_request_id`/`parent_task_id` 的子任务树摘要
+  3. 支持 `--json` 和表格输出。
+- **测试/校验**：
+  - 用现有 100+ 个任务目录跑脚本。
+- **验收标准**：
+  - 能在不改任何任务状态的前提下输出稳定汇总。
+
+##### Step P2-7：把聚合视图接入 PM 日常巡检
+- **目标**：让单 PM 在不升级 runtime 的前提下提前感知“是否接近分层阈值”。
+- **修改文件**：
+  - `scripts/pm-chat-check.sh` 或新增 `scripts/pm-daily-brief.sh`
+  - `design/分层PM演进方案.md`
+- **具体动作**：
+  1. 给 PM 一个命令，能同时看到 chat 指标与 task 聚合摘要。
+  2. 输出重点提醒：
+     - 某 domain 是否积压
+     - `coordination/integration/review` 是否开始占比过高
+- **测试/校验**：
+  - 手工运行并核对输出。
+- **验收标准**：
+  - PM 能据此判断是否仍适合单 PM 管理。
+
+##### Step P2-8：定义“升级到两层 PM”的预警规则
+- **目标**：让分层演进从“拍脑袋”变成“指标触发”。
+- **修改文件**：
+  - `design/分层PM演进方案.md`
+  - `design/OpenClaw-tmux协作方案优化.md`（本章可引用）
+- **具体动作**：
+  1. 把已有阈值（活跃任务数、跨域 blocker、integration queue 等）改成脚本可观测字段。
+  2. 明确哪些阈值连续几天触发，才建议进入两层 PM。
+- **测试/校验**：
+  - 用聚合脚本输出结果进行人工演练。
+- **验收标准**：
+  - “是否升级分层 PM”可基于数据讨论，而不是凭体感。
+
+### 22.7 事件严重度分级（P3）
+
+> 现在很多事件虽然已经结构化了，但“噪音等级”还不够清晰。P3 的目标是把通信/通知事件分成 `info / degraded / critical`，让 PM、watcher、前端提示、飞书通知不再把所有异常一视同仁。
+
+#### 22.7.1 目标
+
+- 降低误报警噪音。
+- 让 429、瞬时 request_failed、普通重试等事件不再和真正的生产故障走同一级通道。
+- 为 watcher/PM/前端后续统一事件口径打基础。
+
+#### 22.7.2 严重度定义
+
+| 级别 | 含义 | 示例 |
+|------|------|------|
+| `info` | 普通状态变化，不要求立即介入 | task_announce、ack、普通完成、已知可恢复重试 |
+| `degraded` | 能力退化或短时异常，需关注但不应立刻当作生产事故 | 429、瞬时 request_failed、单次重发、非关键线程长时间无 answer |
+| `critical` | 需要立即唤醒/仲裁/升级 | 生产故障、session 丢失、任务重试耗尽、关键 blocker 超时 |
+
+#### 22.7.3 开发步骤拆解（可直接分派）
+
+##### Step P3-1：给现有通知事件补 severity 字段口径
+- **目标**：统一 watcher / chat / PM 提醒中的严重度语义。
+- **修改文件**：
+  - `chat/README.md`
+  - `scripts/send-chat.sh`
+  - `scripts/task-watcher.sh`
+  - 如有必要：`README.md`
+- **具体动作**：
+  1. 在文档中明确 `priority` 与 `severity` 的区别：
+     - `priority` 偏任务业务优先级
+     - `severity` 偏事件严重度
+  2. 对 watcher 事件定义默认 severity。
+- **测试/校验**：
+  - 文档审查 + grep 现有事件模板。
+- **验收标准**：
+  - 团队不再把“高优先级任务”和“高严重度故障”混为一谈。
+
+##### Step P3-2：增强 task-watcher / pm-chat-check 的严重度输出
+- **目标**：不同严重度走不同提示口径。
+- **修改文件**：
+  - `scripts/task-watcher.sh`
+  - `scripts/pm-chat-check.sh`
+- **具体动作**：
+  1. `task-watcher` 对重发、working 超时、QA 失败、session 丢失等事件打 severity。
+  2. `pm-chat-check.sh` 默认优先展示 `critical`，其次 `degraded`。
+- **测试/校验**：
+  - 构造三类事件样例，检查脚本输出分层。
+- **验收标准**：
+  - PM 巡检输出不再把普通同步与故障噪音混在一起。
+
+##### Step P3-3：critical 事件强制双通道，degraded 事件默认聚合
+- **目标**：把真正要打断人的事件和可观察事件分流。
+- **修改文件**：
+  - `scripts/dispatch-task.sh`
+  - `scripts/task-watcher.sh`
+  - 可能涉及 `chat/README.md`
+- **具体动作**：
+  1. `critical`：继续走 chat + `send-to-agent.sh` + Feishu。
+  2. `degraded`：默认进入 chat / 日志 / PM 巡检，不强制实时唤醒。
+  3. `info`：仅保留在线程或本地日志中。
+- **测试/校验**：
+  - 用模拟事件检查三条路径。
+- **验收标准**：
+  - 关键故障仍能第一时间到达；普通退化事件不会制造同等级噪音。
+
+### 22.8 建议实施顺序（可直接排期）
 
 #### 第一批（P0，先做）
 1. `P0-1` 统一文档口径
@@ -3559,7 +3771,26 @@ Program PM（全局优先级和仲裁）
 
 > 交付目标：PM 巡检能区分“消息已写入”和“消息已被消费”，但不引入完整 IM 状态机复杂度。
 
-### 22.6 本章验收标准
+#### 第四批（P2，验证与只读聚合）
+1. `P2-1` 定义 Chat Hub 验证期指标字典
+2. `P2-2` 新增 chat 指标统计脚本
+3. `P2-3` 把 critical 双通道接入可观测性
+4. `P2-4` 把指标接入 PM 巡检/复盘流程
+5. `P2-5` 定义只读聚合视图字段
+6. `P2-6` 新增任务聚合脚本
+7. `P2-7` 把聚合视图接入 PM 日常巡检
+8. `P2-8` 定义升级到两层 PM 的预警规则
+
+> 交付目标：A-Lite 是否有效、单 PM 是否接近瓶颈，都能用数据判断，而不是靠体感。
+
+#### 第五批（P3，事件严重度分级）
+1. `P3-1` 定义 severity 口径与字段边界
+2. `P3-2` 增强 watcher / PM 巡检的严重度输出
+3. `P3-3` 实现 critical 双通道、degraded 默认聚合
+
+> 交付目标：降低误报警噪音，让真正的生产故障与普通退化事件走不同通知通道。
+
+### 22.9 本章验收标准
 
 v14 增补内容完成后，应满足以下验收标准：
 
@@ -3571,10 +3802,16 @@ v14 增补内容完成后，应满足以下验收标准：
    - PM 能通过工具识别关键 thread 是否长期未被 owner 消费
 4. **自动批准边界可解释**
    - tmux-watcher 不再对所有关键词命中一律自动 Enter，而是遵循白名单 session + prompt 前缀规则
-5. **不提前引入重状态机**
+5. **验证期指标可量化**
+   - PM 能看到 `task_announce`、问答闭环、PM @、critical 双通道触发等核心指标，而不是只靠抽样观察
+6. **分层 PM 先有只读视图**
+   - 在不上 runtime 的前提下，PM 能按 `owner_pm/domain/task_level/parent_task_id` 做只读汇总与拥塞判断
+7. **事件严重度分级生效**
+   - `info / degraded / critical` 口径明确，PM 巡检与 watcher 通知不再把所有异常等价对待
+8. **不提前引入重状态机**
    - 仍然不接入 `task_claim`、私聊、完整 read pointer、chat 驱动状态机
 
-### 22.7 不在本轮范围内的事项
+### 22.10 不在本轮范围内的事项
 
 以下能力继续后移，不纳入 v14 本轮改造：
 
@@ -3583,5 +3820,6 @@ v14 增补内容完成后，应满足以下验收标准：
 - 完整未读/已读/通知去重状态机
 - watcher 主动扫描 chat 并自动唤醒所有普通消息
 - 分层 PM runtime（子 PM / Pod PM）
+- Chat Hub 与 task 状态机的直接融合
 
 > 原则：**先把当前链路收敛和加固，再决定是否继续复杂化。**
