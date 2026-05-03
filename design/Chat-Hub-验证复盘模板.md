@@ -40,6 +40,12 @@
 - 双通道是否执行到位：
 - 授权边界是否有混乱：
 
+### 6. 协议与数据质量
+- 是否出现字段缺失 / 非法 `reply_to` / task_id 与文件名不一致：
+- 是否出现关键结论只写 chat、不回写 feature/notes：
+- 是否出现同一类消息口径分裂（priority 与 severity 混用、human/system 混写）：
+- 看板若已接入 communication ingest，是否能稳定回放 thread 与系统通知：
+
 ## 四、是否进入 Phase B 的判断
 
 ### 可进入的前提（逐项判断）

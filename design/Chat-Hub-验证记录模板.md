@@ -41,6 +41,12 @@
   - `notes/dev.md / arch.md / qa.md`
 - 是否出现“只在 chat 里说了，但没落盘”：
 
+### 4.5 协议/数据质量观察
+- `lint-chat.sh` 是否通过：
+- 是否出现非法 `reply_to` / `task_id` 错配 / 重复 `msg_id`：
+- 是否出现应该是 system 事件却被人工消息冒充的情况：
+- 是否出现 priority / severity 理解混乱：
+
 ### 5. 超时与 PM 介入
 - `working 超时` 提醒次数：
 - PM 介入次数：
@@ -52,6 +58,12 @@
   - `task_announce`
   - `send-to-agent.sh`
 - 是否有遗漏：
+
+### 6.5 看板/事件对齐观察
+- 如果看板/communication ingest 已接入：
+  - task thread 是否能被稳定抽取
+  - system notice / direct nudge 是否有统一事件口径
+  - 是否出现 timeline 无法排序/事件归属错误
 
 ## 当日观察
 

@@ -31,6 +31,10 @@
    - `task_announce` 之前，任务类型 / 目标 / 边界 / 验收标准 / 环境范围 / 下游动作 / 授权状态必须已明确
    - 不能把“仍在补 instruction 的任务”直接推进 chat 扩散讨论
 
+6. **协议先于扩展**
+   - 在 A-Lite 继续运行的同时，后续若要把 watcher / dispatch / direct nudge 接入看板，必须先对齐 `design/Chat-Hub-协议补充.md`
+   - 不允许由具体脚本各自发明 system event 格式
+
 ---
 
 ## 二、阶段总览
@@ -574,3 +578,26 @@
   4. 没有引入新的任务状态混乱
 
 在这之前，**不要急着把 chat 接入任务认领状态机**。
+
+
+### A-Lite-3A
+- **ID**：A-Lite-3A
+- **标题**：补充 Chat Hub 协议补充文档（schema_version / system event / severity）
+- **状态**：待实施
+- **描述**：
+  - 新增 `design/Chat-Hub-协议补充.md`
+  - 明确：
+    - `schema_version`
+    - `event_class`
+    - `source_type=human/system` 的边界
+    - `priority` 与 `severity` 的分工
+    - 与看板 `communication_events` 的映射
+- **涉及文件**：
+  - `design/Chat-Hub-协议补充.md`
+  - `design/Chat-Hub-A-Lite-验证使用说明.md`
+  - `design/Chat-Hub-落地清单.md`
+- **预估复杂度**：低
+- **依赖关系**：A-Lite-3
+- **验收标准**：
+  1. A-Lite 文档与后续看板 ingest 之间有统一桥接契约
+  2. 文档明确当前只有 human 生产路径，system 事件仍是预留/后续扩展

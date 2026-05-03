@@ -11,6 +11,7 @@
 - `chat/general/`
 - `chat/tasks/{task-id}.jsonl`
 - `scripts/send-chat.sh`
+- 仅 **human 消息生产路径**（system 事件仍未直接写入 chat）
 
 当前**不启用**：
 - `chat/agents/` 私聊
@@ -22,10 +23,17 @@
 也就是说：
 - **任务状态仍看 `tasks/`**
 - **任务讨论开始用 `chat/`**
+- **若后续要把 watcher / dispatch / direct nudge 接到 timeline，请先遵循 `design/Chat-Hub-协议补充.md`，不要在 A-Lite 文档里自行扩字段**
 
 ---
 
 ## 二、谁该怎么用
+
+## 二点五、协议补充阅读要求
+
+- 若任务涉及 chat 协议、看板 ingest、system 通知、severity / priority 口径，必须同时阅读：
+  - `design/Chat-Hub-协议补充.md`
+- 当前验证期默认只验证 **human message thread**，不默认把 watcher/system 事件算作“已接入 chat”。
 
 ### 1. PM（pm-chief）
 
