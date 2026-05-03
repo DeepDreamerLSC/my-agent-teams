@@ -2,7 +2,7 @@
 
 > 基于 `design/OpenClaw-tmux协作方案优化.md` 第 15.5 章的 **A-Lite → 验证期 → B → C** 路线整理。
 > 目标：先验证共享消息区是否能降低 PM 中转负担，再决定是否把 chat 接入任务认领与状态机。
-> 更新时间：2026-04-27
+> 更新时间：2026-05-03
 
 ---
 
@@ -583,7 +583,7 @@
 ### A-Lite-3A
 - **ID**：A-Lite-3A
 - **标题**：补充 Chat Hub 协议补充文档（schema_version / system event / severity）
-- **状态**：待实施
+- **状态**：已完成（2026-05-03）
 - **描述**：
   - 新增 `design/Chat-Hub-协议补充.md`
   - 明确：
@@ -601,3 +601,30 @@
 - **验收标准**：
   1. A-Lite 文档与后续看板 ingest 之间有统一桥接契约
   2. 文档明确当前只有 human 生产路径，system 事件仍是预留/后续扩展
+
+
+### A-Lite-9
+- **ID**：A-Lite-9
+- **标题**：提供 Chat Hub 验证期指标采集脚本
+- **状态**：已完成（2026-05-03）
+- **描述**：
+  - 新增 `scripts/chat-metrics.py`
+  - 自动统计：
+    - `task_announce_count`
+    - `question / answer` 数与比例
+    - `pm_mention_count`
+    - `critical_dual_channel_count`
+    - `decision_count / task_done_count`
+    - `unanswered_question_count`
+    - `schema_version_coverage`
+  - 为验证期台账提供自动化数据输入，而不只依赖人工统计
+- **涉及文件**：
+  - `scripts/chat-metrics.py`
+  - `scripts/pm-chat-check.sh`
+  - `chat/README.md`
+- **预估复杂度**：中
+- **依赖关系**：A-Lite-2、A-Lite-8
+- **验收标准**：
+  1. 可按天/天数区间输出 Chat Hub 指标摘要
+  2. PM 可直接复用脚本结果填写验证模板
+  3. critical 双通道与未答复问题可被自动识别

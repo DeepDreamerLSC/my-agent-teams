@@ -11,7 +11,8 @@
 - `chat/general/`
 - `chat/tasks/{task-id}.jsonl`
 - `scripts/send-chat.sh`
-- 仅 **human 消息生产路径**（system 事件仍未直接写入 chat）
+- human 任务/公共消息生产路径
+- 受控 system 事件路径（`watcher / dispatch / nudge`）
 
 当前**不启用**：
 - `chat/agents/` 私聊
@@ -33,7 +34,7 @@
 
 - 若任务涉及 chat 协议、看板 ingest、system 通知、severity / priority 口径，必须同时阅读：
   - `design/Chat-Hub-协议补充.md`
-- 当前验证期默认只验证 **human message thread**，不默认把 watcher/system 事件算作“已接入 chat”。
+- 当前验证期主验证对象仍是 **human message thread**；system 事件已可写入 `chat/system/...`，但主要用于时间线、审计和指标补强。
 
 ### 1. PM（pm-chief）
 
@@ -189,6 +190,14 @@ PM 每天至少记录一次：
 
 统一模板：
 - `design/Chat-Hub-验证记录模板.md`
+
+### 6.5 指标采集建议
+可结合脚本：
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
+/Users/lin/Desktop/work/my-agent-teams/scripts/pm-chat-check.sh --days 1 --limit 20
+```
+用于自动采集：task_announce、question/answer、PM @、critical 双通道、未答复问题等核心验证指标。
 
 ---
 

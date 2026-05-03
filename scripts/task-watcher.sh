@@ -232,6 +232,27 @@ push_task_event() {
     push_feishu "$message"
 }
 
+emit_system_chat_event() {
+    local channel="$1"
+    local task_id="$2"
+    local msg="$3"
+    local to_actor="${4:-all}"
+    local severity="${5:-info}"
+    local event_type="${6:-notify}"
+
+    [ -n "$task_id" ] || return 0
+    [ -x "$SEND_CHAT_SCRIPT" ] || return 0
+
+    local source_name="task-watcher"
+    case "$channel" in
+        watcher) source_name="task-watcher" ;;
+        dispatch) source_name="dispatch-task" ;;
+        nudge) source_name="send-to-agent" ;;
+    esac
+
+    TASKS_ROOT="$TASKS_ROOT" "$SEND_CHAT_SCRIPT" "$channel" "$task_id" "$msg"         --to "$to_actor"         --type "$event_type"         --severity "$severity"         --source-type system         --source-name "$source_name" >/dev/null 2>&1 || true
+}
+
 # 检查 task.json 中的 status
 get_task_status() {
     local task_dir="$1"
@@ -831,16 +852,19 @@ auto_dispatch_review() {
     while IFS= read -r reviewer; do
         [ -n "$reviewer" ] || continue
         if [ "$review_level" = "complex" ] && [ "$reviewer" = "arch-1" ]; then
-            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行设计审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 design-review.md。摘要：$(truncate_utf8 "$summary" 300)"
+            notify_agent "$reviewer" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并按任务目录工件执行设计审查，输出 design-review.md。"
+            emit_system_chat_event watcher "$task_id" "已通知 ${reviewer} 执行设计审查。" "$reviewer" info notify
         else
-            notify_agent "$reviewer" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行代码审查。读取 instruction.md、result.json、verify.json 和相关 artifacts，输出 review.md。摘要：$(truncate_utf8 "$summary" 300)"
+            notify_agent "$reviewer" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并按任务目录工件执行代码审查，输出 review.md。"
+            emit_system_chat_event watcher "$task_id" "已通知 ${reviewer} 执行代码审查。" "$reviewer" info notify
         fi
     done <<< "$(task_reviewers "$task_dir")"
 }
 
 auto_dispatch_qa() {
     local task_id="$1"
-    notify_agent "$QA_SESSION" "请对 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id} 执行 QA 验证。读取 instruction.md、result.json、review.md、design-review.md（若存在）并将验证结论写入 verify.json。verify.json 至少包含 task_id、agent/agent_id、verified_at、status(pass|fail)、pass(true|false)、summary；通过请标记 status=pass 且 pass=true，失败请标记 status=fail 且 pass=false，并写明失败原因与复现步骤。"
+    notify_agent "$QA_SESSION" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并结合 result/review artifacts 执行 QA 验证，输出 verify.json。"
+    emit_system_chat_event watcher "$task_id" "已通知 qa-1 执行 QA 验证。" "$QA_SESSION" info notify
 }
 
 auto_close_task() {
@@ -859,7 +883,8 @@ auto_close_task() {
     fi
     if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1; then
         log "$task_id: QA 通过，已自动收口"
-        notify_pm "[task-watcher] $task_id QA 已通过并自动收口（done）。摘要：$(truncate_utf8 "$result_summary" 500)。如需部署请联系林总工。"
+        notify_pm "[task-watcher] $task_id QA 已通过并自动收口，请查看任务目录与 verify.json。" 
+        emit_system_chat_event watcher "$task_id" "QA 已通过并自动收口。" "$PM_SESSION" info notify
         return 0
     fi
     log "$task_id: close-task.sh 执行失败，未自动收口"
@@ -924,7 +949,8 @@ while true; do
                         if [ -n "$agent_session" ]; then
                             instruction="$task_dir/instruction.md"
                             if [ -f "$instruction" ]; then
-                                notify_agent "$agent_session" "请读取 ${task_dir}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
+                                notify_agent "$agent_session" "请重新读取 ${task_dir}/instruction.md 并继续执行，完成后写 ack.json / result.json。"
+                                emit_system_chat_event nudge "$task_id" "任务超时未确认，已触发重新唤醒。" "$agent_session" degraded nudge
                                 log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，兜底重发指令给 $agent_session"
                                 push_task_event "【任务重发】" "$task_id" "超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已重新发送给 ${agent_session}" "等待 agent 写入 ack.json"
                             fi
@@ -972,19 +998,23 @@ while true; do
                         push_task_event "【任务完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "${downstream_action:-请按任务下游动作继续推进}"
                     fi
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
-                        notify_pm "[task-watcher] $task_id 技术方案已完成（agent: ${agent:-arch-1}）。请整理摘要并通过飞书推送林总工确认。摘要：$(truncate_utf8 "$summary" 300)"
+                        notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
+                        emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
                     elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
                         auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                         log "$task_id: 已自动通知 reviewer，review_level=$review_level"
                     else
-                        notify_pm "[task-watcher] $task_id 已完成（agent: ${agent:-?}）。摘要：$(truncate_utf8 "$summary" 300)。请验收并决定是否推进下游任务。"
+                        notify_pm "[task-watcher] $task_id 已完成，请查看 result.json 并决定下游动作。"
+                        emit_system_chat_event watcher "$task_id" "任务已完成，等待 PM 验收与下游推进。" "$PM_SESSION" info notify
                     fi
                 elif [ "$result_status" = "blocked" ]; then
                     set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
-                    notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 300)。请处理。"
+                    notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
+                    emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
                     push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因"
                 else
-                    notify_pm "[task-watcher] $task_id 有 result.json（status=$result_status），请检查。"
+                    notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
+                    emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
                 fi
 
                 sync_task_board "$task_dir" "result-detected"
@@ -999,7 +1029,8 @@ while true; do
                 working_timeout_key="${task_id}_working_timeout_notice"
                 if ! is_notified "$working_timeout_key" || is_file_newer_than_notified "$working_timeout_key" "$task_dir/task.json"; then
                     agent_session=$(task_json_pick "$task_dir" assigned_agent)
-                    notify_pm "[task-watcher] $task_id 持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟（agent: ${agent_session:-?}），请 PM 介入检查；本次不自动重发。"
+                    notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
+                    emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
                     push_task_event "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查"
                     log "$task_id: working 超时已通知 PM 介入，未触发重发"
                     mark_notified "$working_timeout_key"
@@ -1020,10 +1051,12 @@ while true; do
                         auto_dispatch_qa "$task_id"
                         log "$task_id: review 通过，已自动通知 qa-1"
                     else
-                        notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请验收并决定是否收口。"
+                        notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
+                        emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 验收。" "$PM_SESSION" info notify
                     fi
                 elif [ "$state" = "fail" ]; then
-                    notify_pm "[task-watcher] $task_id 审查未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)"
+                    notify_pm "[task-watcher] $task_id 审查未通过，请查看 review.md 并仲裁。"
+                    emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
                     push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修"
                 fi
                 sync_task_board "$task_dir" "review-detected"
@@ -1042,14 +1075,17 @@ while true; do
                     if [ "$current_status" = "ready_for_merge" ]; then
                         if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
                             notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败，请检查 close-task.sh 与任务状态。"
+                            emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败。" "$PM_SESSION" degraded notify
                             continue
                         fi
                     else
-                        notify_pm "[task-watcher] $task_id QA 已通过，但当前状态为 $current_status，未自动收口，请检查。"
+                        notify_pm "[task-watcher] $task_id QA 已通过但未自动收口，请检查任务状态。"
+                        emit_system_chat_event watcher "$task_id" "QA 已通过但未自动收口。" "$PM_SESSION" degraded notify
                         continue
                     fi
                 elif [ "$vstate" = "fail" ]; then
-                    notify_pm "[task-watcher] $task_id QA 未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$vsummary" 300)"
+                    notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
+                    emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
                     push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证"
                 fi
                 sync_task_board "$task_dir" "verify-detected"

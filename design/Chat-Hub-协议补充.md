@@ -2,7 +2,7 @@
 
 > 创建时间：2026-05-03  
 > 适用范围：`chat/`、`scripts/send-chat.sh`、`scripts/lint-chat.sh`、后续 `communication_events` ingest 设计  
-> 目标：在 A-Lite 继续可用的前提下，补齐 **协议版本、system 事件、priority/severity 分工、与看板 communication_events 的桥接契约**。
+> 目标：在 A-Lite 继续可用的前提下，补齐 **协议版本、system 事件、priority/severity 分工、与看板 communication_events 的桥接契约**，并为当前已上线的 watcher / dispatch / direct nudge 结构化事件提供统一口径。
 
 ---
 
@@ -69,11 +69,11 @@
 | `question` | 已启用 | 提问 |
 | `answer` | 已启用 | 回答 |
 | `decision` | 已启用 | 需要被感知的决策 |
-| `notify` | 预留 | watcher 系统通知 |
-| `dispatch` | 预留 | 派发完成的结构化事件 |
-| `nudge` | 预留 | send-to-agent 强制唤醒 / 重试 |
+| `notify` | 已启用（system） | watcher 系统通知 |
+| `dispatch` | 已启用（system） | 派发完成的结构化事件 |
+| `nudge` | 已启用（system） | send-to-agent 强制唤醒 / 重试 |
 
-> A-Lite 当前只有前六类由 `send-chat.sh` 直接生产；`notify / dispatch / nudge` 先作为协议预留，等系统事件正式落盘时启用。
+> 当前实现中：前六类由 `send-chat.sh` 的 human 路径直接生产；`notify / dispatch / nudge` 已可由 `send-chat.sh` 的 system 路径生产，并由 `dispatch-task.sh` / `task-watcher.sh` 调用写入 `chat/system/...`。
 
 ---
 
@@ -83,7 +83,7 @@
 | 值 | 当前状态 | 说明 |
 |---|---|---|
 | `human` | 已启用 | 来自 PM / dev / arch / qa / reviewer / kael / linsceo 的人工消息 |
-| `system` | 预留 | 来自 watcher / dispatch / ingest / direct_nudge 的系统事件 |
+| `system` | 已启用（受控） | 来自 watcher / dispatch / ingest / direct_nudge 的系统事件 |
 
 ### 4.2 source_name（建议新增）
 当 `source_type=system` 时，建议再带：
@@ -95,8 +95,8 @@
 ```
 
 当前 A-Lite 文档必须明确：
-- **现阶段 `send-chat.sh` 只生产 `human` 消息**；
-- `system` 是为后续 event ingest / timeline 扩展预留，不应误解为 watcher 已经直接写进 chat。
+- `send-chat.sh` 默认生产 `human` 消息，但现在也支持 `watcher / dispatch / nudge` 三类 `system` 事件；
+- 普通 agent 讨论仍以 human task/general thread 为主，system 事件主要用于 timeline、审计与指标采集。
 
 ---
 
@@ -193,15 +193,16 @@
 
 ### 当前 A-Lite 已启用
 - `general / task` 两类公开通道
+- `system/watcher / system/dispatch / system/direct_nudge` 三类系统事件通道
 - `text / task_announce / task_done / question / answer / decision`
-- `human` 消息生产路径
+- `notify / dispatch / nudge` 的 system 事件生产路径
+- `human` 与受控 `system` 两类生产路径
 
 ### 当前 A-Lite 未启用
 - `chat/agents/` 私聊
 - `task_claim / task_claim_confirmed`
-- `system` 事件直接写入 chat
-- `severity` 强制落盘
 - 已读游标 / 通知去重状态机
+- 完整的 chat 驱动状态机
 
 ### 后续若进入看板/通知增强阶段
 必须优先复用本补充文档中的：

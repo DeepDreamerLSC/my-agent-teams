@@ -24,3 +24,5 @@ chat/general/*.jsonl
 chat/general/*.lock
 chat/tasks/*.jsonl
 chat/tasks/*.lock
+chat/system/**/*.jsonl
+chat/system/**/*.lock

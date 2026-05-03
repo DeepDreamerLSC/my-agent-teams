@@ -1,9 +1,14 @@
 # Chat Hub（A-Lite）
 
 > Chat Hub 是 agent 之间的**公共消息区**。  
-> A-Lite 阶段只做：
+> A-Lite 阶段主做：
 > - `chat/general/` 公共频道
 > - `chat/tasks/` 任务讨论串
+>
+> 同时为后续看板 / watcher / dispatch / direct nudge 事件预留：
+> - `chat/system/watcher/`
+> - `chat/system/dispatch/`
+> - `chat/system/direct_nudge/`
 >
 > 当前**不做**：
 > - 私聊 `chat/agents/`
@@ -16,8 +21,15 @@
 chat/
 ├── general/
 │   └── YYYY-MM-DD.jsonl
-└── tasks/
-    └── {task-id}.jsonl
+├── tasks/
+│   └── {task-id}.jsonl
+└── system/
+    ├── watcher/
+    │   └── YYYY-MM-DD.jsonl
+    ├── dispatch/
+    │   └── YYYY-MM-DD.jsonl
+    └── direct_nudge/
+        └── YYYY-MM-DD.jsonl
 ```
 
 ## 角色边界
@@ -37,6 +49,9 @@ chat/
 /Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh general "消息内容"
 /Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task <task-id> "消息内容"
 /Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh announce <task-id> "任务公告内容"
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "系统通知" --to pm-chief --severity degraded
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发" --to dev-1 --severity info
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "已强制唤醒" --to dev-2 --severity critical
 ```
 
 ### `task_announce` 前置条件
@@ -79,6 +94,9 @@ chat/
 ```bash
 /Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh general --limit 20
 /Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh task <task-id> --limit 50
+/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh watcher --limit 20
+/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh dispatch --limit 20
+/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh nudge --limit 20
 ```
 
 ### 2. PM 巡检
@@ -106,3 +124,47 @@ chat/
 - `answer` 必须带 `reply_to`
 - `task_announce / task_done / decision` 必须带 `task_id`
 - task thread 中 `task_id` 与文件名一致
+
+
+## 协议补充（schema_version / system / severity）
+
+当前写入的新消息建议统一带：
+- `schema_version=1`
+- `channel`
+- `event_class`
+- `source_type`
+
+其中：
+- `priority` = 任务/消息的重要程度
+- `severity` = 事件严重度（`info/degraded/critical`）
+
+更多约束见：`design/Chat-Hub-协议补充.md`。
+
+### system 事件生产路径
+- `send-chat.sh` 现已支持：
+  - `watcher`
+  - `dispatch`
+  - `nudge`
+- 这些通道默认写入 `chat/system/...`，用于后续 communication timeline / dashboard ingest。
+
+### 常用 system 示例
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发并完成定向唤醒" --to dev-1 --severity info
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "QA 未通过，需 PM 仲裁" --to pm-chief --severity degraded
+/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "critical 任务已强制唤醒" --to dev-2 --severity critical
+```
+
+
+### 4. 指标采集
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
+/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 7 --json
+```
+
+用于采集：
+- `task_announce_count`
+- `question/answer` 数与比例
+- `pm_mention_count`
+- `critical_dual_channel_count`
+- `unanswered_question_count`
+- `schema_version_coverage`

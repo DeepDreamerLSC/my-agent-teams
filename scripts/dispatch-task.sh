@@ -326,6 +326,12 @@ fi
 if [ -x "$SEND_CHAT_SCRIPT" ]; then
   TASK_JSON="${TASK_DIR}/task.json"
   PRIORITY=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("priority") or "")' "$TASK_JSON")
+  TARGET_ENVIRONMENT=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("target_environment") or "")' "$TASK_JSON")
+  "$SEND_CHAT_SCRIPT" dispatch "$TASK_ID" "任务已派发，执行者请读取 instruction.md。" --to "$ASSIGNED_AGENT" --type dispatch --severity info --priority "${PRIORITY:-medium}" --source-type system --source-name dispatch-task >/dev/null 2>&1 || true
+  "$SEND_CHAT_SCRIPT" nudge "$TASK_ID" "已向目标 agent 发出定向唤醒。" --to "$ASSIGNED_AGENT" --type nudge --severity "$([ "${PRIORITY:-}" = "critical" ] && echo critical || echo info)" --priority "${PRIORITY:-medium}" --source-type system --source-name dispatch-task >/dev/null 2>&1 || true
+
+  TASK_JSON="${TASK_DIR}/task.json"
+  PRIORITY=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("priority") or "")' "$TASK_JSON")
   TITLE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("title") or "")' "$TASK_JSON")
   TARGET_ENVIRONMENT=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("target_environment") or "")' "$TASK_JSON")
   ANNOUNCE_MESSAGE="任务公告：${TITLE}（类型：${TASK_TYPE}，执行者：${ASSIGNED_AGENT}，环境：${TARGET_ENVIRONMENT:-dev}）"
