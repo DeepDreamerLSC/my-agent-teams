@@ -1,0 +1,47 @@
+{
+  "task_id": "前端置灰DeepSeek联网搜索并保持其他模型正常",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-27T13:31:30+08:00",
+  "summary": "已按林总工最新方向完成前端最小调整：当前模型为 DeepSeek 时，联网搜索按钮直接置灰并提示用户改为普通对话；DeepSeek 普通对话与深度思考能力不受误伤；GLM/Zhipu 继续沿用现有 provider-native unavailable 提示逻辑，其他 provider 的联网搜索也不受影响。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx"
+  ],
+  "implementation": {
+    "comparison_basis": [
+      "先对照当前已正常工作的 GLM/Zhipu provider-native unavailable 接线实现。",
+      "再对照 DeepSeek 现有普通对话/深度思考能力接线，确保只置灰联网搜索，不误伤其他能力。"
+    ],
+    "changes": [
+      "useChatOptions 在当前模型 provider=deepseek 且模型声明支持 web_search 时，前端强制把联网搜索视为 unavailable。",
+      "DeepSeek 导出专用提示文案：当前 DeepSeek 联网搜索已禁用，请直接进行普通对话。",
+      "当当前模型为 DeepSeek 时，自动清掉 enableWebSearch，避免出现按钮看起来可开但实际策略已禁用的状态。",
+      "不改 supportsThinking / supportsWebSearch 的能力判断，因此 DeepSeek 普通对话与深度思考按钮能力不被误伤。",
+      "GLM/Zhipu 的 zhipu_web_search_runtime_status 逻辑保持原样；非 DeepSeek/非 Zhipu 模型继续走原有全局 web_search_runtime_status。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/chatOptions.test.tsx src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx",
+        "result": "passed (4 files, 51 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ],
+    "notes": [
+      "Vitest 输出包含 jsdom 的 getComputedStyle pseudo-elements not implemented 提示，但不影响测试通过。"
+    ]
+  },
+  "non_regression": [
+    "DeepSeek 普通对话仍可正常发送，本次未改 Chat 发送链路。",
+    "DeepSeek 深度思考按钮仍按模型 capabilities 控制，不因联网搜索置灰而被禁用。",
+    "GLM/Zhipu 仍按现有 provider-native unavailable/degraded 策略展示。",
+    "其他 provider 不会因 DeepSeek 前端置灰策略被误伤。"
+  ]
+}

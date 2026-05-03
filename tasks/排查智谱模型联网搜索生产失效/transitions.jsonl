@@ -1,0 +1,3 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-29T18:17:06+08:00", "reason": "watcher auto-claimed pending execution task"}
+{"from": "dispatched", "to": "working", "at": "2026-04-29T18:18:12+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-29T18:51:31+08:00", "reason": "watcher observed result.json status=done"}

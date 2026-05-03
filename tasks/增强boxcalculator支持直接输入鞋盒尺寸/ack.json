@@ -1,0 +1,7 @@
+{
+  "task_id": "增强boxcalculator支持直接输入鞋盒尺寸",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-28T10:51:29+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与现有 box-calculator skill，开始仅在 /Users/lin/.agents/skills/box-calculator/SKILL.md 内补‘鞋盒实际尺寸 + 数量’输入模式、尺寸匹配规则与不匹配提示。"
+}

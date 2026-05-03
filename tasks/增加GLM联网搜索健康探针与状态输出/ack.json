@@ -1,0 +1,7 @@
+{
+  "task_id": "增加GLM联网搜索健康探针与状态输出",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T10:42:47+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md、排查结论与缓解方案。按“先看现有正常实现”的方法，先以 GLM/Zhipu 当前 native_provider_tool 链路为参照，补后端最小健康探针与 provider 级状态输出，不扩散到模型切换或本地搜索链路重写。"
+}

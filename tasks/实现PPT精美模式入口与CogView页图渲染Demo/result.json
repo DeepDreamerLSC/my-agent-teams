@@ -1,0 +1,96 @@
+{
+  "task_id": "实现PPT精美模式入口与CogView页图渲染Demo",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-01T02:45:30+08:00",
+  "summary": "当前没有环境或权限阻塞，已按最小 demo 可交付结果完成：在 `ppt_generator` 中新增 `simple / polished` 两种模式入口，扩展了 polished 模式的 `presentation_plan` schema，并新增独立 `ppt_page_render_service`，用 CogView-3-Flash 跑通了 `cover / content / closing` 三类页型的逐页图像渲染 demo。由于本任务边界明确不含 PPTX 图片页装配，polished 模式当前返回的是一个 zip demo 包（包含 `presentation_plan.json`、`rendered_pages.json` 与逐页渲染图片），而不是最终图片版 PPTX。",
+  "blocking_status": {
+    "blocked": false,
+    "remaining_work": [
+      "图片页装配进最终 `.pptx`（已明确由并行任务处理）",
+      "图表页结构化渲染（本任务边界外）",
+      "将 demo 阶段的 CogView-3-Flash 切换/抽象到生产级图片模型策略（后续任务）"
+    ]
+  },
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "action": "modified",
+      "description": "新增 polished/simple 模式元数据入口（`default_render_mode`、`render_modes`），并保持现有 skill 输入输出契约。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "新增 `render_mode` 入口判定；simple 模式继续输出 `.pptx`，polished 模式改为输出 zip demo 包；扩展 polished `presentation_plan` schema，并接入独立页图渲染 service。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
+      "action": "added",
+      "description": "新增独立页图渲染 service，封装 CogView-3-Flash 图片模型选择、分页 prompt 构造、逐页图片生成与本地导出，避免 provider 调用散落在 skill 中。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "action": "modified",
+      "description": "补充 polished 模式入口、demo archive 输出、图片 OCR 上下文消费等测试。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "action": "added",
+      "description": "新增页图渲染 service 测试，验证支持页型过滤/页数限制，以及调用 CogView-3-Flash 图片生成接口。"
+    }
+  ],
+  "presentation_plan_schema_extension": {
+    "simple_mode": {
+      "shape": "{ title, slides[] }",
+      "use": "继续供现有文本型 PPTX 生成链路使用"
+    },
+    "polished_mode": {
+      "shape": "{ title, mode, theme_hint, slides[{ slide_id, page_type, title, summary, bullets, visual_brief, layout_hint }] }",
+      "supported_page_types_demo": [
+        "cover",
+        "content",
+        "closing"
+      ],
+      "page_count_demo_limit": 5
+    }
+  },
+  "demo_output_contract": {
+    "display_type": "file",
+    "file_kind": "zip",
+    "contains": [
+      "presentation_plan.json",
+      "rendered_pages.json",
+      "pages/*.png|jpg|webp"
+    ],
+    "why_not_pptx": "本任务边界明确不负责 PPTX 图片页装配，因此 polished 模式先以 zip demo 包完成‘文本规划 -> 逐页图像渲染’闭环。"
+  },
+  "demo_page_types_supported": [
+    "cover",
+    "content",
+    "closing"
+  ],
+  "demo_model": {
+    "provider": "zhipu",
+    "model": "CogView-3-Flash（优先），其次兼容 cogview-3 候选）"
+  },
+  "why_no_other_provider_impact": [
+    "CogView 页图渲染逻辑被封装在新 service 中，没有改已有聊天主链路或其他 skill 的 provider 调用。",
+    "simple 模式仍走原有 `build_pptx_bytes()` 文本生成路径，不受 polished demo 影响。",
+    "当前改动不涉及 DeepSeek、GLM 文本模型的联网搜索或其他 runtime 探针。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
+      "result": "passed (8 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "这是最小可交付 demo，不是最终生产级精美 PPT 图片装配方案。",
+    "当前工作区还存在与前置 PPT 主链路/OCR 收口相关的未提交文件（如 `office_export_service.py`、`context_assembler.py` 等），但本任务本身的最小 polished demo 已可单独说明与验证。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` 弃用提示，与本次 polished demo 实现无关。"
+  ]
+}

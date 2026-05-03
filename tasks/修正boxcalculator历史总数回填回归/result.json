@@ -1,0 +1,43 @@
+{
+  "task_id": "修正boxcalculator历史总数回填回归",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T19:25:30+08:00",
+  "summary": "已做最小补修，阻断 recent_messages 路径把历史错误 total_quantity 回填到当前混装 forward 的问题；同时补了多轮上下文下的 forward / direct_dimension / reverse 回归测试，确保历史内容不再污染当前轮意图。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "在 _build_request 的 recent_messages 合并前后增加‘当前轮意图保护’：当前文本已有 style_quantities 且无显式总数时，合并后强制清空 total_quantity；当前轮若是纯 direct_dimension 或纯 reverse，也会在 recent_messages 合并后清空历史 style_quantities / total_quantity 污染。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "action": "modified",
+      "description": "新增 recent_messages 场景回归测试，覆盖历史错误总数回填、direct_dimension 多轮不回归、reverse 多轮不回归。"
+    }
+  ],
+  "how_history_total_backfill_is_blocked": [
+    "先基于当前 query 文本计算本轮局部事实：是否已有 style_quantities、是否有显式总数字样、是否属于 direct_dimension、是否属于纯 reverse。",
+    "recent_messages 合并完成后，如果当前 query 已经有 style_quantities 且当前文本没有显式总数语义，就再次把 total_quantity 置空，彻底切断历史 total_quantity 回填。",
+    "如果当前轮是纯 direct_dimension（当前轮有三维尺寸+数量、无款号、无 reverse hint），则 recent_messages 合并后会把历史 style_quantities 清空，避免历史款号把当前轮从 direct_dimension 拖回 forward。",
+    "如果当前轮是纯 reverse（当前轮有外箱尺寸+reverse hint、无款号），则 recent_messages 合并后会把历史 style_quantities 和 total_quantity 一并清空，避免误走 reverse_with_known_contents。"
+  ],
+  "recent_messages_tests_added": [
+    "上一轮历史消息含错误总数 `A 4 双，B 6 双，一箱共 4 双，算纸箱`，当前轮 `A 4 双，B 6 双，算纸箱` 仍正常 forward，不再报总双数不一致。",
+    "direct_dimension 在带 recent_messages 时不回归：历史轮含错误混装总数，当前轮 `28.8 x 25.5 x 10.9规格10双` 仍保持 direct_dimension 并匹配到 B 款。",
+    "reverse 在带 recent_messages 时不回归：历史轮含错误混装总数，当前轮 `现有外箱 ... 帮我看是不是最优` 仍走候选 reverse，不会被污染成‘已知内容’分支。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
+      "result": "passed (15 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次 recent_messages 回填补修无关。"
+  ]
+}

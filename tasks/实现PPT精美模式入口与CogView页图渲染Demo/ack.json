@@ -1,0 +1,7 @@
+{
+  "task_id": "实现PPT精美模式入口与CogView页图渲染Demo",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-01T02:28:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。按最小 demo 闭环推进：为 ppt_generator 增加 simple/polished 入口，扩展 presentation_plan schema，并抽出独立 CogView-3-Flash 页图渲染 service 跑通 cover/content/closing 页型，再补测试。"
+}

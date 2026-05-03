@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-28T10:45:25+08:00", "reason": "pm dispatch for box-calculator direct-size mode enhancement"}
+{"from": "dispatched", "to": "working", "at": "2026-04-28T10:52:46+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-28T10:52:48+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-28T10:57:42+08:00", "reason": "task-watcher auto close after qa verify pass"}

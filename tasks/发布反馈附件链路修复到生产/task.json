@@ -1,0 +1,62 @@
+{
+  "id": "发布反馈附件链路修复到生产",
+  "title": "发布反馈附件链路修复到生产",
+  "project": "chiralium",
+  "execution_mode": "deploy",
+  "target_environment": "prod",
+  "assigned_agent": "arch-1",
+  "review_required": false,
+  "review_authority": "owner",
+  "reviewer": null,
+  "review_level": "skip",
+  "reviewers": [],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "done",
+  "task_level": "integration",
+  "owner_pm": "pm-chief",
+  "domain": "quality",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/.git",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "depends_on": [
+    "补齐反馈附件详情契约与元数据返回",
+    "收束反馈附件详情为可靠下载入口",
+    "补齐反馈AI链路附件元数据传递"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/发布反馈附件链路修复到生产/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "反馈管理未关闭问题修复发布",
+  "parent_task_id": "排查反馈管理未关闭问题根因",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 90,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T16:24:38+08:00",
+  "lease_expires_at": "2026-04-28T16:24:38+08:00",
+  "workspace_mode": "main",
+  "target_branch": "master",
+  "result_summary": "反馈附件链路三条修复已更新 Release Note、合入并推送 commit e9d8a12b36ecafeda7b5ebfc199801752f17f393，并已部署到生产；生产与本地 HEAD 一致，后端/Hotpick/公网健康检查通过。",
+  "last_error": null,
+  "created_at": "2026-04-28T16:13:53+08:00",
+  "updated_at": "2026-04-28T16:39:43+08:00"
+}

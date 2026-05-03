@@ -1,0 +1,7 @@
+{
+  "task_id": "排查DeepSeek模型不可用与GLM联网搜索丢失",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T08:53:47+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json，按只读排查要求执行：先用 GLM 现有正常联网搜索实现做参照，再核对 DeepSeek/GLM 的模型配置、capability、meta/runtime 和生产 chat 日志，确认根因后只输出事实与建议，不做大范围代码修改。"
+}

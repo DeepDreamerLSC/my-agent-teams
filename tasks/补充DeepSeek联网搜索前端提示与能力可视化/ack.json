@@ -1,0 +1,7 @@
+{
+  "task_id": "补充DeepSeek联网搜索前端提示与能力可视化",
+  "agent_id": "dev-1",
+  "acknowledged_at": "2026-04-25T18:45:00+08:00",
+  "status": "working",
+  "notes": "开始执行。先完成独立 UI 部分（管理后台能力可视化、聊天页禁用态提示、runtime unavailable 提示），后端契约落地后再接线。"
+}

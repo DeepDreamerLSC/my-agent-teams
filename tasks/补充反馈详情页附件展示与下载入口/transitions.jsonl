@@ -1,0 +1,5 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-28T11:44:19+08:00", "reason": "watcher auto-claimed pending execution task"}
+{"from": "dispatched", "to": "working", "at": "2026-04-28T11:47:37+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-28T11:53:12+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-28T12:07:42+08:00", "reason": "review request changes: protected file download path not wired correctly"}
+{"from": "blocked", "to": "cancelled", "at": "2026-04-28T16:13:53+08:00", "reason": "pm cancelled superseded blocked frontend task after narrower fix passed QA"}

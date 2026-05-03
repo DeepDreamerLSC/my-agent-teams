@@ -1,0 +1,7 @@
+{
+  "task_id": "实现taskwatcher超时检测优化",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T17:14:15+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md、feature BRIEF/CONTEXT/notes，并以前两条 execution 的 heartbeat/watchdog 与持久化日志实现为参照，开始在现有 watcher shell 主循环内最小调整超时检测：dispatched 3 分钟才重发，working 30 分钟仅通知 PM，不重发，同时优先依据任务工件与明确状态减少误报。"
+}

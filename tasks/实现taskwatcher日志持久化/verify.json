@@ -1,0 +1,29 @@
+{
+  "task_id": "实现taskwatcher日志持久化",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-26T17:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。watcher 启动事件正确写入日志文件；watchdog 事件写入同一日志文件；跨天轮转正常（2 天前日志归档为 task-watcher.YYYY-MM-DD.log，新日志继续写入 task-watcher.log）；7 天清理逻辑在代码中确认正确（find -mtime +6 -delete）；日志写入失败采用 || true 容忍，不阻塞主流转。shell 语法检查通过。",
+  "test_commands": [
+    "bash -n task-watcher.sh && bash -n task-watcher-watchdog.sh — SYNTAX OK",
+    "集成验证: watcher 启动日志写入文件 → PASS",
+    "集成验证: watchdog 事件写入同一日志文件 → PASS",
+    "集成验证: mtime 2 天前的日志跨天轮转为归档 → PASS",
+    "代码确认: 7 天清理 find -mtime +6 -delete → OK",
+    "代码确认: 日志写入 >> ... 2>/dev/null || true → 不阻塞主流转"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "关键事件记录到文件日志", "result": "PASS"},
+    {"id": 2, "criterion": "日志落点 ~/.openclaw/workspace/logs/task-watcher.log", "result": "PASS"},
+    {"id": 3, "criterion": "7 天轮转/保留", "result": "PASS"},
+    {"id": 4, "criterion": "日志写入失败不阻塞主流转", "result": "PASS"}
+  ],
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "当前仅按天轮转，未做按大小切分；若事件量暴增单日文件可能偏大",
+    "watcher 与 watchdog 同时追加同一文件，极端情况单行顺序可能轻微交错（不影响可追溯性）"
+  ]
+}

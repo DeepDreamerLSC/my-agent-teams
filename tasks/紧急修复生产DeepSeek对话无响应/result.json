@@ -1,0 +1,54 @@
+{
+  "task_id": "紧急修复生产DeepSeek对话无响应",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-27T12:14:10+08:00",
+  "summary": "已完成最小代码修复：当 DeepSeek 处于 tool_call 联网搜索链路且 runtime 配置不可用时，后端会在进入模型流式调用前直接短路返回明确失败文案，避免用户感知为“点击后无响应/长时间没结果”。同时确认生产仍需补齐 CHAT_WEB_SEARCH_BASE_URL 才能恢复真实联网搜索。",
+  "root_cause_judgment": {
+    "primary": {
+      "category": "configuration",
+      "detail": "生产 DeepSeek 联网搜索 runtime 当前仍是 unavailable，直接原因是 CHAT_WEB_SEARCH_BASE_URL 缺失。source 生产 .env.prod 后执行 describe_web_search_runtime()，返回 error=missing_base_url。"
+    },
+    "secondary": {
+      "category": "code",
+      "detail": "当前代码虽然已恢复 DeepSeek tool_call 正确链路，但在 runtime unavailable 时仍会继续走模型流式路径；当模型未及时产出有效 tool_call/正文时，用户侧可能感知为“没有反应”。"
+    }
+  },
+  "code_fix_completed": true,
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+      "action": "modified",
+      "description": "在 _stream_text_model_response() 中为 DeepSeek tool_call 链路增加 runtime preflight：若 web_search runtime 不 ready，则在进入模型流式调用前直接返回固定失败文案并记录日志。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "action": "modified",
+      "description": "新增回归测试，验证 DeepSeek tool_call 在 runtime unavailable（missing_base_url）时会直接短路返回固定响应，并且不会继续调用 tool_call runtime。"
+    }
+  ],
+  "key_evidence": [
+    "生产部署代码与工作区当前 HEAD 一致，DeepSeek provider 已恢复为 web_search.mode=tool_call，不再是旧的 native_provider_tool 回退。",
+    "生产环境变量上下文下 describe_web_search_runtime() 返回：provider=deepseek, status=unavailable, internal_status=misconfigured, ready=false, error=missing_base_url。",
+    "生产最近 2 天 chat_logs 中，DeepSeek + web_search_enabled=true 的记录多次只返回“联网搜索功能不可用”的兜底文案；说明开关已进入后端，但没有拿到真实联网结果。",
+    "这些记录里存在 tool_turn_count=0 的样本，说明当前并非每次都会形成有效 tool_call 补轮，因此需要后端在 runtime unavailable 时做更前置、更确定的短路。"
+  ],
+  "verification_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py -q",
+      "result": "passed (72 passed, 4 warnings)"
+    },
+    {
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py /Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
+      "result": "passed"
+    }
+  ],
+  "remaining_production_actions": [
+    "arch-1 / 运维需在生产环境补齐 CHAT_WEB_SEARCH_BASE_URL，并确认目标外部搜索接口可达。",
+    "补齐配置后需在生产重新验证：DeepSeek 普通对话有稳定响应；开启联网搜索后能拿到真实搜索结果，而不是固定失败文案。"
+  ],
+  "notes": [
+    "本次优先修复“有确定响应”的对话主链路，没有扩散改动到前端或部署流程。",
+    "当前工作区中 backend/app/services/model_service.py、backend/tests/test_chat_capabilities.py 还有其他任务留下的未提交改动（GLM 健康探针修正）；本次紧急修复本身只依赖并修改了 chat.py 与 test_chat.py。"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "task_id": "补充反馈详情页附件展示与下载入口",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-28T12:05:00+08:00",
+  "acked_at": "2026-04-28T12:05:00+08:00",
+  "summary": "已读取 instruction.md 与上游附件契约结果；正按最小范围补充问题/需求详情页的附件展示与下载入口，并补相关测试。"
+}

@@ -1,0 +1,53 @@
+{
+  "id": "修正DeepSeek联网搜索后端运行时契约与审查问题",
+  "title": "修正 DeepSeek 联网搜索后端运行时契约与审查问题",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "complex",
+  "reviewers": [
+    "review-1",
+    "arch-1"
+  ],
+  "review_deadline": null,
+  "review_round": 1,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/修正DeepSeek联网搜索后端运行时契约与审查问题/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "DeepSeek联网搜索生产异常",
+  "parent_task_id": "修复DeepSeek联网搜索后端守卫与可观测性",
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T19:03:21+08:00",
+  "lease_expires_at": "2026-04-25T19:03:21+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "DeepSeek 联网搜索后端运行时契约补修已通过 complex 审查，并作为最终有效后端修复进入集成链路。",
+  "last_error": null,
+  "created_at": "2026-04-25T19:03:21+08:00",
+  "updated_at": "2026-04-25T20:24:03+08:00"
+}

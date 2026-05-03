@@ -1,0 +1,54 @@
+{
+  "id": "修正反馈附件详情下载链路与契约接线",
+  "title": "修正反馈附件详情下载链路与契约接线",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 1,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "cancelled",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+  ],
+  "depends_on": [
+    "补齐反馈附件详情契约与元数据返回"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/修正反馈附件详情下载链路与契约接线/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "反馈管理未关闭问题修复",
+  "parent_task_id": "补充反馈详情页附件展示与下载入口",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T12:07:42+08:00",
+  "lease_expires_at": "2026-04-28T12:07:42+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已由后续补修任务“收束反馈附件详情为可靠下载入口”吸收并完成闭环：本轮按 PM 裁决移除误导性的“打开”入口，仅保留可靠下载入口。",
+  "last_error": null,
+  "created_at": "2026-04-28T12:07:42+08:00",
+  "updated_at": "2026-04-28T14:19:31+08:00"
+}

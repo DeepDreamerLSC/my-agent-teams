@@ -1,0 +1,53 @@
+{
+  "task_id": "补充GLM联网搜索不可用前端提示",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-26T11:14:30+08:00",
+  "summary": "已按最小范围完成 GLM 联网搜索不可用前端提示接线：前端优先消费 zhipu provider-native runtime，GLM 联网搜索确认 unavailable 时给出明确提示并禁用搜索开关；DeepSeek 与其他 provider 继续沿用原有状态语义，不被 zhipu 状态误伤。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+  ],
+  "implementation": {
+    "comparison_basis": [
+      "先对照现有 DeepSeek / 全局 web_search_runtime_status 的正常接线实现。",
+      "再对照上游后端新增的 zhipu provider-native 状态契约：zhipu_web_search_runtime_status / provider_web_search_runtime。"
+    ],
+    "frontend_wiring": [
+      "useChatOptions 新增 zhipu provider-native runtime 读取，并在当前选中模型 provider=zhipu 时优先使用该状态。",
+      "将 zhipu 的 healthy 映射为前端统一的 available，其余 degraded / unavailable / unknown 原样透传。",
+      "当当前模型是 GLM 且 provider-native runtime=unavailable 时，导出明确提示文案：当前 GLM 联网搜索不可用，建议先关闭联网搜索继续对话。",
+      "当 GLM runtime 确认 unavailable 时，自动清掉 enableWebSearch，避免按钮看起来已开启但实际无效。",
+      "ChatToolbar 在收到明确 unavailable 提示时禁用联网搜索按钮并展示该提示；degraded 仍保持软提示不禁用。",
+      "Chat 页面把新的 provider-aware tooltip 继续透传到工具栏。"
+    ],
+    "non_regression": [
+      "非 zhipu 模型继续使用原有全局 webSearchRuntimeStatus。",
+      "DeepSeek / 其他 provider 不会被 zhipu provider-native unavailable 状态误伤。",
+      "未引入复杂降级或模型切换策略，仅做最小提示与前端接线。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/chatOptions.test.tsx src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx",
+        "result": "passed (4 files, 48 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ],
+    "notes": [
+      "Vitest 输出包含 jsdom 的 getComputedStyle pseudo-elements not implemented 提示，但不影响测试通过。"
+    ]
+  },
+  "risks": [
+    "本次仅消费当前后端已暴露的 zhipu_web_search_runtime_status 顶层字段；若后端未来只保留 provider_web_search_runtime 嵌套字段，前端需要再同步调整。"
+  ]
+}

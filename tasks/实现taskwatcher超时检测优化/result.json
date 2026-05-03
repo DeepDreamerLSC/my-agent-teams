@@ -1,0 +1,45 @@
+{
+  "task_id": "实现taskwatcher超时检测优化",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T17:35:56+08:00",
+  "summary": "已在现有 shell watcher 架构上完成超时检测优化：dispatched 任务改为“3 分钟无 ack 且无 Working/无后续工件才重发”，working 超过 30 分钟只通知 PM 介入、不再重发，并保留重发冷却避免短时间重复重发。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "action": "modified",
+      "description": "新增超时阈值配置、任务时间戳/显式工件/Working 信号辅助函数；重写 dispatched 与 working 两类超时判断逻辑，优先依据 task.json / ack.json / result.json / review / verify 等显式工件，减少仅靠 tmux pane 文本造成的误报。"
+    }
+  ],
+  "timeout_policy": {
+    "dispatched_without_ack": {
+      "rule": "dispatched 且无 ack.json 时，只有在超过 180 秒、无 result/review/design-review/verify 明确进展工件、且无 Working pane 信号时才重发。",
+      "cooldown_seconds": 300,
+      "state_file": "STATE_DIR/${task_id}_resend"
+    },
+    "working_too_long": {
+      "rule": "working 且无 result.json 时，若自 ack.json（或 working 状态时间）起超过 1800 秒，则通知 PM 介入，不执行重发。",
+      "state_file": "STATE_DIR/${task_id}_working_timeout_notice"
+    },
+    "artifact_priority": "对于 dispatched 超时检查，若已发现 result/review/design-review/verify 等后续工件，则优先继续正常流转，不再先做兜底重发判断。"
+  },
+  "non_regression": [
+    "没有改动 send-to-agent.sh 协议本身。",
+    "没有改变 review / QA / close 主链路语义。",
+    "仅在 task-watcher.sh 内增强超时判断，沿用前两条 execution 已实现的 heartbeat/watchdog 与文件日志能力。"
+  ],
+  "test_commands": [
+    {
+      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh",
+      "result": "passed"
+    },
+    {
+      "command": "临时 TASKS_ROOT/STATE_DIR/LOG_DIR 环境下启动真实 task-watcher：构造 4 分钟前 dispatched 且无 ack 的任务、31 分钟前 working 的任务、以及 dispatched 但已出现 result.json 的任务；验证分别触发“3 分钟后单次重发”“30 分钟后仅通知 PM”“显式工件优先不重发并继续流转到 ready_for_merge”。",
+      "result": "passed (dispatched_resend_after_3m=ok, working_timeout_notify_only=ok, artifact_priority_over_pane_text=ok)"
+    }
+  ],
+  "notes": [
+    "当前工作区里 scripts/send-to-agent.sh 存在既有未提交改动（ACK/TIMEOUT 等待时间调整），本任务未修改该文件内容。",
+    "本次实现仍保留 tmux pane Working 信号作为最后一层辅助判断，但不再把它作为 dispatched 超时重发的唯一依据。"
+  ]
+}

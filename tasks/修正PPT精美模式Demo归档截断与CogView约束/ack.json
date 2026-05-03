@@ -1,0 +1,7 @@
+{
+  "task_id": "修正PPT精美模式Demo归档截断与CogView约束",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-01T03:18:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将按最小补修处理两个 review 阻塞点：1) 去掉 polished demo 对 presentation_plan.json 的字节硬截断，保证归档内始终是合法 UTF-8 JSON；2) 收紧 image_model_id 选择，只允许 CogView-3-Flash / cogview-3 路径并补测试。"
+}

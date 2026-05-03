@@ -1,0 +1,38 @@
+{
+  "task_id": "更新ReleaseNote并部署0423到0425生产",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-26T11:47:34+08:00",
+  "summary": "已更新 2026-04-23 至 2026-04-25 的 release note，整理并提交当前工作树中的有效 DeepSeek/GLM 相关改动并推送到 origin/master，随后完成生产部署。",
+  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "release_note_entries_summary": {
+    "2026-04-25": [
+      "DeepSeek 联网搜索异常已修复，联网搜索链路恢复到正确可用状态",
+      "聊天页开始区分 GLM 与其他模型的联网搜索可用性提示，搜索退化时会给出更明确说明"
+    ],
+    "2026-04-24": [
+      "反馈弹窗关闭后会保留草稿，减少内容误丢失",
+      "反馈重复提交已被拦截，减少重复记录和重复处理",
+      "Word 生成质量已恢复，生成内容会更稳定继承当前对话上下文"
+    ],
+    "2026-04-23": [
+      "当日无新增用户可感知变更，主要为发布准备与方案整理"
+    ]
+  },
+  "commit_hash": "4f37d637a274e3a860753e997939d2eaee80fdb4",
+  "pushed": true,
+  "deployed_commit": "4f37d637a274e3a860753e997939d2eaee80fdb4",
+  "deploy_command": "cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod",
+  "health_check_result": {
+    "backend_health": "http://127.0.0.1:18000/health ready",
+    "hotpick_backend_health": "http://127.0.0.1:18100/health ready",
+    "public_site": "https://chiraliumai.cn ready"
+  },
+  "verification": {
+    "backend_tests": "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q -> 41 passed, 5 warnings",
+    "frontend_tests": "npx vitest run src/test/chatOptions.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx src/test/deepseekWebSearchVisibility.test.tsx -> 37 passed",
+    "frontend_typecheck": "npx tsc --noEmit -> passed",
+    "git_match": "local HEAD == prod HEAD == 4f37d637a274e3a860753e997939d2eaee80fdb4"
+  },
+  "remaining_unrelated_changes": []
+}

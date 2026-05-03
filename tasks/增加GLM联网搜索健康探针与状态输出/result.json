@@ -1,0 +1,86 @@
+{
+  "task_id": "增加GLM联网搜索健康探针与状态输出",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T10:52:42+08:00",
+  "summary": "已按林总工简化方向实现 GLM/Zhipu provider-native 联网搜索的最小健康探针与状态输出：后端会对 zhipu/native_provider_tool 做轻量 probe，输出 healthy/degraded/unavailable/unknown，并通过 meta 接口稳定暴露给前端消费。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+      "action": "modified",
+      "description": "chat-capabilities 新增 provider_web_search_runtime 与 zhipu_web_search_runtime_status，并新增 /api/meta/provider-web-search-runtime 接口输出 provider 级状态。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "action": "modified",
+      "description": "新增 zhipu/native_provider_tool 轻量健康探针、60 秒缓存、状态归类与统一 payload 构造；不复用 DeepSeek tool_call runtime 语义。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "action": "modified",
+      "description": "补充 chat-capabilities 与 provider-web-search-runtime 暴露测试，验证 zhipu provider 级状态字段可被前端稳定消费。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "action": "modified",
+      "description": "新增 provider-native health probe 单测，覆盖 healthy 与“模型文本明确表示联网搜索不可用”两种 probe 结果。"
+    }
+  ],
+  "minimal_backend_capability": {
+    "probe_target": "zhipu provider + native_provider_tool web_search path",
+    "probe_strategy": "使用当前活跃的 zhipu 文本模型发起一个低成本非流式联网搜索请求；探针结果做 60 秒内存缓存，避免每次 meta 请求都重复命中上游。",
+    "statuses": [
+      "healthy",
+      "degraded",
+      "unavailable",
+      "unknown"
+    ],
+    "reason_examples": [
+      "no_active_model",
+      "decrypt_failed",
+      "request_failed",
+      "rate_limited",
+      "provider_error",
+      "empty_response",
+      "search_unavailable",
+      "search_degraded"
+    ]
+  },
+  "frontend_consumable_output": {
+    "chat_capabilities_fields": {
+      "provider_web_search_runtime": {
+        "zhipu": {
+          "provider": "zhipu",
+          "mode": "native_provider_tool",
+          "status": "healthy|degraded|unavailable|unknown",
+          "reason": "string|null",
+          "model_name": "当前探针使用的活跃 zhipu 文本模型",
+          "updated_at": "ISO 时间"
+        }
+      },
+      "zhipu_web_search_runtime_status": "顶层快捷字段，便于前端直接判断当前 zhipu 搜索可用性"
+    },
+    "extra_endpoint": "/api/meta/provider-web-search-runtime -> {\"providers\": {\"zhipu\": ...}}"
+  },
+  "scope_and_non_regression": [
+    "没有改模型自动切换策略。",
+    "没有重写 GLM 本地搜索链路。",
+    "没有把 DeepSeek 的 tool_call runtime 语义直接套到 GLM 上。",
+    "chat.py 本次无需改动，现有聊天主链路保持不变。",
+    "DeepSeek 现有 web_search_runtime / web_search_runtime_status 暴露保持原样。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+      "result": "passed (49 passed, 4 warnings)"
+    },
+    {
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "result": "passed"
+    }
+  ],
+  "notes": [
+    "本次仅实现后端最小健康探针/状态输出，前端提示消费可由后续任务继续接。",
+    "provider-native 探针依赖当前活跃 zhipu 文本模型与上游联网能力，因此它反映的是 GLM 原生联网搜索的运行时状态，而不是全局搜索状态。"
+  ]
+}

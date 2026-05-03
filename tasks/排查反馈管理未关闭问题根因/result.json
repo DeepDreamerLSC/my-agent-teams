@@ -1,0 +1,74 @@
+{
+  "task_id": "排查反馈管理未关闭问题根因",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T11:29:14+08:00",
+  "summary": "已完成对两个生产反馈问题的事实排查。结论：A 号问题对应的真实重复落库事故发生在 2026-04-24 13:00:17/13:00:18 +08:00，属于历史版本在幂等修复上线前的代码问题；当前 6217ad1d 这条工单本身不是重复行，而是用于报告该事故，后续未关闭。B 号问题不是数据库/存储整体失效；健康样本证明附件可落库，但反馈链路当前只保存/返回 attachment_ids，详情页不展示附件，AI 分析也不携带附件，且本条工单 14ce5122 自身没有任何已上传文件记录，因此当前更像“附件契约与展示/传递链路缺失”，而不是单纯存储故障。",
+  "issues": [
+    {
+      "issue_id": "6217ad1d-ef53-4d4f-9e2b-29bc892e52f9",
+      "title": "问题提交后产生重复记录",
+      "current_status": "pending_action",
+      "root_cause_judgement": "这条工单本身不是重复数据；它是在 2026-04-24 13:04:22 +08:00 提交的一条‘投诉工单’，用于描述更早发生的真实重复落库事故。真实事故是同一用户在 2026-04-24 13:00:17 +08:00 与 13:00:18 +08:00 连续产生了两条内容完全一致的问题单（3ffc8586 与 1cb7ed13）。代码仓库显示后端幂等 + 前端防重提交修复于 2026-04-24 14:03:37 +08:00 才提交，因此该事故发生在修复落地之前。当前未关闭的根因，已不是‘线上仍在重复落库’的直接证据，而是历史事故工单在数据清理和代码修复后没有继续走关闭流转。",
+      "category": "代码（历史版本）",
+      "secondary_factors": [
+        "数据：真实重复行 1cb7ed13 已被手工归并关闭，3ffc8586 保留为主记录。",
+        "操作流程：投诉工单 6217ad1d 在事故处理后未同步更新为 resolved/closed。"
+      ],
+      "key_evidence": [
+        "生产库 feedback_issues：6217ad1d 仅有 1 条记录，submitted_at=2026-04-24 05:04:22+00（即 2026-04-24 13:04:22+08），说明它本身不是重复落库出来的第二行。",
+        "生产库同用户同日真实重复行：3ffc8586-973e-4d28-a8d4-3febdd474b8f（2026-04-24 05:00:17+00）与 1cb7ed13-3136-417d-bfa1-4ca167b2843b（2026-04-24 05:00:18+00），title/description/repro_steps/impact_scope/page_url/client_meta_json 全部一致。",
+        "生产库 feedback_events：1cb7ed13 于 2026-04-24 06:34:24+00 被写入 closed，并注明“重复提交记录，已归并到 3ffc8586”；3ffc8586 同时记录 merged_duplicate_id=1cb7ed13。",
+        "代码提交记录：git log 显示幂等修复 commit 6cbc0177《Block duplicate feedback submissions before they create extra records》提交时间为 2026-04-24 14:03:37 +08:00，晚于真实事故发生时间。",
+        "后端修复内容：/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_service.py 中新增 5 秒窗口指纹去重 + pg_advisory_xact_lock；/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py 在 deduplicated 命中时不再重复入队 AI。",
+        "前端修复内容：/Users/lin/Desktop/work/chiralium/frontend/src/components/MainLayout.tsx:617-642 已有 feedbackSubmitting 重入保护；git blame 显示该保护来自 6cbc0177。"
+      ],
+      "recommended_owner": "dev-2",
+      "minimal_fix_scope_suggestion": [
+        "不建议先大改代码；先做一次生产回归验证，确认 6cbc0177 对应的前后端防重逻辑已在线上运行。",
+        "若线上版本已包含该修复，则本工单的最小动作是：补一条验证记录后将 6217ad1d 从 pending_action 推进到 resolved/closed。",
+        "若线上版本未包含该修复，再由 dev-2 检查部署差异并补部署/回滚说明。"
+      ],
+      "confidence": "high"
+    },
+    {
+      "issue_id": "14ce5122-6a37-411c-9ce6-95dec8dc3d5d",
+      "title": "反馈附件未保存或传递导致后续环节无法查看",
+      "current_status": "in_progress",
+      "root_cause_judgement": "当前更像‘附件运行时契约缺失’而不是‘存储系统整体坏掉’。健康样本证明反馈附件可以成功上传并写入 uploaded_files，同时 feedback_issues / feedback_requests 也能保存 attachment_ids；但反馈详情 API 只返回原始 attachment_ids，问题/需求详情页完全没有附件展示区，AI 分析输入也根本不包含附件信息，因此后续人员和 AI 都无法真正查看附件。与此同时，本条工单 14ce5122 自身在生产库中的 attachment_ids 为空，且该用户在 2026-04-27 当天没有任何 uploaded_files 记录，所以对这张具体工单而言，没有证据证明“文件已经到库后又丢了”；更可能是上传未发生/未成功，外加下游链路本来就不支持查看与传递附件。",
+      "category": "代码",
+      "secondary_factors": [
+        "数据：工单 14ce5122 本身 attachment_ids=[]，对应日期无 uploaded_files 行，说明该具体样本没有形成有效附件关联数据。",
+        "运行时契约：反馈 domain API/前端/AI 三段没有形成可消费的 attachment metadata contract。"
+      ],
+      "key_evidence": [
+        "生产库 feedback_issues：14ce5122 的 attachment_ids=[]，submitted_at=2026-04-27 12:57:12+00。",
+        "生产库 uploaded_files：同一用户 f5c65698-4919-458a-ac95-2daffd4cc8f2 在 2026-04-27 全天没有任何上传记录；因此这张工单没有证据表明附件曾成功写入服务器。",
+        "健康对照样本：feedback_issues.db640906 在 2026-04-27 12:17:46+00 保存了 attachment_ids=[\"e8c8be38-977c-42f1-a064-34932202632c\"]，uploaded_files 表中存在对应文件行，说明生产上传/存储链路并非整体不可用。",
+        "API 现状：/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py:95-115 与 /Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py:118-160 仅把 attachment_ids 原样塞进 detail response，没有展开 file_name/download_url/mime_type。",
+        "前端现状：/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx:183-270 与 FeedbackRequestsPage.tsx:211-300 的详情页只渲染标题、正文、AI 结果、管理操作、时间线，没有任何附件列表或下载入口。",
+        "AI 现状：/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py:566-584 的 _issue_input_json/_request_input_json 只传 title/description/background 等文本字段，完全不包含 attachment_ids、文件元数据或解析文本。",
+        "测试现状：现有测试只验证 feedback form 能把 attachment_ids 带到 create payload（如 frontend/src/test/feedbackFormSimplified.test.ts），没有覆盖“详情页可见附件 / AI 可消费附件”的回归测试。"
+      ],
+      "recommended_owner": "arch-1",
+      "minimal_fix_scope_suggestion": [
+        "先由 arch-1 定一个最小附件契约：feedback detail/admin detail 直接返回 attachments[]（file_id/file_name/mime_type/download_url），而不是只返回 attachment_ids。",
+        "随后按该契约补最小实现：后端 detail serializer 展开 uploaded_files 元数据；前端问题/需求详情页渲染附件列表和下载链接。",
+        "若要覆盖‘传递给后续环节’，再补第二步最小增强：feedback_ai_service 在 input_json 中带上附件元数据，必要时带 extracted_text 摘要；并补对应测试。",
+        "附带建议：反馈提交时若附件上传失败或仍在上传，前端应阻止最终提交或至少给出不可忽略的阻断提示，避免生成 attachment_ids=[] 的误导性工单。"
+      ],
+      "confidence": "medium_high"
+    }
+  ],
+  "commands_run": [
+    "docker exec chiralium_prod_postgres psql -U chiralium -d chiralium_prod_db -c '... feedback_issues / feedback_events / feedback_ai_analyses / uploaded_files ...'",
+    "git -C /Users/lin/Desktop/work/chiralium log --oneline -- backend/app/services/feedback_service.py backend/app/api/feedback.py backend/tests/test_feedback_api.py",
+    "git -C /Users/lin/Desktop/work/chiralium blame ... frontend/src/components/MainLayout.tsx backend/app/api/feedback.py backend/app/services/feedback_ai_service.py",
+    "rg / nl -ba on frontend/backend feedback-related files for attachment and dedup code-path inspection"
+  ],
+  "notes": [
+    "本次任务只做事实排查与根因定位，没有改动业务代码。",
+    "问题 A 当前最重要的结论是：历史事故真实存在，但 open 工单 6217ad1d 本身不是重复数据；是否仍需代码修复，应先看线上是否已部署 6cbc0177 对应逻辑。",
+    "问题 B 当前最重要的结论是：不能把它简单归因为‘数据库没存附件’；至少从代码与健康样本看，更核心的是附件 contract 没有打通到详情页与 AI 分析链路。"
+  ]
+}

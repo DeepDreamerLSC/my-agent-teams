@@ -1,0 +1,66 @@
+{
+  "id": "收口PPT生成skill图片OCR消费闭环",
+  "title": "收口PPT生成skill图片OCR消费闭环",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": "2026-04-30T23:30:00+08:00",
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "task_type": "development",
+  "read_only": false,
+  "downstream_action": "review",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "write_scope": [
+    "backend/app/services/context_assembler.py",
+    "backend/app/core/chat_capabilities.py",
+    "backend/app/services/parser_service.py",
+    "backend/app/services/file_service.py",
+    "backend/app/schemas/file.py",
+    "skills/custom/ppt_generator/1.0.0/skill.py",
+    "skills/custom/ppt_generator/1.0.0/manifest.json",
+    "backend/tests/test_parser_service.py",
+    "backend/tests/test_ppt_generator_image_input.py",
+    "backend/tests/test_ppt_generator_skill.py"
+  ],
+  "depends_on": [
+    "实现PPT生成skill文档主链路"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/收口PPT生成skill图片OCR消费闭环/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "收口PPT生成skill图片OCR消费闭环",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-30T13:32:02+08:00",
+  "lease_expires_at": "2026-04-30T13:32:02+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已补齐 PPT 生成 skill 的图片 OCR 消费闭环：图片附件现在会在现有文件解析主链路中进入 `parsed_files`，`ppt_generator` 可直接消费 OCR 文本生成 PPT；同时把 manifest / skill 输入能力与实际实现对齐，并补了证明闭环的测试。（QA 已通过自动收口） QA 结论：QA 验证通过。图片 OCR 结果已通过 ContextAssembler.ensure_parsed_files() 进入 parsed_files，ppt_generator 主链路直接消费；manifest 输入能力已扩展 document+image 且与实际一致；文档/PDF 主链路无回归，9 测试全部通过，review 已 APPROVE。",
+  "last_error": null,
+  "created_at": "2026-04-30T13:31:41+08:00",
+  "updated_at": "2026-04-30T15:17:42+08:00"
+}

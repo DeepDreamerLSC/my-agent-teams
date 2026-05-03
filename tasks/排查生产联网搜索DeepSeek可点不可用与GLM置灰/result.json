@@ -1,0 +1,82 @@
+{
+  "task_id": "排查生产联网搜索DeepSeek可点不可用与GLM置灰",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T23:45:56+08:00",
+  "summary": "生产事实排查结论：DeepSeek 当前已部署回 tool_call 正确代码，但生产搜索 runtime 配置仍不完整，导致按钮可点却拿不到真实联网结果；GLM 按钮置灰主要是当前已部署的 zhipu provider-native 健康探针判定为 unavailable，前端据此置灰，属于策略生效后的表现，不是单纯 capability 丢失。",
+  "modified_files": [],
+  "issues": {
+    "deepseek_clickable_but_unusable": {
+      "root_cause_judgment": "当前生产已不是之前的 native_provider_tool 回退问题；DeepSeek 生产代码已经恢复到 tool_call。现在按钮可点但联网不可用的主因是生产 runtime 配置缺项：CHAT_WEB_SEARCH_BASE_URL 缺失，导致后端没有真实外部搜索入口。与此同时，当前前端并不会因为 DeepSeek 的 runtime unavailable 而直接置灰按钮，所以用户仍能点击，但最终只能收到“联网搜索不可用”的失败语义。",
+      "primary_category": "configuration",
+      "secondary_category": "code",
+      "key_evidence": [
+        "生产部署代码 HEAD 与工作区一致，均为 3ab9d9a（2026-04-26 README 发布日志之后的版本），不再是旧回退版本。",
+        "生产 backend/app/core/model_providers.py 中 DeepSeek provider 当前明确是 web_search.mode = tool_call，不再是 native_provider_tool。",
+        "生产 backend/.env.prod 第 41-42 行只有 CHAT_WEB_SEARCH_API_KEY 与 CHAT_WEB_SEARCH_PROVIDER=deepseek，没有 CHAT_WEB_SEARCH_BASE_URL。",
+        "在生产环境变量上下文下直接调用 app.services.web_search_service.describe_web_search_runtime()，返回 provider=deepseek, status=unavailable, internal_status=misconfigured, ready=false, error=missing_base_url, missing=[CHAT_WEB_SEARCH_BASE_URL]。",
+        "生产最近聊天记录（2026-04-26 15:09:13+00:00，model_used=deepseek-v4-flash）显示 token_usage.web_search_enabled=true，但 response_summary 仍是“抱歉，我目前无法直接获取实时天气信息（联网搜索功能不可用）”；说明开关已传到后端，但没有拿到真实搜索结果。",
+        "同一条记录 token_usage.tool_turn_count=0，说明这次响应里模型没有产出有效 tool call 补轮，最终直接回了不可用提示；因此当前生产没有形成“真实搜索结果 -> 再回答”的闭环。",
+        "前端生产代码 frontend/src/hooks/useChatOptions.ts 与 ChatToolbar.tsx 当前只为 zhipu provider 生成 webSearchUnavailableTooltip；DeepSeek 不会因 runtime unavailable 被直接置灰，因此“按钮能点”是当前代码路径决定的。"
+      ],
+      "explanation": "所以 DeepSeek 当前问题不是数据漂移，也不是旧 400 回退仍在运行，而是“代码已修回 + 生产 runtime 仍缺 BASE_URL + 前端未对 DeepSeek unavailable 直接置灰”的组合结果。",
+      "suggested_fix_owner": [
+        "arch-1",
+        "dev-2"
+      ],
+      "suggested_minimal_fix_scope": [
+        "生产配置：补齐 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 中的 CHAT_WEB_SEARCH_BASE_URL，并确认对应外部搜索接口可达。",
+        "如仍需避免“可点但必失败”的体验，再评估是否让前端也对 DeepSeek 的 web_search_runtime_status=unavailable 做显式禁用或更明确提示。相关代码范围：/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts、/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx、/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py。"
+      ]
+    },
+    "glm_button_greyed_out": {
+      "root_cause_judgment": "GLM 按钮置灰主要不是 capability 丢失，而是当前已部署的 provider-native 健康探针把 zhipu 联网搜索判定为 unavailable；前端按当前简化策略据此直接置灰 GLM。也就是说，“置灰”本身符合当前策略，真正的问题是 zhipu 原生联网搜索当前被探针判成不可用。",
+      "primary_category": "external_dependency",
+      "secondary_category": "code",
+      "key_evidence": [
+        "生产前端代码 frontend/src/hooks/useChatOptions.ts 第 247-257 行：如果当前模型 provider === zhipu，就用 zhipu_web_search_runtime_status 作为实际联网状态；当状态是 unavailable 时，tooltip 固定为“当前 GLM 联网搜索不可用，建议先关闭联网搜索继续对话”。",
+        "生产前端代码 frontend/src/components/ChatToolbar.tsx 第 74-77 与 223-226 行：当 webSearchRuntimeStatus === unavailable 且存在 webSearchUnavailableTooltip 时，按钮进入 runtime_unavailable 禁用态。",
+        "生产后端代码 backend/app/api/meta.py 第 16-27 行：/api/meta/chat-capabilities 已经把 provider_web_search_runtime.zhipu 与 zhipu_web_search_runtime_status 暴露给前端。",
+        "生产后端探针实现 backend/app/services/model_service.py 第 295-390 行：zhipu provider-native 搜索会做真实 probe，并输出 healthy/degraded/unavailable/unknown。",
+        "在生产环境配置 + 生产数据库下实际运行 probe，返回 zhipu_runtime={provider:\"zhipu\", mode:\"native_provider_tool\", status:\"unavailable\", reason:\"request_failed\", model_name:\"GLM-4.7-Flash\"}。",
+        "生产模型记录里 GLM-5.0 与 GLM-4.7-Flash 都是 active=true、provider=zhipu，没有数据层禁用或 provider 漂移。",
+        "生产最近聊天记录（2026-04-26 00:37:27+00:00，model_used=GLM-5.0）显示 token_usage.web_search_enabled=true，但 response_summary 仍是“联网搜索功能不可用”；另有 2026-04-25 13:59:30+00:00 的 GLM-4.7-Flash 返回 HTTP 429 “该模型当前访问量过大”。这说明 GLM 原生联网搜索近期确实不稳定/不可用，而不是前端凭空置灰。"
+      ],
+      "explanation": "因此当前 GLM 按钮置灰更像是“后端健康探针确认 unavailable 后，前端按策略正确执行”的结果，而不是简单的 UI 判断 bug。",
+      "suggested_fix_owner": [
+        "arch-1",
+        "dev-2"
+      ],
+      "suggested_minimal_fix_scope": [
+        "先由 arch-1 确认是否接受继续按 provider 级 unavailable 直接置灰所有 GLM；如果接受，则无需前端修复，重点转为排查 zhipu 上游可用性。",
+        "如果需要更细粒度，dev-2 可把 provider-native 探针从 provider 级进一步细化到 model 级（例如区分 GLM-5.0 与 GLM-4.7-Flash），再由 dev-1/前端按更细状态展示。当前最小相关范围：/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py、/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py、/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts。"
+      ]
+    }
+  },
+  "cross_issue_assessment": {
+    "shared_or_not": "两个问题不再是同一个直接根因。DeepSeek 当前主要是自建搜索 runtime 配置缺项；GLM 当前主要是 zhipu provider-native 探针判断 unavailable。",
+    "important_difference": "DeepSeek 走的是平台自建 runtime（tool_call + CHAT_WEB_SEARCH_* 配置）；GLM 走的是 zhipu 原生 native_provider_tool 探针与状态输出，不应混用语义。"
+  },
+  "minimal_verification": [
+    {
+      "command": "读取生产部署代码 /Users/lin/Desktop/prod/chiralium/backend/app/core/model_providers.py、backend/app/api/meta.py、frontend/src/hooks/useChatOptions.ts、frontend/src/components/ChatToolbar.tsx",
+      "result": "confirmed: 生产已部署 DeepSeek tool_call 修复，以及 GLM provider-native runtime 状态输出与前端置灰逻辑"
+    },
+    {
+      "command": "读取 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 相关项，并在已 source 环境下执行 describe_web_search_runtime()",
+      "result": "confirmed: DeepSeek runtime 当前 unavailable，直接原因是 missing_base_url"
+    },
+    {
+      "command": "在生产 ENV_FILE + 生产数据库上下文下执行 describe_provider_native_web_search_runtime(db, provider=\"zhipu\", force_refresh=True)",
+      "result": "confirmed: zhipu runtime 当前 unavailable，reason=request_failed，model_name=GLM-4.7-Flash"
+    },
+    {
+      "command": "只读查询本地生产数据库中的 model_configs 与近 3 天 chat_logs",
+      "result": "confirmed: DeepSeek/GLM 模型记录本身都存在且 active；近期 DeepSeek 已不再报旧 400，但仍返回联网不可用文案；近期 GLM 既有 web_search_enabled=true 仍不可用的样本，也有 429 样本。"
+    }
+  ],
+  "notes": [
+    "本任务为只读排查，未修改生产或开发代码。",
+    "直接用 ENV_FILE 启动单独 Python 进程时，app.services.web_search_service 这类直接读 os.getenv 的模块不会自动拿到 .env.prod 中的值，因此针对 DeepSeek runtime 的最终判定以“source .env.prod 后执行的 describe_web_search_runtime()”与 .env.prod 文件本身为准。"
+  ]
+}

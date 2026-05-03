@@ -1,0 +1,7 @@
+{
+  "task_id": "紧急修复生产外箱尺寸计算直接尺寸输入模式",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-28T18:08:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。先按生产紧急问题处理：以现有款号模式/反向验算模式为参照，优先补 skill.py 的直接鞋盒尺寸+数量运行时判定、10个/10双 数量解析与回归测试，不只改文档。"
+}

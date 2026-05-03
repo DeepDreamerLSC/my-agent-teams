@@ -1,0 +1,53 @@
+{
+  "task_id": "实现taskwatcher日志持久化",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T17:05:03+08:00",
+  "summary": "已在现有 shell watcher 架构上补上持久化日志与 7 天轮转：watcher 与 watchdog 都会把关键事件写入 ~/.openclaw/workspace/logs/task-watcher.log，跨天自动归档为 task-watcher.YYYY-MM-DD.log，并清理 7 天前归档；日志写入失败不会阻塞主流转。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "action": "modified",
+      "description": "新增日志目录/文件/保留期配置、按天轮转与 7 天归档清理、stdout+文件双写且失败容忍；set_task_status 改为记录状态流转日志；close-task 失败也会明确落日志。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "action": "modified",
+      "description": "复用同一 task-watcher.log，补上 watchdog 事件文件日志与相同的按天轮转/保留策略，确保自动重启原因能持久化。"
+    }
+  ],
+  "persistent_logging": {
+    "log_path": "~/.openclaw/workspace/logs/task-watcher.log",
+    "rotation": "首次写日志时若发现当前日志文件属于前一天，会归档为 task-watcher.YYYY-MM-DD.log；之后继续写新的 task-watcher.log。",
+    "retention": "归档日志保留 7 天，清理 task-watcher.*.log 中超过 7 天的文件。",
+    "non_blocking_guarantee": "mkdir/rotate/append 都以失败容忍方式执行（2>/dev/null || true），日志写入失败不会阻塞 ack -> working -> ready_for_merge -> review -> QA -> close 主链路。"
+  },
+  "important_events_logged": [
+    "状态流转（通过 set_task_status 统一落日志）",
+    "自动派发 / 自动认领",
+    "超时重发",
+    "review / QA 路由",
+    "自动收口成功与 close-task 失败",
+    "外部脚本失败（send-to-agent 回退、task-board-sync 失败等现有 log 点）",
+    "watchdog 检测 watcher 退出或 heartbeat 异常后的重启事件"
+  ],
+  "non_regression": [
+    "日志文件写在 ~/.openclaw/workspace/logs，不在 tasks/ 或 STATE_DIR 的 board sync 监控工件集合中，因此不会触发任务看板同步噪声。",
+    "没有改动 watcher 主状态推进顺序与语义。",
+    "heartbeat/pid/restart-cause 机制保持上一条 execution 的行为不变，仅新增日志落盘。"
+  ],
+  "test_commands": [
+    {
+      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "result": "passed"
+    },
+    {
+      "command": "临时 TASKS_ROOT/STATE_DIR/LOG_DIR 环境下启动真实 task-watcher：预置一份两天前的 task-watcher.log 与一份 10 天前归档；验证 watcher 启动后会轮转旧当前日志、清理过期归档、记录 dispatched -> working 状态流转；随后运行 watchdog 单次检查验证其重启事件也会写入同一日志文件。",
+      "result": "passed (log_rotation=ok, state_transition_logging=ok, watchdog_logging=ok)"
+    }
+  ],
+  "remaining_risks": [
+    "当前只实现本地文件持久化与天级轮转，尚未做日志大小上限控制；若未来事件量显著上升，可在后续批次增加按大小切分。",
+    "scripts/task-watcher.sh 中已存在上一任务留下的摘要截断长度调整（300 字）；本次未回退该既有变更。"
+  ]
+}

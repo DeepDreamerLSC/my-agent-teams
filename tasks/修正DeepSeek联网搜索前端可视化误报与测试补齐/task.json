@@ -1,0 +1,53 @@
+{
+  "id": "修正DeepSeek联网搜索前端可视化误报与测试补齐",
+  "title": "修正 DeepSeek 联网搜索前端可视化误报与测试补齐",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+  ],
+  "depends_on": [
+    "修复DeepSeek联网搜索后端守卫与可观测性"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/修正DeepSeek联网搜索前端可视化误报与测试补齐/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "DeepSeek联网搜索生产异常",
+  "parent_task_id": "补充DeepSeek联网搜索前端提示与能力可视化",
+  "integration_owner": "review-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-25T18:55:25+08:00",
+  "lease_expires_at": "2026-04-25T18:55:25+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "DeepSeek 联网搜索前端可视化补修已通过审查，并作为最终有效前端修复进入集成链路。",
+  "last_error": null,
+  "created_at": "2026-04-25T18:55:25+08:00",
+  "updated_at": "2026-04-25T20:24:03+08:00"
+}

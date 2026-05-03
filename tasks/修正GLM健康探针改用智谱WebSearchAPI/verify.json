@@ -1,0 +1,36 @@
+{
+  "task_id": "修正GLM健康探针改用智谱WebSearchAPI",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-27T16:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。GLM/Zhipu provider-native 健康探针已从 chat completion + 模型自然语言回答改为直接调用智谱 POST /api/paas/v4/web_search Tool API 的结构化探测；429/request_failed 等瞬时故障校准为 degraded 而非 unavailable；前端消费字段 provider_web_search_runtime.zhipu 与 zhipu_web_search_runtime_status 保持兼容；DeepSeek tool_call 链路未受影响。测试 50 passed。",
+  "test_commands": [
+    "pytest tests/test_chat.py tests/test_chat_capabilities.py -q → 50 passed, 4 warnings",
+    "py-compile model_service.py meta.py test_chat.py test_chat_capabilities.py → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "探针改为 POST /api/paas/v4/web_search 结构化请求", "result": "PASS"},
+    {"id": 2, "criterion": "429/request_failed 校准为 degraded，不直接判 unavailable", "result": "PASS"},
+    {"id": 3, "criterion": "前端消费字段 provider_web_search_runtime.zhipu 保持稳定", "result": "PASS"},
+    {"id": 4, "criterion": "DeepSeek tool_call 链路未受影响", "result": "PASS"},
+    {"id": 5, "criterion": "测试覆盖 healthy / degraded(rate_limited) / degraded(request_failed)", "result": "PASS"}
+  ],
+  "verified_implementation_details": {
+    "probe_endpoint": "build_model_web_search_url() → {base_url}/web_search，测试断言 url == https://open.bigmodel.cn/api/paas/v4/web_search",
+    "probe_request_shape": "{search_query, search_engine='search_std', search_intent=false, count=1}，与智谱官方 Web Search Tool API 文档对齐",
+    "status_mapping": {
+      "healthy": "HTTP 200 + search_result 非空列表",
+      "degraded": "429(rate_limited) / 请求异常(request_failed) / 5xx(provider_error) / JSON非法(invalid_response) / search_result空(empty_result)",
+      "unavailable": "no_active_model / decrypt_failed / 4xx非429(provider_error)"
+    },
+    "frontend_fields_unchanged": "meta.py 仍暴露 provider_web_search_runtime.zhipu + zhipu_web_search_runtime_status，capabilities 测试断言 mode=native_provider_tool 稳定"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "探针超时 20s（PROVIDER_NATIVE_WEB_SEARCH_PROBE_TIMEOUT_SECONDS），在高延迟网络下可能偏短，但当前属合理默认值",
+    "探针仍需找一个 active zhipu 模型获取 base_url 和 api_key，若所有 zhipu 模型同时被禁用则状态为 unknown；这与官方 Tool API 需要 Bearer token 的前提一致"
+  ]
+}

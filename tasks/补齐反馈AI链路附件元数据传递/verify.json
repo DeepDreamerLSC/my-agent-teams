@@ -1,0 +1,36 @@
+{
+  "task_id": "补齐反馈AI链路附件元数据传递",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-28T16:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。反馈 AI 链路已补齐附件元数据透传：issue/request 的 AI input_json 现在带 attachments[]，包含 file_id/file_name/mime_type/file_size/parse_status + 可选 extracted_text_summary（600字截断）；无附件场景 attachments=[] 保持兼容。start_* 落库 input_json 和 finish_* 模型调用两条链路均已覆盖。测试 17 passed。",
+  "test_commands": [
+    "pytest tests/test_feedback_ai_service.py -q → 17 passed, 4 warnings",
+    "py-compile feedback_ai_service.py test_feedback_ai_service.py → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "AI input_json 带上附件元数据(file_id/file_name/mime_type)", "result": "PASS", "evidence": "_serialize_feedback_attachment() 输出5个字段，测试断言完整匹配"},
+    {"id": 2, "criterion": "已有 extracted_text 时附带摘要", "result": "PASS", "evidence": "_summarize_attachment_text() 截断600字，测试190-212验证 extracted_text_summary 正确透传"},
+    {"id": 3, "criterion": "无附件场景不破坏现有流程", "result": "PASS", "evidence": "测试141-148/185-187 断言 issue/request 无附件时 user_payload['attachments']==[]"}
+  ],
+  "verified_implementation": {
+    "attachment_loading": "_load_feedback_attachments() (566-579) 按 attachment_ids 读取 uploaded_files 并序列化",
+    "text_summarization": "_summarize_attachment_text() (541-549) 非 str/空值返回 None，超 600 字截断加...",
+    "serialization": "_serialize_feedback_attachment() (552-563) 输出 file_id/file_name/mime_type/file_size/parse_status + 可选 extracted_text_summary",
+    "issue_chain": "start_issue_analysis(804) 落库 input_json 带附件 → finish_issue_analysis(841-842) 模型调用带同一附件",
+    "request_chain": "start_request_evaluation(924) 落库 input_json 带附件 → finish_request_evaluation(961-962) 模型调用带同一附件"
+  },
+  "key_test_assertions": {
+    "metadata_and_summary": "test_load_feedback_attachments_includes_metadata_and_extracted_text_summary (190-212): 验证完整 payload 含 extracted_text_summary",
+    "input_json_persist": "test_start_issue_analysis_persists_attachment_metadata_in_input_json (234-271): 验证落库 input_json['attachments'] 含全部字段",
+    "no_attachment_compat": "issue(141-148) + request(185-187): 验证无附件时 attachments==[]"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "request 侧'有附件'持久化/透传的测试比 issue 侧少一层，但两侧共用同一 _load_feedback_attachments() helper，风险可控",
+    "extracted_text_summary 截断 600 字为硬编码常量，若附件文本较长可能丢失上下文"
+  ]
+}

@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-28T12:24:14+08:00", "reason": "pm dispatch minimal closure fix for attachment detail UX"}
+{"from": "dispatched", "to": "working", "at": "2026-04-28T12:26:32+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-28T12:59:20+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-28T13:05:18+08:00", "reason": "task-watcher auto close after qa verify pass"}

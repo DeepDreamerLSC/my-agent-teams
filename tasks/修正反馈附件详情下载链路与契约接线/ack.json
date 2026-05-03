@@ -1,0 +1,9 @@
+{
+  "task_id": "修正反馈附件详情下载链路与契约接线",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-28T12:18:30+08:00",
+  "acked_at": "2026-04-28T12:18:30+08:00",
+  "summary": "已读取 instruction.md 与原任务 review.md，正对照 MessageBubble.tsx 的现有受保护附件下载实现，补修反馈详情页下载链路、DTO 契约与相关测试。"
+}

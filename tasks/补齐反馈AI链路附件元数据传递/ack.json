@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐反馈AI链路附件元数据传递",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-28T11:42:58+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。开始在 feedback_ai_service 中补最小附件元数据透传：为反馈 AI input_json 带入 file_id/file_name/mime_type，并在存在 extracted_text 时带最小摘要；保持无附件场景兼容并补测试。"
+}

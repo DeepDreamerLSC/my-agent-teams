@@ -1,0 +1,29 @@
+{
+  "task_id": "补齐生产AI对话联网搜索配置并部署验证",
+  "agent_id": "arch-1",
+  "status": "blocked",
+  "completed_at": "2026-04-27T12:59:47+08:00",
+  "summary": "任务当前阻塞：代码要求 DeepSeek tool_call 外部搜索 runtime 必须提供 CHAT_WEB_SEARCH_BASE_URL，但生产仅配置了 CHAT_WEB_SEARCH_PROVIDER=deepseek 和 CHAT_WEB_SEARCH_API_KEY，未发现任何已知可用且契合当前契约的外部搜索 endpoint。为避免继续混用 provider 语义或写入不可验证配置，已飞书通知林总工请求提供实际可用 endpoint 或进一步决策。",
+  "blocked_reason": "missing_compatible_external_search_endpoint",
+  "production_config_checked": {
+    "CHAT_WEB_SEARCH_PROVIDER": "deepseek",
+    "CHAT_WEB_SEARCH_BASE_URL": "<missing>",
+    "CHAT_WEB_SEARCH_API_KEY": "<present>",
+    "CHAT_WEB_SEARCH_TIMEOUT_MS": "<missing>"
+  },
+  "provider_contracts": {
+    "deepseek": "thinking = native_toggle; web_search = tool_call + external runtime",
+    "zhipu_glm": "thinking = native_toggle; web_search = native_provider_tool"
+  },
+  "data_or_config_findings": [
+    "生产数据库中 DeepSeek 文本模型 provider/base_url/model_name 与当前代码契约一致。",
+    "生产数据库仍有 GLM-4.6V 使用 custom provider + zhipu base_url 的数据级混用，但不是当前 DeepSeek 主链路阻塞点。",
+    "CHAT_WEB_SEARCH_PROVIDER=deepseek 的命名语义容易误导，它在当前代码里代表外部搜索 runtime provider，而不是聊天主 provider。"
+  ],
+  "deployed_commit": null,
+  "health_check_result": null,
+  "deepseek_verification_result": "未执行部署验证；缺少可验证的 CHAT_WEB_SEARCH_BASE_URL。",
+  "glm_verification_result": "未执行部署后验证；当前未改动 zhipu/native_provider_tool 配置。",
+  "feishu_notified": true,
+  "next_needed_decision": "提供实际可用的外部搜索服务完整 URL，或明确允许采用某个兼容当前 query/results 契约的 endpoint。"
+}

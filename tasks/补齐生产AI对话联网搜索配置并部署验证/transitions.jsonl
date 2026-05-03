@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-27T12:54:44+08:00", "reason": "pm dispatch after Lin ordered production config completion"}
+{"from": "dispatched", "to": "working", "at": "2026-04-27T12:59:48+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "blocked", "at": "2026-04-27T12:59:51+08:00", "reason": "watcher observed result.json status=blocked"}
+{"from": "blocked", "to": "cancelled", "at": "2026-04-27T13:15:50+08:00", "reason": "pm superseded by new product direction: disable DeepSeek web search in frontend"}

@@ -1,0 +1,7 @@
+{
+  "task_id": "收口PPT生成skill图片OCR消费闭环",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-30T13:40:30+08:00",
+  "status": "accepted",
+  "notes": "instruction 仍为占位，但根据任务标题先按最小闭环处理：补齐 PPT 生成 skill 对图片 OCR/解析结果的消费链路，优先复用现有上传文件、parsed_files 与 skill file-display 契约，不扩散到新页面。"
+}

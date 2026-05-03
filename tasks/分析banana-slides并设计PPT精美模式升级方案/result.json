@@ -1,0 +1,33 @@
+{
+  "task_id": "分析banana-slides并设计PPT精美模式升级方案",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-30T18:58:17+08:00",
+  "document_path": "/Users/lin/Desktop/work/chiralium/design/product/ppt-skill-image-mode-upgrade-plan.md",
+  "banana_slides_architecture_summary": "banana-slides 的核心是“先做页面规划，再逐页用图像模型渲染成视觉页图，最后装配导出”，重点价值在 page planning + image rendering pipeline，而不是单纯 PPTX 导出器。",
+  "integration_recommendation": "建议继续围绕现有 ppt_generator skill 扩展，不做独立页面；在 skill 内新增 polished 模式，复用当前 parsed_files / recent_messages / display_type=file 主链路，新增页面 schema、页图渲染层和图片页装配能力。",
+  "demo_minimal_closed_loop": "demo 阶段建议用 CogView-3-Flash，限制 3~5 页、只做 cover/content/closing 三类页，走“文本模型出 presentation_plan -> 图像模型逐页渲染 -> PPTX 图片页装配”的最小闭环。",
+  "suggested_execution_tasks": [
+    {
+      "title": "为 ppt_generator 增加 presentation_plan 扩展 schema 与 polished 模式入口",
+      "assigned_agent": "dev-2"
+    },
+    {
+      "title": "新增 PPT 页图渲染 service，并用 CogView-3-Flash 跑通 demo",
+      "assigned_agent": "dev-2"
+    },
+    {
+      "title": "扩展 PPTX 装配器，支持图片页插入",
+      "assigned_agent": "dev-1"
+    },
+    {
+      "title": "为图表页补一条结构化渲染路径",
+      "assigned_agent": "dev-1 / dev-2"
+    }
+  ],
+  "risk_and_cost_judgement": [
+    "图像页每页都调用图像模型，成本会线性增长。",
+    "图像内文字清晰度、排版稳定性和可编辑性弱于结构化 PPT。",
+    "仍建议推进，因为林总工当前目标是“更精美”，而不是“更可编辑”。"
+  ]
+}

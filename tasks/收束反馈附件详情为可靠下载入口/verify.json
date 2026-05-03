@@ -1,0 +1,30 @@
+{
+  "task_id": "收束反馈附件详情为可靠下载入口",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-28T13:15:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。反馈详情页已按 PM 裁决移除误导性的'打开'入口，只保留可靠的'下载'按钮；受保护下载链路保持签名链接优先+blob fallback 兜底；无附件时安全不渲染附件区。测试 2 文件 7 passed。",
+  "test_commands": [
+    "npx vitest run feedbackAttachmentDetails.test.tsx messageBubbleActions.test.tsx → 2 files, 7 tests passed",
+    "npx tsc --noEmit → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "详情页收束为明确可靠的下载入口", "result": "PASS", "evidence": "测试断言 screen.queryByText('打开') === null, screen.getByText('下载') 可点击"},
+    {"id": 2, "criterion": "移除误导性的'打开'按钮", "result": "PASS", "evidence": "两个测试用例均断言无'打开'文本(测试行109,150)"},
+    {"id": 3, "criterion": "保留受保护下载链路(签名+blob fallback)", "result": "PASS", "evidence": "测试1验证签名下载链路(/files/file-1/download-link), 测试2验证签名失败后退回blob下载(/files/file-2+triggerBlobDownload)"},
+    {"id": 4, "criterion": "无附件时安全不渲染附件区", "result": "PASS", "evidence": "测试3验证attachments为空时screen.queryByText('附件')===null"}
+  ],
+  "verified_test_scenarios": {
+    "scenario1_signed_download": "问题详情页→签名链接成功→隐藏<a>触发浏览器下载(clickSpy确认)",
+    "scenario2_blob_fallback": "需求详情页→签名链接失败→blob请求+triggerBlobDownload兜底",
+    "scenario3_no_attachment": "无附件需求→不渲染附件区"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "feedbackManagement.ts中openFeedbackAttachment()已无调用方但仍存在，属死代码，后续可清理",
+    "当前无真正的inline预览能力，若未来需要在线预览需后端新增preview契约"
+  ]
+}

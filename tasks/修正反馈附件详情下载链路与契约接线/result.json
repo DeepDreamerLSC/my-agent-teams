@@ -1,0 +1,45 @@
+{
+  "task_id": "修正反馈附件详情下载链路与契约接线",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-28T12:18:30+08:00",
+  "summary": "已按审查意见完成最小补修：反馈详情页不再把受保护的 /api/files/{id} 裸链接直接塞给 <a>，而是复用 MessageBubble.tsx 已工作的受保护下载模式；同时在 feedbackManagement.ts 正式补齐 attachments DTO 契约，并补齐问题详情/需求详情/无附件/下载策略测试。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+  ],
+  "implementation": {
+    "reference_impl": "参考 /Users/lin/Desktop/work/chiralium/frontend/src/components/MessageBubble.tsx 的受保护附件下载实现：先请求 /files/{id}/download-link，失败时退回 axios blob 下载。",
+    "final_download_strategy": [
+      "打开/下载都先调用 /files/{file_id}/download-link 获取签名链接。",
+      "获取成功后用隐藏 <a> 触发打开（target=_blank）或下载（download 属性）。",
+      "若签名链接获取失败，则退回 axios 请求受保护的 download_url；下载场景用 blob + triggerBlobDownload，打开场景用 blob object URL 新开窗口。"
+    ],
+    "dto_contract": [
+      "在 feedbackManagement.ts 新增 FeedbackAttachmentSummary。",
+      "正式为 FeedbackIssueDetail / FeedbackRequestDetail 增加 attachments?: FeedbackAttachmentSummary[] 字段。",
+      "页面不再依赖局部类型断言读取 attachments。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/feedbackAttachmentDetails.test.tsx src/test/messageBubbleActions.test.tsx",
+        "result": "passed (2 files, 7 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ],
+    "coverage": [
+      "问题详情页有附件时展示并优先走签名下载链路。",
+      "需求详情页有附件时展示并在签名失败时退回 blob 下载链路。",
+      "无附件时安全不渲染附件区。",
+      "同时保留对 MessageBubble 受保护下载参考实现的回归验证。"
+    ]
+  }
+}

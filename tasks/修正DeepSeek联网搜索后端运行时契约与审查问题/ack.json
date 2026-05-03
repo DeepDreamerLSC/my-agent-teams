@@ -1,0 +1,7 @@
+{
+  "task_id": "修正DeepSeek联网搜索后端运行时契约与审查问题",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-25T19:04:21+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与上一轮 result，开始核对 /api/meta/chat-capabilities 的前后端 web_search runtime 契约，并按审查驳回意见在 write_scope 内补修兼容字段、状态枚举与测试。"
+}

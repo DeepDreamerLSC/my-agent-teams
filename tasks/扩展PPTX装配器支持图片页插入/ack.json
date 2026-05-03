@@ -1,0 +1,9 @@
+{
+  "task_id": "扩展PPTX装配器支持图片页插入",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-01T10:38:30+08:00",
+  "acked_at": "2026-05-01T10:38:30+08:00",
+  "summary": "已读取 instruction.md；该任务已进入 PPT 精美模式 demo 执行阶段，当前正为 PPTX 装配器补充整页图片插入能力，并确保现有结构化简洁模式不回归。"
+}

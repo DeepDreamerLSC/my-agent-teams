@@ -1,0 +1,54 @@
+{
+  "id": "发布boxcalculator直接尺寸模式修复到生产",
+  "title": "发布 box-calculator 直接尺寸模式修复到生产",
+  "project": "chiralium",
+  "execution_mode": "deploy",
+  "target_environment": "prod",
+  "assigned_agent": "arch-1",
+  "review_required": false,
+  "review_authority": "owner",
+  "reviewer": null,
+  "review_level": "skip",
+  "reviewers": [],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "done",
+  "task_level": "integration",
+  "owner_pm": "pm-chief",
+  "domain": "quality",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/.git",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "depends_on": [
+    "增强boxcalculator支持直接输入鞋盒尺寸",
+    "修正boxcalculator历史总数回填回归"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/发布boxcalculator直接尺寸模式修复到生产/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "box-calculator直接尺寸模式生产发布",
+  "parent_task_id": "增强boxcalculator支持直接输入鞋盒尺寸",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 90,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T20:41:43+08:00",
+  "lease_expires_at": "2026-04-28T20:41:43+08:00",
+  "workspace_mode": "main",
+  "target_branch": "master",
+  "result_summary": "box-calculator 直接尺寸输入模式与 recent_messages 历史总数回填回归修复已更新 Release Note、合入并推送 commit 519d4d2d385889c64dd9da1ad22d78c33371dd83，并已部署到生产；生产与本地 HEAD 一致，后端/Hotpick/公网健康检查通过。",
+  "last_error": null,
+  "created_at": "2026-04-28T20:41:43+08:00",
+  "updated_at": "2026-04-28T21:20:36+08:00"
+}

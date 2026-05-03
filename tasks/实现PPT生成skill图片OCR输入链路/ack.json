@@ -1,0 +1,9 @@
+{
+  "task_id": "实现PPT生成skill图片OCR输入链路",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-30T13:05:00+08:00",
+  "acked_at": "2026-04-30T13:05:00+08:00",
+  "summary": "已读取 instruction.md，正按现有 parser / extracted_text 思路补齐图片 OCR 输入链路，并补充图片解析与可供后续 skill 消费的测试。"
+}

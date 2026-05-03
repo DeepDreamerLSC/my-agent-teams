@@ -1,0 +1,39 @@
+{
+  "task_id": "补充反馈详情页附件展示与下载入口",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-28T12:08:00+08:00",
+  "summary": "已按最小范围为问题详情页与需求详情页补充附件展示区：当后端返回 attachments[] 时显示文件名，并提供打开/下载入口；无附件时页面保持正常，不额外报错。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+  ],
+  "implementation": {
+    "display_positions": [
+      "问题详情页：AI 分析结果卡片之后、处理时间线之前新增附件区。",
+      "需求详情页：AI 评估结果卡片之后、处理时间线之前新增附件区。"
+    ],
+    "download_entry": [
+      "对每个 attachments[] 项展示 file_name。",
+      "使用后端返回的 download_url 直接提供两个入口：打开（新窗口）与下载（download 属性）。",
+      "若 attachments 为空或未返回，则不渲染附件区，页面维持现状。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/feedbackAttachmentDetails.test.tsx",
+        "result": "passed (1 file, 2 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ]
+  },
+  "notes": [
+    "本次只做最小展示与下载入口，未扩展复杂预览器。"
+  ]
+}

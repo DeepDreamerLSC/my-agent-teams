@@ -1,0 +1,85 @@
+{
+  "task_id": "修正DeepSeek联网搜索后端运行时契约与审查问题",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-25T19:12:25+08:00",
+  "summary": "已对齐 /api/meta/chat-capabilities 的 web_search runtime 前后端契约：补回前端正在消费的 web_search_runtime_status，并把 runtime 对象 status 统一到 available/unavailable/degraded/unknown，同时保留 internal_status 承载旧内部枚举。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+      "action": "modified",
+      "description": "在 /api/meta/chat-capabilities 中新增顶层 web_search_runtime_status，并继续保留 web_search_runtime 对象；/api/meta/web-search-runtime 继续复用统一 runtime 描述。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+      "action": "modified",
+      "description": "新增 runtime 状态枚举映射函数，把内部 ready/disabled/misconfigured 映射为前端稳定枚举 available/unavailable/degraded/unknown；保留 internal_status 供兼容与排障。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "action": "modified",
+      "description": "补充 /api/meta/chat-capabilities 的顶层字段契约测试，覆盖 available / unavailable（含 misconfigured）映射与对象结构兼容。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_web_search_service.py",
+      "action": "modified",
+      "description": "补充 runtime 枚举映射与 describe_web_search_runtime() 兼容结构测试。"
+    }
+  ],
+  "runtime_contract_alignment": {
+    "chat_capabilities_top_level": {
+      "new_field": "web_search_runtime_status",
+      "enum": [
+        "available",
+        "unavailable",
+        "degraded",
+        "unknown"
+      ],
+      "purpose": "直接对齐前端 useChatOptions 当前实际消费字段，避免前端再猜测或硬编码映射。"
+    },
+    "web_search_runtime_object": {
+      "retained": true,
+      "status": "现改为前端稳定枚举 available/unavailable/degraded/unknown",
+      "internal_status": "保留旧内部状态 ready/disabled/misconfigured 供兼容和排障",
+      "preserved_fields": [
+        "provider",
+        "ready",
+        "degraded",
+        "error",
+        "missing",
+        "provider_configured",
+        "base_url_configured",
+        "api_key_configured",
+        "timeout_ms"
+      ]
+    },
+    "status_mapping": {
+      "ready": "available",
+      "disabled": "unavailable",
+      "misconfigured": "unavailable",
+      "degraded": "degraded",
+      "fallback": "unknown"
+    }
+  },
+  "why_this_fixes_review": [
+    "前端 useChatOptions 当前直接读取 /api/meta/chat-capabilities.web_search_runtime_status；本次后端明确补回该字段，消除了字段缺失导致的契约断裂。",
+    "web_search_runtime.status 不再返回 ready/disabled/misconfigured 这组后端内部枚举，而是直接返回前端语义可消费的 available/unavailable/degraded/unknown。",
+    "对真正不可用的状态（missing_provider / provider_disabled / missing_base_url）统一映射为 unavailable，可直接驱动前端禁用联网搜索按钮，避免“按钮可点但无效果”。",
+    "原有 web_search_runtime 对象没有被移除；同时新增 internal_status 保留旧内部状态，满足向后兼容与排障可观测性。",
+    "上一轮已完成的 drift guard、/api/admin/models/diagnostics、/api/meta/web-search-runtime、warning/degraded 日志能力本次均未回退。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_web_search_service.py -q",
+      "result": "passed (38 passed, 4 warnings; warnings are existing FastAPI on_event deprecations)"
+    },
+    {
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_web_search_service.py",
+      "result": "passed"
+    }
+  ],
+  "notes": [
+    "本次没有扩散到前端改动；修复方式是让后端契约主动对齐前端现有消费点。",
+    "本任务 write_scope 未包含 admin_models.py，因此 DeepSeek drift guard 与 diagnostics 逻辑保持上一轮实现不变，仅通过回归测试确认未受影响。"
+  ]
+}

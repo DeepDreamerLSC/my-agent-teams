@@ -1,0 +1,44 @@
+{
+  "task_id": "发布PPT生成skill到生产",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-30T18:50:18+08:00",
+  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "commit_hash": "966fbfa412f63a1a7b3f12c23792c4f8f3300860",
+  "pushed": true,
+  "deployed_commit": "966fbfa412f63a1a7b3f12c23792c4f8f3300860",
+  "health_check_result": {
+    "backend_health": "http://127.0.0.1:18000/health ready",
+    "hotpick_backend_health": "http://127.0.0.1:18100/health ready",
+    "public_site": "https://chiraliumai.cn ready",
+    "skill_discovery": "production checkout contains skills/custom/ppt_generator/1.0.0/manifest.json with attachment_kinds=[document,image]"
+  },
+  "included_files": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/parser_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "remaining_unrelated_changes": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md"
+  ],
+  "verification": {
+    "backend_tests": "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py /Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py -q -> 13 passed, 5 warnings",
+    "git_match": "local HEAD == prod HEAD == 966fbfa412f63a1a7b3f12c23792c4f8f3300860"
+  },
+  "summary": "已将 PPT 生成 skill 的文档/PDF 主链路与图片 OCR 消费闭环相关改动整理为集成提交并推送到 origin/master，随后完成生产部署。生产 checkout 已包含 ppt_generator manifest/skill 文件，主站与后端健康检查通过。",
+  "residual_risks": [
+    "本次未做人工浏览器端生成/下载点击验证，当前最小验证以部署健康检查与生产 checkout 发现层为准。"
+  ]
+}

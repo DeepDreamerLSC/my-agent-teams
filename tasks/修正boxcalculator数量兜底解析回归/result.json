@@ -1,0 +1,52 @@
+{
+  "task_id": "修正boxcalculator数量兜底解析回归",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T19:16:30+08:00",
+  "summary": "已修正 box-calculator 的数量兜底解析回归：现在只有在没有款号明细时才会启用 `10个/10双` 这类兜底总数解析；如果 query 文本里已经解析出了混装明细（如 A 4 双，B 6 双），且没有显式总数语义（如 一箱共/合计/每箱/规格/总双数），就不会再把第一个数量误当总数，从而避免 forward 混装被误报总数不一致。同时 direct_dimension 的 `10个/10双` 兼容保持不变。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "把总数解析拆成“显式总数模式”和“兜底模式”；当文本里已解析出 style_quantities 明细且没有显式总数短语时，主动清空 total_quantity，避免把第一个 X双/个 误当总数。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "action": "modified",
+      "description": "新增混装明细不再误中总数兜底、上游错误 total_quantity 参数被文本明细纠偏、以及 direct_dimension 仍兼容 `10个/10双` 的回归测试。"
+    }
+  ],
+  "how_regression_was_fixed": [
+    "原先 `total_quantity` 的兜底正则会无差别匹配第一个 `X双/个`，导致 `A 4 双，B 6 双，算纸箱` 把 4 误当总数。",
+    "现在先只识别显式总数语义：`一箱共 / 总共 / 合计 / 每箱 / 一箱 / 规格 / 数量 / 总双数 / 数量规格`。",
+    "只有在 query 文本里没有解析出 `style_quantities` 明细时，才允许使用 `10个/10双` 这种宽松兜底总数解析。",
+    "如果 query 文本里已经有 `style_quantities` 明细、但没有显式总数字样，则会把 `total_quantity` 视为不可信并清空，即使上游 params 误传了 `total_quantity=4` 也会被 skill.py 本地纠偏。"
+  ],
+  "new_regression_tests": [
+    "`A 4 双，B 6 双，算纸箱` 不再误报“总双数 4 与明细 10 不一致”。",
+    "模拟上游 params 误传 `total_quantity=4` 时，`A 4 双，B 6 双，算纸箱` 仍会按混装 10 双正确 forward。",
+    "`28.8 x 25.5 x 10.9规格10双` 仍能正确走 `direct_dimension` 模式并匹配到 B 款。",
+    "`63.2 x 49.0 x 25.8规格10个` 仍不会回退到 reverse，而是给出“不符合标准鞋盒尺寸”的明确提示。",
+    "原有 forward / reverse 用例继续通过。"
+  ],
+  "direct_dimension_compatibility": {
+    "kept": true,
+    "details": [
+      "保留了 `规格10个`、`规格10双`、以及无款号但带三维尺寸时的 direct_dimension 判定。",
+      "显式总数字样 `规格` 仍会被识别为总数来源，因此不会破坏上一轮紧急修复。"
+    ]
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
+      "result": "passed (12 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次数量解析补修无关。"
+  ]
+}

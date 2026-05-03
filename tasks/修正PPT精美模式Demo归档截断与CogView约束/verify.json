@@ -1,0 +1,44 @@
+{
+  "task_id": "修正PPT精美模式Demo归档截断与CogView约束",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-01T11:20:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。review.md 原文为 APPROVE（task-watcher 误报以 review.md 为准）。两个阻塞点已修复：1) presentation_plan.json 完整 UTF-8 写入、可 JSON 解析、长字段不截断；2) 非 CogView image_model_id 被 RuntimeError 拒绝；simple 模式与 polished demo 主链路无回归，9 测试全部通过。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_generator_skill.py tests/test_ppt_page_render_service.py -q",
+      "result": "9 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "polished demo zip 中 presentation_plan.json 完整 UTF-8 解码并成功 JSON 解析",
+      "result": "pass",
+      "evidence": "skill.py L320-321: json.dumps(plan, ensure_ascii=False, indent=2).encode('utf-8') 后 archive.writestr 完整写入，不再按字节截断。测试 test_ppt_generator_polished_mode_returns_demo_archive L161-162: json.loads(archive.read('presentation_plan.json').decode('utf-8')) 正常解析，且 L162 断言 visual_brief='视觉描述'×3000 的 12000 字符长字段未被截断损坏。"
+    },
+    {
+      "criterion": "非 CogView 的 image_model_id 被拒绝",
+      "result": "pass",
+      "evidence": "ppt_page_render_service.py L82-88: _is_allowed_demo_image_model() 仅允许 provider=zhipu 且 model_name ∈ {cogview-3-flash, cogview-3}；L103-104: 显式 image_model_id 路径下不合法直接 raise RuntimeError('仅允许使用 CogView-3-Flash / cogview-3 图片模型')。测试 test_resolve_demo_image_model_rejects_non_cogview_override L117-140: 传入 provider=zhipu, model_name=glm-image 时抛出 RuntimeError 匹配 'CogView-3-Flash / cogview-3'。"
+    },
+    {
+      "criterion": "simple 模式与现有 polished demo 主链路无回归",
+      "result": "pass",
+      "evidence": "test_ppt_generator_generates_pptx_from_parsed_text (L54-94): simple 模式 .pptx 生成继续通过；test_ppt_generator_polished_mode_returns_demo_archive (L98-162): polished 模式 zip demo 包继续通过；test_render_presentation_demo_filters_supported_page_types_and_limits (L13-52): page_types 过滤 + page_limit 约束继续通过；test_render_page_image_calls_cogview3_flash_api (L55-114): CogView API 调用链继续通过。原有 ppt_generator 图片 OCR + 文档/PDF 计划消息测试全部保留并通过。"
+    },
+    {
+      "criterion": "review 结论",
+      "result": "pass",
+      "evidence": "review.md 明确结论为审查通过（APPROVE），确认两个阻塞点已正面解决。task-watcher 误报为审查未通过属自动化判断错误，本次验证以 review.md 原文为准。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 条 warning 为已有 FastAPI on_event 弃用提示，非本次引入",
+    "review.md 原文 APPROVE，task-watcher 误报应以 review.md 为准",
+    "presentation_plan.json 截断修复方案是将字节硬截断改为完整 UTF-8 JSON 写入，当前 demo 页数限制 5 页、体量可控",
+    "CogView 约束通过 _is_allowed_demo_image_model 统一校验，自动选择路径仍优先挑 CogView 候选，不会误伤正常 demo 流程"
+  ]
+}

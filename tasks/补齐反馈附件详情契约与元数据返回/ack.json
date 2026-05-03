@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐反馈附件详情契约与元数据返回",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-28T11:29:14+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。先按最小范围补后端 feedback detail/admin detail 的附件元数据契约：在保持 attachment_ids 兼容的前提下返回 attachments[]，并补对应详情接口测试。"
+}

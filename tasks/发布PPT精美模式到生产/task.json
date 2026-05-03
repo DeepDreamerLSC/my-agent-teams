@@ -1,0 +1,53 @@
+{
+  "id": "发布PPT精美模式到生产",
+  "title": "发布PPT精美模式到生产",
+  "project": "chiralium",
+  "execution_mode": "deploy",
+  "target_environment": "prod",
+  "assigned_agent": "arch-1",
+  "review_required": false,
+  "review_authority": "reviewer",
+  "reviewer": null,
+  "review_level": "skip",
+  "reviewers": [],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "ready_for_merge",
+  "task_level": "integration",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "task_type": "deployment",
+  "read_only": false,
+  "downstream_action": "deploy",
+  "owner_approval_required": true,
+  "owner_approved_by": "林总工",
+  "owner_approved_at": "2026-05-01T13:22:11+08:00",
+  "write_scope": [],
+  "depends_on": [
+    "合入PPT精美模式最终闭环到集成"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/发布PPT精美模式到生产/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "发布PPT精美模式到生产",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-01T13:28:28+08:00",
+  "lease_expires_at": "2026-05-01T13:28:28+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-05-01T13:18:42+08:00",
+  "updated_at": "2026-05-01T13:43:05+08:00"
+}

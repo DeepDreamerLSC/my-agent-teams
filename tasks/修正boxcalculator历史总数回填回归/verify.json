@@ -1,0 +1,31 @@
+{
+  "task_id": "修正boxcalculator历史总数回填回归",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-28T19:45:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。已阻断 recent_messages 路径把历史错误 total_quantity 回填到当前混装 forward 的问题：当前轮有 style_quantities 且无显式总数时，合并后强制清空 total_quantity；direct_dimension 和 reverse 模式也有独立的当前轮意图保护。测试 15 passed，覆盖 forward/direct_dimension/reverse 三条 recent_messages 回归场景。",
+  "test_commands": [
+    "pytest tests/test_box_calculator_skill.py -q → 15 passed, 4 warnings",
+    "py-compile skill.py test_box_calculator_skill.py → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "修正 recent_messages 回填逻辑，阻断历史错误 total_quantity", "result": "PASS", "evidence": "skill.py:148-149 合并后若当前有 local_styles 且无 explicit_total，强制 total_quantity=None；测试108-121 验证历史错误总数4不再污染当前10"},
+    {"id": 2, "criterion": "补多轮 forward 回归测试：历史含错误总数当前轮正常 forward", "result": "PASS", "evidence": "test 108-121: recent_messages 含'A 4双 B 6双 共4双'，当前'A 4双 B 6双 算纸箱' → total_quantity=10, 无不一致报错"},
+    {"id": 3, "criterion": "direct_dimension 带 recent_messages 不回归", "result": "PASS", "evidence": "test 169-182: 28.8x25.5x10.9规格10双 + 历史混装 → mode=direct_dimension, matched=B"},
+    {"id": 4, "criterion": "reverse 带 recent_messages 不回归", "result": "PASS", "evidence": "test 185-197: 现有外箱...帮我看是不是最优 + 历史混装 → mode=reverse, 候选组合正常输出"}
+  ],
+  "verified_protection_logic": {
+    "forward_total_protection": "skill.py:124-125 合并前若 local_styles 且无 explicit_total 则 total_quantity=None; 148-149 合并后再次清空",
+    "direct_dimension_protection": "skill.py:138 检测当前轮是否纯 direct_dimension; 150-151 合并后清空 style_quantities",
+    "reverse_protection": "skill.py:139 检测当前轮是否纯 reverse; 152-154 合并后清空 style_quantities 和 total_quantity",
+    "intent_snapshot_before_merge": "current_has_local_styles/current_is_direct_dimension/current_is_pure_reverse 在合并前(115-139行)计算并保存，合并后(146-154行)基于合并前快照做清理"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "意图保护依赖合并前的局部快照变量(current_has_local_styles等)，若未来新增更多 recent_messages 合并路径需同步维护保护逻辑",
+    "当前仅对 total_quantity 和 style_quantities 做保护，若未来新增其他可被历史污染的字段需补充清理"
+  ]
+}

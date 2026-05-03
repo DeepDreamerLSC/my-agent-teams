@@ -1,0 +1,49 @@
+{
+  "id": "建立taskwatcher可靠性优化上下文",
+  "title": "建立 task-watcher 可靠性优化共享上下文与拆分方案",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "arch-1",
+  "review_required": false,
+  "review_authority": "reviewer",
+  "reviewer": null,
+  "review_level": "skip",
+  "reviewers": [],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "done",
+  "task_level": "domain",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "write_scope": [
+    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md",
+    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/decisions.log",
+    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/建立taskwatcher可靠性优化上下文/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "task-watcher可靠性优化第一批",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-26T13:03:10+08:00",
+  "lease_expires_at": "2026-04-26T13:03:10+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "feature 级共享上下文已建立并完成 execution 拆分：进程级可靠性、日志持久化、超时检测优化三条任务已按顺序创建，其中第 1 条已派发实施。",
+  "last_error": null,
+  "created_at": "2026-04-26T13:03:10+08:00",
+  "updated_at": "2026-04-26T16:32:30+08:00"
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "实现PPT生成skill文档主链路",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-30T12:40:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将优先复用现有 custom skill 目录结构、office_export_service 与 file-display 返回契约，先实现文档/PDF解析文本到 PPTX 文件的主链路与最小测试。"
+}

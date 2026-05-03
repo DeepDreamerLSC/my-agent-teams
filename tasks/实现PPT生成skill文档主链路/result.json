@@ -1,0 +1,75 @@
+{
+  "task_id": "实现PPT生成skill文档主链路",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-30T12:58:30+08:00",
+  "summary": "已在 chiralium 现有 skill 体系中新增 `ppt_generator` 主链路：可基于用户提示词与已解析的 PDF/文档文本生成可下载的 `.pptx` 文件，并复用现有 `display_type=file` 文件回传契约。",
+  "skill_name": "ppt_generator",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "action": "added",
+      "description": "新增 PPT 生成 skill manifest，声明 document/PDF 输入能力、PPTX 输出格式与 subprocess 执行方式。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "action": "added",
+      "description": "新增 PPT 生成 skill 主链路：复用现有文本模型、recent_messages 与 parsed_files，上下文整理后请求模型返回结构化 JSON，并导出 PPTX。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py",
+      "action": "modified",
+      "description": "新增 `PPTX_MIME` 与 `build_pptx_bytes()`，使用现有 zip/XML 方式手工构造最小可下载 PPTX 包，不引入额外第三方依赖。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "action": "added",
+      "description": "新增后端测试，验证 skill 可发现、可基于解析文本生成 `.pptx`，且返回 `display_type=file` 契约。"
+    }
+  ],
+  "requirements_change": {
+    "changed": false,
+    "reason": "本次复用了现有 `office_export_service` 的 zip/XML 输出风格，手工生成最小 PPTX 包，没有新增 `python-pptx` 等依赖。"
+  },
+  "main_chain": {
+    "input": [
+      "text prompt",
+      "parsed PDF text",
+      "parsed Word text"
+    ],
+    "flow": [
+      "聊天链路把 parseable 文件解析成 `parsed_files`",
+      "`ppt_generator` 读取 `recent_messages + parsed_files + 当前 query` 组织提示词",
+      "文本模型返回 `title + slides[]` 结构化 JSON",
+      "skill 调用 `build_pptx_bytes()` 生成 `.pptx` 文件",
+      "skill 以 `display_type=file` 返回给现有聊天文件回传链路"
+    ],
+    "output_format": ".pptx"
+  },
+  "ppt_basic_structure": {
+    "cover_slide": true,
+    "content_slides": "按模型返回的 `slides[]` 逐页生成",
+    "slide_content": "每页包含标题与 bullet 要点列表"
+  },
+  "tests_added": [
+    "manifest 声明 document/PDF 输入与 PPTX 输出",
+    "SkillManager 能发现 `ppt_generator`",
+    "基于 `parsed_files` 的文本计划可生成真实 `.pptx` 文件，且 ZIP 包内包含 `ppt/presentation.xml` 与 slide XML",
+    "计划消息构造会带入 `recent_messages` 与 `parsed_files` 内容"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py -q",
+      "result": "passed (4 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "本任务只实现 skill 主链路与 PPTX 导出能力，没有新增页面 UI。",
+    "当前实现重点覆盖文档/PDF 解析文本输入，不包含图片 OCR 输入链路。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` 弃用提示，与本次 PPT skill 实现无关。"
+  ]
+}

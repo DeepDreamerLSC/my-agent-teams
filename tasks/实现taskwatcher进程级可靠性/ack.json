@@ -1,0 +1,7 @@
+{
+  "task_id": "实现taskwatcher进程级可靠性",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T16:41:41+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md、feature BRIEF/CONTEXT/notes，并检查现有 task-watcher shell 主循环。将按最小增强方案实现 heartbeat 与 watchdog，不改主状态流转语义，也不把 watcher 运行时工件纳入任务看板同步链。"
+}

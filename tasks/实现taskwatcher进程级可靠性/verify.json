@@ -1,0 +1,28 @@
+{
+  "task_id": "实现taskwatcher进程级可靠性",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-26T17:05:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。heartbeat 文件周期更新正常（phase=running）；watchdog 能检测 watcher 进程退出并自动重启（restart-cause=process_exit）；能检测 heartbeat 超时并重启（restart-cause=heartbeat_timeout）；heartbeat/pid/restart-cause 未纳入任务看板同步链；shell 语法检查通过。验收标准 4/4 满足。",
+  "test_commands": [
+    "bash -n task-watcher.sh && bash -n task-watcher-watchdog.sh — SYNTAX OK",
+    "集成验证: heartbeat 更新 → PASS",
+    "集成验证: kill -9 watcher → watchdog 检测 process_exit 并重启 → PASS (new pid confirmed)",
+    "集成验证: 过期 heartbeat → watchdog 检测 heartbeat_timeout 并重启 → PASS",
+    "集成验证: restart-cause 文件写入 → PASS"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "heartbeat 文件存在且周期更新", "result": "PASS"},
+    {"id": 2, "criterion": "watchdog 能在 watcher 退出或 heartbeat 超时后重启", "result": "PASS"},
+    {"id": 3, "criterion": "不破坏现有 watcher 主流程", "result": "PASS"},
+    {"id": 4, "criterion": "相关验证命令通过", "result": "PASS"}
+  ],
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "watchdog 常驻托管方式（cron/launchd/tmux）仍需 PM/运维决定",
+    "restart-cause 文件不会自动清理，长时间运行后可能积累历史记录"
+  ]
+}

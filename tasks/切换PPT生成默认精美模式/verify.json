@@ -1,0 +1,60 @@
+{
+  "task_id": "切换PPT生成默认精美模式",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-02T22:50:00+08:00",
+  "status": "fail",
+  "pass": false,
+  "summary": "QA 验证不通过。review.md 结论为 REQUEST CHANGES，两个阻塞问题经独立验证均成立：1) 默认切到 polished 后对 CogView 图片模型形成强依赖，当 CogView 不可用时普通 PPT 请求直接 RuntimeError，无降级回退 simple 的策略；2) 缺少“默认 polished 但图片模型不可用”场景的测试覆盖。8 个测试全部通过但均未触及该失败路径。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_generator_skill.py -q",
+      "result": "8 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "普通 PPT 生成请求在未显式传 mode 时，默认进入 polished",
+      "result": "pass",
+      "evidence": "skill.py L135: _resolve_render_mode() 默认返回 'polished'；test_ppt_generator_defaults_to_polished_when_mode_not_explicit (L186-232): 不传 render_mode 时 result['meta']['render_mode'] == 'polished' 且 render_presentation_demo 被调用。"
+    },
+    {
+      "criterion": "显式传 simple 时，仍然进入 simple",
+      "result": "pass",
+      "evidence": "skill.py L130-131: explicit_mode ∈ {simple, polished} 分支优先于默认值；test_ppt_generator_explicit_simple_still_uses_simple_mode (L236-257): render_mode=simple 时 result['meta']['render_mode'] == 'simple'。"
+    },
+    {
+      "criterion": "显式传 polished 时，继续进入 polished",
+      "result": "pass",
+      "evidence": "skill.py L130-131: 同分支覆盖 polished；test_ppt_generator_polished_mode_returns_demo_archive (L117-182): render_mode=polished 正确进入 polished 路径并产出含图片页的 .pptx。"
+    },
+    {
+      "criterion": "测试覆盖默认 polished 与显式 simple 两条路径",
+      "result": "pass",
+      "evidence": "test_ppt_generator_defaults_to_polished_when_mode_not_explicit + test_ppt_generator_explicit_simple_still_uses_simple_mode 覆盖两条路径。"
+    },
+    {
+      "criterion": "不引入对现有导出契约的破坏",
+      "result": "pass",
+      "evidence": "polished 与 simple 路径均保持 display_type: file、mime_type: PPTX_MIME、file 字段四元组（file_name/file_path/file_size/mime_type），契约未变。"
+    },
+    {
+      "criterion": "默认 polished 时 CogView 不可用的降级处理（review 阻塞问题 #1）",
+      "result": "fail",
+      "evidence": "skill.py L77-82: polished 分支直接调用 render_presentation_demo() 无 try/except 包裹，无降级回退 simple 的逻辑。ppt_page_render_service.py L63-65: _resolve_demo_image_model() 在无 CogView 模型时抛出 RuntimeError('当前没有可用的 CogView 图片生成模型，无法运行精美模式 demo')。当 default_render_mode=polished 且环境无 CogView 模型时，普通 PPT 请求将从未传 mode 的简单请求直接变为 RuntimeError，而非降级走 simple 文本导出。review.md 将此标记为阻塞问题，独立验证确认存在。"
+    },
+    {
+      "criterion": "CogView 不可用场景的测试覆盖（review 阻塞问题 #2）",
+      "result": "fail",
+      "evidence": "test_ppt_generator_defaults_to_polished_when_mode_not_explicit (L186-232) 始终将 render_presentation_demo mock 为成功返回，未测试其抛出 RuntimeError 时 skill.execute() 的行为。test_ppt_generator_skill.py 全部 8 个测试均未覆盖 render_presentation_demo 失败路径。review.md 将此标记为测试缺口，独立验证确认存在。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "8 个测试全部通过，无回归",
+    "review.md 结论为 REQUEST CHANGES，非 APPROVE。以 review.md 原文为准",
+    "两个阻塞问题均属实：默认 polished 对 CogView 的硬依赖未兜底 + 缺少失败场景测试",
+    "manifest.json default_render_mode 已正确更新为 polished，代码层面的默认切换本身正确",
+    "建议修复方向：在 skill.py polished 分支增加 CogView 不可用时的降级（如回退 simple 或明确错误契约），并补充对应测试"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "排查生产联网搜索DeepSeek可点不可用与GLM置灰",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T23:45:56+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md，按生产关键问题只读排查执行：先以当前系统中已部署的正常/预期实现为参照，对比生产代码、前端按钮判断、生产配置、生产日志与最近聊天记录，确认 DeepSeek 与 GLM 各自的根因，不先做大范围代码修改。"
+}

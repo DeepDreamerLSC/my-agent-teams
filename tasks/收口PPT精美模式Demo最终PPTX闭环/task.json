@@ -1,0 +1,59 @@
+{
+  "id": "收口PPT精美模式Demo最终PPTX闭环",
+  "title": "收口PPT精美模式Demo最终PPTX闭环",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": "2026-05-01T23:59:00+08:00",
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "task_type": "development",
+  "read_only": false,
+  "downstream_action": "review",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "write_scope": [
+    "skills/custom/ppt_generator/1.0.0/skill.py",
+    "backend/tests/test_ppt_generator_skill.py",
+    "backend/tests/test_ppt_image_page_assembly.py"
+  ],
+  "depends_on": [
+    "合入PPT精美模式Demo到集成"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/收口PPT精美模式Demo最终PPTX闭环/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "收口PPT精美模式Demo最终PPTX闭环",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 60,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-01T05:24:37+08:00",
+  "lease_expires_at": "2026-05-01T05:24:37+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已按最小收口方式补齐 polished 模式的最终 `.pptx` 闭环：不再返回 zip demo 包，而是把已完成渲染的 `cover / content / closing` 页图映射为 image slides，并直接复用现有 `build_pptx_bytes()` 图片页装配能力导出最终 `.pptx` 文件。（QA 已通过自动收口） QA 结论：QA 验证通过。polished 模式已从 zip demo 包收口为最终 .pptx：新增 _build_polished_image_slides() 将 render_presentation_demo() 的页面图片映射为 slide dict，传入 build_pptx_bytes() 复用现有图片页装配能力产出 .pptx。simple 模式无回归，全部 11 个测试通过，review.md 结论为 APPROVE。",
+  "last_error": null,
+  "created_at": "2026-05-01T05:24:37+08:00",
+  "updated_at": "2026-05-01T05:38:15+08:00"
+}

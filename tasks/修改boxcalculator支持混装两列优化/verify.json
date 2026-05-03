@@ -1,0 +1,40 @@
+{
+  "task_id": "修改boxcalculator支持混装两列优化",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-27T23:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。box-calculator SKILL.md 已按生产 feedback selected_plan 更新：两列混装强制启用左右列优化（内宽=左列maxW+右列maxW，列高=maxH，内高=maxL）；外箱长宽交换规则（外宽>外长时强制交换保证长≥宽）；固定鞋盒库/摆放方向/+2.0cm/1位小数等原有规则均保留。示例 2（B10+D2混装两列）和示例 3（A款长宽交换）数学验算正确。",
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "混装两列时强制启用优化规则，左右列分别分配，内宽=左列maxW+右列maxW", "result": "PASS", "evidence": "SKILL.md:81-97 明确写出适用条件与8条强制规则，SKILL.md:113-124 给出公式"},
+    {"id": 2, "criterion": "外箱长宽交换：外宽>外长时交换，保证长≥宽", "result": "PASS", "evidence": "SKILL.md:132-135 新增强制规则，示例3(243-254)演示A款6双交换"},
+    {"id": 3, "criterion": "原有规则保留：固定鞋盒库/摆放方向/+2.0cm/1位小数", "result": "PASS", "evidence": "数据库43-53, 摆放方向57-63, +2.0cm:126-130, 1位小数:130,213"},
+    {"id": 4, "criterion": "输出格式与示例同步更新", "result": "PASS", "evidence": "输出格式190-214含两列优化+交换说明, 示例2(229-241)混装两列, 示例3(243-254)长宽交换, 示例4(256-266)反向验算"}
+  ],
+  "math_verification": {
+    "example2_B10_D2": {
+      "input": "B10双 + D2双, 共12双",
+      "steps": "统一列高=MAX(10.9,10.9)=10.9, 左列6B→maxW=25.5, 右列4B+2D→maxW=27.5, 内径长=6×10.9=65.4, 内径宽=25.5+27.5=53.0, 内径高=MAX(28.8,29.8)=29.8",
+      "result": "外箱=67.4×55.0×31.8cm, 67.4≥55.0无需交换",
+      "correct": true
+    },
+    "example3_A6_swap": {
+      "input": "A款6双",
+      "steps": "内径长=3×10.2=30.6, 内径宽=2×23.5=47.0, 内径高=23.8, 外箱原始=32.6×49.0×25.8",
+      "result": "49.0>32.6, 交换后=49.0×32.6×25.8cm",
+      "correct": true
+    }
+  },
+  "rules_replaced_confirmed": [
+    "旧'两列宽度按2×基准宽'→收紧为两列混装必须用左右列优化(SKILL.md:68,145)",
+    "旧'混装三维取max'→两列混装只保留max L和max H, 宽度改为左右列分别求max再相加(SKILL.md:92-96)",
+    "新增输出必须交换长宽保证长≥宽(SKILL.md:132-135)"
+  ],
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "本次为技能文档规则变更，无自动化测试覆盖；后续风险在于调用该skill的agent是否严格按文档执行",
+    "两列混装优化的'同款尽量集中'是软性约束（非唯一解），不同agent可能给出不同的左右列分配方案"
+  ]
+}

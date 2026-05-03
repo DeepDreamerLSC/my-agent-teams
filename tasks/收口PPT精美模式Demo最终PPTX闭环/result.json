@@ -1,0 +1,59 @@
+{
+  "task_id": "收口PPT精美模式Demo最终PPTX闭环",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-01T05:46:30+08:00",
+  "summary": "已按最小收口方式补齐 polished 模式的最终 `.pptx` 闭环：不再返回 zip demo 包，而是把已完成渲染的 `cover / content / closing` 页图映射为 image slides，并直接复用现有 `build_pptx_bytes()` 图片页装配能力导出最终 `.pptx` 文件。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "将 polished 分支从“生成 zip demo 包”切换为“把 `render_presentation_demo()` 的 pages 映射为 `[{title, image_path}]` slides 后，直接调用 `build_pptx_bytes()` 导出 `.pptx`”；保留 simple 模式原行为。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "action": "modified",
+      "description": "把 polished 主链路测试从 zip 断言改为 `.pptx` 断言，并验证最终 PPTX 内确实包含图片页媒体资源。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py",
+      "action": "verified",
+      "description": "继续复用现有图片页装配测试，确认 `build_pptx_bytes()` 的 image slide 契约未回退。"
+    }
+  ],
+  "final_polished_file_shape": {
+    "display_type": "file",
+    "output_extension": ".pptx",
+    "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  },
+  "how_images_are_wired_into_pptx": [
+    "`render_presentation_demo()` 仍负责生成逐页页图，并返回 `pages[].file_path`。",
+    "`skill.py` 在 polished 分支新增 `_build_polished_image_slides()`，把每个渲染页映射为 `{ title, image_path }` 结构。",
+    "映射结果直接传给现有 `build_pptx_bytes()`，复用其 `slide.image_path` -> 整页图片插入的装配能力，不再另造导出路径。"
+  ],
+  "non_regression": [
+    "simple 模式仍沿用原有 `title + bullets -> .pptx` 路径。",
+    "页图渲染 service 未被重做，只复用其输出。",
+    "仍未扩展图表页与 GLM-Image，保持当前 demo 边界。"
+  ],
+  "still_out_of_scope": [
+    "图表页结构化渲染",
+    "更复杂的图片页+文本页混排版式",
+    "GLM-Image 接入",
+    "独立页面 UI"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py -q",
+      "result": "passed (8 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "本次只收口 polished 最终文件形态，不扩展新页型。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` 弃用提示，与本次闭环补修无关。"
+  ]
+}

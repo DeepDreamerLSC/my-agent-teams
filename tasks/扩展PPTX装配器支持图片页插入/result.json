@@ -1,0 +1,44 @@
+{
+  "task_id": "扩展PPTX装配器支持图片页插入",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-01T10:41:30+08:00",
+  "summary": "已完成 PPTX 装配器图片页插入能力：office_export_service 现在支持根据 slide.image_path 把整页渲染好的图片写入 ppt/media 并作为单页图片插入最终 .pptx；同时保留现有结构化标题+bullets 简洁模式不回归。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py"
+  ],
+  "implementation": {
+    "image_page_assembly": [
+      "为 build_pptx_bytes 扩展 image slide 识别：当 slide 含 image_path 时，读取图片并规范化为 png/jpg/jpeg 媒体资源。",
+      "图片页会把媒体写入 ppt/media，并在对应 slide rels 中建立 image relationship。",
+      "新增整页图片 shape，当前按‘顶部标题 + 下方整页图’的最小 demo 方式装配。"
+    ],
+    "non_regression": [
+      "如果 slides 不包含 image_path，则继续走原有结构化简洁模式：自动封面 + 标题/要点内容页。",
+      "现有 build_pptx_bytes 的文本页输出行为保持兼容。"
+    ],
+    "current_boundary": [
+      "当前图片页只支持本地可读 image_path 输入。",
+      "当前不做复杂动画、可编辑图层拆分或图表结构化重绘。",
+      "当前图片页是 demo 装配基础，不等于可编辑设计稿 PPT。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py -q",
+        "result": "passed (7 passed, 4 warnings)"
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py",
+        "result": "passed"
+      }
+    ],
+    "tests_added": [
+      "给定图片页时可以生成包含 ppt/media 与图片 relationship 的可打开 .pptx。",
+      "现有结构化 PPTX 生成能力仍可正常输出，不与图片页装配冲突。"
+    ]
+  }
+}

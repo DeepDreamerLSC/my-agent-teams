@@ -1,0 +1,9 @@
+{
+  "task_id": "前端置灰DeepSeek联网搜索并保持其他模型正常",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-27T13:25:00+08:00",
+  "acked_at": "2026-04-27T13:25:00+08:00",
+  "summary": "已读取 instruction.md 与相关结果文件；按林总工最新方向，在保持普通对话与其他 provider 行为正常的前提下，对 DeepSeek 联网搜索做前端置灰与提示。"
+}

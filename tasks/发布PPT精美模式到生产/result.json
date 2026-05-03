@@ -1,0 +1,63 @@
+{
+  "task_id": "发布PPT精美模式到生产",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-01T13:40:00+08:00",
+  "summary": "已基于已通过 QA 的 PPT 精美模式集成基线更新 Release Note、推送发布说明提交并完成生产部署。生产环境已包含 ppt_generator 的 polished 模式与最终 .pptx 闭环能力，部署后冒烟检查通过。",
+  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "release_note_entries_summary": {
+    "2026-05-01": [
+      "PPT 生成器已新增 polished 精美模式，可将页图渲染结果直接装配为最终 .pptx 演示文稿"
+    ]
+  },
+  "upstream_integrated_commits": [
+    {
+      "task_id": "合入PPT精美模式Demo到集成",
+      "commit_hash": "6da9ad96de7f0c03069aef39330db62fb74e6419"
+    },
+    {
+      "task_id": "合入PPT精美模式最终闭环到集成",
+      "commit_hash": "f1c221a415f0946b57d82cc9e8db94d7fe1fd8a8"
+    }
+  ],
+  "commit_hash": "d5df5ef11ff64a17ce8cb6ae0ae6e16ae1891e9d",
+  "pushed": true,
+  "branch": "master",
+  "remote_branch": "origin/master",
+  "deployed_commit": "d5df5ef11ff64a17ce8cb6ae0ae6e16ae1891e9d",
+  "deploy_command": "cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod",
+  "health_check_result": {
+    "backend_health": "deploy.sh 内置生产后端健康检查通过",
+    "hotpick_backend_health": "deploy.sh 内置生产 Hotpick 后端健康检查通过",
+    "public_site": "deploy.sh 内置公网域名健康检查通过",
+    "prod_smoke": "./scripts/test-prod-smoke.sh -> [smoke:prod] health checks passed",
+    "skill_discovery": "production checkout contains skills/custom/ppt_generator/1.0.0/manifest.json with parameters.render_modes=[simple, polished] and output_format=pptx"
+  },
+  "included_files": [
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_image_page_assembly.py",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "remaining_unrelated_changes": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md"
+  ],
+  "verification": {
+    "git_match": "local HEAD == prod HEAD == d5df5ef11ff64a17ce8cb6ae0ae6e16ae1891e9d",
+    "release_note_check": "design/product/release-note.md 已追加 polished 上线说明",
+    "prod_manifest_check": "ppt_generator manifest description mentions simple/polished and parameters.render_modes=[simple, polished]",
+    "smoke_test": "/Users/lin/Desktop/work/chiralium/scripts/test-prod-smoke.sh -> passed"
+  },
+  "residual_risks": [
+    "本次仅完成部署后最小健康/冒烟验证，未在生产站点做一次端到端人工生成 PPT 下载验证。",
+    "工作区仍存在与本次发布无关的 AI 对话改动，已明确未夹带进本次发布提交。"
+  ]
+}

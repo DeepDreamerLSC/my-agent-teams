@@ -1,0 +1,36 @@
+{
+  "task_id": "发布boxcalculator直接尺寸模式修复到生产",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-28T20:59:12+08:00",
+  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "commit_hash": "519d4d2d385889c64dd9da1ad22d78c33371dd83",
+  "pushed": true,
+  "deployed_commit": "519d4d2d385889c64dd9da1ad22d78c33371dd83",
+  "health_check_result": {
+    "backend_health": "http://127.0.0.1:18000/health ready",
+    "hotpick_backend_health": "http://127.0.0.1:18100/health ready",
+    "public_site": "https://chiraliumai.cn ready"
+  },
+  "included_files": [
+    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "remaining_unrelated_changes": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md"
+  ],
+  "verification": {
+    "backend_tests": "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q -> 15 passed, 5 warnings",
+    "git_match": "local HEAD == prod HEAD == 519d4d2d385889c64dd9da1ad22d78c33371dd83"
+  },
+  "summary": "已仅整理并发布 box-calculator 直接尺寸输入模式与历史总数回填回归修复，补充 release note，推送 commit 519d4d2d385889c64dd9da1ad22d78c33371dd83，并完成生产部署。当前生产与本地发布 commit 一致，健康检查通过。"
+}

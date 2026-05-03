@@ -1,0 +1,58 @@
+{
+  "id": "扩展PPTX装配器支持图片页插入",
+  "title": "扩展PPTX装配器支持图片页插入",
+  "assigned_agent": "dev-1",
+  "domain": "backend",
+  "task_type": "development",
+  "write_scope": [
+    "backend/app/services/office_export_service.py",
+    "backend/tests/test_ppt_image_page_assembly.py"
+  ],
+  "root_request_id": "扩展PPTX装配器支持图片页插入",
+  "parent_task_id": null,
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/扩展PPTX装配器支持图片页插入/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "owner_pm": "pm-chief",
+  "integration_owner": "arch-1",
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-01T02:13:42+08:00",
+  "lease_expires_at": "2026-05-01T02:13:42+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已完成 PPTX 装配器图片页插入能力：office_export_service 现在支持根据 slide.image_path 把整页渲染好的图片写入 ppt/media 并作为单页图片插入最终 .pptx；同时保留现有结构化标题+bullets 简洁模式不回归。（QA 已通过自动收口） QA 结论：QA 验证通过。build_pptx_bytes 已支持通过 slide.image_path 将整页渲染图插入 .pptx（图片写入 ppt/media + image relationship），现有结构化标题+bullets 简洁模式无回归，7 测试全部通过，review 已 APPROVE。",
+  "last_error": null,
+  "created_at": "2026-05-01T02:13:42+08:00",
+  "updated_at": "2026-05-01T02:28:56+08:00",
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "depends_on": [
+    "分析banana-slides并设计PPT精美模式升级方案"
+  ],
+  "blocks": [],
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": "2026-05-01T23:30:00+08:00",
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "priority": "high",
+  "timeout_minutes": 90,
+  "read_only": false,
+  "downstream_action": "review"
+}

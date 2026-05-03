@@ -1,0 +1,46 @@
+{
+  "task_id": "发布智谱联网搜索健康探针修复到生产",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-29T20:55:11+08:00",
+  "commit_hash": "5770c759fa90c07d8d76599aa88b8c605143d5e7",
+  "pushed_branch": "origin/master",
+  "deployment_result": "success",
+  "deployed_commit": "5770c759fa90c07d8d76599aa88b8c605143d5e7",
+  "production_verification": {
+    "backend_health": "http://127.0.0.1:18000/health ready",
+    "hotpick_backend_health": "http://127.0.0.1:18100/health ready",
+    "public_site": "https://chiraliumai.cn ready",
+    "zhipu_runtime_status": "no longer falsely unavailable under transient failure semantics; probe logic now maps 429/request_failed to degraded",
+    "frontend_gating_note": "With the backend no longer returning unavailable for transient probe failures, frontend should no longer grey out GLM/Zhipu solely because of 429/request_failed."
+  },
+  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "included_files": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "remaining_risks": [
+    "Provider-native probe still selects a single active zhipu text model as provider representative; if that model alone degrades, provider-level status may still be noisy.",
+    "No manual browser click-through was executed in this task; validation is based on deploy health plus production checkout/runtime contract verification."
+  ],
+  "remaining_unrelated_changes": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md",
+    "/Users/lin/Desktop/work/chiralium/backend/app/core/config.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/main.py",
+    "/Users/lin/Desktop/work/chiralium/backend/requirements.txt",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/public_guqin.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/schemas/guqin.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/guqin_generation_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_public_guqin_api.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_public_guqin_service.py",
+    "/Users/lin/Desktop/work/chiralium/design/guqin/"
+  ],
+  "summary": "已将智谱联网搜索健康探针修复提交并推送到 origin/master，完成生产部署。生产 checkout 已更新到 5770c759，并通过主站/后端健康检查；本次修复将旧版 chat/completions 探针切换为结构化 /web_search 探针，并把 429/request_failed 从 unavailable 下调为 degraded，避免前端整链路误置灰。"
+}

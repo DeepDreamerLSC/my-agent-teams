@@ -1,0 +1,109 @@
+{
+  "task_id": "排查DeepSeek模型不可用与GLM联网搜索丢失",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T08:53:47+08:00",
+  "summary": "只读排查结论：DeepSeek 当前“模型不可用”不是模型配置/数据漂移，而是 2026-04-26 引入的代码回退把 DeepSeek web_search 从 tool_call 改成了 native_provider_tool，导致向 DeepSeek 发送了错误的 web_search 工具格式并触发 400；GLM 的联网搜索能力并未在前后端 capability/UI 上丢失，当前症状更像智谱原生搜索的外部依赖/模型侧退化，且与 DeepSeek 修复链路没有直接共因。",
+  "modified_files": [],
+  "issues": {
+    "deepseek_model_unavailable": {
+      "root_cause_judgment": "主因是代码回退：DeepSeek 当前 capability 被声明成 native_provider_tool，build_model_chat_request_body() 因此向 DeepSeek 发送了 Zhipu 风格的 tools[0].type=web_search 请求体；DeepSeek 实际期望的是 function/tool_call 形态，因此直接返回 400。",
+      "primary_category": "code",
+      "secondary_blocker": {
+        "category": "configuration",
+        "detail": "即使把 DeepSeek capability 改回 tool_call，当前生产 runtime 仍有配置缺口，/api/meta/chat-capabilities 对应的 search runtime 会继续报 unavailable。",
+        "missing_items": [
+          "CHAT_WEB_SEARCH_BASE_URL"
+        ]
+      },
+      "endpoint_and_chain_check": {
+        "/api/models/available": "代码上会通过 resolve_model_capabilities() 暴露 DeepSeek web_search.supported=true，但当前 mode 会被错误暴露为 native_provider_tool。",
+        "/api/admin/models": "会返回正确的模型记录（provider=deepseek，base_url=https://api.deepseek.com/），没有发现数据漂移；异常在 capability mode，而不在数据本身。",
+        "/api/meta/model-providers": "当前会把 DeepSeek web_search.mode 暴露成 native_provider_tool，这与此前已通过的设计/实现结论（tool_call）不一致。",
+        "/api/meta/chat-capabilities and /api/meta/web-search-runtime": "在当前生产 .env.prod 下，runtime 会被判定为 unavailable / internal_status=misconfigured / error=missing_base_url。"
+      },
+      "key_evidence": [
+        "生产 model_configs 只读查询：deepseek-v4-flash / deepseek-v4-pro 均为 provider=deepseek、api_type=text_generation、base_url=https://api.deepseek.com/、is_active=true；未见 provider/data 漂移。",
+        "backend/app/core/model_providers.py:24-33 当前把 DeepSeek web_search.mode 写成 native_provider_tool。",
+        "backend/app/services/model_service.py:164-190 对 native_provider_tool 会组装 Zhipu 风格 tools[0].type=\"web_search\"，而不是 function/tool_call。",
+        "backend/tests/test_models.py:517-611 和 backend/tests/test_chat_capabilities.py:152-163 已把“DeepSeek= native_provider_tool”固化进回归测试。",
+        "git log / git show 2425c845（2026-04-26）明确把 DeepSeek web_search 从 tool_call 改成 native_provider_tool，并同步改测。",
+        "生产 chat_logs 只读查询：2026-04-26 00:37:05 UTC（deepseek-v4-flash）与 00:37:40 UTC（deepseek-v4-pro）error_message 都是 HTTP 400: tools[0].type unknown variant `web_search`, expected `function`。",
+        "读取 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 并执行 describe_web_search_runtime()：provider=deepseek, status=unavailable, internal_status=misconfigured, error=missing_base_url。"
+      ],
+      "suggested_fix_owner": {
+        "primary": "dev-2",
+        "secondary": "arch-1"
+      },
+      "suggested_change_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py"
+      ],
+      "notes": "DeepSeek 模型本身不是全量不可用：生产 chat_logs 中同一批模型在 web_search_enabled=false 时有成功对话记录，因此“模型不可用”实质是 DeepSeek + 联网搜索路径失配。"
+    },
+    "glm_web_search_lost": {
+      "root_cause_judgment": "目前没有发现 GLM capability/前端按钮/本地后端链路被回退的证据；更像智谱原生 web_search 的外部依赖/模型侧退化或不稳定。当前默认本地代码仍会给 GLM 注入 native_provider_tool，前端也仍可把 enable_web_search=true 发到后端，但上游返回结果表现不稳定。",
+      "primary_category": "external_dependency",
+      "secondary_category": null,
+      "endpoint_and_chain_check": {
+        "GLM 参照实现": "backend/app/core/model_providers.py:12-21 仍把 zhipu 标成 web_search.mode=native_provider_tool；backend/app/services/model_service.py:164-189 仍会为 zhipu 组装原生 web_search 工具。",
+        "前端按钮状态": "frontend/src/hooks/useChatOptions.ts:155-179 仍读取 web_search_runtime_status；但 frontend/src/components/ChatToolbar.tsx:69-72 与 215-221 当前只按 capability 禁用搜索按钮，不再因 runtime unavailable 全局禁用，因此不存在“DeepSeek runtime 把 GLM 按钮一起关掉”的现象。",
+        "后端是否真的收到联网搜索开关": "生产 chat_logs 只读查询显示 2026-04-26 00:37:27 UTC 的 GLM-5.0 记录 token_usage.web_search_enabled=true，说明请求已带着联网搜索开关进入后端链路。"
+      },
+      "key_evidence": [
+        "生产 model_configs 只读查询：GLM-5.0 provider=zhipu、GLM-4.7-Flash provider=zhipu，记录存在且 active=true；没有“模型被禁用/被改成 custom”的数据问题。",
+        "frontend/src/components/ChatToolbar.tsx:69-72 当前 webSearchDisabledReason 只看 capability，不再看 runtime unavailable；因此“GLM 联网搜索按钮被 DeepSeek runtime 全局关掉”这一条当前代码上不成立。",
+        "生产 chat_logs 只读查询：2026-04-26 00:37:27 UTC 的 GLM-5.0 记录中 token_usage.web_search_enabled=true，但 response_summary 仍说“联网搜索功能不可用”，说明不是前端没传开关，也不是 capability 丢失。",
+        "生产 chat_logs 只读查询：2026-04-19 03:57:10 UTC 的 GLM-4.7 记录中 token_usage.web_search_enabled=true，且回答里包含真实 7 天天气结果，说明同类 GLM 原生联网搜索链路此前确实能工作。",
+        "生产 chat_logs 只读查询：2026-04-25 13:59:30 UTC 的 GLM-4.7-Flash 记录返回 HTTP 429（该模型当前访问量过大），进一步说明近期 GLM 侧存在上游可用性/配额抖动。"
+      ],
+      "suggested_fix_owner": {
+        "primary": "arch-1",
+        "optional_followup": [
+          "dev-2",
+          "dev-1"
+        ]
+      },
+      "suggested_change_scope": {
+        "arch_decision_first": "先由 arch-1 确认产品策略：继续依赖智谱原生 web_search，还是增加 provider-side 健康探针/模型降级策略（例如在 GLM-5.0 不稳定时明确切回可验证可用的模型或给用户显式提示）。",
+        "if_backend_mitigation_needed": [
+          "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+          "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+          "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+          "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py"
+        ],
+        "if_ui_copy_needed": [
+          "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+          "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+          "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+        ]
+      },
+      "notes": "当前证据不支持把 GLM 问题归因为这次 DeepSeek 后端修复链路；更像上游 provider-native search 的模型/配额/行为变化。"
+    }
+  },
+  "cross_issue_assessment": {
+    "shared_or_not": "两个问题不是同一个根因。DeepSeek 是本地代码把 provider mode 改错；GLM 没有看到同类 capability/UI 回退，近期症状更像上游依赖退化。",
+    "important_interaction": "当前生产 search runtime 还缺 CHAT_WEB_SEARCH_BASE_URL，这会阻塞 DeepSeek 正确的 tool_call runtime；但 GLM 走的是 zhipu 原生 native_provider_tool，不依赖这组 backend runtime 配置。"
+  },
+  "minimal_verification": [
+    {
+      "command": "git -C /Users/lin/Desktop/work/chiralium show 2425c845 -- backend/app/core/model_providers.py backend/tests/test_models.py",
+      "result": "confirmed: 2026-04-26 commit 2425c845 explicitly changed DeepSeek web_search from tool_call to native_provider_tool and updated tests accordingly"
+    },
+    {
+      "command": "source /Users/lin/Desktop/prod/chiralium/backend/.env.prod && describe_web_search_runtime()",
+      "result": "confirmed: provider=deepseek, status=unavailable, internal_status=misconfigured, error=missing_base_url"
+    },
+    {
+      "command": "read-only asyncpg query against local prod DB: model_configs",
+      "result": "confirmed: DeepSeek and GLM model records exist, active, and provider values are correct; no current provider/data drift"
+    },
+    {
+      "command": "read-only asyncpg query against local prod DB: recent chat_logs for DeepSeek/GLM weather prompts",
+      "result": "confirmed: DeepSeek with web_search hits HTTP 400 expected function; GLM still receives web_search_enabled=true but recent result quality depends on upstream behavior"
+    }
+  ]
+}

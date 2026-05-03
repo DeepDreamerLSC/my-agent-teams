@@ -1,0 +1,49 @@
+{
+  "task_id": "收口PPT精美模式Demo最终PPTX闭环",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-01T12:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。polished 模式已从 zip demo 包收口为最终 .pptx：新增 _build_polished_image_slides() 将 render_presentation_demo() 的页面图片映射为 slide dict，传入 build_pptx_bytes() 复用现有图片页装配能力产出 .pptx。simple 模式无回归，全部 11 个测试通过，review.md 结论为 APPROVE。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_generator_skill.py tests/test_ppt_image_page_assembly.py tests/test_ppt_page_render_service.py -q",
+      "result": "11 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "polished 模式最终返回 .pptx 文件，不再只是 zip demo 包",
+      "result": "pass",
+      "evidence": "skill.py L77-104: polished 分支新增 _build_polished_image_slides(demo) (L83) 将渲染页图映射为 [{title, image_path}]，传入 build_pptx_bytes() 产出 .pptx (L85)；file_name 以 .pptx 结尾 (L84)，mime_type 为 PPTX_MIME (L94)。测试 test_ppt_generator_polished_mode_returns_demo_archive L149: assert file_name.endswith('.pptx')（此前断言 .zip）；L155-164: 验证 pptx 内存在 ppt/presentation.xml、ppt/slides/slide1-3.xml、ppt/media/image1-3.png。"
+    },
+    {
+      "criterion": ".pptx 包含 demo 图片页（cover/content/closing 的已渲染图片）",
+      "result": "pass",
+      "evidence": "_build_polished_image_slides() (L318-330) 遍历 demo['pages']，将每个 file_path 映射为 {title, image_path} slide dict。测试 L162-164: assert ppt/media/image1.png、image2.png、image3.png 均存在于 pptx 包内，对应 cover/content/closing 三页渲染图片。test_build_pptx_bytes_supports_full_image_slides 独立验证 image_path → ppt/media + slide rels 链路完整。"
+    },
+    {
+      "criterion": "沿用现有 display_type=file 契约",
+      "result": "pass",
+      "evidence": "skill.py L89: polished 返回仍为 display_type: file，与 simple 模式 (L115) 一致。file 字段包含 file_name/file_path/file_size/mime_type 四项，契约未变。"
+    },
+    {
+      "criterion": "simple 模式无回归",
+      "result": "pass",
+      "evidence": "test_ppt_generator_generates_pptx_from_parsed_text (L55-95): simple 模式 .pptx 生成正常，slide1.xml/slide2.xml 内容验证通过。test_build_pptx_bytes_keeps_existing_structured_mode: 纯文本 bullet 模式不受图片页逻辑影响。simple 分支 (L106-126) 代码未改动。"
+    },
+    {
+      "criterion": "review 结论",
+      "result": "pass",
+      "evidence": "review.md 明确结论为审查通过（APPROVE），确认 polished 路径已从 zip 收口为 .pptx，页图接入方式复用 build_pptx_bytes() 图片页装配，测试覆盖 polished .pptx + simple 非回归。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 条 warning 为已有 FastAPI on_event 弃用提示，非本次引入",
+    "review.md 结论 APPROVE，以 review.md 原文为准",
+    "_build_polished_demo_archive() (L332-363) 仍保留在 skill.py 中但已不被主链路调用，review.md 标记为非阻塞死代码，建议后续清理",
+    "本次闭环仅收口 polished 最终文件形态为 .pptx，仍未扩展图表页 / GLM-Image / 图文混排等能力"
+  ]
+}

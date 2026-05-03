@@ -1,0 +1,48 @@
+{
+  "task_id": "收口PPT生成skill图片OCR消费闭环",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-30T14:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。图片 OCR 结果已通过 ContextAssembler.ensure_parsed_files() 进入 parsed_files，ppt_generator 主链路直接消费；manifest 输入能力已扩展 document+image 且与实际一致；文档/PDF 主链路无回归，9 测试全部通过，review 已 APPROVE。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_generator_skill.py tests/test_context_assembler.py -q",
+      "result": "9 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "图片上传→OCR→parsed_files→ppt_generator 消费闭环",
+      "result": "pass",
+      "evidence": "context_assembler.py:85-86: IMAGE_OCR_EXTENSIONS 中的图片扩展名也进入 ParserService.parse()；L89-96: 解析结果以 {file_id,file_name,content,parser_source} 进入 parsed_files[]；skill.py:137-139: _build_plan_messages 读取 context.get('parsed_files') 统一消费。测试：test_context_assembler.py:65-84 验证 png OCR → parsed_files；test_ppt_generator_skill.py:96-113 验证图片 OCR 文本进入 PPT 计划消息。"
+    },
+    {
+      "criterion": "manifest 输入能力与实际一致",
+      "result": "pass",
+      "evidence": "manifest.json: attachment_kinds=[document,image]，allowed_extensions 包含 .png/.jpg/.jpeg/.webp，allowed_mime_types 包含 image/png image/jpeg image/webp；实际 context_assembler.py IMAGE_OCR_EXTENSIONS={.png,.jpg,.jpeg,.webp} 完全对齐。测试 test_ppt_generator_skill.py:38-39 断言 .png 和 image 在 manifest 中。"
+    },
+    {
+      "criterion": "不误伤文档/PDF 主链路",
+      "result": "pass",
+      "evidence": "context_assembler.py:86 使用 or 并联 CHAT_PARSEABLE_EXTENSIONS 和 IMAGE_OCR_EXTENSIONS，文档解析路径不变；skill.py 的 _build_plan_messages 和 _format_parsed_files 无破坏性改动。测试：test_ppt_generator_skill.py:52-92 原 PDF→.pptx 测试继续通过；test_ppt_generator_skill.py:116-138 原 docx 计划消息测试继续通过；test_context_assembler.py:43-62 原 PDF parsed_files 测试继续通过。"
+    },
+    {
+      "criterion": "未引入割裂结构，复用现有 parsed_files 契约",
+      "result": "pass",
+      "evidence": "整个闭环统一走 parsed_files[] 结构：ParserService.parse() → context_assembler.ensure_parsed_files() → ppt_generator._build_plan_messages() → _format_parsed_files()。result.json 确认未扩展 UploadedFileSummary schema，不依赖新字段。"
+    },
+    {
+      "criterion": "review 结论",
+      "result": "pass",
+      "evidence": "review.md 明确结论为审查通过（APPROVE），确认本轮补修已解决上轮驳回的三个核心问题：图片 OCR 进入 ppt_generator 消费主链路、manifest 与输入能力对齐、测试证明闭环成立。task-watcher 的误报应以 review.md 原文为准。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 条 warning 为已有 FastAPI on_event 弃用提示，非本次引入",
+    "review.md 原文结论为 APPROVE（通过），task-watcher 误报为审查未通过属自动化判断错误，本 verify.json 以 review.md 原文为准",
+    "本次未扩展 UploadedFileSummary 稳定 schema，OCR 文本通过 parsed_files 传递，无新增对外契约字段"
+  ]
+}

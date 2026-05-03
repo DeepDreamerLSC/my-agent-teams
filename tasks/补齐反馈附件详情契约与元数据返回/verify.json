@@ -1,0 +1,32 @@
+{
+  "task_id": "补齐反馈附件详情契约与元数据返回",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-28T12:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。后端 feedback detail / admin detail 已在保留 attachment_ids 兼容的同时新增 attachments[]，包含 file_id/file_name/file_size/mime_type/download_url 五个字段；file_service.get_uploaded_file_summaries() 按 attachment_ids 顺序展开；测试 25 passed，覆盖用户侧与管理员侧两条 detail 路径。",
+  "test_commands": [
+    "pytest tests/test_feedback_api.py tests/test_files.py -q → 25 passed, 4 warnings",
+    "py-compile feedback.py admin_feedback.py file_service.py test_feedback_api.py → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "feedback detail / admin detail 返回 attachments[]", "result": "PASS"},
+    {"id": 2, "criterion": "attachments[] 至少包含 file_id/file_name/mime_type/download_url", "result": "PASS", "evidence": "file_service.py:245-252 返回 5 个字段（超出最小契约）"},
+    {"id": 3, "criterion": "attachment_ids 向后兼容保留", "result": "PASS", "evidence": "测试断言 payload['attachment_ids'] 仍存在"},
+    {"id": 4, "criterion": "补测试覆盖详情接口输出", "result": "PASS", "evidence": "test_feedback_api.py:251-299 覆盖用户侧+管理员侧"}
+  ],
+  "verified_implementation": {
+    "file_service": "get_uploaded_file_summaries() (file_service.py:271-273) 按 attachment_ids 顺序调用 get_uploaded_files() 后展开为 UploadedFileSummary 列表",
+    "user_side": "feedback.py detail helper 统一补出 attachments=await file_service.get_uploaded_file_summaries(...)",
+    "admin_side": "admin_feedback.py detail helper 同步补出 attachments",
+    "field_shape": "file_id, file_name(=original_name), file_size, mime_type, download_url(=/api/files/{id})",
+    "order_preserved": "get_uploaded_files() (file_service.py:266-267) 按 attachment_ids 原始顺序排序"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "当 attachment_id 在 uploaded_files 中不存在时会被跳过，attachments[] 可能少于 attachment_ids 长度；但 attachment_ids 原值保留便于排障",
+    "响应模型在 feedback.py/admin_feedback.py 本地定义而非统一 schema，长期维护建议收敛到 app/schemas/"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "id": "补齐反馈AI链路附件元数据传递",
+  "title": "补齐反馈AI链路附件元数据传递",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "backend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests"
+  ],
+  "depends_on": [
+    "补齐反馈附件详情契约与元数据返回"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/补齐反馈AI链路附件元数据传递/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "反馈管理未关闭问题修复",
+  "parent_task_id": "排查反馈管理未关闭问题根因",
+  "integration_owner": "arch-1",
+  "priority": "medium",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T11:44:35+08:00",
+  "lease_expires_at": "2026-04-28T11:44:35+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已为反馈 AI 链路补齐最小附件元数据透传：issue/request 的 AI input_json 现在都会带 attachments[]，至少包含 file_id、file_name、mime_type；若 uploaded_files 上已有 extracted_text，则再附带最小 extracted_text_summary。无附件场景保持兼容，attachments 会稳定为 []。（QA 已通过自动收口） QA 结论：QA 验证通过。反馈 AI 链路已补齐附件元数据透传：issue/request 的 AI input_json 现在带 attachments[]，包含 file_id/file_name/mime_type/file_size/parse_status + 可选 extracted_text_summary（600字截断）；无附件场景 attachments=[] 保持兼容。start_* 落库 input_json 和 finish_* 模型调用两条链路均已覆盖。测试 17 passed。",
+  "last_error": null,
+  "created_at": "2026-04-28T11:33:55+08:00",
+  "updated_at": "2026-04-28T16:22:41+08:00"
+}

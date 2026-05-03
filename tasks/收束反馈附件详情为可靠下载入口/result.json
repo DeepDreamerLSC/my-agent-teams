@@ -1,0 +1,42 @@
+{
+  "task_id": "收束反馈附件详情为可靠下载入口",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-28T12:59:30+08:00",
+  "summary": "已按 PM 裁决完成收束：反馈问题/需求详情页本轮不再保留误导性的‘打开’入口，只保留可靠的‘下载’入口；受保护下载链路继续沿用签名链接优先、blob fallback 兜底的实现。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+  ],
+  "final_decision": {
+    "keep_open_entry": false,
+    "reason": "当前后端没有独立 inline/preview 契约，成功路径本质仍是下载响应，继续保留‘打开’按钮会误导用户。"
+  },
+  "download_interaction": [
+    "详情页仅展示文件名与一个明确的‘下载’按钮。",
+    "点击后先请求 /files/{file_id}/download-link 获取签名链接。",
+    "若签名链接成功，使用隐藏 <a> 触发浏览器下载。",
+    "若签名链接失败，则退回 axios 请求受保护 download_url，并用 blob + triggerBlobDownload 完成下载。"
+  ],
+  "test_results": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/feedbackAttachmentDetails.test.tsx src/test/messageBubbleActions.test.tsx",
+        "result": "passed (2 files, 7 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ],
+    "coverage": [
+      "问题详情页有附件时展示下载入口并优先走签名下载链路。",
+      "需求详情页有附件时签名失败会退回 blob 下载链路。",
+      "无附件时不渲染附件区。",
+      "不再对不存在真实语义的‘打开’路径做伪验证。"
+    ]
+  }
+}

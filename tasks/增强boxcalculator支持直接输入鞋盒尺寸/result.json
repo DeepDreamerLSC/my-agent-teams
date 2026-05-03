@@ -1,0 +1,59 @@
+{
+  "task_id": "增强boxcalculator支持直接输入鞋盒尺寸",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T10:51:29+08:00",
+  "summary": "已为 box-calculator skill 增加‘用户直接输入鞋盒实际尺寸 + 数量’模式，并明确 exact-match / mismatch 提示：匹配成功才继续按 A-G 规则计算外箱，不匹配则列出 A-G 标准尺寸并停止计算。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "action": "modified",
+      "description": "新增鞋盒实际尺寸输入模式、尺寸匹配规则、不匹配提示、输出格式与正反例示例。"
+    }
+  ],
+  "input_mode_rules_added": [
+    "在原有‘正向计算 / 反向验算’基础上新增‘鞋盒实际尺寸输入模式’。",
+    "当用户输入鞋盒长 × 宽 × 高 + 数量时，先匹配 A-G 标准鞋盒数据库，再决定是否进入现有正向外箱计算。",
+    "若用户只给鞋盒尺寸未给数量，skill 需要先追问数量，不自行假设。"
+  ],
+  "dimension_match_rule": {
+    "unit": "cm",
+    "normalization": "用户输入若超过 1 位小数，先四舍五入保留 1 位小数后再匹配。",
+    "comparison": "长、宽、高三项必须与 A-G 某一款标准尺寸完全一致。",
+    "non_goals": [
+      "不允许只匹配其中两项。",
+      "不允许模糊猜测相近款号。"
+    ],
+    "on_match": "明确输出匹配到哪一款，然后继续沿用现有 A-G 正向计算规则计算外箱。"
+  },
+  "mismatch_prompting": {
+    "message": "该尺寸不符合标准鞋盒数据库，无法自动归类到 A-G 款，也无法自动计算外箱尺寸。",
+    "followup": [
+      "列出 A-G 全部标准鞋盒尺寸供用户核对。",
+      "不继续往下计算外箱。",
+      "不强行猜测款号。"
+    ]
+  },
+  "preserved_features": [
+    "A-G 款号输入模式保留。",
+    "混装两列优化规则保留。",
+    "外箱长宽交换规则保留。",
+    "反向验算模式保留。",
+    "外箱三边 +2.0 cm 与结果保留 1 位小数的规则保留。"
+  ],
+  "verification": [
+    {
+      "command": "grep -n '鞋盒实际尺寸输入模式\\|鞋盒尺寸匹配规则\\|不符合标准鞋盒数据库\\|输入鞋盒尺寸' /Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "result": "passed"
+    },
+    {
+      "command": "人工复核 /Users/lin/.agents/skills/box-calculator/SKILL.md 中‘工作方式 / 鞋盒尺寸匹配规则 / 输出格式 / 示例 5-6’段落",
+      "result": "passed"
+    }
+  ],
+  "notes": [
+    "本次只改 skill 文档，没有扩散到其他代码或脚本。",
+    "新增了匹配成功与不匹配两个示例，便于后续 agent/调用方按统一口径输出。",
+    "由于本任务仅涉及技能文档规则更新，无需运行代码级测试。"
+  ]
+}

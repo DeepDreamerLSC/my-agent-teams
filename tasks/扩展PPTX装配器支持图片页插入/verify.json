@@ -1,0 +1,43 @@
+{
+  "task_id": "扩展PPTX装配器支持图片页插入",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-01T11:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。build_pptx_bytes 已支持通过 slide.image_path 将整页渲染图插入 .pptx（图片写入 ppt/media + image relationship），现有结构化标题+bullets 简洁模式无回归，7 测试全部通过，review 已 APPROVE。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_image_page_assembly.py tests/test_ppt_generator_skill.py -q",
+      "result": "7 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "后端可以把整页图片插入 PPTX，形成 demo 可展示的页面",
+      "result": "pass",
+      "evidence": "build_pptx_bytes L245: image_mode 检测 slide.kind==image；L253-257: 图片页走 _pptx_image_slide_xml + ppt/media 写入；L402-403: archive.writestr 将图片 bytes 写入 ppt/media/；_pptx_slide_rels_xml(L446-463): 在 slide rels 中添加 image relationship(rId2)；_pptx_picture_xml(L563-577): 生成 <p:pic> 元素嵌入整页图；_normalize_pptx_image(L734-744): PIL 规范化图片为 PNG/JPEG。测试 test_build_pptx_bytes_supports_full_image_slides 验证 zip 中包含 ppt/media/image1.png 和 image relationship。"
+    },
+    {
+      "criterion": "不误伤现有简洁模式 .pptx 输出",
+      "result": "pass",
+      "evidence": "L249-251: 非 image_mode 时才添加封面页；L258-260: 非图片 slide 继续走 _pptx_content_slide_xml；_normalize_pptx_slides L419-427: 仅当 slide.image_path 存在时走图片分支，否则走 bullets 分支；_pptx_slide_rels_xml 默认 media_target=None，文本页无 image relationship。测试 test_build_pptx_bytes_keeps_existing_structured_mode 验证纯 bullets 模式仍正常输出、zip 中不含 ppt/media。原 ppt_generator_skill 5 个测试继续通过。"
+    },
+    {
+      "criterion": "result.json 说明当前图片页装配能力的边界",
+      "result": "pass",
+      "evidence": "result.json current_boundary 字段明确：本地可读 image_path 输入、不做复杂动画/可编辑图层拆分/图表结构化重绘、当前是 demo 装配基础，不是可编辑设计稿 PPT。"
+    },
+    {
+      "criterion": "review 结论",
+      "result": "pass",
+      "evidence": "review.md 明确结论为审查通过（APPROVE），确认三项通过项：图片页插入能力落地、结构化模式未回归、测试覆盖匹配。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 条 warning 为已有 FastAPI on_event 弃用提示，非本次引入",
+    "当前图片页装配为最小 demo 实现：整页图底部配标题，不做复杂动画或可编辑图层",
+    "PIL/Pillow 为项目已有依赖（OCR 等链路在用），本次新增 import 不引入新依赖"
+  ]
+}

@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-26T10:35:41+08:00", "reason": "pm dispatch after direction update"}
+{"from": "dispatched", "to": "working", "at": "2026-04-26T10:42:48+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-26T10:53:55+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-27T08:19:03+08:00", "reason": "pm blocked after comparing production behavior with Zhipu Web Search API docs"}

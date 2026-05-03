@@ -1,0 +1,6 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-25T19:03:21+08:00", "reason": "pm dispatched review-fix task"}
+{"from": "dispatched", "to": "working", "at": "2026-04-25T19:04:28+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-25T19:12:29+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-25T19:19:20+08:00", "reason": "arch-1 request changes: missing_api_key still reports available/unavailable contract not closed; degraded tool-call path still relies on model instead of backend short-circuit"}
+{"from": "blocked", "to": "ready_for_merge", "at": "2026-04-25T19:20:40+08:00", "reason": "pm reconciled conflicting review notifications; final review.md is APPROVE"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-25T20:24:03+08:00", "reason": "pm closed after review pass and integration completion"}

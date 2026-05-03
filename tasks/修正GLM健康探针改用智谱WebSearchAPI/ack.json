@@ -1,0 +1,7 @@
+{
+  "task_id": "修正GLM健康探针改用智谱WebSearchAPI",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-27T08:22:54+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md。将先对照智谱官方 Chat Completions 与 Web Search API 文档，确认我们当前 probe 使用 chat completion + 自然语言反推状态的偏差，再最小修正为结构化 Web Search API 探测，并保持 provider_web_search_runtime.zhipu / zhipu_web_search_runtime_status 兼容。"
+}

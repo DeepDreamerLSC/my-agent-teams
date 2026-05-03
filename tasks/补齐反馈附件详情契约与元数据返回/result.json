@@ -1,0 +1,67 @@
+{
+  "task_id": "补齐反馈附件详情契约与元数据返回",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T11:42:58+08:00",
+  "summary": "已完成后端 feedback detail / admin detail 的附件契约补齐：在保留 attachment_ids 兼容的同时，新增可直接消费的 attachments[]，返回 file_id、file_name、file_size、mime_type、download_url；并补了详情接口输出测试。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py",
+      "action": "modified",
+      "description": "为用户侧问题/需求 detail 响应增加 attachments[] 契约，并在 create/get detail 返回中统一带出附件元数据。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py",
+      "action": "modified",
+      "description": "为管理员侧问题/需求 detail 响应增加 attachments[] 契约，并在 get/update/rerun detail 返回中统一带出附件元数据。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
+      "action": "modified",
+      "description": "新增 get_uploaded_file_summaries()，按 attachment_ids 顺序把 uploaded_files 记录展开为结构化附件摘要。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
+      "action": "modified",
+      "description": "新增用户问题详情与管理员需求详情的附件元数据输出测试，验证 attachment_ids 兼容保留且 attachments[] 正确返回。"
+    }
+  ],
+  "attachment_fields_added": {
+    "field": "attachments",
+    "item_shape": [
+      "file_id",
+      "file_name",
+      "file_size",
+      "mime_type",
+      "download_url"
+    ],
+    "minimum_contract_requested": [
+      "file_id",
+      "file_name",
+      "mime_type",
+      "download_url"
+    ]
+  },
+  "backward_compatibility": {
+    "attachment_ids_kept": true,
+    "details": "历史 attachment_ids 字段未删除，旧调用方仍可继续按原字段消费；新调用方可直接改用 attachments[]."
+  },
+  "implementation_notes": [
+    "为避免超出本任务 write_scope，没有改 app/schemas/feedback.py，而是在 feedback.py / admin_feedback.py 内定义了带 attachments 字段的本地 detail response model 包装类。",
+    "attachments[] 的内容来自 uploaded_files 展开，不改动 feedback_issues / feedback_requests 现有 attachment_ids 存储结构。",
+    "当部分 attachment_id 在 uploaded_files 中不存在时，attachments[] 会跳过缺失项，但 attachment_ids 原值仍保留，便于后续排障。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py /Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py /Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py /Users/lin/Desktop/work/chiralium/backend/tests/test_files.py -q",
+      "result": "passed (25 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次附件契约改动无关。"
+  ]
+}

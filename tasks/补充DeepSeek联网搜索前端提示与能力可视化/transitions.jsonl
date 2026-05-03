@@ -1,0 +1,5 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-25T18:31:47+08:00", "reason": "pm manual dispatch (dispatch-task.sh cross-project conflict bug)"}
+{"from": "dispatched", "to": "working", "at": "2026-04-25T18:33:53+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-25T18:47:33+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-25T18:55:25+08:00", "reason": "review-1 request changes: Models capability uses hardcoded map causing drift/misreport; need real Models component test and useChatOptions runtime-status test"}
+{"from": "blocked", "to": "cancelled", "at": "2026-04-25T20:24:03+08:00", "reason": "pm cancelled superseded blocked baseline task"}

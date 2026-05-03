@@ -1,0 +1,133 @@
+{
+  "task_id": "排查智谱模型联网搜索生产失效",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-29T18:42:30+08:00",
+  "summary": "只读诊断结论：当前生产里“智谱（GLM/Zhipu）联网搜索全部失效”的主因不是前端 capability 丢失，也不是生产配置缺失，而是生产后端仍在使用旧版 Zhipu provider-native 健康探针实现。该旧探针走 `chat/completions + 自然语言内容判断`，并把 429 / request_failed 直接判成 `unavailable`；前端聊天页又会在 `zhipu_web_search_runtime_status === unavailable` 时直接关闭 GLM 联网搜索按钮，最终形成“所有智谱模型联网搜索都失效/被置灰”的生产现象。对照验证显示：在同一套生产配置与生产数据库下，当前开发工作区里改用智谱官方 `POST /web_search` 结构化探针的新版实现可返回 `healthy`，因此本次生产事故以**后端 runtime/probe 实现陈旧或未部署**为主，而不是纯上游不可用。",
+  "root_cause_conclusion": {
+    "primary": {
+      "category": "后端联网搜索链路异常",
+      "judgement": "生产后端的 Zhipu provider-native web_search runtime probe 仍是旧实现，导致错误/过严的 unavailable 判定扩散到所有智谱模型。"
+    },
+    "secondary": [
+      {
+        "category": "前端 gating / 能力展示异常",
+        "judgement": "前端聊天页本身不是根因，但会严格消费后端 `zhipu_web_search_runtime_status`；当后端给出 `unavailable` 时，前端会直接关闭 GLM 联网搜索，因此用户感知为‘全部失效’。"
+      },
+      {
+        "category": "外部依赖 / 上游退化",
+        "judgement": "有次要影响：旧探针当前确实打到了 `rate_limited`，说明智谱某条旧探测路径存在瞬时 429/抖动；但因为新版官方 Web Search API 探针在同一生产配置下返回 `healthy`，所以这次不应把根因归为‘纯上游不可用’。"
+      }
+    ],
+    "not_primary": [
+      "未见明确生产配置漂移导致智谱联网搜索失效。",
+      "未见前端 capability 字段缺失或按钮误判为不支持。"
+    ]
+  },
+  "evidence": [
+    {
+      "type": "production_code",
+      "location": "/Users/lin/Desktop/prod/chiralium/backend/app/services/model_service.py:295-410",
+      "finding": "生产探针仍使用旧逻辑：选一个 zhipu 文本模型，走 `build_model_chat_completions_url()` + `build_model_chat_request_body(enable_web_search=True)` 做 probe，并把 `request_failed` / `429` 直接映射为 `status=unavailable`。"
+    },
+    {
+      "type": "production_runtime_probe",
+      "command": "ENV_FILE=/Users/lin/Desktop/prod/chiralium/backend/.env.prod PYTHONPATH=/Users/lin/Desktop/prod/chiralium/backend ... describe_provider_native_web_search_runtime(provider='zhipu', force_refresh=True)",
+      "finding": "返回 `{'provider': 'zhipu', 'mode': 'native_provider_tool', 'status': 'unavailable', 'reason': 'rate_limited', 'model_name': 'GLM-4.7-Flash'}`。"
+    },
+    {
+      "type": "workspace_compare_probe",
+      "command": "ENV_FILE=/Users/lin/Desktop/prod/chiralium/backend/.env.prod PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend ... describe_provider_native_web_search_runtime(provider='zhipu', force_refresh=True)",
+      "finding": "在同一套生产配置+生产数据库下，开发工作区新版探针返回 `{'provider': 'zhipu', 'mode': 'native_provider_tool', 'status': 'healthy', 'reason': null, 'model_name': 'GLM-4.7-Flash'}`，直接说明当前生产故障主要来自 probe 实现差异，而不是配置缺项。"
+    },
+    {
+      "type": "workspace_code",
+      "location": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py:336-405",
+      "finding": "开发工作区的新版实现已经改为调用官方 `POST /web_search` 结构化探针，并把 `request_failed` / `429` 归为 `degraded` 而不是 `unavailable`。当前 `git status` 显示这些改动仍是工作区未提交/未部署状态。"
+    },
+    {
+      "type": "frontend_gating",
+      "location": "/Users/lin/Desktop/prod/chiralium/frontend/src/hooks/useChatOptions.ts:247-276",
+      "finding": "生产前端对于 `provider === 'zhipu'` 的模型，会直接消费 `zhipu_web_search_runtime_status`；当值为 `unavailable` 时，会 `setEnableWebSearch(false)` 并展示“当前 GLM 联网搜索不可用”提示。"
+    },
+    {
+      "type": "meta_api_wiring",
+      "location": "/Users/lin/Desktop/prod/chiralium/backend/app/api/meta.py:16-27",
+      "finding": "生产 `/api/meta/chat-capabilities` 会把 `describe_provider_native_web_search_runtime(db, provider='zhipu')` 的结果直接映射到 `zhipu_web_search_runtime_status`，因此前端拿到的 unavailable 就是来自这条旧探针。"
+    },
+    {
+      "type": "production_db",
+      "command": "docker exec chiralium_prod_postgres psql ... SELECT name, provider, api_type, model_name, base_url, is_active, is_default FROM model_configs WHERE provider='zhipu'",
+      "finding": "生产当前活跃 zhipu 文本模型至少有 `GLM-4.7-Flash` 与 `GLM-5.0`，两者都 `is_active=true`、`base_url=https://open.bigmodel.cn/api/paas/v4/`；没有发现 provider 配错或 base_url 缺失。"
+    },
+    {
+      "type": "production_db",
+      "finding": "这两个 zhipu 文本模型都不是 default；按 `list_available_models()` 的排序，探针会优先拿创建时间更晚的 `GLM-4.7-Flash` 作为 provider 级代表，因此一个模型的 429 会把整个 zhipu provider 统一判坏。"
+    },
+    {
+      "type": "production_usage",
+      "command": "docker exec chiralium_prod_postgres psql ... recent chat_logs",
+      "finding": "最近 3 天 `web_search_enabled=true` 的记录里，GLM 只有 1 条，而 DeepSeek 有 5 条；说明当前生产用户侧对 GLM 联网搜索几乎已经无法持续使用。GLM 最近一次 web_search 记录是 `2026-04-27 12:25:15+00`，模型为 `GLM-4.7-Flash`。"
+    }
+  ],
+  "impact_scope": {
+    "models": [
+      "GLM-4.7-Flash",
+      "GLM-5.0",
+      "其他 provider=zhipu 且 api_type=text_generation、capabilities.web_search.supported=true 的模型"
+    ],
+    "pages": [
+      "AI 对话页聊天工具栏（联网搜索开关）"
+    ],
+    "api_or_contracts": [
+      "/api/meta/chat-capabilities -> zhipu_web_search_runtime_status",
+      "/api/meta/provider-web-search-runtime",
+      "provider-native web_search runtime probe"
+    ],
+    "user_visible_effect": [
+      "GLM/智谱模型联网搜索按钮被置灰或被强制关闭",
+      "即使模型 capability 支持 web_search，用户也无法正常开启智谱联网搜索"
+    ]
+  },
+  "classification": {
+    "is_code_problem": true,
+    "is_configuration_problem": false,
+    "is_upstream_problem": "secondary_only",
+    "notes": [
+      "生产配置里未发现导致智谱联网搜索必然失效的缺项；当前 ZHIPU_API_KEY 环境变量为空不构成主因，因为生产链路实际从 model_configs 解密取 key。",
+      "上游/配额抖动确实存在（旧探针返回 rate_limited），但新版官方 Web Search API 探针在同一生产环境下返回 healthy，因此‘全部失效’不能归咎为纯上游故障。"
+    ]
+  },
+  "recommended_follow_up_actions": [
+    {
+      "priority": "P0",
+      "owner": "dev-2 / arch-1",
+      "action": "把 `/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py` 中已存在的新版智谱 Web Search API 结构化探针修复正式提交并部署到生产。",
+      "why": "这是当前最小修复面，能直接消除旧 probe 误判 unavailable 的主因。",
+      "min_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py"
+      ]
+    },
+    {
+      "priority": "P1",
+      "owner": "arch-1",
+      "action": "决定 zhipu provider 级 runtime 状态是否继续由单一活跃模型代表，或改成更稳的策略（例如优先 default 模型、或 provider 级 probe 不依赖单个聊天模型）。",
+      "why": "当前生产里 `GLM-4.7-Flash` 与 `GLM-5.0` 都不是 default，provider 级状态完全被创建时间更晚的 4.7-Flash 决定，抗抖动性较差。"
+    },
+    {
+      "priority": "P2",
+      "owner": "dev-1 / 前端",
+      "action": "如果产品允许，在 runtime 为 `degraded` 时不要直接硬禁用，只做警告提示；仅在真正 `unavailable` 时禁用。",
+      "why": "新版 probe 已把 `429/request_failed` 下调为 `degraded`，前端可以进一步把‘可降级但可尝试’与‘完全不可用’区分开。",
+      "min_scope": [
+        "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts"
+      ]
+    }
+  ],
+  "notes": [
+    "本任务为只读诊断，未修改生产或开发代码。",
+    "公网直接访问 `/api/meta/chat-capabilities` 未认证返回 `Not authenticated`，因此本次接口证据主要通过本地生产代码路径 + 生产环境变量 + 生产数据库只读执行获得。"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "task_id": "审阅协作优化与ChatHub落地文档",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-30T07:54:28+08:00",
+  "overall_conclusion": "基本可行但需补充",
+  "summary": "两份文档整体方向已与当前实战规则更接近，尤其是 A-Lite“先通信后状态机”、Dispatch Gate、生产任务授权边界与 arch-1 集成/部署职责已经基本对齐。但 OpenClaw 主文档头部修订说明仍残留 v13 全量 Chat Hub 描述（含私聊/task_claim），与 A-Lite 收缩版正文和当前 AGENT/CLAUDE 规则冲突；落地清单总体更清晰，但 B/C 阶段仍偏重，需进一步强调“验证期不过，不进入状态机接入”。",
+  "issues": {
+    "high": [
+      {
+        "title": "OpenClaw 主文档顶部 v13 修订说明仍保留旧版全量 Chat Hub 叙述",
+        "location": "design/OpenClaw-tmux协作方案优化.md:8",
+        "problem": "写着“支持 agent 私聊、task_announce/task_claim 替代共享任务池、chat/tasks/ 替代 scratchpad”，这与 15.5 正文里 A-Lite 不启用私聊、不碰 task_claim 状态机、tasks/ 继续做事实源的收缩版方案直接冲突。",
+        "recommendation": "把文档头部 v13 摘要改成 A-Lite 版本，明确“先 general/tasks 通信，后续是否进入 claim/read-pointer/private chat 取决于验证期结果”。"
+      },
+      {
+        "title": "15.4 Scratchpad 正文仍作为现行方案大篇幅存在，容易与 15.5 Chat Hub 形成双主线",
+        "location": "design/OpenClaw-tmux协作方案优化.md:1940-2073（15.4 全段）",
+        "problem": "虽然 15.5 已说明 chat/tasks/ 替代 scratchpad 思路，但 15.4 仍像当前推荐方案，容易让执行者不知道是继续做 scratchpad watcher，还是切到 A-Lite。",
+        "recommendation": "在 15.4 开头加醒目状态标注：如“已被 15.5 A-Lite 暂代，不再作为当前主推进方案”，避免并行落地两套通信模型。"
+      }
+    ],
+    "medium": [
+      {
+        "title": "Dispatch Gate 在主文档里有，但 Chat-Hub 落地清单还可以进一步与任务 archetype 绑定",
+        "location": "OpenClaw: 5.1.1 / 17xx；Chat-Hub-落地清单: 29-31, 144-162",
+        "problem": "现在写了“任务进入 Chat Hub 前必须先过 Dispatch Gate”，但还没有把排查/开发/验证/集成/部署这几种 archetype 的最低字段差异挂进去。执行者知道要过 gate，但不知道每类任务最少必须具备哪些项。",
+        "recommendation": "在落地清单 A-Lite-5 或附录补一张表：不同 task archetype 的 gate 最小要求（例如部署任务必须有 owner 授权、目标环境、回滚口径；排查任务必须标清只读/可写）。"
+      },
+      {
+        "title": "B 阶段仍然一次性引入过多状态能力，实施复杂度偏高",
+        "location": "design/Chat-Hub-落地清单: B-1 ~ B-5",
+        "problem": "task_claim 原子绑定、通知去重、已读游标、watcher 扫 chat、tmux-watcher 空闲提醒、critical 双通道几乎都是中高复杂度；如果验证期证据不充分，很容易重复造一个轻量 IM + 状态机。",
+        "recommendation": "把 B 阶段再收缩成“B1 task-watcher 只做 chat 提醒 + B2 critical 双通道”，claim/read-pointer 延后到 C 或单独 go/no-go。"
+      },
+      {
+        "title": "“不启用私聊”规则在主文档与模板已对齐，但 send-chat.sh 示例仍保留 agent 私聊命令",
+        "location": "design/OpenClaw-tmux协作方案优化.md:2264-2267",
+        "problem": "示例里还写 `/scripts/send-chat.sh agent dev-2 ...`，会让执行者误以为 A-Lite 可以直接私聊。",
+        "recommendation": "把 A-Lite 正文中的 agent 私聊示例删除或改成“预留给后续阶段，不在当前启用”。"
+      },
+      {
+        "title": "“arch-1 负责集成/部署”已对齐，但文档中建议 owner 轨道 / PM 汇总逻辑仍偏重",
+        "location": "OpenClaw 第二/第四/十四章多处；15.5 与 Chat Hub 清单中少量保留",
+        "problem": "当前实战已经更强调能拆就拆、能派就派、无法自主解决立即飞书升级；一些旧段落仍偏“PM 大中转 + review-summary 再上推”叙述，和现行高优紧急响应节奏不完全一致。",
+        "recommendation": "在文档里增加“当前执行总原则优先级”：生产/紧急事项优先直接派任务 + 飞书升级，文档流转只服务沉淀，不应拖慢响应。"
+      }
+    ],
+    "low": [
+      {
+        "title": "主文档版本头仍显示修订时间 v12，但正文已写 v13/A-Lite",
+        "location": "design/OpenClaw-tmux协作方案优化.md:3-8",
+        "problem": "版本标题与修订记录不一致，容易让读者误判哪一版是最新。",
+        "recommendation": "统一为 v13（A-Lite 收缩版）或更高版本号。"
+      },
+      {
+        "title": "Chat-Hub 落地清单可以明确“当前不要求自动化统计，先手工观测”已经是临时措施",
+        "location": "design/Chat-Hub-落地清单: V-1",
+        "problem": "现在写法合理，但可以再强调“验证期结束后决定是否保留手工记录”，避免长期半人工化。",
+        "recommendation": "在验证期章节补一个退出条件。"
+      }
+    ]
+  },
+  "suggested_modifications": [
+    "优先修改 OpenClaw 主文档顶部 v13 摘要，使其与 A-Lite 收缩版正文一致。",
+    "在 15.4 Scratchpad 章节加“已被 A-Lite 暂代/不作为当前主线推进”的状态说明。",
+    "删除或改写 A-Lite 正文中仍然展示 agent 私聊命令的示例。",
+    "在 Chat-Hub 落地清单中补一张 Dispatch Gate × task archetype 最小要求表。",
+    "把 Chat Hub B 阶段收缩，先做提醒与 critical 双通道，claim/read-pointer 暂后。"
+  ],
+  "recommended_first_landings": [
+    "A-Lite-1 建立 chat/general 与 chat/tasks 目录",
+    "A-Lite-2 实现 send-chat.sh 基础写入脚本",
+    "A-Lite-3 固化 Lite 消息协议",
+    "A-Lite-4 更新 agent 模板的主动检查与回写规则",
+    "A-Lite-5 让 PM 只把已过 Dispatch Gate 的任务发 task_announce 作为讨论入口",
+    "随后进入 1-2 周验证期，不直接推进 B 阶段状态机接入"
+  ]
+}

@@ -2,3 +2,4 @@
 {"from": "dispatched", "to": "working", "at": "2026-04-25T11:24:06+08:00", "reason": "watcher observed ack.json"}
 {"from": "working", "to": "ready_for_merge", "at": "2026-04-25T11:29:46+08:00", "reason": "watcher observed result.json status=done"}
 {"from": "ready_for_merge", "to": "blocked", "at": "2026-04-25T12:59:00+08:00", "reason": "review request changes: missing real component-level wiring tests"}
+{"from": "blocked", "to": "cancelled", "at": "2026-04-25T18:24:42+08:00", "reason": "pm cancelled superseded blocked task"}

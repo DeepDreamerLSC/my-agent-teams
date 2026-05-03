@@ -1,0 +1,60 @@
+{
+  "task_id": "修正PPT精美模式Demo归档截断与CogView约束",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-01T03:28:30+08:00",
+  "summary": "已按 review 驳回意见完成最小补修：1) polished demo zip 包中的 `presentation_plan.json` 不再做按字节硬截断，现始终完整写入、可合法 UTF-8 解码并可被 JSON 解析；2) polished demo 的 `image_model_id` 不再允许绕过 CogView 约束，若显式传入非 CogView-3-Flash / cogview-3 的图片模型会直接拒绝。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "删除 polished demo 归档时对 `presentation_plan.json` 的字节硬截断逻辑，改为完整 UTF-8 JSON 写入。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
+      "action": "modified",
+      "description": "新增 `_is_allowed_demo_image_model()`，并在显式 `image_model_id` 路径下强制校验 demo 只允许 `CogView-3-Flash / cogview-3`；非 CogView 模型直接抛错，不再静默绕过。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "action": "modified",
+      "description": "补充 polished demo 归档测试，验证 `presentation_plan.json` 可被完整 UTF-8 解码并 JSON 解析，且长视觉描述字段未被截断损坏。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "action": "modified",
+      "description": "新增显式非 CogView `image_model_id` 被拒绝的测试，确保 demo 模型边界不会被绕过。"
+    }
+  ],
+  "review_blockers_fixed": {
+    "presentation_plan_archive_truncation": {
+      "before": "`presentation_plan.json` 写入 zip 时先转字节再按固定长度切片，可能截断 UTF-8 多字节字符并破坏 JSON 结构。",
+      "after": "`presentation_plan.json` 现在完整写入 zip，不再按字节截断，因此始终是合法 UTF-8 且可解析 JSON。",
+      "why_safe": "当前 demo 页数本就限制在 5 页，presentation_plan 体量可控；相比硬截断，完整写入更符合 review 的可解析性要求。"
+    },
+    "cogview_demo_constraint": {
+      "before": "若传入显式 `image_model_id`，service 会优先返回该模型，只要它是 active 的 `image_generation` 模型，即使不是 CogView 也会绕过 demo 约束。",
+      "after": "显式 `image_model_id` 只有在 provider=`zhipu` 且 model_name 属于 `cogview-3-flash / cogview-3` 时才允许；否则直接拒绝。",
+      "why_safe": "自动选择路径仍优先从当前激活图片模型中挑选 CogView 候选，因此不会误伤原有 polished demo 主链路；simple 模式完全不受影响。"
+    }
+  },
+  "non_regression": [
+    "simple 模式主链路未改，仍输出 `.pptx`。",
+    "polished 模式仍输出 zip demo 包，且 cover/content/closing 页图渲染逻辑未回退。",
+    "未引入 GLM-Image 或其他非 CogView 图片模型到当前 demo 边界。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
+      "result": "passed (9 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "本次是 review 驳回后的最小补修，没有扩展 polished demo 新能力。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` 弃用提示，与本次补修无关。"
+  ]
+}

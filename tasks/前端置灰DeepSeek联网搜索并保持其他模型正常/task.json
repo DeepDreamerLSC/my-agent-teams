@@ -1,0 +1,56 @@
+{
+  "id": "前端置灰DeepSeek联网搜索并保持其他模型正常",
+  "title": "前端置灰 DeepSeek 联网搜索并保持其他模型正常",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "frontend",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+  ],
+  "depends_on": [
+    "紧急修复生产DeepSeek对话无响应",
+    "修正GLM健康探针改用智谱WebSearchAPI",
+    "补充GLM联网搜索不可用前端提示"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/前端置灰DeepSeek联网搜索并保持其他模型正常/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "生产联网搜索问题复发",
+  "parent_task_id": "排查生产联网搜索DeepSeek可点不可用与GLM置灰",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-27T13:15:50+08:00",
+  "lease_expires_at": "2026-04-27T13:15:50+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已按林总工最新方向完成前端最小调整：当前模型为 DeepSeek 时，联网搜索按钮直接置灰并提示用户改为普通对话；DeepSeek 普通对话与深度思考能力不受误伤；GLM/Zhipu 继续沿用现有 provider-native unavailable 提示逻辑，其他 provider 的联网搜索也不受影响。（QA 已通过自动收口） QA 结论：QA 验证通过。选中 DeepSeek 时联网搜索按钮前端强制置灰（effectiveWebSearchRuntimeStatus='unavailable'），提示“当前 DeepSeek 联网搜索已禁用，请直接进行普通对话”；DeepSeek 普通对话与深度思考能力不受误伤（supportsThinking 不受影响）；GLM/Zhipu 继续用 zhipu_web_search_runtime_status 独立链路；其他 provider 不受 DeepSeek 特判影响。测试 4 文件 51 passed。",
+  "last_error": null,
+  "created_at": "2026-04-27T13:15:50+08:00",
+  "updated_at": "2026-04-27T14:33:19+08:00"
+}

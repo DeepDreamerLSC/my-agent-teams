@@ -1,0 +1,9 @@
+{
+  "task_id": "补充GLM联网搜索不可用前端提示",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-26T11:02:00+08:00",
+  "acked_at": "2026-04-26T11:02:00+08:00",
+  "summary": "已读取 instruction.md 与上游后端状态输出结果，按最小范围接入 zhipu provider-native 联网搜索状态，并补充不可用提示与相关测试。"
+}

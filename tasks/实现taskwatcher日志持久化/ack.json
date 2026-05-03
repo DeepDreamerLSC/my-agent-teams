@@ -1,0 +1,7 @@
+{
+  "task_id": "实现taskwatcher日志持久化",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-04-26T16:55:36+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md、feature BRIEF/CONTEXT/notes，并以前一条 heartbeat/watchdog 实现为参照，开始在现有 shell watcher 架构上补持久化日志与 7 天轮转；重点保证日志写入失败不阻塞主流转，且日志文件不进入 board sync 触发链。"
+}

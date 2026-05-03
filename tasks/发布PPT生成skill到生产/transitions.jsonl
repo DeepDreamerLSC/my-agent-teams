@@ -1,0 +1,3 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-30T17:08:24+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-04-30T17:16:28+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-30T17:36:47+08:00", "reason": "watcher observed result.json status=done"}

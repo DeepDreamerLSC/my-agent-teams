@@ -1,0 +1,29 @@
+{
+  "task_id": "评估GLM联网搜索退化缓解方案",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-26T10:26:11+08:00",
+  "summary": "已完成 GLM 联网搜索退化缓解方案文档。结论为：当前更像智谱 provider-native 搜索上游退化，不建议立刻重写本地搜索链路，优先补 provider 级健康探针、降级状态与用户提示。",
+  "design_doc_path": "/Users/lin/Desktop/work/chiralium/design/product/glm-web-search-degradation-mitigation-plan.md",
+  "root_cause_judgment": "更可能是智谱 GLM provider-native web_search 的上游退化/限流/结果不稳定，而不是本地 capability、前端按钮或后端基础链路被关掉。",
+  "should_fix_local_code_immediately": false,
+  "recommended_followup_tasks": [
+    {
+      "title": "增加 GLM provider-native 搜索健康探针与状态输出",
+      "assigned_agent": "dev-2"
+    },
+    {
+      "title": "前端消费 provider 级状态并补充联网搜索退化提示",
+      "assigned_agent": "dev-1"
+    },
+    {
+      "title": "补充 GLM 联网搜索告警阈值与运维值班手册",
+      "assigned_agent": "dev-2"
+    }
+  ],
+  "key_decisions": [
+    "继续短期依赖 GLM 原生联网搜索，但不能再把它视为无需兜底的稳定能力。",
+    "MVP 优先做探针、provider 级 runtime 状态和用户提示，不建议首版自动切模型。",
+    "若后续证据显示上游长期不稳定，再评估平台自建搜索执行链路。"
+  ]
+}

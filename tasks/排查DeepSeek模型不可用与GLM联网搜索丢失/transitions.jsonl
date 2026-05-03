@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-26T08:40:35+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-04-26T08:53:53+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-26T08:53:55+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-26T10:54:47+08:00", "reason": "pm closed diagnosis task after downstream split"}

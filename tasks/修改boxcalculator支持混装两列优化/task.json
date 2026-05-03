@@ -1,0 +1,49 @@
+{
+  "id": "修改boxcalculator支持混装两列优化",
+  "title": "修改 box-calculator 支持混装两列优化与长宽交换",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "write_scope": [
+    "/Users/lin/.agents/skills/box-calculator/SKILL.md"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/修改boxcalculator支持混装两列优化/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "外贸鞋盒外箱尺寸计算需求更新",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-27T20:56:38+08:00",
+  "lease_expires_at": "2026-04-27T20:56:38+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已按生产 feedback 的 selected_plan 原文更新 box-calculator skill 文档：两列混装时强制启用左右列优化，宽度改为左右列最大宽度求和，并新增外箱长宽交换规则；其余固定鞋盒库、摆放方向、各边 +2.0 cm、1 位小数等原有正确规则继续保留。（QA 已通过自动收口） QA 结论：QA 验证通过。box-calculator SKILL.md 已按生产 feedback selected_plan 更新：两列混装强制启用左右列优化（内宽=左列maxW+右列maxW，列高=maxH，内高=maxL）；外箱长宽交换规则（外宽>外长时强制交换保证长≥宽）；固定鞋盒库/摆放方向/+2.0cm/1位小数等原有规则均保留。示例 2（B10+D2混装两列）和示例 3（A款长宽交换）数学验算正确。",
+  "last_error": null,
+  "created_at": "2026-04-27T20:56:38+08:00",
+  "updated_at": "2026-04-27T23:19:54+08:00"
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "收口PPT精美模式Demo最终PPTX闭环",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-01T05:35:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将按最小收口方式把 polished 渲染页图真正映射为 image slides，并复用现有 build_pptx_bytes() 图片页装配能力返回最终 `.pptx`；同时补测试验证 polished 最终文件形态与 simple 不回归。"
+}

@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-28T20:41:43+08:00", "reason": "pm dispatch after Lin ordered immediate box-calculator production release"}
+{"from": "dispatched", "to": "working", "at": "2026-04-28T20:44:03+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-28T20:59:35+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-04-28T21:20:36+08:00", "reason": "pm closed after box-calculator direct-dimension production release completed"}

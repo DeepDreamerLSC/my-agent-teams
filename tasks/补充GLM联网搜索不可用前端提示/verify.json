@@ -1,0 +1,24 @@
+{
+  "task_id": "补充GLM联网搜索不可用前端提示",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-26T11:25:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。前端已消费 zhipu provider-native runtime 状态，GLM 联网搜索 unavailable 时给出明确提示并禁用开关；DeepSeek 及其他 provider 不受 zhipu 状态误伤。48 条前端测试全绿，tsc 无错误，review APPROVE。验收标准 4/4 满足。",
+  "test_commands": [
+    "npx vitest run src/test/chatOptions.test.tsx src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx — 4 files, 48 passed",
+    "npx tsc --noEmit — 无错误"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "前端能正确消费后端输出的 GLM 搜索状态", "result": "PASS"},
+    {"id": 2, "criterion": "不可用时用户能看到明确提示", "result": "PASS"},
+    {"id": 3, "criterion": "不误伤 DeepSeek 或其他模型", "result": "PASS"},
+    {"id": 4, "criterion": "相关测试通过", "result": "PASS"}
+  ],
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "前端当前消费 zhipu_web_search_runtime_status 顶层字段；若后端未来只保留 provider_web_search_runtime 嵌套字段，前端需同步调整"
+  ]
+}

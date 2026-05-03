@@ -1,0 +1,37 @@
+{
+  "task_id": "前端置灰DeepSeek联网搜索并保持其他模型正常",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-27T17:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。选中 DeepSeek 时联网搜索按钮前端强制置灰（effectiveWebSearchRuntimeStatus='unavailable'），提示“当前 DeepSeek 联网搜索已禁用，请直接进行普通对话”；DeepSeek 普通对话与深度思考能力不受误伤（supportsThinking 不受影响）；GLM/Zhipu 继续用 zhipu_web_search_runtime_status 独立链路；其他 provider 不受 DeepSeek 特判影响。测试 4 文件 51 passed。",
+  "test_commands": [
+    "npx vitest run chatOptions.test.tsx deepseekWebSearchVisibility.test.tsx deepSeekComponentWiring.test.tsx deepseekModelsRuntimeWiring.test.tsx → 4 files, 51 tests passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "选 DeepSeek 时联网搜索按钮置灰且提示正确", "result": "PASS"},
+    {"id": 2, "criterion": "选 DeepSeek 时普通对话正常，深度思考不受误伤", "result": "PASS"},
+    {"id": 3, "criterion": "选 GLM/Zhipu 时联网搜索逻辑不被误伤", "result": "PASS"},
+    {"id": 4, "criterion": "真实组件级测试补齐并通过", "result": "PASS"}
+  ],
+  "verified_implementation_details": {
+    "deepseek_greying": "useChatOptions.ts:248-249 — provider=deepseek && supportsWebSearch 时强制返回 unavailable；258-259 生成 DeepSeek 专用 tooltip",
+    "auto_clear_web_search": "useChatOptions.ts:280-286 — DeepSeek 选中时自动 setEnableWebSearch(false)",
+    "thinking_untouched": "supportsThinking 判定（241-243）仅基于 capabilities.thinking.supported，未做 DeepSeek 特判",
+    "glm_independent": "useChatOptions.ts:251-253 — GLM 继续用 zhipuWebSearchRuntimeStatus 独立链路",
+    "other_providers": "useChatOptions.ts:255 — 非 deepseek 非 zhipu 走全局 webSearchRuntimeStatus"
+  },
+  "key_test_assertions": {
+    "deepseek_greyed": "chatOptions.test.tsx:263 — webSearchRuntimeStatus='unavailable', tooltip 为 DeepSeek 专用文案",
+    "deepseek_thinking_ok": "deepseekWebSearchVisibility.test.tsx:315-318 — searchBtn.disabled=true, thinkingBtn.disabled=false",
+    "glm_independent": "chatOptions.test.tsx:170-171 — GLM 用 zhipu unavailable, tooltip 为 GLM 专用文案",
+    "other_provider_ok": "chatOptions.test.tsx:215-216 — OpenAI 模型 webSearchRuntimeStatus='available', tooltip=null"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "DeepSeek 置灰策略目前是前端硬编码产品策略（provider==='deepseek'），若未来恢复 DeepSeek 联网搜索需移除 useChatOptions.ts:248-249 的特判",
+    "前端未改后端配置语义，后端仍保留 DeepSeek tool_call 联网搜索链路，与前端置灰策略独立"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "blocks": [],
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-26T16:53:49+08:00",
+  "lease_expires_at": "2026-04-26T16:53:49+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已在现有 shell watcher 架构上补上持久化日志与 7 天轮转：watcher 与 watchdog 都会把关键事件写入 ~/.openclaw/workspace/logs/task-watcher.log，跨天自动归档为 task-watcher.YYYY-MM-DD.log，并清理 7 天前归档；日志写入失败不会阻塞主流转。（QA 已通过自动收口） QA 结论：QA 验证通过。watcher 启动事件正确写入日志文件；watchdog 事件写入同一日志文件；跨天轮转正常（2 天前日志归档为 task-watcher.YYYY-MM-DD.log，新日志继续写入 task-watcher.log）；7 天清理逻辑在代码中确认正确（find -mtime +6 -delete）；日志写入失败采用 || true 容忍，不阻塞主流转。shell 语法检查通过。",
+  "last_error": null,
+  "created_at": "2026-04-26T16:28:08+08:00",
+  "updated_at": "2026-04-26T17:28:22+08:00",
+  "root_request_id": "task-watcher可靠性优化第一批",
+  "parent_task_id": "建立taskwatcher可靠性优化上下文",
+  "id": "实现taskwatcher日志持久化",
+  "title": "实现 task-watcher 持久化日志与 7 天轮转",
+  "status": "done",
+  "write_scope": [
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh"
+  ],
+  "depends_on": [
+    "实现taskwatcher进程级可靠性"
+  ],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/实现taskwatcher日志持久化/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ]
+}

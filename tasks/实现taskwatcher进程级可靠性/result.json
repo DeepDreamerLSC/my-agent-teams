@@ -1,0 +1,79 @@
+{
+  "task_id": "实现taskwatcher进程级可靠性",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-26T16:52:27+08:00",
+  "summary": "已在现有 shell watcher 架构上完成最小进程级可靠性增强：task-watcher 主循环会持续写 heartbeat 与 pid，新增 watchdog 脚本可检测 watcher 退出或 heartbeat 超时并自动重启，同时不把 heartbeat/pid/restart-cause 文件纳入任务看板同步链。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "action": "modified",
+      "description": "新增 PID/heartbeat/restart-cause 运行时文件约定；启动时写 pid 和 startup heartbeat，主循环每轮写 running heartbeat；增加单实例保护；补充 TERM/INT 的优雅退出清理，确保 watchdog 能正确停止并重启 watcher。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "action": "created",
+      "description": "新增 watchdog 监控脚本：检测 watcher 进程退出、heartbeat 缺失、heartbeat 非法或 heartbeat 超时后自动重启；支持循环守护和 WATCHDOG_RUN_ONCE=1 单次检查模式。"
+    }
+  ],
+  "implementation_details": {
+    "runtime_files": {
+      "pid": "STATE_DIR/task-watcher.pid",
+      "heartbeat": "STATE_DIR/task-watcher-heartbeat.json",
+      "restart_cause": "STATE_DIR/task-watcher-restart-cause.txt"
+    },
+    "heartbeat_payload": {
+      "fields": [
+        "pid",
+        "phase",
+        "interval_seconds",
+        "updated_at",
+        "updated_ts"
+      ],
+      "phases": [
+        "startup",
+        "running"
+      ]
+    },
+    "watchdog_behavior": {
+      "detects": [
+        "watcher 进程退出",
+        "heartbeat 文件缺失",
+        "heartbeat 文件损坏/非法",
+        "heartbeat 超时"
+      ],
+      "default_interval_seconds": 15,
+      "default_timeout_seconds": 120,
+      "restart_strategy": "先 TERM，最多等待 5 秒；若仍存活则 KILL，然后记录 restart-cause 并重新拉起 watcher。",
+      "one_shot_mode": "WATCHDOG_RUN_ONCE=1 时执行一次检查后退出，便于 cron / launchd / 手工验证。"
+    }
+  },
+  "non_regression": [
+    "没有改动 ack -> working -> ready_for_merge -> review -> QA -> close 主链路判定逻辑。",
+    "heartbeat/pid/restart-cause 均写入 watcher 自身 STATE_DIR，不进入任务目录，因此不会触发 task-board-sync。",
+    "日志/通知/close-task 调用语义保持原样，仅增加 watcher 自愈外围能力。"
+  ],
+  "test_commands": [
+    {
+      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "result": "passed"
+    },
+    {
+      "command": "chmod 755 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "result": "passed"
+    },
+    {
+      "command": "临时 STATE_DIR/TASKS_ROOT 环境下启动真实 task-watcher + watchdog 的 Python 集成验证：检查 heartbeat 持续更新；watcher 退出后 watchdog 单次检查可拉起；人为回写过期 heartbeat 后 watchdog 单次检查可重启",
+      "result": "passed (heartbeat_update=ok, restart_on_exit=ok, restart_on_stale_heartbeat=ok)"
+    }
+  ],
+  "simplifications_made": [
+    "沿用现有 shell watcher 主入口，不引入 Python 常驻服务或 fswatch/inotify。",
+    "watchdog 只负责进程级恢复，不触碰任务状态推进、close-task 去重、通知重试等后续批次内容。",
+    "采用轻量 JSON heartbeat + 文本 restart-cause 文件，而不是引入额外持久层。"
+  ],
+  "remaining_risks": [
+    "本任务只交付 watchdog 脚本本身，后续仍需要 PM/运维决定如何通过 cron、launchd 或 tmux 会话持续托管它。",
+    "当前工作区中 scripts/task-watcher.sh 原本就存在未提交的摘要截断长度调整（80/100 -> 300）差异；本次实现保留了这些既有差异，没有回退。"
+  ]
+}

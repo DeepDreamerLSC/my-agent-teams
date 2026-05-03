@@ -1,0 +1,34 @@
+{
+  "task_id": "实现taskwatcher超时检测优化",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-26T18:10:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。超时检测优化三项核心策略均已正确落地：（1）dispatched 3 分钟无 ack 且无工件且无 Working 信号才重发，重发冷却 300s 去抖；（2）working 超 30 分钟只通知 PM 介入不自动重发；（3）工件优先（result/review/design-review/verify 存在则跳过重发判断）。shell 语法检查通过，集成测试 10/10 全部 PASS。",
+  "test_commands": [
+    "bash -n task-watcher.sh && bash -n task-watcher-watchdog.sh && bash -n send-to-agent.sh — SYNTAX OK",
+    "集成验证: dispatched 240s 无 ack 无工件 → 触发重发 → PASS",
+    "集成验证: dispatched 240s 无 ack 但有 result.json → 工件优先跳过重发 → PASS",
+    "集成验证: working 1860s 无 result.json → 通知 PM 介入不重发 → PASS",
+    "单元验证: task_has_progress_artifact 无工件 → false → PASS",
+    "单元验证: task_has_progress_artifact result.json → true → PASS",
+    "单元验证: task_has_progress_artifact review.md → true → PASS",
+    "单元验证: task_has_progress_artifact verify.json → true → PASS",
+    "单元验证: task_has_progress_artifact design-review.md → true → PASS",
+    "单元验证: 重发冷却 100s < 300s → 阻止重发 → PASS",
+    "单元验证: 重发冷却 400s > 300s → 允许重发 → PASS"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "dispatched 3 分钟无 ack 且无工件/无 Working 才重发", "result": "PASS"},
+    {"id": 2, "criterion": "重发冷却 5 分钟避免短时间重复", "result": "PASS"},
+    {"id": 3, "criterion": "working 超过 30 分钟只通知 PM 不自动重发", "result": "PASS"},
+    {"id": 4, "criterion": "超时判断优先依赖显式工件而非 tmux pane 文本", "result": "PASS"}
+  ],
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "agent_has_working_signal 仍依赖 tmux capture-pane 文本匹配，若 agent pane 输出格式变化可能导致误判；但该函数已降级为最后一道辅助判断，不再作为唯一依据",
+    "send-to-agent.sh 存在既有未提交改动，本任务未修改该文件，范围控制正确"
+  ]
+}

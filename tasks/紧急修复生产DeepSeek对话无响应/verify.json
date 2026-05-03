@@ -1,0 +1,32 @@
+{
+  "task_id": "紧急修复生产DeepSeek对话无响应",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-27T16:45:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。DeepSeek tool_call 联网搜索链路已增加 runtime preflight 短路：当 web_search runtime 不可用时（ready=false），在进入模型流式调用前直接返回固定失败文案，用户不再感知为“无响应”。测试 72 passed，关键测试断言 tool_runtime.assert_not_awaited() 确认不会继续进入无效调用路径。修复范围仅 chat.py + test_chat.py，无扩散。",
+  "test_commands": [
+    "pytest tests/test_chat.py tests/test_chat_tool_runtime_service.py tests/test_models.py -q → 72 passed, 4 warnings",
+    "py-compile chat.py chat_tool_runtime_service.py model_service.py web_search_service.py model_providers.py test_chat.py test_chat_tool_runtime_service.py test_models.py → passed"
+  ],
+  "acceptance_criteria": [
+    {"id": 1, "criterion": "runtime unavailable 时在模型流式调用前直接短路返回明确失败文案", "result": "PASS"},
+    {"id": 2, "criterion": "不会继续进入 tool_call runtime 无效调用", "result": "PASS"},
+    {"id": 3, "criterion": "修复范围最小化，只改 chat.py + test_chat.py", "result": "PASS"},
+    {"id": 4, "criterion": "代码问题与生产配置问题边界划分清楚", "result": "PASS"}
+  ],
+  "verified_implementation_details": {
+    "preflight_location": "chat.py:859-893",
+    "preflight_logic": "web_search_mode == 'tool_call' 时检查 runtime_state.ready，false 则直接返回 RUNTIME_UNAVAILABLE_USER_MESSAGE，finish_reason='preflight_runtime_unavailable'，不进入后续模型调用(chat.py:895+)和 tool runtime(chat.py:903+)",
+    "fixed_message": "当前联网搜索服务不可用，请稍后重试或关闭联网搜索后再试。(web_search_service.RUNTIME_UNAVAILABLE_USER_MESSAGE)",
+    "test_short_circuit": "test_chat.py:399-454 断言 full_response 为固定文案、tool_runtime.assert_not_awaited()、finish_reason='preflight_runtime_unavailable'、WebSocket 先发 assistant_start 再发 text_delta",
+    "scope_control": "仅修改 chat.py + test_chat.py，native_provider_tool 路径(GLM)不受影响"
+  },
+  "review_status": "APPROVE",
+  "regressions_found": [],
+  "residual_risks": [
+    "生产环境仍需补齐 CHAT_WEB_SEARCH_BASE_URL 才能恢复真实联网搜索；本次修复只保证用户收到明确失败文案而非无响应",
+    "preflight 短路返回 finish_reason='preflight_runtime_unavailable' 为新增值，若前端对 finish_reason 有白名单校验需确认兼容"
+  ]
+}

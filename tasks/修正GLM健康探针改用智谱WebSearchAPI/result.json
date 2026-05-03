@@ -1,0 +1,83 @@
+{
+  "task_id": "修正GLM健康探针改用智谱WebSearchAPI",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-27T08:33:07+08:00",
+  "summary": "已按最小范围把 GLM/Zhipu provider-native 健康探针从“chat completion + 模型自然语言回答”改为直接调用智谱 Web Search API 的结构化探测；同时把 429 / request_failed 这类瞬时故障校准为 degraded，避免单次抖动直接把整个 provider 长时间判成 unavailable。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "action": "modified",
+      "description": "将 zhipu provider-native 健康探针改为直接调用 /web_search Tool API，按结构化 search_result 结果判定健康状态；同时将 rate_limited/request_failed 等瞬时失败校准为 degraded。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "action": "modified",
+      "description": "更新 provider-native 健康探针单测：断言请求命中 /api/paas/v4/web_search，使用结构化请求体，并覆盖 healthy / degraded(rate_limited) / degraded(request_failed)。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "action": "modified",
+      "description": "补强 chat-capabilities 与 provider-web-search-runtime 的兼容字段测试，确保 provider_web_search_runtime.zhipu 与 zhipu_web_search_runtime_status 对前端保持稳定。"
+    }
+  ],
+  "official_doc_vs_old_impl": {
+    "reference_sources": [
+      "https://docs.bigmodel.cn/api-reference/模型-api/对话补全",
+      "https://docs.bigmodel.cn/api-reference/工具-api/网络搜索"
+    ],
+    "differences": [
+      "官方网络搜索文档把 Web Search 暴露为独立 Tool API：POST /api/paas/v4/web_search，返回结构化搜索结果；而我们原探针走的是 Chat Completions /chat/completions。",
+      "官方 Tool API 请求是结构化字段（如 search_query / search_engine / search_intent / count）；而我们原探针是把“请联网搜索今天日期”塞给模型，再依赖模型自然语言内容反推健康状态。",
+      "官方 Tool API 语义是 provider 级搜索能力；而我们原探针绑定到某个 active zhipu 模型，一旦该模型瞬时 429 / request_failed，就把整个 provider 直接判成 unavailable。"
+    ]
+  },
+  "new_probe_strategy": {
+    "endpoint": "POST /api/paas/v4/web_search",
+    "request_shape": {
+      "search_query": "请联网搜索今天的日期，并只返回搜索结果中的日期。",
+      "search_engine": "search_std",
+      "search_intent": false,
+      "count": 1
+    },
+    "status_rules": {
+      "healthy": "HTTP 200 且 search_result 为非空列表",
+      "degraded": [
+        "HTTP 429 (rate_limited)",
+        "请求异常/网络异常 (request_failed)",
+        "HTTP 5xx provider_error",
+        "响应 JSON 非法 (invalid_response)",
+        "search_result 为空 (empty_result)"
+      ],
+      "unavailable": [
+        "no_active_model",
+        "decrypt_failed",
+        "HTTP 4xx provider_error（429 除外）"
+      ]
+    },
+    "why": "把健康探针建立在官方结构化 Tool API 上，而不是建立在模型措辞/自然语言表现上。"
+  },
+  "frontend_compatibility": {
+    "compatible": true,
+    "stable_fields": [
+      "provider_web_search_runtime.zhipu",
+      "zhipu_web_search_runtime_status"
+    ],
+    "meta_change": "后端 meta 接口字段形状保持不变；本次只修 probe 实现和状态归类，因此前端无需同步改字段。"
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+      "result": "passed (50 passed, 4 warnings)"
+    },
+    {
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "result": "passed"
+    }
+  ],
+  "notes": [
+    "本次没有重写 GLM 聊天链路，只修健康探针与状态输出。",
+    "meta.py 无需改字段形状，兼容性保持不变。",
+    "DeepSeek 生产配置问题（如 CHAT_WEB_SEARCH_BASE_URL 缺失）未在本任务内处理。"
+  ]
+}

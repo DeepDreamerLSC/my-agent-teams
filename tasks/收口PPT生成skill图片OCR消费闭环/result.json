@@ -1,0 +1,63 @@
+{
+  "task_id": "收口PPT生成skill图片OCR消费闭环",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-30T13:54:30+08:00",
+  "summary": "已补齐 PPT 生成 skill 的图片 OCR 消费闭环：图片附件现在会在现有文件解析主链路中进入 `parsed_files`，`ppt_generator` 可直接消费 OCR 文本生成 PPT；同时把 manifest / skill 输入能力与实际实现对齐，并补了证明闭环的测试。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "action": "modified",
+      "description": "把 `ppt_generator` 的输入能力从仅文档扩展为文档 + 图片，允许 `.png/.jpg/.jpeg/.webp`，并声明 `attachment_kinds=[document,image]`，与实际 OCR 消费能力保持一致。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "更新 skill 描述，明确支持消费文档/PDF/图片 OCR 解析结果；生成逻辑继续统一消费 `parsed_files`，不额外分叉新的页面/UI 链路。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+      "action": "modified",
+      "description": "让 `ensure_parsed_files()` 在现有文档解析之外，也会把图片扩展名（IMAGE_OCR_EXTENSIONS）送入 ParserService，从而让图片 OCR 文本进入 skill 可消费的 `parsed_files`。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "action": "modified",
+      "description": "新增 manifest 输入能力对齐断言，以及图片 OCR 解析内容会进入 PPT 计划消息的测试。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+      "action": "modified",
+      "description": "新增图片文件在 `ensure_parsed_files()` 中会产出 OCR 解析结果的测试，证明图片 -> parsed_files 主链路闭环。"
+    }
+  ],
+  "closure_points": {
+    "image_ocr_into_ppt_generator": "已闭环。图片附件在聊天 skill 路径中会经 `ContextAssembler.ensure_parsed_files()` 调用现有 `ParserService.parse()`，图片 OCR 结果以 `parsed_files[].content` 进入 `ppt_generator`。",
+    "manifest_vs_runtime": "已对齐。manifest 现在明确允许 image/document 两类附件，和 skill 真实可消费输入一致。",
+    "uploaded_file_summary_schema_change": {
+      "changed": false,
+      "reason": "本次闭环不依赖新增 `uploaded_file_summary` 字段；OCR 文本通过现有 `parsed_files` 传递，因此无需扩散修改 schema / API 序列化。"
+    }
+  },
+  "tests_added_or_updated": [
+    "`test_ppt_generator_manifest_declares_document_pdf_input_and_pptx_output`：新增图片扩展名与 `attachment_kinds=image` 断言。",
+    "`test_ppt_generator_build_plan_messages_include_image_ocr_parsed_context`：验证图片 OCR 文本会进入 PPT 生成提示主链路。",
+    "`test_context_assembler_ensure_parsed_files_includes_image_ocr_results`：验证图片文件会被 OCR 解析并进入 `parsed_files`。",
+    "原有 PPT 生成文件输出与 discoverability 测试继续通过。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py /Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py -q",
+      "result": "passed (9 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "本任务按 review 指出的主链路缺口做最小补修，没有重做 OCR 模型本身。",
+    "没有新增页面 UI，也没有对外宣称新的 uploaded_file_summary 字段。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` 弃用提示，与本次 OCR 闭环补修无关。"
+  ]
+}

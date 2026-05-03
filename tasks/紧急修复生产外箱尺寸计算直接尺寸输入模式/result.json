@@ -1,0 +1,55 @@
+{
+  "task_id": "紧急修复生产外箱尺寸计算直接尺寸输入模式",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T18:17:30+08:00",
+  "summary": "已修复生产 box-calculator 运行时代码对‘直接输入鞋盒实际尺寸 + 数量’模式的缺口：现在会优先识别 direct_dimension 模式，不再把这类输入误落到反向验算；同时补了 10个/10双 数量解析、尺寸匹配成功后按现有 forward 逻辑继续计算、以及尺寸不匹配时的明确提示与 A-G 参考尺寸。",
+  "root_cause_judgement": [
+    "当前生产 skill.py 运行时只有 forward / reverse 两种真实分支，没有 direct_dimension 第三种模式。",
+    "当 query 里出现三维尺寸但没有款号时，旧逻辑会直接把输入归到 reverse。",
+    "数量解析偏向‘X双’，像‘10个’这类表达不稳定，因此更容易落到错误分支。",
+    "在 selected_skill 场景下，即使上游把 params.mode 预判成 reverse，旧 skill.py 也不会自行纠偏。"
+  ],
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+      "action": "modified",
+      "description": "新增 direct_dimension 运行时模式；补 10个/10双 数量解析；补尺寸匹配与不匹配提示；在 query 明显属于直接尺寸模式时覆盖误判的 reverse params。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+      "action": "modified",
+      "description": "把部署中的 skill 文档补齐到与当前运行时一致，加入鞋盒实际尺寸输入模式说明，并保留现有资产测试所需文案。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "action": "modified",
+      "description": "新增直接尺寸匹配成功、10个 误落 reverse 纠偏、不匹配提示等回归测试。"
+    }
+  ],
+  "new_runtime_logic": {
+    "mode_name": "direct_dimension",
+    "trigger_rule": "当输入中存在三维尺寸 + 数量、没有款号、且没有‘是不是最优/反推/验算’等反向提示词时，优先识别为直接鞋盒尺寸输入模式。",
+    "quantity_support": [
+      "10个",
+      "10双"
+    ],
+    "match_rule": "把输入尺寸按 cm 口径参与匹配，按现有 EXACT_TOLERANCE_CM 做 A-G 标准鞋盒精确匹配。",
+    "on_match": "输出匹配到哪一款，然后复用现有 _run_forward 逻辑继续计算外箱。",
+    "on_mismatch": "明确提示‘不符合标准鞋盒尺寸’，列出 A-G 标准尺寸，并停止，不再走 reverse 反推。",
+    "reverse_guard": "即使 selected_skill 上游 params 预判成 reverse，只要 query 文本满足直接尺寸模式条件，skill.py 也会本地纠偏到 direct_dimension。"
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
+      "result": "passed (10 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次 box-calculator 修复无关。"
+  ]
+}

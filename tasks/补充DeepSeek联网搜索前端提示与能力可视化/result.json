@@ -1,0 +1,45 @@
+{
+  "task_id": "补充DeepSeek联网搜索前端提示与能力可视化",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-25T18:47:00+08:00",
+  "summary": "完成前端可见性与可理解性增强：管理后台能力可视化、聊天页禁用态区分提示、runtime 状态前向兼容接线、组件级测试覆盖",
+  "modified_files": [
+    "frontend/src/pages/admin/Models.tsx",
+    "frontend/src/components/ChatToolbar.tsx",
+    "frontend/src/hooks/useChatOptions.ts",
+    "frontend/src/pages/Chat.tsx",
+    "frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "frontend/src/test/deepSeekComponentWiring.test.tsx"
+  ],
+  "details": {
+    "models_page": {
+      "description": "管理后台模型管理页新增「能力」列，展示每个 provider 对应的深度思考/联网搜索能力标签（绿=支持，灰=不支持）。同时检测 provider 与 model_name 不匹配的异常配置（如 deepseek-v4-flash provider=custom），显示黄色「配置异常」警告标签。桌面端和移动端均已适配。",
+      "new_functions": ["getExpectedCapabilities(provider)", "detectProviderAnomaly(modelName, provider)"]
+    },
+    "chat_toolbar": {
+      "description": "ChatToolbar 新增 webSearchRuntimeStatus 属性，区分两类禁用原因并给出明确文案提示：1) 模型能力不支持 →「当前模型不支持联网搜索」；2) runtime 服务不可用 →「联网搜索服务暂不可用」；3) 服务降级 →「联网搜索服务不稳定，结果可能不完整」（按钮仍可点击）。深度思考按钮同样改为具体文案。新增 data-testid 便于测试定位。",
+      "new_prop": "webSearchRuntimeStatus?: 'available' | 'unavailable' | 'degraded' | 'unknown'"
+    },
+    "use_chat_options": {
+      "description": "从 /meta/chat-capabilities 接口读取 web_search_runtime_status 字段（前向兼容：字段不存在时默认 available），传递给 ChatToolbar。后端任务落地后自动生效。",
+      "forward_compat": "后端在 /meta/chat-capabilities 响应中新增 web_search_runtime_status 字段即可，无需前端再改。"
+    },
+    "tests": {
+      "new_test_file": "deepseekWebSearchVisibility.test.tsx",
+      "test_count": 30,
+      "coverage": [
+        "getExpectedCapabilities: 6 个 provider 场景",
+        "detectProviderAnomaly: 8 个异常/正常场景",
+        "Models 页能力标签渲染: 4 个 Table DOM 断言",
+        "ChatToolbar 禁用态提示: 6 个 tooltip 断言",
+        "ChatToolbar data-testid: 2 个",
+        "ChatToolbar 点击行为: 3 个 runtime 状态交互",
+        "useChatOptions 前向兼容: 2 个值校验"
+      ],
+      "regression_update": "deepSeekComponentWiring.test.tsx 更新 tooltip 断言以匹配新文案"
+    }
+  },
+  "test_command": "cd /Users/lin/Desktop/work/chiralium/frontend && npx vitest run src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx",
+  "test_result": "41/41 passed (30 new + 11 existing)"
+}

@@ -1,0 +1,44 @@
+{
+  "task_id": "修正DeepSeek联网搜索前端可视化误报与测试补齐",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-04-25T19:12:30+08:00",
+  "summary": "按 review 驳回意见完成前端最小范围补修：Models 能力标签改为以后端返回 capabilities 为准，保留 provider anomaly 仅作辅助提示；补充真实 Models 页面接线测试，以及 useChatOptions 对 degraded/unknown/非法 runtime status 的前向兼容测试。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+  ],
+  "implementation": {
+    "backend_capabilities_wiring": [
+      "在 Models.tsx 的 ModelConfig 中补充 capabilities 字段类型。",
+      "新增 getModelCapabilityFlags()，从后端返回的 capabilities.thinking/web_search.supported 提取能力标记。",
+      "桌面表格与移动端卡片都改为使用 record.capabilities 渲染能力标签，避免继续依赖前端 provider 硬编码能力表。",
+      "detectProviderAnomaly() 继续保留，仅作为模型前缀与 provider 不一致时的辅助异常提示。"
+    ],
+    "tests": [
+      "更新 deepseekWebSearchVisibility.test.tsx：不再测试 provider 硬编码映射，改测 getModelCapabilityFlags 的后端 payload 提取逻辑。",
+      "新增 deepseekModelsRuntimeWiring.test.tsx：真实渲染 Models 组件，mock /admin/models 返回 provider + capabilities，断言实际页面中的能力标签与配置异常提示。",
+      "同文件新增 useChatOptions hook 接线测试：mock /meta/chat-capabilities，覆盖 web_search_runtime_status=degraded、unknown，以及非法值 pending 被忽略后回退为 available。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "npx vitest run src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx",
+        "result": "passed (3 files, 42 tests)"
+      },
+      {
+        "command": "npx tsc --noEmit",
+        "result": "passed"
+      }
+    ],
+    "notes": [
+      "Vitest 输出包含 jsdom 的 getComputedStyle pseudo-elements not implemented 提示，但不影响测试通过。"
+    ]
+  },
+  "risks": [
+    "本次按 instruction 保持最小修复范围，未扩展到其他非 write_scope 文件。"
+  ]
+}

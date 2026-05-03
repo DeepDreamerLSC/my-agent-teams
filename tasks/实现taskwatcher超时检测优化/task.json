@@ -1,0 +1,53 @@
+{
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "blocks": [],
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-26T17:11:23+08:00",
+  "lease_expires_at": "2026-04-26T17:11:23+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已在现有 shell watcher 架构上完成超时检测优化：dispatched 任务改为“3 分钟无 ack 且无 Working/无后续工件才重发”，working 超过 30 分钟只通知 PM 介入、不再重发，并保留重发冷却避免短时间重复重发。（QA 已通过自动收口） QA 结论：QA 验证通过。超时检测优化三项核心策略均已正确落地：（1）dispatched 3 分钟无 ack 且无工件且无 Working 信号才重发，重发冷却 300s 去抖；（2）working 超 30 分钟只通知 PM 介入不自动重发；（3）工件优先（result/review/design-review/verify 存在则跳过重发判断）。shell 语法检查通过，集成测试 10/10 全部 PASS。",
+  "last_error": null,
+  "created_at": "2026-04-26T16:28:08+08:00",
+  "updated_at": "2026-04-26T17:45:17+08:00",
+  "root_request_id": "task-watcher可靠性优化第一批",
+  "parent_task_id": "建立taskwatcher可靠性优化上下文",
+  "id": "实现taskwatcher超时检测优化",
+  "title": "实现 task-watcher 超时检测优化",
+  "status": "done",
+  "write_scope": [
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh"
+  ],
+  "depends_on": [
+    "实现taskwatcher进程级可靠性",
+    "实现taskwatcher日志持久化"
+  ],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/实现taskwatcher超时检测优化/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "task_id": "实现PPT生成skill文档主链路",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-04-30T13:15:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。ppt_generator skill 主链路已按现有 skill 体系落地，能基于解析文本生成结构化 .pptx 文件，返回 display_type=file 契约正确，测试 4 passed，review 已通过，不引入新依赖。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/pytest tests/test_ppt_generator_skill.py -q",
+      "result": "4 passed, 4 warnings (warnings 为已有 FastAPI on_event 弃用提示，与本次无关)"
+    }
+  ],
+  "scenarios_verified": [
+    {
+      "criterion": "skill 目录结构与现有 custom skill 保持一致",
+      "result": "pass",
+      "evidence": "ppt_generator/1.0.0/ 包含 manifest.json + skill.py，与 docx_generator 结构一致；manifest 字段（name/display_name/version/runtime_backend/class_name/timeout_sec/user_visible/input_capabilities/model_capabilities）完全对齐；skill.py 继承 BaseSkill"
+    },
+    {
+      "criterion": "用户上传 PDF/文档后，skill 能利用已解析文本生成结构化 PPTX 文件",
+      "result": "pass",
+      "evidence": "skill.py L132-142: _build_plan_messages 读取 recent_messages + parsed_files + query；L162-175: _format_parsed_files 格式化附件内容；L77-101: _generate_presentation_plan 调用文本模型返回结构化 JSON；office_export_service.py L237-387: build_pptx_bytes 生成包含 presentation.xml + slide XML 的有效 PPTX ZIP 包；测试 L51-91 验证端到端流程"
+    },
+    {
+      "criterion": "skill 返回结果可被现有聊天链路识别为 display_type=file",
+      "result": "pass",
+      "evidence": "skill.py L65-74: 返回 status=success, display_type=file, file{file_name,file_path,file_size,mime_type=PPTX_MIME}；测试 L77-78 断言 result['display_type']=='file'，L79 断言文件名以 .pptx 结尾"
+    },
+    {
+      "criterion": "测试通过，result.json 说明新增 skill 名称、主要文件、生成 PPT 的基本结构",
+      "result": "pass",
+      "evidence": "4 测试全部通过；result.json 包含 skill_name=ppt_generator、modified_files（4 个文件）、ppt_basic_structure（封面+内容页+bullet）、main_chain 流程描述"
+    },
+    {
+      "criterion": "不引入新依赖（如 python-pptx）",
+      "result": "pass",
+      "evidence": "office_export_service.py build_pptx_bytes 使用 zipfile + xml.sax.saxutils.escape 手工构造 PPTX，沿用与 build_docx_bytes/build_xlsx_bytes 一致的风格，requirements.txt 无需新增"
+    },
+    {
+      "criterion": "review 结论",
+      "result": "pass",
+      "evidence": "review-1 审查通过（APPROVE），确认四项通过项"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 条 warning 为已有 FastAPI on_event 弃用提示，非本次引入",
+    "本次只实现文档/PDF 主链路，不含图片 OCR 输入（与任务边界一致）",
+    "docx_generator_skill 测试在本次工作区不可用（skill 目录缺失），为已有环境问题，不影响本次验证结论"
+  ]
+}

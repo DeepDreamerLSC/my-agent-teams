@@ -1,0 +1,20 @@
+{
+  "task_id": "分析AI对话供应商配置与生产一致性",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-27T12:40:30+08:00",
+  "document_path": "/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md",
+  "core_conclusions_summary": "当前代码已把 GLM/Zhipu 的 provider-native web_search 与 DeepSeek 的 tool_call + 外部 runtime 搜索链路分开处理；当前未发现继续把 DeepSeek 当成 GLM native search 调用的现行代码错误。生产最关键的不一致是 DeepSeek tool-call runtime 仍缺少 CHAT_WEB_SEARCH_BASE_URL，另有 GLM-4.6V 使用 custom provider + zhipu base_url 的数据级混用。",
+  "found_provider_mixing": true,
+  "found_provider_mixing_details": [
+    "历史上曾发生过 DeepSeek 被误当成 native_provider_tool 调用的代码混用（当前已修复）。",
+    "生产数据库当前存在 GLM-4.6V 使用 custom provider + zhipu base_url + glm model_name 的数据级混用。",
+    "全局 web_search_runtime 与 provider-specific zhipu runtime 已在代码中拆分，但顶层命名仍有语义混淆风险。"
+  ],
+  "found_prod_config_gap_or_inconsistency": true,
+  "prod_config_gap_details": [
+    "CHAT_WEB_SEARCH_BASE_URL 缺失，但 DeepSeek tool_call runtime 代码要求该变量。",
+    "CHAT_WEB_SEARCH_PROVIDER=deepseek 在当前代码契约下更像外部搜索 runtime provider，而不是聊天主 provider，语义存在误导。",
+    "ZHIPU_API_KEY 为空，但聊天主链路优先依赖 model_configs，因此不是当前主聊天功能的直接阻塞项。"
+  ]
+}

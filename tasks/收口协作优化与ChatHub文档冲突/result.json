@@ -1,0 +1,23 @@
+{
+  "task_id": "收口协作优化与ChatHub文档冲突",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-30T17:11:55+08:00",
+  "summary": "已对协作优化主文档与 Chat-Hub 落地清单做最小范围收口：统一版本头与 A-Lite 表述，删除私聊误导示例，并进一步明确验证期不过则不进入 B/C 阶段。",
+  "modified_sections": [
+    "OpenClaw-tmux协作方案优化.md 顶部 v13 修订说明",
+    "OpenClaw-tmux协作方案优化.md 15.4 / 15.5 邻接说明与 A-Lite send-chat 示例",
+    "Chat-Hub-落地清单.md Phase B 进入条件说明",
+    "Chat-Hub-落地清单.md Phase C 条件性增强说明",
+    "Chat-Hub-落地清单.md 实施顺序标题"
+  ],
+  "resolved_conflicts": [
+    "消除了文档头部仍描述全量 Chat Hub（私聊/task_claim）的冲突，使其与 A-Lite 正文和当前 AGENT/CLAUDE 规则一致。",
+    "删除/收口了 A-Lite 阶段仍展示 agent 私聊命令的误导性表述。",
+    "进一步明确验证期是硬门槛，B/C 不是默认施工项。"
+  ],
+  "remaining_discussion_points": [
+    "Dispatch Gate 与 task archetype 的最小字段对照表仍可后续补充，但不属于本次最小收口范围。",
+    "B 阶段 claim/read-pointer 是否值得立项，仍应等待验证期数据后再决策。"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "id": "增强boxcalculator支持直接输入鞋盒尺寸",
+  "title": "增强 box-calculator 支持直接输入鞋盒尺寸",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "write_scope": [
+    "/Users/lin/.agents/skills/box-calculator/SKILL.md"
+  ],
+  "depends_on": [
+    "修改boxcalculator支持混装两列优化"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/增强boxcalculator支持直接输入鞋盒尺寸/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "外箱尺寸计算skill增强-尺寸输入模式",
+  "parent_task_id": "修改boxcalculator支持混装两列优化",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T10:45:25+08:00",
+  "lease_expires_at": "2026-04-28T10:45:25+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已为 box-calculator skill 增加‘用户直接输入鞋盒实际尺寸 + 数量’模式，并明确 exact-match / mismatch 提示：匹配成功才继续按 A-G 规则计算外箱，不匹配则列出 A-G 标准尺寸并停止计算。（QA 已通过自动收口） QA 结论：QA 验证通过。box-calculator SKILL.md 已新增鞋盒实际尺寸输入模式：用户输入长×宽×高+数量时先与 A-G 标准数据库做完全一致匹配，匹配成功明确输出款号后续按现有规则计算外箱，不匹配则停止计算并列出 A-G 标准尺寸供参考。原有款号输入、混装两列优化、长宽交换、反向验算等规则均保留。",
+  "last_error": null,
+  "created_at": "2026-04-28T10:45:25+08:00",
+  "updated_at": "2026-04-28T10:57:42+08:00"
+}

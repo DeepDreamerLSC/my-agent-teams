@@ -1,0 +1,55 @@
+{
+  "task_id": "定位DeepSeek联网搜索生产异常",
+  "agent": "arch-1",
+  "agent_id": "arch-1",
+  "status": "done",
+  "completed_at": "2026-04-25T18:14:50+08:00",
+  "summary": "已完成 DeepSeek 联网搜索生产异常只读排查与技术方案设计。flash 问题根因为生产模型记录 provider 漂移（custom 而非 deepseek）；pro 问题根因为生产环境缺失 CHAT_WEB_SEARCH_* 配置，导致 DeepSeek tool-call runtime 只能拿到空搜索结果。",
+  "design_doc": "/Users/lin/Desktop/work/chiralium/design/product/deepseek-web-search-production-incident-plan.md",
+  "flash_root_cause": "生产数据库中 deepseek-v4-flash 被配置为 provider=custom 且 is_default=true，导致 /api/models/available 返回 web_search/thinking unsupported，前端因此正确禁用按钮。",
+  "pro_root_cause": "生产代码已具备 DeepSeek tool-call 搜索链路，但 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 中 CHAT_WEB_SEARCH_PROVIDER / BASE_URL / API_KEY / TIMEOUT_MS 全部缺失，web_search_service 退化为 provider=disabled + 空结果，因此按钮可点但联网搜索不生效。",
+  "key_evidence": [
+    "prod 与 work checkout 关键文件无实质差异，说明不是未部署问题",
+    "只读查询 prod model_configs：deepseek-v4-pro.provider=deepseek，而 deepseek-v4-flash.provider=custom",
+    "只读读取 prod .env.prod：CHAT_WEB_SEARCH_PROVIDER / BASE_URL / API_KEY / TIMEOUT_MS 全部缺失",
+    "当前 web_search_service.search 在 provider 缺失时会返回 {query, results: [], provider: disabled}"
+  ],
+  "recommended_execution_tasks": [
+    {
+      "title": "修复生产环境 DeepSeek flash 模型 provider 漂移并补校验",
+      "assigned_agent": "be-1"
+    },
+    {
+      "title": "补齐生产平台级 web_search provider 配置并验证 DeepSeek tool-call 联网搜索",
+      "assigned_agent": "be-1"
+    },
+    {
+      "title": "增加 DeepSeek web_search runtime 健康检查与结构化告警",
+      "assigned_agent": "be-1"
+    },
+    {
+      "title": "补充 DeepSeek 联网搜索不可用的前端提示与后台能力可视化",
+      "assigned_agent": "fe-1"
+    }
+  ],
+  "evidence_sources": [
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/定位DeepSeek联网搜索生产异常/instruction.md",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatStreaming.ts",
+    "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/models.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py",
+    "/Users/lin/Desktop/prod/chiralium/backend/.env.prod",
+    "/Users/lin/Desktop/prod/chiralium (deployed checkout)",
+    "production model_configs deepseek rows (read-only query)"
+  ],
+  "risks_and_notes": [
+    "当前事故不是代码未部署，而是生产数据与生产 env 双漂移叠加",
+    "若只修 flash provider 不补 search env，问题会从“按钮禁用”变成“按钮可点但仍无效果”",
+    "当前 runtime 在 search provider 缺失时静默降级为空结果，未来应增加 fail-fast 或显式健康告警"
+  ]
+}

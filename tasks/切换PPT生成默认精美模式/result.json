@@ -1,0 +1,48 @@
+{
+  "task_id": "切换PPT生成默认精美模式",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-02T22:24:30+08:00",
+  "summary": "已完成紧急行为切换：ppt_generator 在未显式传 mode/render_mode 时，默认进入 polished 精美模式；同时保留显式 simple 与显式 polished 两条兼容入口，不破坏现有导出文件契约。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py"
+  ],
+  "mode_resolution_change": {
+    "before": "显式 render_mode/mode 优先；否则只有命中精美/高级/polished/cogview 等关键词才走 polished，默认回到 simple。",
+    "after": "显式 render_mode/mode 仍然优先；未显式传 mode 时默认直接走 polished；只有调用方明确传 simple 时才回落 simple。"
+  },
+  "explicit_simple_safeguard": [
+    "显式 render_mode=simple 时仍走 simple。",
+    "显式 mode=simple 时仍走 simple。",
+    "显式 polished 时继续走 polished。"
+  ],
+  "manifest_update": {
+    "default_render_mode": "polished",
+    "description": "补充默认走 polished、显式 simple 才回落普通模式的契约说明。"
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py -q",
+        "result": "passed (8 passed, 4 warnings)"
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+        "result": "passed"
+      }
+    ],
+    "coverage": [
+      "manifest 默认模式改为 polished。",
+      "默认请求未显式传 mode 时进入 polished。",
+      "显式传 simple 时仍进入 simple。",
+      "显式 polished 路径保持兼容。"
+    ]
+  },
+  "notes": [
+    "本次只做 skill 层默认模式切换，不处理并行任务中的 CogView 密钥/图片模型可用性问题。",
+    "测试中已同步把原‘默认 simple’预期更新为当前产品要求的‘默认 polished’。"
+  ]
+}

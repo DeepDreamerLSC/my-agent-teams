@@ -1,0 +1,58 @@
+{
+  "task_id": "补齐反馈AI链路附件元数据传递",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-04-28T11:50:49+08:00",
+  "summary": "已为反馈 AI 链路补齐最小附件元数据透传：issue/request 的 AI input_json 现在都会带 attachments[]，至少包含 file_id、file_name、mime_type；若 uploaded_files 上已有 extracted_text，则再附带最小 extracted_text_summary。无附件场景保持兼容，attachments 会稳定为 []。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py",
+      "action": "modified",
+      "description": "新增反馈附件元数据装配与摘要截断逻辑，并将 attachments[] 接入 issue/request 的 AI input_json、start_* 持久化 input_json、finish_* 实际模型调用三处链路。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
+      "action": "modified",
+      "description": "补充附件元数据/摘要装配测试、start_issue_analysis input_json 持久化测试，以及无附件场景下模型请求 attachments=[] 兼容性断言。"
+    }
+  ],
+  "attachment_fields_forwarded": {
+    "container_field": "attachments",
+    "minimum_fields": [
+      "file_id",
+      "file_name",
+      "mime_type"
+    ],
+    "extra_fields": [
+      "file_size",
+      "parse_status",
+      "extracted_text_summary（仅在已有 extracted_text 时返回）"
+    ]
+  },
+  "compatibility": {
+    "no_attachment_scene": "compatible",
+    "details": [
+      "当 feedback issue/request 没有 attachment_ids 时，不会额外查文件，AI input_json 中的 attachments 稳定为 [].",
+      "现有 issue/request 文本字段 title/description/background/... 保持不变，只新增 attachments 上下文。"
+    ]
+  },
+  "implementation_notes": [
+    "新增 _load_feedback_attachments()：按 attachment_ids 顺序读取 uploaded_files 并序列化为 AI 可消费的轻量 payload。",
+    "新增 _summarize_attachment_text()：若文件已存在 extracted_text，则截断到 600 字以内后作为 extracted_text_summary 透传，不额外引入新的解析流程。",
+    "start_issue_analysis / start_request_evaluation 写入 feedback_ai_analyses.input_json 时已包含 attachments[]，因此后续排查可直接看到 AI 当时收到的附件上下文。",
+    "finish_issue_analysis / finish_request_evaluation 实际调用模型时也会带同样的 attachments[]，避免只有落库 input_json 有而真实推理请求没有。"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py -q",
+      "result": "passed (17 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次附件元数据透传改动无关。"
+  ]
+}

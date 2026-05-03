@@ -1,0 +1,9 @@
+{
+  "task_id": "修正DeepSeek联网搜索前端可视化误报与测试补齐",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-04-25T19:12:30+08:00",
+  "acked_at": "2026-04-25T19:12:30+08:00",
+  "summary": "已读取 instruction.md 与原任务 review.md，按驳回意见执行最小范围补修：Models 改为消费后端 capabilities，并补真实页面/Hook 接线测试。"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "同步boxcalculator修复到仓库并部署生产",
+  "title": "同步 box-calculator 修复到仓库并部署生产",
+  "project": "chiralium",
+  "execution_mode": "deploy",
+  "target_environment": "prod",
+  "assigned_agent": "arch-1",
+  "review_required": false,
+  "review_authority": "owner",
+  "reviewer": null,
+  "review_level": "skip",
+  "reviewers": [],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": false,
+  "status": "done",
+  "task_level": "integration",
+  "owner_pm": "pm-chief",
+  "domain": "quality",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/.git",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+  ],
+  "depends_on": [
+    "修改boxcalculator支持混装两列优化"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/同步boxcalculator修复到仓库并部署生产/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "box-calculator生产部署",
+  "parent_task_id": "修改boxcalculator支持混装两列优化",
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 90,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-04-28T01:05:32+08:00",
+  "lease_expires_at": "2026-04-28T01:05:32+08:00",
+  "workspace_mode": "main",
+  "target_branch": "master",
+  "result_summary": "box-calculator 两列混装优化与长宽交换规则已同步到 chiralium 仓库，release note 已更新，commit bb3dde3dad8c8ef8990a1f2c80739721c5d2de7f 已推送，并完成生产部署与健康检查。",
+  "last_error": null,
+  "created_at": "2026-04-28T01:05:32+08:00",
+  "updated_at": "2026-04-28T01:19:42+08:00"
+}

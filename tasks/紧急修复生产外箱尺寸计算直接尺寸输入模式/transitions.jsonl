@@ -1,0 +1,5 @@
+{"from": "pending", "to": "dispatched", "at": "2026-04-28T18:05:21+08:00", "reason": "pm urgent dispatch for production box-calculator outage"}
+{"from": "dispatched", "to": "working", "at": "2026-04-28T18:08:30+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-04-28T18:52:30+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-04-28T19:04:35+08:00", "reason": "review request changes: forward mixed quantity regression introduced"}
+{"from": "blocked", "to": "cancelled", "at": "2026-04-28T20:09:36+08:00", "reason": "pm cancelled superseded blocked box-calculator task after later fix passed review+QA"}
