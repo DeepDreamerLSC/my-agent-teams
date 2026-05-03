@@ -7,7 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .db import connect_db, resolve_db_path, upsert_event, upsert_task, utcnow_iso
+from .db import (
+    connect_db,
+    resolve_db_path,
+    upsert_chat_ingest_state,
+    upsert_communication_event,
+    upsert_event,
+    upsert_task,
+    utcnow_iso,
+)
 
 PENDING_BOARD_STATUSES = {'pending', 'dispatched'}
 BLOCKED_STATUSES = {'blocked', 'failed', 'cancelled', 'timeout'}
@@ -481,4 +489,164 @@ def backfill_tasks(
         'db_path': str(resolve_db_path(db_path)),
         'task_count': len(task_dirs),
         'synced_tasks': summaries,
+    }
+
+
+CHAT_CHANNEL_FILE_MAP = {
+    'general': 'general',
+    'tasks': 'task',
+    'watcher': 'watcher',
+    'dispatch': 'dispatch',
+    'direct_nudge': 'direct_nudge',
+}
+
+
+def _discover_chat_files(chat_root: str | Path) -> list[Path]:
+    root = Path(chat_root).expanduser().resolve()
+    if not root.exists():
+        return []
+    return sorted(root.rglob('*.jsonl'))
+
+
+def _infer_channel_from_path(path: Path) -> str:
+    parts = path.parts
+    for part, channel in CHAT_CHANNEL_FILE_MAP.items():
+        if part in parts:
+            return channel
+    return 'unknown'
+
+
+def _normalize_chat_row(
+    *,
+    row: dict[str, Any],
+    file_path: Path,
+    line_number: int,
+) -> dict[str, Any]:
+    happened_at = _normalize_time(row.get('ts')) or _file_mtime(file_path) or utcnow_iso()
+    task_id = str(row.get('task_id') or '').strip() or None
+    thread_id = str(row.get('thread_id') or task_id or file_path.stem).strip() or None
+    channel = str(row.get('channel') or _infer_channel_from_path(file_path)).strip() or 'unknown'
+    event_id = str(
+        row.get('source_msg_id')
+        or row.get('msg_id')
+        or f'{channel}:{file_path.name}:{line_number}'
+    ).strip()
+    return {
+        'event_id': event_id,
+        'task_id': task_id,
+        'thread_id': thread_id,
+        'channel': channel,
+        'event_type': str(row.get('type') or 'text').strip() or 'text',
+        'event_class': str(row.get('event_class') or '').strip() or None,
+        'source_type': str(row.get('source_type') or 'human').strip() or 'human',
+        'from_actor': str(row.get('from') or '').strip() or None,
+        'to_actor': str(row.get('to') or '').strip() or None,
+        'priority': str(row.get('priority') or '').strip() or None,
+        'severity': str(row.get('severity') or '').strip() or None,
+        'message_text': str(row.get('msg') or '').strip(),
+        'reply_to': str(row.get('reply_to') or '').strip() or None,
+        'source_file': str(file_path),
+        'source_line': line_number,
+        'source_msg_id': str(row.get('msg_id') or '').strip() or None,
+        'source_name': str(row.get('source_name') or '').strip() or None,
+        'related_artifact_path': str(row.get('related_artifact_path') or '').strip() or None,
+        'happened_at': happened_at,
+        'observed_at': utcnow_iso(),
+        'payload_json': _json_dumps(row),
+    }
+
+
+def _chat_state_key(file_path: Path) -> str:
+    return hashlib.sha1(str(file_path).encode('utf-8')).hexdigest()
+
+
+def sync_chat_file(
+    chat_file: str | Path,
+    *,
+    db_path: str | Path | None = None,
+    source: str = 'chat-sync',
+    conn: sqlite3.Connection | None = None,
+    incremental: bool = True,
+) -> dict[str, Any]:
+    file_path = Path(chat_file).expanduser().resolve()
+    if not file_path.exists():
+        raise FileNotFoundError(f'chat file not found: {file_path}')
+
+    own_connection = conn is None
+    if own_connection:
+        conn = connect_db(db_path)
+    assert conn is not None
+
+    state_key = _chat_state_key(file_path)
+    last_line_number = 0
+    if incremental:
+        row = conn.execute(
+            'SELECT last_line_number FROM chat_ingest_state WHERE state_key = ?',
+            (state_key,),
+        ).fetchone()
+        if row is not None:
+            last_line_number = int(row['last_line_number'] or 0)
+
+    synced = 0
+    last_event_id: str | None = None
+    raw_lines = file_path.read_text(encoding='utf-8').splitlines()
+    with conn:
+        for idx, line in enumerate(raw_lines, start=1):
+            if idx <= last_line_number:
+                continue
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            event_record = _normalize_chat_row(row=row, file_path=file_path, line_number=idx)
+            upsert_communication_event(conn, event_record)
+            synced += 1
+            last_event_id = event_record['event_id']
+
+        upsert_chat_ingest_state(
+            conn,
+            {
+                'state_key': state_key,
+                'file_path': str(file_path),
+                'last_line_number': len(raw_lines),
+                'last_event_id': last_event_id,
+                'updated_at': utcnow_iso(),
+            },
+        )
+
+    if own_connection:
+        conn.close()
+
+    return {
+        'file_path': str(file_path),
+        'source': source,
+        'incremental': incremental,
+        'synced_events': synced,
+        'last_line_number': len(raw_lines),
+    }
+
+
+def backfill_chat(
+    chat_root: str | Path,
+    *,
+    db_path: str | Path | None = None,
+    source: str = 'chat-backfill',
+    incremental: bool = True,
+) -> dict[str, Any]:
+    files = _discover_chat_files(chat_root)
+    conn = connect_db(db_path)
+    summaries: list[dict[str, Any]] = []
+    try:
+        for path in files:
+            summaries.append(sync_chat_file(path, db_path=db_path, source=source, conn=conn, incremental=incremental))
+    finally:
+        conn.close()
+    return {
+        'chat_root': str(Path(chat_root).expanduser().resolve()),
+        'db_path': str(resolve_db_path(db_path)),
+        'file_count': len(files),
+        'synced_files': summaries,
+        'synced_event_count': sum(item['synced_events'] for item in summaries),
     }

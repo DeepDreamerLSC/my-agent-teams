@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = WORKSPACE_ROOT / '.omx' / 'task-board' / 'task-board.sqlite3'
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 TASK_COLUMNS = [
     'task_id',
@@ -57,6 +57,38 @@ EVENT_COLUMNS = [
     'artifact_path',
     'payload_json',
     'observed_at',
+]
+
+COMMUNICATION_EVENT_COLUMNS = [
+    'event_id',
+    'task_id',
+    'thread_id',
+    'channel',
+    'event_type',
+    'event_class',
+    'source_type',
+    'from_actor',
+    'to_actor',
+    'priority',
+    'severity',
+    'message_text',
+    'reply_to',
+    'source_file',
+    'source_line',
+    'source_msg_id',
+    'source_name',
+    'related_artifact_path',
+    'happened_at',
+    'observed_at',
+    'payload_json',
+]
+
+CHAT_INGEST_STATE_COLUMNS = [
+    'state_key',
+    'file_path',
+    'last_line_number',
+    'last_event_id',
+    'updated_at',
 ]
 
 
@@ -151,11 +183,48 @@ def initialize_db(conn: sqlite3.Connection) -> None:
             FOREIGN KEY(task_id) REFERENCES tasks(task_id) ON DELETE CASCADE
         );
 
+        CREATE TABLE IF NOT EXISTS communication_events (
+            event_id TEXT PRIMARY KEY,
+            task_id TEXT,
+            thread_id TEXT,
+            channel TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            event_class TEXT,
+            source_type TEXT NOT NULL,
+            from_actor TEXT,
+            to_actor TEXT,
+            priority TEXT,
+            severity TEXT,
+            message_text TEXT NOT NULL,
+            reply_to TEXT,
+            source_file TEXT,
+            source_line INTEGER,
+            source_msg_id TEXT,
+            source_name TEXT,
+            related_artifact_path TEXT,
+            happened_at TEXT,
+            observed_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE TABLE IF NOT EXISTS chat_ingest_state (
+            state_key TEXT PRIMARY KEY,
+            file_path TEXT NOT NULL,
+            last_line_number INTEGER NOT NULL DEFAULT 0,
+            last_event_id TEXT,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS ix_tasks_board_status ON tasks(board_status, current_status_at DESC);
         CREATE INDEX IF NOT EXISTS ix_tasks_assigned_agent ON tasks(assigned_agent, current_status_at DESC);
         CREATE INDEX IF NOT EXISTS ix_tasks_project_status ON tasks(project, board_status, current_status_at DESC);
         CREATE INDEX IF NOT EXISTS ix_task_events_task_time ON task_events(task_id, event_at);
         CREATE INDEX IF NOT EXISTS ix_task_events_type_time ON task_events(event_type, event_at);
+        CREATE INDEX IF NOT EXISTS ix_comm_task_time ON communication_events(task_id, happened_at);
+        CREATE INDEX IF NOT EXISTS ix_comm_thread_time ON communication_events(thread_id, happened_at);
+        CREATE INDEX IF NOT EXISTS ix_comm_type_time ON communication_events(event_type, happened_at);
+        CREATE INDEX IF NOT EXISTS ix_comm_to_time ON communication_events(to_actor, happened_at);
+        CREATE INDEX IF NOT EXISTS ix_comm_severity_time ON communication_events(severity, happened_at);
         '''
     )
     conn.execute(
@@ -178,6 +247,8 @@ def _build_upsert_sql(table: str, columns: list[str], conflict_key: str) -> str:
 
 TASK_UPSERT_SQL = _build_upsert_sql('tasks', TASK_COLUMNS, 'task_id')
 EVENT_UPSERT_SQL = _build_upsert_sql('task_events', EVENT_COLUMNS, 'event_key')
+COMMUNICATION_EVENT_UPSERT_SQL = _build_upsert_sql('communication_events', COMMUNICATION_EVENT_COLUMNS, 'event_id')
+CHAT_INGEST_STATE_UPSERT_SQL = _build_upsert_sql('chat_ingest_state', CHAT_INGEST_STATE_COLUMNS, 'state_key')
 
 
 def upsert_task(conn: sqlite3.Connection, task_record: Mapping[str, Any]) -> None:
@@ -188,3 +259,13 @@ def upsert_task(conn: sqlite3.Connection, task_record: Mapping[str, Any]) -> Non
 def upsert_event(conn: sqlite3.Connection, event_record: Mapping[str, Any]) -> None:
     payload = {column: event_record.get(column) for column in EVENT_COLUMNS}
     conn.execute(EVENT_UPSERT_SQL, payload)
+
+
+def upsert_communication_event(conn: sqlite3.Connection, event_record: Mapping[str, Any]) -> None:
+    payload = {column: event_record.get(column) for column in COMMUNICATION_EVENT_COLUMNS}
+    conn.execute(COMMUNICATION_EVENT_UPSERT_SQL, payload)
+
+
+def upsert_chat_ingest_state(conn: sqlite3.Connection, state_record: Mapping[str, Any]) -> None:
+    payload = {column: state_record.get(column) for column in CHAT_INGEST_STATE_COLUMNS}
+    conn.execute(CHAT_INGEST_STATE_UPSERT_SQL, payload)
