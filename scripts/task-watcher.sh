@@ -214,6 +214,24 @@ push_feishu() {
     fi
 }
 
+push_task_event() {
+    local title="$1"
+    local task_id="$2"
+    local summary="${3:-}"
+    local next_action="${4:-}"
+    local message="${title}
+任务：${task_id}"
+    if [ -n "$summary" ]; then
+        message="${message}
+摘要：${summary}"
+    fi
+    if [ -n "$next_action" ]; then
+        message="${message}
+下一步：${next_action}"
+    fi
+    push_feishu "$message"
+}
+
 # 检查 task.json 中的 status
 get_task_status() {
     local task_dir="$1"
@@ -587,11 +605,45 @@ mark_signature_notified() {
 review_file_state() {
     local review_file="$1"
     [ -f "$review_file" ] || { echo "missing"; return 0; }
+
+    # 优先提取明确的结论行（## 结论 / ## 最终意见 / 结论： 等标题下的内容）
+    local conclusion_block
+    conclusion_block=$(awk '/^(#{1,4}\s*(结论|最终意见|审查结论|Conclusion|Summary|Verdict))/,/^#{1,3}\s/ {print}' "$review_file" 2>/dev/null)
+    local scan_text
+    scan_text="${conclusion_block:-$(cat "$review_file")}"
+
+    # 在结论块（或全文）中检测通过/驳回信号
     local pass=""
     local fail=""
-    grep -qi '通过\|approve' "$review_file" && pass="pass" || true
-    grep -qi '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes' "$review_file" && fail="fail" || true
-    if [ -n "$fail" ]; then
+    # 通过信号
+    echo "$scan_text" | grep -qi '通过\|approve\|approved\|lgtm\|ship it' && pass="pass" || true
+    # 驳回信号 — 使用更精确的模式，避免「review blocker」等上下文词误触发
+    #   - 不通过 / 未通过：完整词组
+    #   - 驳回 / reject / block：后面紧跟标点或空白（即独立词），
+    #     或以 blocked / blocking 形式出现但不在「review blocker」上下文中
+    #   - 不接受 / request changes：完整词组
+    echo "$scan_text" | grep -qiwE '不通过|未通过|驳回|reject|不接受|request.changes' && fail="fail" || true
+    if [ -z "$fail" ]; then
+        # block 独立词检测（非 blocker/blocking 等衍生词，排除 review blocker 上下文）
+        echo "$scan_text" | grep -qiwE '\<block\>' && fail="fail" || true
+    fi
+    if [ -n "$fail" ] && [ -n "$pass" ]; then
+        # 两者同时出现时：看谁出现在结论块更靠后的位置（结论块优先）
+        if [ -n "$conclusion_block" ]; then
+            local last_pass_line last_fail_line
+            last_pass_line=$(echo "$conclusion_block" | grep -ni '通过\|approve\|approved' | tail -1 | cut -d: -f1)
+            last_fail_line=$(echo "$conclusion_block" | grep -niE '不通过|未通过|驳回|reject|\\<block\\>|不接受|request.changes' | tail -1 | cut -d: -f1)
+            if [ -n "$last_pass_line" ] && [ -n "$last_fail_line" ]; then
+                if [ "$last_pass_line" -ge "$last_fail_line" ] 2>/dev/null; then
+                    echo "pass"
+                    return 0
+                fi
+            fi
+        fi
+        # 无法区分优先级时，默认通过（宁可多走 QA 也不误报驳回）
+        echo "pass"
+        return 0
+    elif [ -n "$fail" ]; then
         echo "fail"
     elif [ -n "$pass" ]; then
         echo "pass"
@@ -808,7 +860,6 @@ auto_close_task() {
     if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1; then
         log "$task_id: QA 通过，已自动收口"
         notify_pm "[task-watcher] $task_id QA 已通过并自动收口（done）。摘要：$(truncate_utf8 "$result_summary" 500)。如需部署请联系林总工。"
-        push_feishu "✅ $task_id 已完成并自动收口。$result_summary"
         return 0
     fi
     log "$task_id: close-task.sh 执行失败，未自动收口"
@@ -875,7 +926,7 @@ while true; do
                             if [ -f "$instruction" ]; then
                                 notify_agent "$agent_session" "请读取 ${task_dir}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
                                 log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，兜底重发指令给 $agent_session"
-                                push_feishu "🔄 $task_id 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已重新发送给 $agent_session"
+                                push_task_event "【任务重发】" "$task_id" "超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已重新发送给 ${agent_session}" "等待 agent 写入 ack.json"
                             fi
                             echo "$now" > "$STATE_DIR/$resend_key"
                         fi
@@ -907,10 +958,19 @@ while true; do
                 task_level=$(task_json_pick "$task_dir" task_level)
                 assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
                 review_level=$(task_json_pick "$task_dir" review_level)
+                task_type=$(task_json_pick "$task_dir" task_type)
+                execution_mode=$(task_json_pick "$task_dir" execution_mode)
+                target_environment=$(task_json_pick "$task_dir" target_environment)
+                downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
                 if [ "$result_status" = "done" ]; then
                     set_task_status "$task_dir" "ready_for_merge" "watcher observed result.json status=done"
                     current_status="ready_for_merge"
+                    if [ "$task_type" = "deployment" ] || [ "$execution_mode" = "deploy" ] || [ "$target_environment" = "prod" ]; then
+                        push_task_event "【部署完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请关注生产验证结果与后续用户反馈"
+                    else
+                        push_task_event "【任务完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "${downstream_action:-请按任务下游动作继续推进}"
+                    fi
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                         notify_pm "[task-watcher] $task_id 技术方案已完成（agent: ${agent:-arch-1}）。请整理摘要并通过飞书推送林总工确认。摘要：$(truncate_utf8 "$summary" 300)"
                     elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
@@ -922,7 +982,7 @@ while true; do
                 elif [ "$result_status" = "blocked" ]; then
                     set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
                     notify_pm "[task-watcher] $task_id 被 agent ${agent:-?} 标记为 blocked。摘要：$(truncate_utf8 "$summary" 300)。请处理。"
-                    push_feishu "⚠️ $task_id 阻塞: $(truncate_utf8 "$summary" 300)"
+                    push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因"
                 else
                     notify_pm "[task-watcher] $task_id 有 result.json（status=$result_status），请检查。"
                 fi
@@ -940,7 +1000,7 @@ while true; do
                 if ! is_notified "$working_timeout_key" || is_file_newer_than_notified "$working_timeout_key" "$task_dir/task.json"; then
                     agent_session=$(task_json_pick "$task_dir" assigned_agent)
                     notify_pm "[task-watcher] $task_id 持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟（agent: ${agent_session:-?}），请 PM 介入检查；本次不自动重发。"
-                    push_feishu "⏱️ $task_id 持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟，请 PM 介入"
+                    push_task_event "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查"
                     log "$task_id: working 超时已通知 PM 介入，未触发重发"
                     mark_notified "$working_timeout_key"
                 fi
@@ -964,7 +1024,7 @@ while true; do
                     fi
                 elif [ "$state" = "fail" ]; then
                     notify_pm "[task-watcher] $task_id 审查未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)"
-                    push_feishu "❌ $task_id 审查未通过，需要 PM 仲裁"
+                    push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修"
                 fi
                 sync_task_board "$task_dir" "review-detected"
                 mark_signature_notified "$review_key" "$review_sig"
@@ -990,7 +1050,7 @@ while true; do
                     fi
                 elif [ "$vstate" = "fail" ]; then
                     notify_pm "[task-watcher] $task_id QA 未通过，需要 PM 仲裁。结论：$(truncate_utf8 "$vsummary" 300)"
-                    push_feishu "❌ $task_id QA 未通过，需要 PM 仲裁"
+                    push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证"
                 fi
                 sync_task_board "$task_dir" "verify-detected"
                 mark_notified "$verify_key"

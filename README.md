@@ -20,12 +20,12 @@ Agent 之间不直接对话。
 ### 当前团队配置
 
 ```
-PM（pm-chief）— 需求分析、任务拆解、进度跟踪
-├── 架构师（arch-1）— 方案设计、接口契约、技术选型
-├── 前端开发（fe-1）— 页面、组件、样式
-├── 后端开发（be-1）— API、数据库、业务逻辑
+PM（pm-chief）— 需求分析、任务拆解、进度跟踪、决策通知
+├── 架构师/集成者（arch-1）— 方案设计、接口契约、集成、部署
+├── 全栈开发（dev-1）— 前后端任务实现
+├── 全栈开发（dev-2）— 前后端任务实现
 ├── 测试（qa-1）— 功能验证、回归测试
-└── 审查（review-1）— 代码审查、文档审阅
+└── 审查（review-1）— 代码审查、质量把关
 ```
 
 ### 工作目录隔离（当前方案）
@@ -58,22 +58,22 @@ cd /Users/lin/Desktop/work/my-agent-teams/agents/pm-chief
 # 架构师（Codex）
 cd /Users/lin/Desktop/work/my-agent-teams/agents/arch-1
 
-# 前端
-cd /Users/lin/Desktop/work/my-agent-teams/agents/fe-1
+# 全栈开发（Codex）
+cd /Users/lin/Desktop/work/my-agent-teams/agents/dev-1
+cd /Users/lin/Desktop/work/my-agent-teams/agents/dev-2
 
-# 后端
-cd /Users/lin/Desktop/work/my-agent-teams/agents/be-1
-
-# QA
+# QA（Claude Code）
 cd /Users/lin/Desktop/work/my-agent-teams/agents/qa-1
 
-# Reviewer
+# Reviewer（Codex）
 cd /Users/lin/Desktop/work/my-agent-teams/agents/review-1
 ```
 
 各 agent 启动后先读取各自目录下的角色文件再按其中规则工作：
-- Claude Code：`CLAUDE.md`（`pm-chief`、`fe-1`、`qa-1`）
-- Codex：`AGENT.md`（`arch-1`、`be-1`、`review-1`）
+- Claude Code：`CLAUDE.md`（`pm-chief`、`qa-1`）
+- Codex：`AGENT.md`（`arch-1`、`dev-1`、`dev-2`、`review-1`）
+
+> ⚠️ agent 角色文件由模板自动生成，请勿手动编辑。见下方「角色模板系统」。
 
 ### 2. 启动 watcher
 
@@ -159,6 +159,83 @@ QA 任务完成时，`qa-1` 必须额外写 `verify.json`。
 ```
 
 `scripts/verify.sh` 目前仅保留为手工协议校验/调试脚本，不再作为 watcher 主流程的 QA 结论来源。
+
+## 当前实际作业流（已落地）
+
+当前系统已经形成两条并行但分工明确的主线：
+
+1. **任务事实源线（`tasks/`）**
+   - 管任务状态、执行者、验收、流转
+   - 事实源包括：
+     - `task.json`
+     - `ack.json`
+     - `result.json`
+     - `verify.json`
+     - `transitions.jsonl`
+
+2. **Chat Hub 沟通线（`chat/`）**
+   - 管任务公告、讨论、提问、回答、关键同步
+   - 当前 A-Lite 阶段只启用：
+     - `chat/general/`
+     - `chat/tasks/{task-id}.jsonl`
+   - **chat 不是任务状态事实源**，只负责沟通加速
+
+一句话总结：
+
+> **`tasks/` 管状态，`chat/` 管沟通；任务必须先过 Dispatch Gate，才能进入 Chat Hub。**
+
+### 当前主流程
+
+1. PM 用 `create-task.sh` 创建任务
+2. PM 补全 `instruction.md`（任务类型、目标、边界、输入事实、交付物、验收标准、下游动作等）
+3. `dispatch-task.sh` 执行 **Dispatch Gate** 校验
+   - 若 instruction 仍是占位内容，直接拒绝派发
+4. 派发成功后：
+   - `task.json: pending -> dispatched`
+   - 自动通过 `send-to-agent.sh` 唤醒目标 agent
+   - 自动通过 `send-chat.sh announce` 向 `chat/tasks/{task-id}.jsonl` 发 `task_announce`
+5. agent 读取 `instruction.md` 后写 `ack.json`
+6. watcher 观察到 `ack.json`，将任务推进到 `working`
+7. agent 实施修改，完成后写 `result.json`
+8. 如有 QA / review / 集成 / 部署，再继续沿 `tasks/` 事实源流转
+9. 过程中的提问、回答、关键同步走 Chat Hub；关键结论必须回写上下文，不得只留在聊天里
+
+### 当前作业流图
+
+```mermaid
+flowchart TD
+    A[林总工 / 开罗尔输入需求] --> B[PM create-task.sh 创建任务]
+    B --> C[PM 补全 instruction.md]
+    C --> D[dispatch-task.sh 执行 Dispatch Gate]
+    D -->|失败| D1[拒绝派发并继续补定义]
+    D -->|通过| E[task.json -> dispatched]
+    E --> F[send-to-agent.sh 唤醒执行 agent]
+    E --> G[send-chat.sh 自动发 task_announce]
+    F --> H[agent 读取 instruction.md]
+    H --> I[agent 写 ack.json]
+    I --> J[task-watcher -> working]
+    H --> K[实现 / 排查 / 验证]
+    K --> L[agent 写 result.json]
+    G --> M[chat/tasks 讨论线程]
+    M --> N[question / answer / decision / task_done]
+    N --> O[关键结论回写 feature / notes]
+    L --> P{是否需要 review / QA / 集成 / 部署}
+    P -->|是| Q[继续沿 tasks/ 事实源流转]
+    P -->|否| R[任务收口]
+```
+
+### 当前阶段明确不做的事
+
+- chat 直接驱动任务状态机
+- 任务池的主动认领（`pooled / claim.json / task_claim`）
+- 私聊线程 `chat/agents/`
+- 已读游标 / 通知去重状态机
+
+这些属于后续阶段，当前先保证：
+- 派发前定义完整
+- 任务状态清晰
+- 沟通效率提升
+- 生产/critical 任务仍保留强制唤醒双通道
 
 ## 任务看板使用说明
 
@@ -325,17 +402,17 @@ my-agent-teams/
 ├── AGENTS.md                        # 根共享规则（Codex）
 ├── agents/                          # agent 独立工作目录
 │   ├── pm-chief/
-│   │   └── CLAUDE.md                # PM 角色身份与特化规则
+│   │   └── AGENT.md                 # PM 角色文件（自动生成）
 │   ├── arch-1/
-│   │   └── AGENT.md                 # 架构师角色身份与特化规则（Codex）
-│   ├── fe-1/
-│   │   └── CLAUDE.md
-│   ├── be-1/
-│   │   └── AGENT.md
+│   │   └── AGENT.md                 # 架构师角色文件（自动生成）
+│   ├── dev-1/
+│   │   └── AGENT.md                 # 全栈开发角色文件（自动生成）
+│   ├── dev-2/
+│   │   └── AGENT.md                 # 全栈开发角色文件（自动生成）
 │   ├── qa-1/
-│   │   └── CLAUDE.md
+│   │   └── CLAUDE.md                # QA 角色文件（自动生成）
 │   └── review-1/
-│       └── AGENT.md
+│       └── AGENT.md                 # 审查角色文件（自动生成）
 ├── tasks/                           # 所有任务
 │   ├── _system/                     # watcher 运行时状态
 │   │   ├── notifications.jsonl      # 通知记录
@@ -351,8 +428,14 @@ my-agent-teams/
 ├── scripts/                         # 运行时脚本
 │   ├── create-task.sh               # 创建任务
 │   ├── dispatch-task.sh             # 派发任务
+│   ├── close-task.sh                # 收口任务
+│   ├── send-to-agent.sh             # 统一消息投递（自动处理 Codex i 模式）
 │   ├── verify.sh                    # 手工协议校验脚本（非 watcher 主流程）
-│   └── task-watcher.sh              # 状态监控 + 通知
+│   ├── task-watcher.sh              # 状态监控 + 通知 + scratchpad 轮询
+│   ├── tmux-watcher.sh              # 确认提示自动处理 + scratchpad 空闲提醒
+│   ├── task-watcher-watchdog.sh     # task-watcher 守护进程
+│   ├── task-board-sync.py           # 看板数据同步
+│   └── build-agent-files.sh         # 从模板生成所有 agent 角色文件
 ├── prompts/                         # 角色 Prompt
 │   ├── pm-base.md                   # PM
 │   ├── architect-base.md            # 架构师
@@ -361,8 +444,16 @@ my-agent-teams/
 │   ├── qa-base.md                   # 测试
 │   └── reviewer-base.md             # 审查
 └── design/                          # 设计文档
-    ├── OpenClaw-tmux协作方案优化.md   # 主方案（v10）
-    └── 分层PM演进方案.md             # 分层 PM 演进
+    ├── OpenClaw-tmux协作方案优化.md   # 主方案（v12）
+    ├── 分层PM演进方案.md             # 分层 PM 演进
+    ├── 任务看板系统方案.md           # 看板系统设计
+    └── agent-templates/             # ⭐ 角色行为准则模板（唯一真相源）
+        ├── base.md                  # 通用行为准则（所有 agent 共享）
+        ├── pm.md                    # PM 特化规则
+        ├── architect.md             # 架构师特化规则
+        ├── developer.md             # 开发特化规则
+        ├── qa.md                    # QA 特化规则
+        └── reviewer.md              # 审查特化规则
 ```
 
 
@@ -441,7 +532,40 @@ my-agent-teams/
 {"from":"working","to":"ready_for_merge","timestamp":"2026-04-23T10:15:00+08:00","reason":"result_received"}
 ```
 
-## 安全约束
+## 角色模板系统
+
+所有 agent 的行为准则统一由 `design/agent-templates/` 下的模板管理，**不要手动编辑 agent 目录下的 AGENT.md / CLAUDE.md**。
+
+### 模板结构
+
+```
+design/agent-templates/
+├── base.md          # 通用行为准则（行动优先、飞书通知、问题分级、生产部署、Scratchpad）
+├── pm.md            # PM 特化（任务拆解、审查分级、配置门禁、决策规则）
+├── architect.md     # 架构师特化（方案输出、集成职责、部署职责、故障排查）
+├── developer.md     # 开发特化（工作方式、角色边界、write_scope）
+├── qa.md            # QA 特化（verify.json 规范、测试流程）
+└── reviewer.md      # 审查特化（审查流程、角色边界）
+```
+
+### 修改规则的流程
+
+1. 编辑 `design/agent-templates/` 下对应的模板文件
+2. 运行构建脚本：`bash scripts/build-agent-files.sh`
+3. 所有 agent 的 AGENT.md / CLAUDE.md 自动更新
+4. 重启需要生效的 agent session
+
+### 查看变更（不写入）
+
+```bash
+bash scripts/build-agent-files.sh --dry-run
+```
+
+### 通用规则 vs 角色规则
+
+- **base.md**：所有 agent 共享的行为准则（工作方法论、飞书通知、问题分级等）
+- **{role}.md**：角色特化规则（PM 的任务拆解、开发的工作方式等）
+- agent 文件 = 启动信息 + base.md + {role}.md，由构建脚本自动合并
 
 - **保护路径**：agent 不能修改 `tasks/`、`scripts/`、`prompts/`、`config.json`
 - **write_scope**：agent 只能修改 task.json 中声明的文件范围
@@ -451,8 +575,9 @@ my-agent-teams/
 
 ## 设计参考
 
-- [OpenClaw-tmux协作方案优化.md](design/OpenClaw-tmux协作方案优化.md) — 完整方案文档（v10，2200+ 行）
+- [OpenClaw-tmux协作方案优化.md](design/OpenClaw-tmux协作方案优化.md) — 完整方案文档（v12，2500+ 行）
 - [分层PM演进方案.md](design/分层PM演进方案.md) — 3-5 / 8-10 / 12-15 agent 的组织演进
+- [任务看板系统方案.md](design/任务看板系统方案.md) — 看板系统设计与数据模型
 - [Claude Code 源码分析](https://github.com/dadiaomengmeimei/claude-code-sourcemap-learning-notebook) — 权限模型、Query Loop、Prompt 工程等设计参考
 
 ## 演进路线

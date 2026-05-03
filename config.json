@@ -9,7 +9,7 @@
     "mode": "single_pm",
     "hierarchy_ready": true,
     "root_pm": "pm-chief",
-    "integration_owner": "review-1",
+    "integration_owner": "arch-1",
     "escalation_policy": {
       "cross_domain_conflict": "pm-chief",
       "retries_exhausted": "pm-chief",
@@ -85,7 +85,7 @@
         "task_dispatch": false,
         "task_reassign": false,
         "task_cancel": false,
-        "integration_gate": true,
+        "integration_gate": false,
         "cross_domain_coordination": false
       },
       "can_support": [
@@ -99,7 +99,7 @@
       "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/review-1/AGENT.md"
     },
     "arch-1": {
-      "name": "Architect",
+      "name": "Architect / Integrator",
       "role": "architect",
       "tmux_session": "arch-1",
       "home_team": "coordination",
@@ -113,7 +113,7 @@
         "task_dispatch": false,
         "task_reassign": false,
         "task_cancel": false,
-        "integration_gate": false,
+        "integration_gate": true,
         "cross_domain_coordination": false
       },
       "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1",
@@ -139,9 +139,9 @@
         "cross_domain_coordination": false
       },
       "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1",
-      "runtime": "claude_code",
-      "guidance_file": "CLAUDE.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1/CLAUDE.md"
+      "runtime": "codex",
+      "guidance_file": "AGENT.md",
+      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1/AGENT.md"
     },
     "dev-2": {
       "name": "Full-stack Dev 2",

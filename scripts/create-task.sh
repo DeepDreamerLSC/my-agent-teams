@@ -18,19 +18,25 @@ REVIEW_LEVEL="${12:-}"
 TASK_LEVEL="${13:-}"
 REVIEWERS_CSV="${14:-}"
 REVIEW_DEADLINE="${15:-}"
+TASK_TYPE_RAW="${16:-}"
+READ_ONLY_RAW="${17:-false}"
+DOWNSTREAM_ACTION_RAW="${18:-}"
+OWNER_APPROVAL_REQUIRED_RAW="${19:-false}"
+OWNER_APPROVED_BY_RAW="${20:-}"
+OWNER_APPROVED_AT_RAW="${21:-}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 STRICT_WRITE_SCOPE_CONFLICT="${STRICT_WRITE_SCOPE_CONFLICT:-0}"
 
 if [ -z "$TASK_ID" ] || [ -z "$TITLE" ] || [ -z "$ASSIGNED_AGENT" ] || [ -z "$DOMAIN" ] || [ -z "$PROJECT" ]; then
-  echo "usage: create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment] [review-level] [task-level] [reviewers-csv] [review-deadline]" >&2
-  echo "example: create-task.sh 修复Word生成质量问题 \"修复 Word 生成功能质量问题\" be-1 backend chiralium '' true true reviewer dev dev standard execution 'review-1' '2026-04-24T20:00:00+08:00'" >&2
+  echo "usage: create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment] [review-level] [task-level] [reviewers-csv] [review-deadline] [task-type] [read-only] [downstream-action] [owner-approval-required] [owner-approved-by] [owner-approved-at]" >&2
+  echo "example: create-task.sh 修复Word生成质量问题 \"修复 Word 生成功能质量问题\" be-1 backend chiralium '' true true reviewer dev dev standard execution 'review-1' '2026-04-24T20:00:00+08:00' development false review" >&2
   exit 2
 fi
 
 TASK_DIR="$TASKS_DIR/$TASK_ID"
 mkdir -p "$TASK_DIR"
 
-python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" "$REVIEW_LEVEL" "$TASK_LEVEL" "$REVIEWERS_CSV" "$REVIEW_DEADLINE" "$STRICT_WRITE_SCOPE_CONFLICT" <<'PY'
+python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" "$REVIEW_LEVEL" "$TASK_LEVEL" "$REVIEWERS_CSV" "$REVIEW_DEADLINE" "$STRICT_WRITE_SCOPE_CONFLICT" "$TASK_TYPE_RAW" "$READ_ONLY_RAW" "$DOWNSTREAM_ACTION_RAW" "$OWNER_APPROVAL_REQUIRED_RAW" "$OWNER_APPROVED_BY_RAW" "$OWNER_APPROVED_AT_RAW" <<'PY'
 import json
 import re
 import sys
@@ -57,11 +63,40 @@ cfg_path = Path(sys.argv[1])
     reviewers_csv,
     review_deadline_raw,
     strict_conflict_raw,
-) = sys.argv[2:19]
+    task_type_raw,
+    read_only_raw,
+    downstream_action_raw,
+    owner_approval_required_raw,
+    owner_approved_by_raw,
+    owner_approved_at_raw,
+) = sys.argv[2:25]
 
 ACTIVE_CREATE_STATUSES = {'pending', 'dispatched', 'working', 'ready_for_merge', 'blocked'}
 AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
 VALID_TASK_LEVELS = {'epic', 'domain', 'execution', 'review', 'integration', 'coordination'}
+TASK_TYPE_ALIASES = {
+    'investigation': 'investigation',
+    'diagnosis': 'investigation',
+    '排查': 'investigation',
+    '诊断': 'investigation',
+    'design': 'design',
+    '方案': 'design',
+    '架构': 'design',
+    'development': 'development',
+    'develop': 'development',
+    '开发': 'development',
+    'verification': 'verification',
+    'verify': 'verification',
+    '验证': 'verification',
+    'qa': 'verification',
+    'integration': 'integration',
+    '集成': 'integration',
+    'merge': 'integration',
+    'deployment': 'deployment',
+    'deploy': 'deployment',
+    '发布': 'deployment',
+    '部署': 'deployment',
+}
 
 
 def parse_bool(raw: str) -> bool:
@@ -89,6 +124,17 @@ def dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         output.append(value)
     return output
+
+
+def normalize_task_type(raw: str, *, execution_mode: str, target_environment: str, task_level: str) -> Optional[str]:
+    stripped = raw.strip().lower()
+    if stripped:
+        return TASK_TYPE_ALIASES.get(stripped)
+    if execution_mode == 'deploy' or target_environment == 'prod':
+        return 'deployment'
+    if task_level == 'integration':
+        return 'integration'
+    return None
 
 
 def is_relative_to(path: Path, other: Path) -> bool:
@@ -173,6 +219,8 @@ target_environment = target_environment if target_environment in {'dev', 'prod'}
 normalized_task_level = task_level_raw.strip().lower() if task_level_raw.strip().lower() in VALID_TASK_LEVELS else cfg.get('defaults', {}).get('task_level', 'execution')
 write_scope = [item.strip() for item in write_scope_csv.split(',') if item.strip()] if write_scope_csv else []
 strict_conflict = parse_bool(strict_conflict_raw)
+read_only = parse_bool(read_only_raw)
+owner_approval_required = parse_bool(owner_approval_required_raw)
 
 agents = cfg.get('agents', {})
 assigned_agent_is_auto = assigned_agent in AUTO_ASSIGNED_AGENTS
@@ -240,6 +288,15 @@ elif review_level == 'complex' and len(reviewers) < 2:
     raise SystemExit('review_level=complex requires at least two reviewers')
 
 review_deadline = normalize_iso(review_deadline_raw)
+owner_approved_at = normalize_iso(owner_approved_at_raw) if owner_approved_at_raw.strip() else None
+task_type = normalize_task_type(
+    task_type_raw,
+    execution_mode=execution_mode,
+    target_environment=target_environment,
+    task_level=normalized_task_level,
+)
+if task_type == 'deployment':
+    owner_approval_required = True
 conflicts = find_scope_conflicts(Path(task_dir).parent, task_id, resolved_scope)
 if conflicts:
     message = 'write_scope conflicts detected with existing active tasks:\n- ' + '\n- '.join(conflicts)
@@ -268,6 +325,12 @@ obj = {
     'task_level': normalized_task_level,
     'owner_pm': cfg.get('orchestration', {}).get('root_pm', 'pm-chief'),
     'domain': domain,
+    'task_type': task_type,
+    'read_only': read_only,
+    'downstream_action': downstream_action_raw.strip() or None,
+    'owner_approval_required': owner_approval_required,
+    'owner_approved_by': owner_approved_by_raw.strip() or None,
+    'owner_approved_at': owner_approved_at,
     'write_scope': write_scope,
     'depends_on': [],
     'blocks': [],
@@ -294,7 +357,46 @@ obj = {
     'updated_at': created_at
 }
 Path(task_dir, 'task.json').write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-Path(task_dir, 'instruction.md').write_text(f'# 任务：{title}\n\n## 目标\n（待 PM 填写）\n', encoding='utf-8')
+instruction_lines = [
+    f'# 任务：{title}',
+    '',
+    '## 任务类型',
+    task_type or '（待 PM 填写）',
+    '',
+    '## 目标',
+    '（待 PM 填写）',
+    '',
+    '## 任务边界',
+    '（待 PM 填写）',
+    '',
+    '## 输入事实',
+    '（待 PM 填写）',
+    '',
+    '## 约束',
+    f'- write_scope: {write_scope if write_scope else "[]"}',
+    f'- read_only: {"true" if read_only else "false"}',
+    f'- 依赖上游任务: 无',
+    f'- target_environment: {target_environment}',
+    f'- execution_mode: {execution_mode}',
+    f'- owner_approval_required: {"true" if owner_approval_required else "false"}',
+    '',
+    '## 交付物',
+    '（待 PM 填写）',
+    '',
+    '## 验收标准',
+    '1. （待 PM 填写）',
+    '',
+    '## 下游动作',
+    downstream_action_raw.strip() or '（待 PM 填写）',
+]
+if owner_approval_required:
+    instruction_lines.extend([
+        '',
+        '## 授权状态',
+        f'- owner_approved_by: {owner_approved_by_raw.strip() or "（待 PM 填写）"}',
+        f'- owner_approved_at: {owner_approved_at or "（待 PM 填写）"}',
+    ])
+Path(task_dir, 'instruction.md').write_text('\n'.join(instruction_lines) + '\n', encoding='utf-8')
 Path(task_dir, 'transitions.jsonl').write_text('', encoding='utf-8')
 PY
 

@@ -19,3 +19,8 @@ tasks/清理*/
 tasks/部署*/
 tasks/验证*/
 tasks/任务看板*/
+# Chat Hub runtime logs
+chat/general/*.jsonl
+chat/general/*.lock
+chat/tasks/*.jsonl
+chat/tasks/*.lock

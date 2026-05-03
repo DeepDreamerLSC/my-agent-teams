@@ -5,6 +5,7 @@ TASK_FILE="${1:-}"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
+SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 ALLOW_WRITE_SCOPE_CONFLICT="${ALLOW_WRITE_SCOPE_CONFLICT:-0}"
 
 if [ -z "$TASK_FILE" ]; then
@@ -21,6 +22,30 @@ from typing import Optional
 
 ACTIVE_DISPATCH_STATUSES = {'dispatched', 'working', 'ready_for_merge', 'blocked'}
 AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
+TASK_TYPE_ALIASES = {
+    'investigation': 'investigation',
+    'diagnosis': 'investigation',
+    '排查': 'investigation',
+    '诊断': 'investigation',
+    'design': 'design',
+    '方案': 'design',
+    '架构': 'design',
+    'development': 'development',
+    'develop': 'development',
+    '开发': 'development',
+    'verification': 'verification',
+    'verify': 'verification',
+    '验证': 'verification',
+    'qa': 'verification',
+    'integration': 'integration',
+    '集成': 'integration',
+    'merge': 'integration',
+    'deployment': 'deployment',
+    'deploy': 'deployment',
+    '发布': 'deployment',
+    '部署': 'deployment',
+}
+PLACEHOLDER_MARKERS = {'（待 PM 填写）', '(待 PM 填写)', '待 PM 填写'}
 
 
 def parse_bool(raw: str) -> bool:
@@ -45,6 +70,38 @@ def dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         output.append(value)
     return output
+
+
+def normalize_task_type(raw: str) -> Optional[str]:
+    stripped = str(raw).strip().lower()
+    if not stripped:
+        return None
+    return TASK_TYPE_ALIASES.get(stripped)
+
+
+def extract_sections(markdown: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current: Optional[str] = None
+    for raw_line in markdown.splitlines():
+        line = raw_line.rstrip('\n')
+        if line.startswith('## '):
+            current = line[3:].strip()
+            sections.setdefault(current, [])
+            continue
+        if current is not None:
+            sections[current].append(line)
+    return sections
+
+
+def compact_section(lines: list[str]) -> str:
+    return '\n'.join(line.strip() for line in lines if line.strip()).strip()
+
+
+def is_placeholder_text(value: str) -> bool:
+    stripped = value.strip()
+    if not stripped:
+        return True
+    return any(marker in stripped for marker in PLACEHOLDER_MARKERS)
 
 
 def is_relative_to(path: Path, other: Path) -> bool:
@@ -153,6 +210,53 @@ conflicts = find_scope_conflicts(task_path.parent.parent, str(task.get('id')), r
 if conflicts and not allow_conflicts:
     raise SystemExit('write_scope conflicts with active tasks:\n- ' + '\n- '.join(conflicts))
 
+instruction_path = task_path.parent / 'instruction.md'
+if not instruction_path.exists():
+    raise SystemExit(f'missing instruction.md: {instruction_path}')
+instruction_text = instruction_path.read_text(encoding='utf-8')
+sections = extract_sections(instruction_text)
+required_sections = ['任务类型', '目标', '任务边界', '输入事实', '约束', '交付物', '验收标准', '下游动作']
+missing_sections = [name for name in required_sections if name not in sections]
+if missing_sections:
+    raise SystemExit('instruction.md missing required sections: ' + ', '.join(missing_sections))
+invalid_sections = [name for name in required_sections if is_placeholder_text(compact_section(sections[name]))]
+if invalid_sections:
+    raise SystemExit('instruction.md contains placeholders or empty required sections: ' + ', '.join(invalid_sections))
+
+task_type = normalize_task_type(task.get('task_type') or compact_section(sections['任务类型']))
+if not task_type:
+    raise SystemExit('task_type missing or invalid; must be one of investigation/design/development/verification/integration/deployment')
+task['task_type'] = task_type
+
+read_only = parse_bool(task.get('read_only'))
+write_scope_items = [item for item in (task.get('write_scope') or []) if str(item).strip()]
+if read_only and write_scope_items:
+    raise SystemExit('read_only task must not declare write_scope')
+if task_type == 'development' and not write_scope_items:
+    raise SystemExit('development task requires non-empty write_scope')
+if task_type == 'integration' and assigned_agent != 'arch-1':
+    raise SystemExit('integration task_type must be assigned to arch-1')
+if task_type == 'deployment' and execution_mode != 'deploy':
+    raise SystemExit('deployment task_type requires execution_mode=deploy')
+
+downstream_action = str(task.get('downstream_action') or compact_section(sections['下游动作'])).strip()
+if not downstream_action or is_placeholder_text(downstream_action):
+    raise SystemExit('downstream_action missing')
+task['downstream_action'] = downstream_action
+
+owner_approval_required = parse_bool(task.get('owner_approval_required'))
+if execution_mode == 'deploy' or target_environment == 'prod' or task_type == 'deployment':
+    if assigned_agent != 'arch-1':
+        raise SystemExit('prod/deploy tasks must be assigned to arch-1')
+    if not owner_approval_required:
+        raise SystemExit('prod/deploy tasks require owner_approval_required=true before dispatch')
+    approved_by = str(task.get('owner_approved_by') or '').strip()
+    approved_at = normalize_iso(task.get('owner_approved_at')) if task.get('owner_approved_at') else None
+    if not approved_by or not approved_at:
+        raise SystemExit('prod/deploy tasks require owner_approved_by and owner_approved_at before dispatch')
+    task['owner_approved_by'] = approved_by
+    task['owner_approved_at'] = approved_at
+
 legacy_review_required = bool(task.get('review_required'))
 review_level = str(task.get('review_level') or '').strip().lower()
 if review_level not in {'skip', 'standard', 'complex'}:
@@ -200,11 +304,14 @@ print(json.dumps({
     'assigned_agent': assigned_agent,
     'task_dir': str(task_path.parent),
     'conflicts': conflicts,
+    'task_type': task.get('task_type'),
 }, ensure_ascii=False))
 PY
 )
 
-echo "dispatched $(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_id"])' <<< "$DISPATCH_OUTPUT")"
+TASK_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_id"])' <<< "$DISPATCH_OUTPUT")
+TASK_TYPE=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("task_type") or "unknown")' <<< "$DISPATCH_OUTPUT")
+echo "dispatched ${TASK_ID}"
 if [ "$ALLOW_WRITE_SCOPE_CONFLICT" = "1" ]; then
   python3 -c 'import json,sys; payload=json.load(sys.stdin); conflicts=payload.get("conflicts") or []; [print(f"WARNING: {item}", file=sys.stderr) for item in conflicts]' <<< "$DISPATCH_OUTPUT"
 fi
@@ -212,6 +319,15 @@ fi
 ASSIGNED_AGENT=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["assigned_agent"])' <<< "$DISPATCH_OUTPUT")
 TASK_DIR=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_dir"])' <<< "$DISPATCH_OUTPUT")
 if [ -x "$SEND_SCRIPT" ]; then
-  MESSAGE="请读取 ${TASK_DIR}/instruction.md 并开始执行任务。完成后写 ack.json 和 result.json。"
+  MESSAGE="请读取 ${TASK_DIR}/instruction.md 并开始执行任务。当前任务类型：${TASK_TYPE}。完成后写 ack.json 和 result.json。"
   CONFIG_PATH="$CONFIG_PATH" "$SEND_SCRIPT" "$ASSIGNED_AGENT" "$MESSAGE"
+fi
+
+if [ -x "$SEND_CHAT_SCRIPT" ]; then
+  TASK_JSON="${TASK_DIR}/task.json"
+  PRIORITY=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("priority") or "")' "$TASK_JSON")
+  TITLE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("title") or "")' "$TASK_JSON")
+  TARGET_ENVIRONMENT=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("target_environment") or "")' "$TASK_JSON")
+  ANNOUNCE_MESSAGE="任务公告：${TITLE}（类型：${TASK_TYPE}，执行者：${ASSIGNED_AGENT}，环境：${TARGET_ENVIRONMENT:-dev}）"
+  TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="pm-chief" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "$PRIORITY"
 fi
