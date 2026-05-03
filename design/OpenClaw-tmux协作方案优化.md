@@ -1,9 +1,11 @@
 # OpenClaw + tmux 协作方案优化
 
 > 创建时间:2026-04-22
-> 修订时间:2026-04-30 v13
+> 修订时间:2026-05-03 v14
 > 实施主目录: `~/Desktop/work/my-agent-teams/`
 > 文档定位:面向当前 OpenClaw + tmux + Claude Code / Codex 的**实操优化方案**,优先解决任务追踪、消息可靠性、选择性隔离开发、真实校验与联调成功率问题。
+
+**2026-05-03 v14：** 新增第二十二章“通信链路加固迭代计划”——基于当前仓库落地审查，明确三主线通信模型（`tasks/ + chat/ + send-to-agent.sh`），并把 tmux 短消息化、轻量消息消费确认、tmux-watcher 自动批准边界收紧拆成可直接分派给 dev 的执行步骤与验收标准。
 
 **2026-04-27 v13：** 新增 15.5 公共消息区（Chat Hub）A-Lite 版——先落地 `chat/general/` 与 `chat/tasks/` 两类公开沟通通道，用于任务公告、讨论与问答；`tasks/` 继续作为状态事实源。A-Lite 阶段**不启用私聊、不接入 `task_claim` 状态机、不替代现有派发链路**，是否进入更重的 B/C 阶段取决于验证期结果。
 
@@ -3227,3 +3229,359 @@ Program PM（全局优先级和仲裁）
 **12+ agent 时再做：**
 1. 引入 Pod 视角，升级为三层组织
 2. 通知升级为看板 + 异常驱动
+
+---
+
+## 二十二、通信链路加固迭代计划（v14）
+
+> 背景：当前 Phase 1 + Chat Hub A-Lite 已可运行，但仓库审查显示仍存在三类现实问题：
+> 1. **现役通信模型不够收敛**——文档/模板里仍残留 scratchpad 语义，容易让执行者误判当前主线；
+> 2. **tmux send-keys 仍是脆弱点**——虽然 `send-to-agent.sh` 已统一封装，但不少通知仍把长摘要直接塞进 tmux 输入流；
+> 3. **消息“写入成功”不等于“被消费”**——A-Lite 还没有最小消费确认；`tmux-watcher` 的自动确认边界也偏宽松。
+>
+> 本章只定义 **P0 + P1** 级别的加固动作，目标是：
+> - 先把“当前到底该走哪条通信主线”说清楚；
+> - 再把 tmux 投递收缩为“短唤醒 + 文件引用”；
+> - 最后补最小消费确认与权限确认边界，降低丢消息、误消费、误批准风险。
+
+### 22.1 当前唯一现役通信模型（P0）
+
+从 v14 开始，当前运行中的通信主线统一定义为：
+
+```text
+1. tasks/            = 任务状态事实源
+2. chat/             = 公共沟通与讨论线程（A-Lite）
+3. send-to-agent.sh  = 强制唤醒 / critical 双通道
+```
+
+#### 22.1.1 明确边界
+
+| 通道 | 现役状态 | 用途 | 明确不承担 |
+|------|---------|------|-----------|
+| `tasks/` | ✅ 现役 | `task.json`、`ack.json`、`result.json`、`review.md`、`verify.json`、`transitions.jsonl` 形成唯一状态事实源 | 不承担自由讨论 |
+| `chat/` | ✅ 现役 | `chat/general/`、`chat/tasks/{task-id}.jsonl` 承担公告、问答、decision、task_done 同步 | 不直接驱动状态机 |
+| `send-to-agent.sh` | ✅ 现役 | 派发后唤醒、critical/生产任务强制提醒、review/QA/集成定向拉起 | 不应再承载长正文 |
+| `tasks/.scratchpad/` | ❌ 非现役主线 | 仅保留为历史设计说明 / 尚未启用能力 | 不能再被当作当前默认沟通通道 |
+| `chat/agents/` | ❌ 未启用 | 私聊保留为 Phase C 预留 | 当前任何 agent 不应创建或依赖 |
+| `task_claim*` | ❌ 未启用 | 认领状态机保留为验证期后议题 | 当前不接入事实源 |
+
+#### 22.1.2 P0 目标
+
+- 让 README、主方案文档、角色模板、运行时脚本说明都指向同一套现役模型。
+- 彻底消除“现在到底要看 scratchpad、chat 还是 tasks”这类认知漂移。
+- 把 scratchpad 明确降级为**历史保留/未启用**，避免新 agent 被误导。
+
+#### 22.1.3 开发步骤拆解（可直接分派）
+
+##### Step P0-1：统一文档口径
+- **目标**：把所有对外说明统一到 `tasks/ + chat/ + send-to-agent.sh` 三主线。
+- **修改文件**：
+  - `README.md`
+  - `design/OpenClaw-tmux协作方案优化.md`
+  - `design/Chat-Hub-落地清单.md`
+  - `design/Chat-Hub-A-Lite-验证使用说明.md`
+- **具体动作**：
+  1. 把 scratchpad 从“当前主线”改成“历史保留/未启用”。
+  2. 明确 `chat/` 不是状态事实源。
+  3. 明确 `send-to-agent.sh` 只负责强制唤醒，不负责长正文承载。
+- **测试/校验**：
+  - 人工 diff 审查，确认文档不存在互相冲突的现役通信描述。
+- **验收标准**：
+  - 所有核心文档都能回答同一个问题：
+    - 状态看哪里？→ `tasks/`
+    - 讨论看哪里？→ `chat/`
+    - 紧急唤醒怎么做？→ `send-to-agent.sh`
+
+##### Step P0-2：收敛角色模板
+- **目标**：让每个 agent 的操作手册不再要求主动检查未启用的 scratchpad。
+- **修改文件**：
+  - `design/agent-templates/base.md`
+  - `design/agent-templates/pm.md`
+  - `design/agent-templates/developer.md`
+  - `design/agent-templates/architect.md`
+  - `design/agent-templates/qa.md`
+  - `design/agent-templates/reviewer.md`
+  - 以及由模板生成的 `agents/*/AGENT.md` / `agents/*/CLAUDE.md`
+- **具体动作**：
+  1. 把“每次完成任务后检查 `tasks/.scratchpad/`”改成历史说明或移除。
+  2. 强化“任务间隙检查 `chat/general` 和当前 `chat/tasks/{task-id}`”。
+  3. 保留 `send-to-agent.sh` 作为 critical 双通道规则。
+- **测试/校验**：
+  - 重新生成 agent 角色文件后，抽查 2-3 个 agent 目录。
+- **验收标准**：
+  - 任一 agent 读取自己的角色文件时，不会再把 scratchpad 误认为当前默认消息入口。
+
+##### Step P0-3：收敛运行时说明
+- **目标**：脚本说明、README 树状图与实际 watcher 职责一致。
+- **修改文件**：
+  - `README.md`
+  - 如有必要：`scripts/task-watcher.sh` 顶部注释、`scripts/tmux-watcher.sh` 顶部注释
+- **具体动作**：
+  1. README 中不要再写“scratchpad 轮询/空闲提醒”已是现役能力，除非脚本真的实现。
+  2. 把 watcher 注释改成“当前职责”和“后续预留职责”分开写。
+- **测试/校验**：
+  - 对照脚本行为做人工审查。
+- **验收标准**：
+  - README 与脚本顶层注释不再高估当前能力。
+
+### 22.2 tmux 唤醒消息短消息化（P1a）
+
+> 原则：**tmux send-keys 只负责唤醒，不再承担长正文。**  
+> 真实内容一律由 agent 自己读取文件：`instruction.md`、`review.md`、`verify.json`、任务目录等。
+
+#### 22.2.1 目标
+
+把所有系统级通知收缩成：
+- 一句短提示
+- 一个明确的任务目录/文件路径
+- 一个动作词（读取/检查/继续）
+
+例如：
+- ✅ 推荐：`请读取 /tasks/xxx/instruction.md 并开始执行。`
+- ❌ 避免：把 200~300 字的 result 摘要直接拼进 tmux 消息里
+
+#### 22.2.2 需要收缩的主要场景
+
+| 场景 | 当前问题 | 目标形态 |
+|------|---------|---------|
+| reviewer/QA 自动通知 | `task-watcher.sh` 会把长摘要直接拼进消息 | 改为“读取任务目录 + 查看 result/review/verify” |
+| PM 仲裁提醒 | 可能带较长 summary | 改为短提示 + 引导 PM 看任务工件 |
+| integration / auto-claim 通知 | 当前消息仍偏长 | 改为“读取 instruction.md” |
+| 派发后的兜底重发 | 已经相对短 | 保持短消息，不再扩写 |
+
+#### 22.2.3 开发步骤拆解（可直接分派）
+
+##### Step P1a-1：梳理所有 tmux 唤醒点
+- **目标**：找出仓库里所有通过 tmux/`send-to-agent.sh` 发消息的入口。
+- **修改文件**：
+  - `scripts/task-watcher.sh`
+  - `scripts/dispatch-task.sh`
+  - `scripts/send-to-agent.sh`
+  - 其他使用 `notify_agent` / `notify_pm` / `tmux send-keys` 的脚本
+- **具体动作**：
+  1. 列出所有消息模板。
+  2. 标注哪些是“长消息风险点”。
+- **测试/校验**：
+  - `rg "notify_agent|notify_pm|send-to-agent.sh|send-keys" scripts/`
+- **验收标准**：
+  - 有一份完整的消息模板清单，且 reviewer/QA/PM/集成链路都被覆盖。
+
+##### Step P1a-2：统一改为短唤醒模板
+- **目标**：把长摘要模板全部替换成短消息模板。
+- **修改文件**：
+  - `scripts/task-watcher.sh`
+  - `scripts/dispatch-task.sh`
+- **具体动作**：
+  1. reviewer 通知改为：`请读取 /tasks/<task-id>/instruction.md、result.json、verify.json，并输出 review.md`。
+  2. QA 通知改为：`请读取任务目录中的 instruction/result/review artifacts，并输出 verify.json`。
+  3. PM 仲裁通知改为：`请检查 /tasks/<task-id>/`，不要内嵌大段 summary。
+  4. auto-dispatch / auto-claim 继续只引用 `instruction.md`。
+- **测试/校验**：
+  - shell 单测或 grep 校验：消息模板中不再出现 `$(truncate_utf8 "$summary"` 等摘要拼接。
+- **验收标准**：
+  - 所有 watcher 自动发出的 tmux 消息均不超过 1-2 行，且正文内容可通过任务文件自行读取。
+
+##### Step P1a-3：为非 tmux 正文建立“文件引用优先”约定
+- **目标**：让长内容统一落到文件，而非塞回 tmux。
+- **修改文件**：
+  - `chat/README.md`
+  - `design/agent-templates/*.md`
+- **具体动作**：
+  1. 补充约定：长说明写 `review.md` / `verify.json` / `notes/*.md`，tmux 只发引用。
+  2. 对 agent 角色提示增加“收到短唤醒后优先打开文件，不等待 PM 二次解释”。
+- **测试/校验**：
+  - 人工审阅模板和 README。
+- **验收标准**：
+  - 文档与脚本口径一致：tmux 不再承担长正文通道。
+
+### 22.3 轻量消息消费确认（P1b）
+
+> 目标不是立刻做完整 IM 状态机，而是补一个**最小可验证的“看过/没看过”机制**，让 PM 巡检不再只看“文件被写了没有”。
+
+#### 22.3.1 设计原则
+
+- 不做 `task_claim`、不改变任务状态机。
+- 不做复杂已读游标中心化存储。
+- 只做**每个 agent 本地一份轻量消费记录**，例如：
+
+```json
+{
+  "general": {
+    "2026-05-03": "general-2026-05-03-..."
+  },
+  "tasks": {
+    "切换PPT生成默认精美模式": {
+      "last_seen_msg_id": "tasks-切换PPT生成默认精美模式-...",
+      "seen_at": "2026-05-03T10:20:00+08:00"
+    }
+  }
+}
+```
+
+建议文件名：`agents/<agent-id>/.runtime/chat_seen.json`（或等价运行时目录，不进 git）。
+
+#### 22.3.2 开发步骤拆解（可直接分派）
+
+##### Step P1b-1：定义 `chat_seen.json` schema 与存放位置
+- **目标**：给所有 agent 一个统一的本地消费记录文件格式。
+- **修改文件**：
+  - `chat/README.md`
+  - `design/agent-templates/base.md`
+  - 如有必要：新增 `docs/chat-seen.schema.json` 或在 README 中内联 schema
+- **具体动作**：
+  1. 约定文件路径。
+  2. 约定 `general/tasks` 两类记录格式。
+  3. 约定该文件属于运行时工件，不纳入 git。
+- **测试/校验**：
+  - 文档审查。
+- **验收标准**：
+  - 任一 agent 都知道该文件写在哪里、何时更新、何时不该提交。
+
+##### Step P1b-2：新增更新消费记录的读消息脚本
+- **目标**：让 agent/PM 查看消息时，能够顺手更新消费记录。
+- **修改文件**：
+  - `scripts/read-chat.sh`
+  - 可能新增：`scripts/mark-chat-seen.sh`
+- **具体动作**：
+  1. `read-chat.sh` 增加 `--mark-seen` 或默认在 agent 目录下运行时更新自己的 `chat_seen.json`。
+  2. 若不想耦合，可拆一个 `mark-chat-seen.sh` 供 agent 显式调用。
+- **测试/校验**：
+  - 读取 `general` / `task` 消息后检查 `chat_seen.json` 是否落盘。
+- **验收标准**：
+  - 本地查看消息可以留下轻量消费痕迹。
+
+##### Step P1b-3：增强 `pm-chat-check.sh`，识别“长期未消费”的关键线程
+- **目标**：让 PM 巡检不只看“有没有消息”，还看“关键线程是否没人处理”。
+- **修改文件**：
+  - `scripts/pm-chat-check.sh`
+- **具体动作**：
+  1. 增加对 `chat_seen.json` 的读取。
+  2. 聚焦：`priority=critical`、`@pm-chief`、`question` 长时间无 answer、task thread 最近有关键消息但 owner 长时间未 seen。
+  3. 输出 actionable 列表，而不是全量刷屏。
+- **测试/校验**：
+  - 构造一条 task thread 新消息，但不更新 seen；脚本应标红提示。
+  - 更新 seen 后，再次巡检应消失。
+- **验收标准**：
+  - PM 能识别“消息写入了，但目标 agent 长时间没消费”的 thread。
+
+##### Step P1b-4：把消费确认纳入 agent 操作准则
+- **目标**：让 agent 在任务间隙查看 chat 时形成稳定动作。
+- **修改文件**：
+  - `design/agent-templates/base.md`
+  - 生成后的 `agents/*/AGENT.md` / `CLAUDE.md`
+- **具体动作**：
+  1. 明确要求：读取 task thread 后应更新 seen（自动或脚本触发）。
+  2. 强调：这是“消费确认”，不是状态机动作。
+- **测试/校验**：
+  - 抽查模板生成结果。
+- **验收标准**：
+  - agent 不会把 `chat_seen.json` 理解成认领/审批机制。
+
+### 22.4 tmux-watcher 自动批准边界收紧（P1c）
+
+> 当前 `tmux-watcher.sh` 通过 pane 关键词匹配后直接 `Enter`，虽然提升了流畅度，但边界偏宽。P1c 的目标不是废掉自动确认，而是把它收敛到**更可解释的白名单范围**。
+
+#### 22.4.1 边界策略
+
+建议新增两层约束：
+
+1. **白名单 session**
+   - 只对白名单 agent session 自动确认；其他 session 只记录并提醒。
+2. **白名单 prompt 前缀/关键短语**
+   - 只对已知安全的确认提示自动 Enter。
+   - 对未知文案、不稳定权限请求、危险动作确认，改为提醒 PM/owner，不自动处理。
+
+#### 22.4.2 开发步骤拆解（可直接分派）
+
+##### Step P1c-1：抽离可配置白名单
+- **目标**：把自动确认范围做成配置，而不是写死在脚本里。
+- **修改文件**：
+  - `scripts/tmux-watcher.sh`
+  - `config.json`（或 watcher 专用配置文件）
+- **具体动作**：
+  1. 增加 `auto_approve_sessions` 白名单。
+  2. 增加 `auto_approve_prompt_prefixes` 或等价配置。
+  3. 脚本启动时读取配置。
+- **测试/校验**：
+  - 使用测试配置模拟允许/不允许的 session。
+- **验收标准**：
+  - 自动批准范围可配置，不再全局一刀切。
+
+##### Step P1c-2：未知确认改为“提醒 + 不自动 Enter”
+- **目标**：降低误批准风险。
+- **修改文件**：
+  - `scripts/tmux-watcher.sh`
+- **具体动作**：
+  1. 关键词命中但不在白名单前缀内时，不发送 Enter。
+  2. 记录日志，必要时通过 Feishu/PM 提醒人工处理。
+- **测试/校验**：
+  - 构造一条命中旧关键词但前缀不在白名单的新提示，确认 watcher 不自动确认。
+- **验收标准**：
+  - 未知/危险确认不再静默自动通过。
+
+##### Step P1c-3：补充日志与审计字段
+- **目标**：后续能回溯“某次自动批准是因为什么规则触发的”。
+- **修改文件**：
+  - `scripts/tmux-watcher.sh`
+  - 如有需要：日志说明文档
+- **具体动作**：
+  1. 记录 session、命中文案、命中规则、动作（auto-approve / notify-only）。
+  2. 冷却去重仍保留，但不能掩盖审计信息。
+- **测试/校验**：
+  - 人工触发一条白名单提示和一条非白名单提示，检查日志输出。
+- **验收标准**：
+  - 每次自动确认都可解释、可追踪。
+
+### 22.5 建议实施顺序（可直接排期）
+
+#### 第一批（P0，先做）
+1. `P0-1` 统一文档口径
+2. `P0-2` 收敛角色模板
+3. `P0-3` 收敛运行时说明
+
+> 交付目标：团队对“当前现役通信链路”只有一个答案，不再出现 scratchpad / chat / tasks 三套并行理解。
+
+#### 第二批（P1a + P1c，强可靠性）
+1. `P1a-1` 梳理所有 tmux 唤醒点
+2. `P1a-2` 统一改为短唤醒模板
+3. `P1a-3` 建立文件引用优先约定
+4. `P1c-1` 抽离自动批准白名单
+5. `P1c-2` 未知确认改为提醒
+6. `P1c-3` 补审计日志
+
+> 交付目标：tmux 只承担“唤醒”职责，自动批准边界更明确，降低消息丢失与误批准风险。
+
+#### 第三批（P1b，最小消费确认）
+1. `P1b-1` 定义 `chat_seen.json`
+2. `P1b-2` 增强 `read-chat.sh` / 新增 `mark-chat-seen.sh`
+3. `P1b-3` 增强 `pm-chat-check.sh`
+4. `P1b-4` 模板接入消费确认动作
+
+> 交付目标：PM 巡检能区分“消息已写入”和“消息已被消费”，但不引入完整 IM 状态机复杂度。
+
+### 22.6 本章验收标准
+
+v14 增补内容完成后，应满足以下验收标准：
+
+1. **口径统一**
+   - README、主方案、模板、脚本注释都一致表述三主线：`tasks/ + chat/ + send-to-agent.sh`
+2. **tmux 短消息化**
+   - watcher/dispatch 发送给 agent 的消息全部可收敛为“短唤醒 + 文件引用”
+3. **消费确认最小闭环**
+   - PM 能通过工具识别关键 thread 是否长期未被 owner 消费
+4. **自动批准边界可解释**
+   - tmux-watcher 不再对所有关键词命中一律自动 Enter，而是遵循白名单 session + prompt 前缀规则
+5. **不提前引入重状态机**
+   - 仍然不接入 `task_claim`、私聊、完整 read pointer、chat 驱动状态机
+
+### 22.7 不在本轮范围内的事项
+
+以下能力继续后移，不纳入 v14 本轮改造：
+
+- `task_claim / task_claim_confirmed`
+- `chat/agents/` 私聊目录
+- 完整未读/已读/通知去重状态机
+- watcher 主动扫描 chat 并自动唤醒所有普通消息
+- 分层 PM runtime（子 PM / Pod PM）
+
+> 原则：**先把当前链路收敛和加固，再决定是否继续复杂化。**
