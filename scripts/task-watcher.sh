@@ -15,6 +15,7 @@ USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
 STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
 BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py}"
 SEND_SCRIPT="${SEND_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh}"
+SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh}"
 CONFIG_PATH="${CONFIG_PATH:-/Users/lin/Desktop/work/my-agent-teams/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
@@ -250,7 +251,12 @@ emit_system_chat_event() {
         nudge) source_name="send-to-agent" ;;
     esac
 
-    TASKS_ROOT="$TASKS_ROOT" "$SEND_CHAT_SCRIPT" "$channel" "$task_id" "$msg"         --to "$to_actor"         --type "$event_type"         --severity "$severity"         --source-type system         --source-name "$source_name" >/dev/null 2>&1 || true
+    TASKS_ROOT="$TASKS_ROOT" "$SEND_CHAT_SCRIPT" "$channel" "$task_id" "$msg" \
+        --to "$to_actor" \
+        --type "$event_type" \
+        --severity "$severity" \
+        --source-type system \
+        --source-name "$source_name" >/dev/null 2>&1 || true
 }
 
 # 检查 task.json 中的 status
@@ -407,7 +413,10 @@ task_dir = Path(sys.argv[1])
 tasks_root = Path(sys.argv[2])
 task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
 depends_on = task.get('depends_on') or []
-allowed = {'done', 'ready_for_merge', 'cancelled'}
+policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
+allowed = {'done', 'cancelled'}
+if policy == 'ready_for_merge_ok':
+    allowed.add('ready_for_merge')
 
 for dep in depends_on:
     dep_path = tasks_root / dep / 'task.json'
@@ -442,6 +451,154 @@ for task_path in tasks_root.glob('*/task.json'):
 
 print(count)
 PY
+}
+
+working_task_count_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+count = 0
+for task_path in tasks_root.glob('*/task.json'):
+    task = json.loads(task_path.read_text(encoding='utf-8'))
+    if str(task.get('assigned_agent') or '') == agent_id and str(task.get('status') or '') == 'working':
+        count += 1
+print(count)
+PY
+}
+
+task_claim_max_concurrency() {
+    local task_dir="$1"
+    python3 - "$task_dir/task.json" "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+config = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
+value = task.get('claim_max_concurrency')
+if value in (None, ''):
+    value = config.get('task_pool', {}).get('default_claim_max_concurrency', 1)
+print(int(value))
+PY
+}
+
+task_claim_scope() {
+    local task_dir="$1"
+    python3 - "$task_dir/task.json" "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+config = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
+scope = task.get('claim_scope')
+if isinstance(scope, list) and scope:
+    for item in scope:
+        value = str(item).strip()
+        if value:
+            print(value)
+    raise SystemExit(0)
+
+task_type = str(task.get('task_type') or '').strip().lower()
+domain = str(task.get('domain') or '').strip().lower()
+agents = config.get('agents') or {}
+for agent_id, payload in agents.items():
+    role = str((payload or {}).get('role') or '').strip().lower()
+    if task_type in {'development', 'investigation'}:
+        if role == 'fullstack_dev' or agent_id.startswith('dev-'):
+            print(agent_id)
+    elif task_type == 'verification' or domain == 'quality':
+        if role == 'qa' or agent_id.startswith('qa-'):
+            print(agent_id)
+    elif task_type == 'design':
+        if role == 'architect' or agent_id == 'arch-1':
+            print(agent_id)
+PY
+}
+
+is_agent_in_claim_scope() {
+    local task_dir="$1"
+    local agent_id="$2"
+    task_claim_scope "$task_dir" | grep -qx "$agent_id"
+}
+
+claim_scope_conflict_free() {
+    local task_dir="$1"
+    local agent_id="$2"
+    python3 - "$task_dir/task.json" "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+def is_relative_to(path: Path, other: Path) -> bool:
+    try:
+        path.relative_to(other)
+        return True
+    except ValueError:
+        return False
+
+def scopes_overlap(a: Path, b: Path) -> bool:
+    return a == b or is_relative_to(a, b) or is_relative_to(b, a)
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+tasks_root = Path(sys.argv[2])
+agent_id = sys.argv[3]
+target_scope = [str(item).strip() for item in (task.get('write_scope') or []) if str(item).strip()]
+if not target_scope:
+    raise SystemExit(0)
+target_scope = [Path(item).expanduser().resolve() for item in target_scope]
+
+for task_path in tasks_root.glob('*/task.json'):
+    payload = json.loads(task_path.read_text(encoding='utf-8'))
+    if str(payload.get('assigned_agent') or '') != agent_id:
+        continue
+    if str(payload.get('status') or '') not in {'dispatched', 'working'}:
+        continue
+    other_scope = [str(item).strip() for item in (payload.get('write_scope') or []) if str(item).strip()]
+    for raw in other_scope:
+        other = Path(raw).expanduser().resolve()
+        for target in target_scope:
+            if scopes_overlap(target, other):
+                print(f'conflict:{task_path.parent.name}:{raw}')
+                raise SystemExit(1)
+raise SystemExit(0)
+PY
+}
+
+claim_dependencies_ready() {
+    local task_dir="$1"
+    dependencies_ready "$task_dir" >/dev/null 2>&1
+}
+
+claim_agent_can_accept_task() {
+    local task_dir="$1"
+    local agent_id="$2"
+
+    is_agent_in_claim_scope "$task_dir" "$agent_id" || return 1
+    claim_dependencies_ready "$task_dir" || return 1
+    claim_scope_conflict_free "$task_dir" "$agent_id" >/dev/null 2>&1 || return 1
+
+    local working_count active_count max_concurrency
+    working_count=$(working_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    [ "${working_count:-0}" -le 0 ] || return 1
+    active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    max_concurrency=$(task_claim_max_concurrency "$task_dir" 2>/dev/null || echo 1)
+    [ "${active_count:-0}" -lt "${max_concurrency:-1}" ]
+}
+
+claim_scope_idle_candidates() {
+    local task_dir="$1"
+    while IFS= read -r agent_id; do
+        [ -n "$agent_id" ] || continue
+        if is_idle_agent "$agent_id" && claim_agent_can_accept_task "$task_dir" "$agent_id"; then
+            echo "$agent_id"
+        fi
+    done <<< "$(task_claim_scope "$task_dir")"
 }
 
 is_idle_agent() {
@@ -757,7 +914,10 @@ dispatch_task_to_agent() {
     local task_dir="$1"
     local assigned_agent="$2"
     local reason="$3"
-    python3 - "$task_dir" "$assigned_agent" "$reason" <<'PY'
+    local claimed_by="${4:-}"
+    local claimed_at="${5:-}"
+    local claim_reason="${6:-}"
+    python3 - "$task_dir" "$assigned_agent" "$reason" "$claimed_by" "$claimed_at" "$claim_reason" <<'PY'
 import json
 import sys
 from datetime import datetime
@@ -766,6 +926,9 @@ from pathlib import Path
 task_dir = Path(sys.argv[1])
 assigned_agent = sys.argv[2]
 reason = sys.argv[3]
+claimed_by = sys.argv[4].strip()
+claimed_at = sys.argv[5].strip()
+claim_reason = sys.argv[6].strip()
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -778,6 +941,13 @@ task['updated_at'] = now
 task['lease_owner'] = task.get('owner_pm')
 task['lease_acquired_at'] = now
 task['lease_expires_at'] = now
+if claimed_by:
+    task['claimed_by'] = claimed_by
+if claimed_at:
+    task['claimed_at'] = claimed_at
+if claim_reason:
+    task['claim_reason'] = claim_reason
+task['pool_entered_at'] = task.get('pool_entered_at')
 
 task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 with transitions_path.open('a', encoding='utf-8') as fp:
@@ -840,6 +1010,87 @@ auto_claim_pending_dev() {
     notify_agent "$target_agent" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。"
     sync_task_board "$task_dir" "auto-claim-dev"
     log "$task_id: 自动认领并派发给 $target_agent"
+    return 0
+}
+
+claim_reject() {
+    local task_dir="$1"
+    local agent_id="$2"
+    local reason="$3"
+    local claim_path="$task_dir/claim.json"
+    [ -f "$claim_path" ] || return 0
+    local stamp
+    stamp=$(date '+%Y%m%dT%H%M%S')
+    mv "$claim_path" "$task_dir/claim.rejected.${stamp}.json" 2>/dev/null || rm -f "$claim_path"
+    [ -n "$agent_id" ] && notify_agent "$agent_id" "任务认领失败：$(basename "$task_dir")。原因：$reason"
+    emit_system_chat_event watcher "$(basename "$task_dir")" "任务认领失败：$reason" "${agent_id:-all}" degraded notify
+    log "$(basename "$task_dir"): claim rejected for ${agent_id:-unknown} | $reason"
+}
+
+process_claim_json() {
+    local task_dir="$1"
+    local task_id="$2"
+    local claim_path="$task_dir/claim.json"
+    [ -f "$claim_path" ] || return 1
+
+    local claim_agent claim_time claim_reason current_status lock_file
+    claim_agent=$(json_pick "$claim_path" agent agent_id)
+    claim_time=$(json_pick "$claim_path" claimed_at timestamp)
+    claim_reason=$(json_pick "$claim_path" reason)
+    current_status=$(get_task_status "$task_dir")
+    [ "$current_status" = "pooled" ] || return 1
+    [ -n "$claim_agent" ] || { claim_reject "$task_dir" "" "claim.json 缺少 agent"; return 0; }
+
+    lock_file="$task_dir/.claim.lock"
+    exec 9>"$lock_file"
+    flock -n 9 || return 0
+
+    current_status=$(get_task_status "$task_dir")
+    if [ "$current_status" != "pooled" ]; then
+        flock -u 9
+        return 1
+    fi
+    if ! claim_agent_can_accept_task "$task_dir" "$claim_agent"; then
+        claim_reject "$task_dir" "$claim_agent" "不满足认领条件（依赖/并发/能力/write_scope 冲突）"
+        flock -u 9
+        return 0
+    fi
+
+    dispatch_task_to_agent "$task_dir" "$claim_agent" "watcher confirmed claim.json" "$claim_agent" "$claim_time" "$claim_reason"
+    emit_system_chat_event dispatch "$task_id" "任务已被 ${claim_agent} 认领并进入 dispatched。" "$claim_agent" info dispatch
+    notify_pm "[task-watcher] $task_id 已被 ${claim_agent} 认领，进入 dispatched。"
+    sync_task_board "$task_dir" "claim-confirmed"
+    log "$task_id: 已确认 ${claim_agent} 的 claim.json，进入 dispatched"
+    flock -u 9
+    return 0
+}
+
+nudge_pooled_task() {
+    local task_dir="$1"
+    local task_id="$2"
+    local status="$3"
+    [ "$status" = "pooled" ] || return 1
+    [ -f "$task_dir/claim.json" ] && return 1
+
+    local nudge_key="${task_id}_pooled_nudge"
+    local now last_nudge priority
+    now=$(date +%s)
+    last_nudge=$(cat "$STATE_DIR/$nudge_key" 2>/dev/null || echo 0)
+    if [ $(( now - last_nudge )) -lt "$(python3 -c "import json;print(json.load(open('$CONFIG_PATH', encoding='utf-8')).get('task_pool',{}).get('nudge_cooldown_seconds',900))" 2>/dev/null || echo 900)" ]; then
+        return 1
+    fi
+
+    local candidates=""
+    candidates=$(claim_scope_idle_candidates "$task_dir" || true)
+    [ -n "$candidates" ] || return 1
+    priority=$(task_json_pick "$task_dir" priority)
+    while IFS= read -r agent_id; do
+        [ -n "$agent_id" ] || continue
+        notify_agent "$agent_id" "任务池有可认领任务：${task_id}。请检查 ${task_dir}/instruction.md，确认依赖与 write_scope 后，如可执行请写 claim.json（可用 scripts/claim-task.sh）。"
+        emit_system_chat_event nudge "$task_id" "任务池有可认领任务，已提醒 ${agent_id} 检查并认领。" "$agent_id" "$([ "$priority" = "critical" ] && echo critical || echo info)" nudge
+    done <<< "$candidates"
+    echo "$now" > "$STATE_DIR/$nudge_key"
+    log "$task_id: 已提醒候选 agent 检查 pooled 任务"
     return 0
 }
 
@@ -926,10 +1177,21 @@ while true; do
         if [ "$current_status" = "pending" ]; then
             task_level=$(task_json_pick "$task_dir" task_level)
             assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
-            if ! auto_dispatch_pending_arch "$task_dir" "$task_id" "$assigned_agent" "$task_level"; then
-                auto_claim_pending_dev "$task_dir" "$task_id" "$assigned_agent" "$task_level" || true
+            claim_policy=$(task_json_pick "$task_dir" claim_policy)
+            if [ "$claim_policy" = "pull" ] || matches_auto_assign_marker "$assigned_agent"; then
+                :
+            else
+                auto_dispatch_pending_arch "$task_dir" "$task_id" "$assigned_agent" "$task_level" || true
             fi
             current_status=$(get_task_status "$task_dir")
+        fi
+
+        if [ "$current_status" = "pooled" ]; then
+            process_claim_json "$task_dir" "$task_id" || true
+            current_status=$(get_task_status "$task_dir")
+            if [ "$current_status" = "pooled" ]; then
+                nudge_pooled_task "$task_dir" "$task_id" "$current_status" || true
+            fi
         fi
 
         # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令

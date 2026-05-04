@@ -137,6 +137,29 @@ def normalize_task_type(raw: str, *, execution_mode: str, target_environment: st
     return None
 
 
+def derive_claim_scope(*, agents: dict, task_type: Optional[str], domain: str, task_level: str, execution_mode: str, target_environment: str, assigned_agent_is_auto: bool) -> list[str]:
+    if not assigned_agent_is_auto:
+        return []
+    if execution_mode != 'dev' or target_environment != 'dev':
+        return []
+    if task_level not in {'execution', 'review'}:
+        return []
+    candidates: list[str] = []
+    normalized_type = (task_type or '').strip().lower()
+    for agent_id, payload in (agents or {}).items():
+        role = str((payload or {}).get('role') or '').strip().lower()
+        if normalized_type in {'development', 'investigation'}:
+            if role == 'fullstack_dev' or agent_id.startswith('dev-'):
+                candidates.append(agent_id)
+        elif normalized_type == 'verification' or domain == 'quality':
+            if role == 'qa' or agent_id.startswith('qa-'):
+                candidates.append(agent_id)
+        elif normalized_type == 'design':
+            if role == 'architect' or agent_id == 'arch-1':
+                candidates.append(agent_id)
+    return dedupe(candidates)
+
+
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
         path.relative_to(other)
@@ -173,6 +196,8 @@ def find_scope_conflicts(tasks_root: Path, current_task_id: str, candidate_scope
         return conflicts
     for task_json in sorted(tasks_root.glob('*/task.json')):
         task_data = json.loads(task_json.read_text(encoding='utf-8'))
+        if str(task_data.get('project') or '') != project:
+            continue
         other_id = str(task_data.get('id') or task_json.parent.name)
         if other_id == current_task_id:
             continue
@@ -297,6 +322,15 @@ task_type = normalize_task_type(
 )
 if task_type == 'deployment':
     owner_approval_required = True
+claim_scope = derive_claim_scope(
+    agents=agents,
+    task_type=task_type,
+    domain=domain,
+    task_level=normalized_task_level,
+    execution_mode=execution_mode,
+    target_environment=target_environment,
+    assigned_agent_is_auto=assigned_agent_is_auto,
+)
 conflicts = find_scope_conflicts(Path(task_dir).parent, task_id, resolved_scope)
 if conflicts:
     message = 'write_scope conflicts detected with existing active tasks:\n- ' + '\n- '.join(conflicts)
@@ -354,7 +388,16 @@ obj = {
     'result_summary': None,
     'last_error': None,
     'created_at': created_at,
-    'updated_at': created_at
+    'updated_at': created_at,
+    'claim_policy': 'pull' if assigned_agent_is_auto else 'push',
+    'claim_scope': claim_scope,
+    'claim_max_concurrency': 1 if assigned_agent_is_auto else None,
+    'dependency_policy': 'done_only' if assigned_agent_is_auto else None,
+    'pool_timeout_minutes': cfg.get('task_pool', {}).get('pool_timeout_minutes', 120) if assigned_agent_is_auto else None,
+    'pool_entered_at': None,
+    'claimed_by': None,
+    'claimed_at': None,
+    'claim_reason': None,
 }
 Path(task_dir, 'task.json').write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 instruction_lines = [

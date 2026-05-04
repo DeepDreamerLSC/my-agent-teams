@@ -17,7 +17,7 @@ from .db import (
     utcnow_iso,
 )
 
-PENDING_BOARD_STATUSES = {'pending', 'dispatched'}
+PENDING_BOARD_STATUSES = {'pending', 'pooled', 'dispatched'}
 BLOCKED_STATUSES = {'blocked', 'failed', 'cancelled', 'timeout'}
 DONE_STATUSES = {'merged', 'archived'}
 APPROVE_KEYWORDS = ('通过', 'approve', 'approved')

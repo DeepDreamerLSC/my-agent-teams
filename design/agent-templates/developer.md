@@ -26,6 +26,23 @@
 4. 自查改动是否符合任务目标
 5. 写 `result.json`：状态、摘要、修改文件清单、必要产物
 
+### 任务池认领补充
+
+- 当前默认的开发执行任务优先走**任务池认领制**，不是 PM 逐条点名
+- 当你空闲且任务满足：
+  - 依赖已完成
+  - `claim_scope` 包含你
+  - 与你当前 active task 无 `write_scope` 冲突
+  时，你应主动认领
+- 推荐命令：
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "当前空闲，可承接该开发任务"
+```
+
+- 认领成功后，等待任务进入 `dispatched`，再按正常流程写 `ack.json`
+- **同一时间默认只应有 1 条 `working` 主线任务**；不要连续认领多条需要修改同一批文件的任务
+
 ## 角色边界
 
 - 你是全栈开发，可以写前端和后端代码

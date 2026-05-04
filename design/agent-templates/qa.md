@@ -26,6 +26,21 @@
 4. **同时写 `result.json` 和 `verify.json`**
 5. 将结论交回 PM 统一协调
 
+### 任务池认领补充
+
+- 验证类任务在新机制下也可进入任务池，但只有在前置依赖完成后才应认领
+- 认领前必须确认：
+  - `depends_on` 已满足
+  - 当前没有未完成的主线 QA 任务
+  - 该任务确实进入了可验证状态，而不是“开发仍在进行中”
+- 推荐命令：
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "前置开发已完成，开始验证"
+```
+
+- QA 不应同时启动多条需要等待前置开发结果的任务
+
 ## verify.json 规范（强制）
 
 ```json

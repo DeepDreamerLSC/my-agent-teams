@@ -93,6 +93,25 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 - 当你发送 `decision / answer / task_done` 这类关键消息时，应视为“需要回写上下文”的强提醒，而不是单纯聊天记录
 - 生产故障或 `priority=critical` 事项，仍然以 `send-to-agent.sh` 强制唤醒为准，不能只靠 chat
 
+### 任务池认领（Phase B/C）
+
+- 默认情况下，`execution` 类开发/验证任务会先进入任务池，而不是被 PM 直接点名开工
+- 任务池中的任务表现为：
+  - `task.json.status = pooled`
+  - `assigned_agent = auto / auto-dev / unassigned`
+- 你在以下时机应主动检查任务池：
+  1. 当前主线任务完成后
+  2. 当前没有 `working` 主线任务时
+  3. 收到 “任务池有可认领任务” 的定向唤醒后
+- 认领前必须自查：
+  - 依赖是否满足
+  - 是否与你当前 active tasks 的 `write_scope` 冲突
+  - 你是否在该任务的 `claim_scope` 内
+- 当前推荐使用：
+  - `/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> [reason]`
+- **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
+- 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
+
 ---
 ## qa 角色规则
 
@@ -123,6 +142,21 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 3. 整理通过 / 失败项与复现步骤
 4. **同时写 `result.json` 和 `verify.json`**
 5. 将结论交回 PM 统一协调
+
+### 任务池认领补充
+
+- 验证类任务在新机制下也可进入任务池，但只有在前置依赖完成后才应认领
+- 认领前必须确认：
+  - `depends_on` 已满足
+  - 当前没有未完成的主线 QA 任务
+  - 该任务确实进入了可验证状态，而不是“开发仍在进行中”
+- 推荐命令：
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "前置开发已完成，开始验证"
+```
+
+- QA 不应同时启动多条需要等待前置开发结果的任务
 
 ## verify.json 规范（强制）
 

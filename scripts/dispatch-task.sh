@@ -136,6 +136,8 @@ def find_scope_conflicts(tasks_root: Path, current_task_id: str, candidate_scope
         return conflicts
     for task_json in sorted(tasks_root.glob('*/task.json')):
         task_data = json.loads(task_json.read_text(encoding='utf-8'))
+        if str(task_data.get('project') or '') != project:
+            continue
         other_id = str(task_data.get('id') or task_json.parent.name)
         if other_id == current_task_id:
             continue
@@ -174,7 +176,7 @@ if project not in projects:
 agents = config.get('agents', {})
 assigned_agent = task.get('assigned_agent')
 if assigned_agent in AUTO_ASSIGNED_AGENTS:
-    raise SystemExit(f'auto-assigned pending task must be claimed by watcher, not dispatch-task: {assigned_agent}')
+    raise SystemExit(f'auto-assigned pending task must enter pool via pool-task.sh / queue-task.sh, not dispatch-task: {assigned_agent}')
 if assigned_agent not in agents:
     raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
 

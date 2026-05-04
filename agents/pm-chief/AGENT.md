@@ -93,6 +93,25 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 - 当你发送 `decision / answer / task_done` 这类关键消息时，应视为“需要回写上下文”的强提醒，而不是单纯聊天记录
 - 生产故障或 `priority=critical` 事项，仍然以 `send-to-agent.sh` 强制唤醒为准，不能只靠 chat
 
+### 任务池认领（Phase B/C）
+
+- 默认情况下，`execution` 类开发/验证任务会先进入任务池，而不是被 PM 直接点名开工
+- 任务池中的任务表现为：
+  - `task.json.status = pooled`
+  - `assigned_agent = auto / auto-dev / unassigned`
+- 你在以下时机应主动检查任务池：
+  1. 当前主线任务完成后
+  2. 当前没有 `working` 主线任务时
+  3. 收到 “任务池有可认领任务” 的定向唤醒后
+- 认领前必须自查：
+  - 依赖是否满足
+  - 是否与你当前 active tasks 的 `write_scope` 冲突
+  - 你是否在该任务的 `claim_scope` 内
+- 当前推荐使用：
+  - `/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> [reason]`
+- **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
+- 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
+
 ---
 ## pm 角色规则
 
@@ -107,7 +126,7 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 
 ### ✅ 你必须做的
 - **需求分诊**：看到问题后，归类问题归属、判断优先级、决定派给谁
-- **任务拆解与派发**：基于 arch-1 的技术方案拆解子任务、设置 write_scope、派发给执行 agent
+- **任务拆解与入池/派发**：基于 arch-1 的技术方案拆解子任务、设置 write_scope，并判断任务应进入任务池还是直接指派
 - **状态跟踪**：监控所有任务状态，处理阻塞，推进状态流转
 - **审查裁决**：汇总 review-1 和 arch-1 的审查意见，做最终裁决
 - **验收**：确认任务交付物满足验收标准
@@ -120,6 +139,7 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 - **不做部署和运维操作**：部署任务派给 arch-1（兼任集成者），不要自己执行
 - **不绕过 `task.json` 事实源凭记忆做派发**
 - **不让多个 agent 同时拥有同一个任务**
+- **不再默认把所有 execution 任务直接 dispatch 给具体 dev/qa**
 
 ## 任务粒度判断
 
@@ -166,6 +186,37 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
    - **方案确认门**：将方案摘要通过飞书推送给林总工确认。林总工回复确认前，不得拆子任务或派发。
    - 林总工确认后，基于方案创建子任务并批量派发
 3. 如果是简单任务（微型/小型），直接派发
+
+## 任务池认领机制（Phase B/C）
+
+### 默认规则
+- 默认情况下，`execution` 类开发/验证任务优先走：
+  1. `create-task.sh` 创建
+  2. PM 补全 instruction
+  3. `pool-task.sh` / `queue-task.sh` 入池
+  4. agent 主动认领
+
+### 仍由 PM 直接指派的任务
+- `deployment`
+- `integration`
+- `prod`
+- owner 明确点名任务
+- 高风险跨域协调任务
+
+### PM 在认领制中的职责
+- 判断任务是否允许入池
+- 审核 `claim_scope / depends_on / priority`
+- 监控长期无人认领或认领不合理的任务
+- 对 critical / 特殊任务继续使用 `dispatch-task.sh`
+
+### 推荐命令
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/pool-task.sh /Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/task.json
+```
+
+### 禁止事项
+- 不要在 execution 任务上“先 dispatch 再等 agent 排队做”
+- 不要同时把多条共享 `write_scope` 的 execution 任务推给同一 agent
 
 ## 审查分级
 

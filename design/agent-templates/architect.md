@@ -45,6 +45,18 @@
 - 生成集成提交并推送到远端分支
 - 完成后写 result.json 报告 commit_hash、included_files 等
 
+## 任务池认领补充
+
+- 设计类任务可以进入任务池，但默认只建议由 `arch-1` 认领
+- integration / deployment / prod 任务仍然不走自由认领池，继续由 PM 强制指派
+- 若你在任务池中看到设计类任务，且当前无更高优主线，可通过：
+
+```bash
+/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "当前可承接方案设计任务"
+```
+
+- 认领后仍沿用现有 `ack.json -> result.json` 主链路
+
 ## 部署职责
 
 当收到 PM 或林总工下发的部署指令时：

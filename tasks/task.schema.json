@@ -48,6 +48,7 @@
       "type": "string",
       "enum": [
         "pending",
+        "pooled",
         "dispatched",
         "working",
         "ready_for_merge",
@@ -194,6 +195,106 @@
     "assigned_agent": {
       "type": "string",
       "minLength": 1
+    },
+    "claim_policy": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "push",
+            "pull"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claim_scope": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "claim_max_concurrency": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dependency_policy": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "done_only",
+            "ready_for_merge_ok"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pool_timeout_minutes": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pool_entered_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claimed_by": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claimed_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "claim_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "review_required": {
       "type": "boolean"
