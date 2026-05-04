@@ -14,6 +14,7 @@ from .db import (
     upsert_communication_event,
     upsert_event,
     upsert_task,
+    upsert_task_stage_duration,
     utcnow_iso,
 )
 
@@ -407,6 +408,39 @@ def _build_task_record(
     }
 
 
+
+
+def _parse_datetime(value: Any) -> datetime | None:
+    normalized = _normalize_time(value)
+    if not normalized:
+        return None
+    try:
+        return datetime.fromisoformat(normalized.replace('Z', '+00:00'))
+    except ValueError:
+        return None
+
+
+def _seconds_between(start: Any, end: Any) -> float | None:
+    start_dt = _parse_datetime(start)
+    end_dt = _parse_datetime(end)
+    if start_dt is None or end_dt is None:
+        return None
+    return max((end_dt - start_dt).total_seconds(), 0.0)
+
+
+def _build_task_stage_duration_record(task_record: dict[str, Any]) -> dict[str, Any]:
+    return {
+        'task_id': task_record['task_id'],
+        'create_to_dispatch_seconds': _seconds_between(task_record.get('created_at'), task_record.get('dispatched_at')),
+        'dispatch_to_ack_seconds': _seconds_between(task_record.get('dispatched_at'), task_record.get('ack_at')),
+        'ack_to_result_seconds': _seconds_between(task_record.get('ack_at'), task_record.get('completed_at')),
+        'result_to_review_seconds': _seconds_between(task_record.get('completed_at'), task_record.get('review_completed_at')),
+        'review_to_verify_seconds': _seconds_between(task_record.get('review_completed_at'), task_record.get('verify_completed_at')),
+        'verify_to_close_seconds': _seconds_between(task_record.get('verify_completed_at'), task_record.get('current_status_at')),
+        'total_cycle_seconds': _seconds_between(task_record.get('created_at'), task_record.get('current_status_at')),
+        'updated_at': utcnow_iso(),
+    }
+
 def sync_task_dir(
     task_dir: str | Path,
     *,
@@ -437,6 +471,7 @@ def sync_task_dir(
         verify=verify,
         source=source,
     )
+    stage_duration_record = _build_task_stage_duration_record(task_record)
     events = _build_events(
         task_id=task_id,
         task_dir=task_dir_path,
@@ -455,6 +490,7 @@ def sync_task_dir(
     assert conn is not None
     with conn:
         upsert_task(conn, task_record)
+        upsert_task_stage_duration(conn, stage_duration_record)
         for event in events:
             upsert_event(conn, event)
 
@@ -467,6 +503,7 @@ def sync_task_dir(
         'event_count': len(events),
         'current_status': task_record['current_status'],
         'board_status': task_record['board_status'],
+        'stage_duration_persisted': True,
     }
 
 
@@ -488,6 +525,7 @@ def backfill_tasks(
         'tasks_root': str(Path(tasks_root).expanduser().resolve()),
         'db_path': str(resolve_db_path(db_path)),
         'task_count': len(task_dirs),
+        'stage_duration_rows': len(task_dirs),
         'synced_tasks': summaries,
     }
 

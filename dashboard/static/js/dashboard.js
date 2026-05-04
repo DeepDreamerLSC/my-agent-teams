@@ -5,7 +5,7 @@ const BOARD_LABELS = {
   pending: '待开始', working: '执行中', ready_for_merge: '待合入', blocked: '阻塞', done: '已完成',
 }
 const CURRENT_STATUS_LABELS = {
-  pending: '待派发', dispatched: '已派发', working: '执行中', ready_for_merge: '待合入',
+  pending: '待派发', pooled: '待认领', dispatched: '已派发', working: '执行中', ready_for_merge: '待合入',
   blocked: '阻塞', done: '已完成', failed: '失败', timeout: '超时', cancelled: '已取消',
   merged: '已合入', archived: '已归档',
 }
@@ -32,8 +32,15 @@ const detailCloseBtn = document.getElementById('detail-close')
 const detailTitle = document.getElementById('detail-title')
 const detailSubtitle = document.getElementById('detail-subtitle')
 const detailBody = document.getElementById('detail-body')
+const filterProject = document.getElementById('filter-project')
+const filterDomain = document.getElementById('filter-domain')
+const filterAgent = document.getElementById('filter-agent')
+const filterOwnerPm = document.getElementById('filter-owner-pm')
+const filterReviewLevel = document.getElementById('filter-review-level')
+const filterReset = document.getElementById('filter-reset')
 
 let currentDetailTaskId = null
+let latestBoardPayload = null
 
 // --- Tab switching ---
 document.querySelectorAll('.tab').forEach(btn => {
@@ -76,22 +83,57 @@ async function fetchTaskDetail(taskId) {
   return fetchJson(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/detail`)
 }
 
+function getActiveFilters() {
+  return {
+    project: filterProject?.value || '',
+    domain: filterDomain?.value || '',
+    assigned_agent: filterAgent?.value || '',
+    owner_pm: filterOwnerPm?.value || '',
+    review_level: filterReviewLevel?.value || '',
+  }
+}
+
+function populateFilterSelect(selectEl, values, placeholder) {
+  if (!selectEl) return
+  const current = selectEl.value
+  selectEl.innerHTML = `<option value="">${placeholder}</option>` + values.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join('')
+  if (values.includes(current)) {
+    selectEl.value = current
+  }
+}
+
+function renderKanbanFilters(tasks) {
+  populateFilterSelect(filterProject, buildFilterOptions(tasks, 'project'), '全部项目')
+  populateFilterSelect(filterDomain, buildFilterOptions(tasks, 'domain'), '全部领域')
+  populateFilterSelect(filterAgent, buildFilterOptions(tasks, 'assigned_agent'), '全部负责人')
+  populateFilterSelect(filterOwnerPm, buildFilterOptions(tasks, 'owner_pm'), '全部 Owner PM')
+  populateFilterSelect(filterReviewLevel, buildFilterOptions(tasks, 'review_level'), '全部审查级别')
+}
+
 // --- Kanban View ---
 function renderKanban(boardPayload) {
+  latestBoardPayload = boardPayload
   const board = document.getElementById('kanban-board')
   board.innerHTML = ''
 
   const grouped = {}
   BOARD_COLUMNS.forEach(s => { grouped[s] = [] })
+  const allTasks = []
 
   if (boardPayload && boardPayload.columns) {
     boardPayload.columns.forEach(col => {
       if (col.tasks && BOARD_COLUMNS.includes(col.key)) {
         grouped[col.key] = col.tasks
+        allTasks.push(...col.tasks)
       }
     })
   }
 
+  renderKanbanFilters(allTasks)
+  const filters = getActiveFilters()
+  BOARD_COLUMNS.forEach(status => {
+    grouped[status] = applyTaskFilters(grouped[status], filters)
+  })
   const totalTasks = BOARD_COLUMNS.reduce((sum, s) => sum + grouped[s].length, 0)
 
   BOARD_COLUMNS.forEach(status => {
@@ -111,6 +153,9 @@ function renderKanban(boardPayload) {
       const showBadge = currentStatus !== status
       const badge = showBadge ? `<span class="card-badge badge-${currentStatus}">${CURRENT_STATUS_LABELS[currentStatus] || currentStatus}</span>` : ''
       const commCount = Number(task.communication_count || 0)
+      const statusHours = hoursBetween(task.current_status_at || task.created_at, new Date().toISOString())
+      const priorityTag = task.priority ? `<span class="card-priority priority-${esc(String(task.priority).toLowerCase())}">${esc(task.priority)}</span>` : ''
+      const envTag = task.target_environment ? `<span class="card-env">${esc(task.target_environment)}</span>` : ''
 
       const card = document.createElement('button')
       card.type = 'button'
@@ -118,15 +163,18 @@ function renderKanban(boardPayload) {
       card.innerHTML = `
         <div class="card-title">${esc(task.title)}</div>
         ${badge}
+        <div class="card-chain">Owner PM: ${esc(task.owner_pm || '-')} · Reviewer: ${esc(task.reviewer || '-')} · Integration: ${esc(task.integration_owner || '-')}</div>
         <div class="card-meta">
           ${task.project || ''} · ${formatTime(task.created_at)}
         </div>
         <div class="card-meta">
-          沟通记录：${commCount}
+          沟通记录：${commCount} · 当前状态停留：${formatDurationHours(statusHours)}
         </div>
         <div class="card-tags">
           <span class="card-agent">${esc(task.assigned_agent)}</span>
           <span class="card-domain">${esc(task.domain)}</span>
+          ${priorityTag}
+          ${envTag}
         </div>
       `
       card.addEventListener('click', () => openTaskDetail(task.task_id))
@@ -381,6 +429,23 @@ function detailItem(label, value) {
       <div class="detail-value">${esc(value == null || value === '' ? '-' : String(value))}</div>
     </div>
   `
+}
+
+;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel].forEach(selectEl => {
+  if (selectEl) {
+    selectEl.addEventListener('change', () => {
+      if (latestBoardPayload) renderKanban(latestBoardPayload)
+    })
+  }
+})
+
+if (filterReset) {
+  filterReset.addEventListener('click', () => {
+    ;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel].forEach(selectEl => {
+      if (selectEl) selectEl.value = ''
+    })
+    if (latestBoardPayload) renderKanban(latestBoardPayload)
+  })
 }
 
 // --- Helpers ---

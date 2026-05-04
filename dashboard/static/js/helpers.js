@@ -13,6 +13,7 @@ const BOARD_LABELS = {
 // Badge labels for current_status (raw task.json status)
 const CURRENT_STATUS_LABELS = {
   pending: '待派发',
+  pooled: '待认领',
   dispatched: '已派发',
   working: '执行中',
   ready_for_merge: '待合入',
@@ -38,6 +39,7 @@ const GANTT_PHASES = [
 // Map raw current_status to board_status (5 columns)
 const STATUS_TO_BOARD = {
   pending: 'pending',
+  pooled: 'pending',
   dispatched: 'pending',
   working: 'working',
   ready_for_merge: 'ready_for_merge',
@@ -107,11 +109,44 @@ function transformAgentPayload(payload) {
   }))
 }
 
+function hoursBetween(startIso, endIso) {
+  if (!startIso || !endIso) return null
+  const start = new Date(startIso)
+  const end = new Date(endIso)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+  return Math.max((end.getTime() - start.getTime()) / 3600000, 0)
+}
+
+function formatDurationHours(value) {
+  if (value == null || Number.isNaN(value)) return '-'
+  if (value < 24) return `${value.toFixed(1)}h`
+  const days = value / 24
+  return `${days.toFixed(1)}d`
+}
+
+function buildFilterOptions(tasks, key) {
+  const values = [...new Set((tasks || []).map(task => String(task?.[key] || '').trim()).filter(Boolean))]
+  values.sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  return values
+}
+
+function applyTaskFilters(tasks, filters) {
+  return (tasks || []).filter(task => {
+    if (filters.project && task.project !== filters.project) return false
+    if (filters.domain && task.domain !== filters.domain) return false
+    if (filters.assigned_agent && task.assigned_agent !== filters.assigned_agent) return false
+    if (filters.owner_pm && task.owner_pm !== filters.owner_pm) return false
+    if (filters.review_level && task.review_level !== filters.review_level) return false
+    return true
+  })
+}
+
 // Export for Node.js test environment
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     esc, formatTime, groupByBoardStatus, truncateTitle, mapToBoardStatus,
     transformBoardPayload, transformAgentPayload,
+    hoursBetween, formatDurationHours, buildFilterOptions, applyTaskFilters,
     BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, STATUS_TO_BOARD,
     GANTT_PHASES,
   }

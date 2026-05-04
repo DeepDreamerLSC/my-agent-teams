@@ -471,6 +471,17 @@ print(count)
 PY
 }
 
+priority_rank() {
+    local value="${1:-}"
+    case "$value" in
+        critical) echo 4 ;;
+        high) echo 3 ;;
+        medium) echo 2 ;;
+        low) echo 1 ;;
+        *) echo 0 ;;
+    esac
+}
+
 task_claim_max_concurrency() {
     local task_dir="$1"
     python3 - "$task_dir/task.json" "$CONFIG_PATH" <<'PY'
@@ -599,6 +610,80 @@ claim_scope_idle_candidates() {
             echo "$agent_id"
         fi
     done <<< "$(task_claim_scope "$task_dir")"
+}
+
+list_pooled_candidates_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+priority_rank = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1}
+rows = []
+for task_path in tasks_root.glob('*/task.json'):
+    try:
+        task = json.loads(task_path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    if str(task.get('status') or '') != 'pooled':
+        continue
+    scope = [str(item).strip() for item in (task.get('claim_scope') or []) if str(item).strip()]
+    if scope and agent_id not in scope:
+        continue
+    pool_entered_at = str(task.get('pool_entered_at') or task.get('created_at') or '')
+    rows.append({
+        'task_id': str(task.get('id') or task_path.parent.name),
+        'priority_rank': priority_rank.get(str(task.get('priority') or '').strip().lower(), 0),
+        'pool_entered_at': pool_entered_at,
+    })
+
+def sort_key(item):
+    try:
+        ts = datetime.fromisoformat(item['pool_entered_at'].replace('Z', '+00:00'))
+    except Exception:
+        ts = datetime.max
+    return (-item['priority_rank'], ts, item['task_id'])
+
+for item in sorted(rows, key=sort_key):
+    print(item['task_id'])
+PY
+}
+
+auto_push_next_task_for_agent() {
+    local agent_id="$1"
+    local trigger_task_id="${2:-}"
+    [ -n "$agent_id" ] || return 1
+
+    local active_count
+    active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    [ "${active_count:-0}" -eq 0 ] || return 1
+
+    local next_task=""
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        local candidate_dir="$TASKS_ROOT/$candidate"
+        [ -f "$candidate_dir/task.json" ] || continue
+        if claim_agent_can_accept_task "$candidate_dir" "$agent_id"; then
+            next_task="$candidate"
+            break
+        fi
+    done <<< "$(list_pooled_candidates_for_agent "$agent_id")"
+
+    [ -n "$next_task" ] || return 1
+
+    local reason="watcher auto-continued after ${trigger_task_id:-previous task completion}"
+    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" /Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh "$next_task" "$reason" >/dev/null 2>&1; then
+        notify_agent "$agent_id" "你当前主线已完成/进入待审。下一条可执行任务已自动续推：${next_task}。请读取 ${TASKS_ROOT}/${next_task}/instruction.md，并在确认后写 ack.json 开始执行。"
+        emit_system_chat_event nudge "$next_task" "上一条主线完成后，已自动续推给 ${agent_id} 作为下一条可执行任务。" "$agent_id" info nudge
+        log "${next_task}: 已在 ${trigger_task_id:-unknown} 完成后自动续推给 ${agent_id}"
+        return 0
+    fi
+
+    return 1
 }
 
 is_idle_agent() {
@@ -1164,6 +1249,10 @@ while true; do
         # 已关闭任务不再触发自动流转，但仍需在文件变更后同步到任务看板 SQLite
         case "$current_status" in
             done|cancelled|archived)
+                if [ "$current_status" = "done" ]; then
+                    assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
+                    auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                fi
                 sync_if_changed "$task_dir" "$task_dir/task.json" "taskjson"
                 sync_if_changed "$task_dir" "$task_dir/transitions.jsonl" "transitions"
                 sync_if_changed "$task_dir" "$task_dir/result.json" "result"
@@ -1265,6 +1354,7 @@ while true; do
                     elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
                         auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                         log "$task_id: 已自动通知 reviewer，review_level=$review_level"
+                        auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                     else
                         notify_pm "[task-watcher] $task_id 已完成，请查看 result.json 并决定下游动作。"
                         emit_system_chat_event watcher "$task_id" "任务已完成，等待 PM 验收与下游推进。" "$PM_SESSION" info notify
