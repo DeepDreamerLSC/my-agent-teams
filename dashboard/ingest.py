@@ -172,6 +172,43 @@ def _bool_value(mapping: dict[str, Any] | None, *keys: str) -> int | None:
     return None
 
 
+def _derive_merge_gate_state(
+    *,
+    task: dict[str, Any],
+    current_status: str,
+    review_state: str | None,
+    verify_ok: int | None,
+) -> str | None:
+    explicit = _get_first(task, 'merge_gate_state')
+    review_required = bool(task.get('review_required'))
+    test_required = bool(task.get('test_required'))
+
+    if current_status == 'done':
+        return 'closed'
+    if current_status in {'cancelled', 'failed', 'timeout', 'archived'}:
+        return explicit or current_status
+    if current_status == 'blocked':
+        if verify_ok == 0:
+            return 'qa_failed'
+        if review_state == 'changes_requested':
+            return 'review_rejected'
+        return explicit or 'blocked'
+    if current_status != 'ready_for_merge':
+        return explicit
+
+    if verify_ok == 0:
+        return 'qa_failed'
+    if review_state == 'changes_requested':
+        return 'review_rejected'
+    if test_required and (not review_required or review_state == 'approved'):
+        return 'qa_pending'
+    if review_required and review_state != 'approved':
+        return 'review_pending'
+    if not test_required and (not review_required or review_state == 'approved'):
+        return 'pm_acceptance_pending'
+    return explicit
+
+
 def _first_transition_at(transitions: list[dict[str, Any]], *, to_status: str) -> str | None:
     for transition in transitions:
         if transition.get('to') == to_status:
@@ -361,6 +398,8 @@ def _build_task_record(
         _file_mtime(task_dir / 'verify.json') if verify is not None else None,
     )
     current_status = str(task.get('status') or 'pending')
+    review_state = _review_state(review_text)
+    verify_ok = _bool_value(verify, 'ok', 'pass')
     current_status_at = _coalesce(
         _last_transition_at(transitions, to_status=current_status),
         _normalize_time(task.get('updated_at')),
@@ -379,12 +418,26 @@ def _build_task_record(
         'assigned_agent': task.get('assigned_agent'),
         'reviewer': task.get('reviewer'),
         'owner_pm': task.get('owner_pm'),
+        'integration_owner': task.get('integration_owner'),
         'parent_task_id': task.get('parent_task_id'),
         'root_request_id': task.get('root_request_id'),
         'review_required': int(bool(task.get('review_required'))),
         'test_required': int(bool(task.get('test_required'))),
+        'target_environment': task.get('target_environment'),
+        'priority': task.get('priority'),
+        'review_level': task.get('review_level'),
         'current_status': current_status,
         'board_status': map_board_status(current_status),
+        'merge_gate_state': _derive_merge_gate_state(
+            task=task,
+            current_status=current_status,
+            review_state=review_state,
+            verify_ok=verify_ok,
+        ),
+        'rework_reason': task.get('rework_reason'),
+        'last_gate_actor': task.get('last_gate_actor'),
+        'last_gate_decision_at': _normalize_time(task.get('last_gate_decision_at')),
+        'auto_close_policy': task.get('auto_close_policy'),
         'created_at': created_at,
         'dispatched_at': dispatched_at,
         'ack_at': ack_at,
@@ -397,8 +450,8 @@ def _build_task_record(
         'lease_acquired_at': _normalize_time(task.get('lease_acquired_at')),
         'updated_at': _normalize_time(task.get('updated_at')),
         'summary': _coalesce(_get_first(result, 'summary'), task.get('result_summary')),
-        'review_state': _review_state(review_text),
-        'verify_ok': _bool_value(verify, 'ok', 'pass'),
+        'review_state': review_state,
+        'verify_ok': verify_ok,
         'task_dir': str(task_dir),
         'task_json_path': str(task_dir / 'task.json'),
         'write_scope_json': _json_dumps(task.get('write_scope') or []),

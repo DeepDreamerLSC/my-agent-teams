@@ -9,6 +9,15 @@ const CURRENT_STATUS_LABELS = {
   blocked: '阻塞', done: '已完成', failed: '失败', timeout: '超时', cancelled: '已取消',
   merged: '已合入', archived: '已归档',
 }
+const MERGE_GATE_LABELS = {
+  review_pending: '待审查',
+  review_rejected: '审查驳回',
+  qa_pending: '待QA',
+  qa_failed: 'QA未通过',
+  pm_acceptance_pending: '待PM收口',
+  closed: '已收口',
+  blocked: '阻塞',
+}
 const EVENT_TYPE_LABELS = {
   created: '创建',
   status_transition: '状态流转',
@@ -26,32 +35,36 @@ const EVENT_TYPE_LABELS = {
   nudge: '强制唤醒',
 }
 
-const detailDrawer = document.getElementById('task-detail-drawer')
-const detailBackdrop = document.getElementById('task-detail-backdrop')
-const detailCloseBtn = document.getElementById('detail-close')
-const detailTitle = document.getElementById('detail-title')
-const detailSubtitle = document.getElementById('detail-subtitle')
-const detailBody = document.getElementById('detail-body')
-const filterProject = document.getElementById('filter-project')
-const filterDomain = document.getElementById('filter-domain')
-const filterAgent = document.getElementById('filter-agent')
-const filterOwnerPm = document.getElementById('filter-owner-pm')
-const filterReviewLevel = document.getElementById('filter-review-level')
-const filterReset = document.getElementById('filter-reset')
+const docRef = typeof document !== 'undefined' ? document : null
+const detailDrawer = docRef ? docRef.getElementById('task-detail-drawer') : null
+const detailBackdrop = docRef ? docRef.getElementById('task-detail-backdrop') : null
+const detailCloseBtn = docRef ? docRef.getElementById('detail-close') : null
+const detailTitle = docRef ? docRef.getElementById('detail-title') : null
+const detailSubtitle = docRef ? docRef.getElementById('detail-subtitle') : null
+const detailBody = docRef ? docRef.getElementById('detail-body') : null
+const filterProject = docRef ? docRef.getElementById('filter-project') : null
+const filterDomain = docRef ? docRef.getElementById('filter-domain') : null
+const filterAgent = docRef ? docRef.getElementById('filter-agent') : null
+const filterOwnerPm = docRef ? docRef.getElementById('filter-owner-pm') : null
+const filterReviewLevel = docRef ? docRef.getElementById('filter-review-level') : null
+const filterMergeGate = docRef ? docRef.getElementById('filter-merge-gate') : null
+const filterReset = docRef ? docRef.getElementById('filter-reset') : null
 
 let currentDetailTaskId = null
 let latestBoardPayload = null
 
 // --- Tab switching ---
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
-    btn.classList.add('active')
-    document.getElementById(btn.dataset.tab).classList.add('active')
-    window.dispatchEvent(new Event('resize'))
+if (docRef) {
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
+      btn.classList.add('active')
+      document.getElementById(btn.dataset.tab).classList.add('active')
+      window.dispatchEvent(new Event('resize'))
+    })
   })
-})
+}
 
 if (detailCloseBtn) detailCloseBtn.addEventListener('click', closeTaskDetail)
 if (detailBackdrop) detailBackdrop.addEventListener('click', closeTaskDetail)
@@ -90,6 +103,7 @@ function getActiveFilters() {
     assigned_agent: filterAgent?.value || '',
     owner_pm: filterOwnerPm?.value || '',
     review_level: filterReviewLevel?.value || '',
+    merge_gate_state: filterMergeGate?.value || '',
   }
 }
 
@@ -108,6 +122,12 @@ function renderKanbanFilters(tasks) {
   populateFilterSelect(filterAgent, buildFilterOptions(tasks, 'assigned_agent'), '全部负责人')
   populateFilterSelect(filterOwnerPm, buildFilterOptions(tasks, 'owner_pm'), '全部 Owner PM')
   populateFilterSelect(filterReviewLevel, buildFilterOptions(tasks, 'review_level'), '全部审查级别')
+  if (filterMergeGate) {
+    const current = filterMergeGate.value
+    const values = buildFilterOptions(tasks, 'merge_gate_state')
+    filterMergeGate.innerHTML = `<option value="">全部收口阶段</option>` + values.map(value => `<option value="${esc(value)}">${esc(MERGE_GATE_LABELS[value] || value)}</option>`).join('')
+    if (values.includes(current)) filterMergeGate.value = current
+  }
 }
 
 // --- Kanban View ---
@@ -156,6 +176,7 @@ function renderKanban(boardPayload) {
       const statusHours = hoursBetween(task.current_status_at || task.created_at, new Date().toISOString())
       const priorityTag = task.priority ? `<span class="card-priority priority-${esc(String(task.priority).toLowerCase())}">${esc(task.priority)}</span>` : ''
       const envTag = task.target_environment ? `<span class="card-env">${esc(task.target_environment)}</span>` : ''
+      const gateTag = task.merge_gate_state ? `<span class="card-gate gate-${esc(String(task.merge_gate_state).toLowerCase())}">${esc(MERGE_GATE_LABELS[task.merge_gate_state] || task.merge_gate_state)}</span>` : ''
 
       const card = document.createElement('button')
       card.type = 'button'
@@ -173,6 +194,7 @@ function renderKanban(boardPayload) {
         <div class="card-tags">
           <span class="card-agent">${esc(task.assigned_agent)}</span>
           <span class="card-domain">${esc(task.domain)}</span>
+          ${gateTag}
           ${priorityTag}
           ${envTag}
         </div>
@@ -348,16 +370,25 @@ function renderTaskDetail(payload) {
 
   detailTitle.textContent = task.title || task.task_id || '任务详情'
   detailSubtitle.textContent = `${task.task_id || ''} · ${task.project || '-'} · ${task.domain || '-'}`
-  detailBody.innerHTML = `
+  detailBody.innerHTML = renderTaskDetailHtml({ task, durations, statusTimeline, communicationTimeline })
+}
+
+function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], communicationTimeline = [] }) {
+  return `
     <section class="detail-section">
       <h3>基本信息</h3>
       <div class="detail-grid">
         ${detailItem('任务ID', task.task_id)}
         ${detailItem('当前状态', task.current_status)}
         ${detailItem('看板列', task.board_status)}
+        ${detailItem('收口阶段', MERGE_GATE_LABELS[task.merge_gate_state] || task.merge_gate_state)}
         ${detailItem('负责人', task.assigned_agent)}
         ${detailItem('Owner PM', task.owner_pm)}
         ${detailItem('Reviewer', task.reviewer)}
+        ${detailItem('Integration Owner', task.integration_owner)}
+        ${detailItem('目标环境', task.target_environment)}
+        ${detailItem('审查级别', task.review_level)}
+        ${detailItem('返工原因', task.rework_reason)}
         ${detailItem('创建时间', formatTime(task.created_at))}
         ${detailItem('最近状态时间', formatTime(task.current_status_at))}
         ${detailItem('沟通记录数', task.communication_count ?? 0)}
@@ -380,21 +411,34 @@ function renderTaskDetail(payload) {
 
     <section class="detail-section">
       <h3>状态流转时间线</h3>
-      ${renderTimeline(statusTimeline, 'status')}
+      ${renderTimelineHtml(statusTimeline, 'status')}
     </section>
 
     <section class="detail-section">
       <h3>沟通时间线</h3>
-      ${renderTimeline(communicationTimeline, 'communication')}
+      ${renderTimelineHtml(communicationTimeline, 'communication')}
     </section>
   `
 }
 
 function renderTimeline(items, mode) {
+  return renderTimelineHtml(items, mode)
+}
+
+function sortTimelineItems(items) {
+  return [...(items || [])].sort((a, b) => {
+    const aTs = new Date(a?.happened_at || a?.observed_at || 0).getTime()
+    const bTs = new Date(b?.happened_at || b?.observed_at || 0).getTime()
+    if (aTs !== bTs) return aTs - bTs
+    return String(a?.event_id || a?.event_type || '').localeCompare(String(b?.event_id || b?.event_type || ''), 'zh-CN')
+  })
+}
+
+function renderTimelineHtml(items, mode) {
   if (!items || !items.length) {
     return '<div class="empty-state small">暂无记录</div>'
   }
-  const lines = items.map(item => {
+  const lines = sortTimelineItems(items).map(item => {
     const when = formatTime(item.happened_at || item.observed_at)
     if (mode === 'status') {
       return `
@@ -431,7 +475,7 @@ function detailItem(label, value) {
   `
 }
 
-;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel].forEach(selectEl => {
+;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel, filterMergeGate].forEach(selectEl => {
   if (selectEl) {
     selectEl.addEventListener('change', () => {
       if (latestBoardPayload) renderKanban(latestBoardPayload)
@@ -441,7 +485,7 @@ function detailItem(label, value) {
 
 if (filterReset) {
   filterReset.addEventListener('click', () => {
-    ;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel].forEach(selectEl => {
+    ;[filterProject, filterDomain, filterAgent, filterOwnerPm, filterReviewLevel, filterMergeGate].forEach(selectEl => {
       if (selectEl) selectEl.value = ''
     })
     if (latestBoardPayload) renderKanban(latestBoardPayload)
@@ -451,6 +495,9 @@ if (filterReset) {
 // --- Helpers ---
 function esc(s) {
   if (!s) return ''
+  if (!docRef) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  }
   const d = document.createElement('div')
   d.textContent = s
   return d.innerHTML
@@ -483,4 +530,16 @@ async function init() {
   renderAgentStats(agentsPayload)
 }
 
-init()
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  init()
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    sortTimelineItems,
+    renderTimelineHtml,
+    renderTaskDetailHtml,
+    detailItem,
+    formatHours,
+  }
+}

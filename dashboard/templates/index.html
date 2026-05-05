@@ -25,6 +25,15 @@
   <main>
     <!-- Kanban View -->
     <section id="kanban" class="view active">
+      <div class="filters-bar" id="kanban-filters">
+        <select id="filter-project"><option value="">全部项目</option></select>
+        <select id="filter-domain"><option value="">全部领域</option></select>
+        <select id="filter-agent"><option value="">全部负责人</option></select>
+        <select id="filter-owner-pm"><option value="">全部 Owner PM</option></select>
+        <select id="filter-review-level"><option value="">全部审查级别</option></select>
+        <select id="filter-merge-gate"><option value="">全部收口阶段</option></select>
+        <button id="filter-reset" type="button" class="filter-reset">重置筛选</button>
+      </div>
       <div class="kanban-board" id="kanban-board"></div>
     </section>
 
@@ -38,6 +47,7 @@
       <div id="agent-tasks-chart" class="chart-container half"></div>
       <div id="agent-load-chart" class="chart-container half"></div>
     </section>
+
   </main>
 
   <div id="task-detail-backdrop" class="detail-backdrop hidden"></div>
@@ -54,6 +64,7 @@
     </div>
   </aside>
 
+  <script src="/static/js/helpers.js"></script>
   <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

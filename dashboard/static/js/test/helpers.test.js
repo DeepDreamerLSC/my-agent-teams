@@ -1,6 +1,7 @@
 const {
   esc, formatTime, groupByBoardStatus, truncateTitle, mapToBoardStatus,
   transformBoardPayload, transformAgentPayload,
+  buildFilterOptions, applyTaskFilters,
   BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, STATUS_TO_BOARD,
   GANTT_PHASES,
 } = require('../helpers')
@@ -141,6 +142,16 @@ function runTests() {
   test('transformAgentPayload handles null payload', () => {
     const result = transformAgentPayload(null)
     assertEqual(result.length, 0, 'empty on null')
+  })
+
+  test('applyTaskFilters supports merge_gate_state filter', () => {
+    const tasks = [
+      { title: 'A', merge_gate_state: 'review_pending', owner_pm: 'pm-chief' },
+      { title: 'B', merge_gate_state: 'qa_pending', owner_pm: 'pm-chief' },
+    ]
+    const result = applyTaskFilters(tasks, { merge_gate_state: 'qa_pending' })
+    assertEqual(result.length, 1, 'one task after gate filter')
+    assertEqual(result[0].title, 'B', 'qa pending task kept')
   })
 
   // --- truncateTitle ---

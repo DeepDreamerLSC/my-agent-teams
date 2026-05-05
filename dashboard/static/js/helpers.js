@@ -137,6 +137,7 @@ function applyTaskFilters(tasks, filters) {
     if (filters.assigned_agent && task.assigned_agent !== filters.assigned_agent) return false
     if (filters.owner_pm && task.owner_pm !== filters.owner_pm) return false
     if (filters.review_level && task.review_level !== filters.review_level) return false
+    if (filters.merge_gate_state && task.merge_gate_state !== filters.merge_gate_state) return false
     return true
   })
 }

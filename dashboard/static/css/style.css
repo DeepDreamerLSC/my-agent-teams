@@ -21,6 +21,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .view { display: none; padding: 20px 24px; }
 .view.active { display: block; }
 
+.filters-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  background: #fff; border-radius: 8px; padding: 12px;
+}
+.filters-bar select, .filter-reset {
+  min-width: 140px; padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; background: #fff;
+}
+.filter-reset { cursor: pointer; }
+
 /* Kanban */
 .kanban-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; min-height: 400px; }
 .kanban-col { background: #fafafa; border-radius: 8px; padding: 12px; min-height: 300px; }
@@ -41,6 +50,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .kanban-card.priority-high { border-left-color: #ff4d4f; }
 .kanban-card.priority-urgent { border-left-color: #cf1322; background: #fff1f0; }
 .kanban-card .card-title { font-weight: 500; margin-bottom: 6px; color: #222; }
+.kanban-card .card-chain { color: #555; font-size: 11px; line-height: 1.5; margin-bottom: 6px; }
 .kanban-card .card-meta { color: #888; font-size: 12px; line-height: 1.6; }
 .kanban-card .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .kanban-card .card-agent {
@@ -51,6 +61,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   display: inline-block; background: #f6ffed; color: #52c41a; border-radius: 4px;
   padding: 1px 6px; font-size: 11px;
 }
+.kanban-card .card-priority,
+.kanban-card .card-env,
+.kanban-card .card-gate {
+  display: inline-block; border-radius: 4px; padding: 1px 6px; font-size: 11px;
+}
+.kanban-card .card-env { background: #f5f5f5; color: #595959; }
+.kanban-card .card-gate { background: #f0f5ff; color: #1d39c4; }
+.gate-review_rejected, .gate-qa_failed { background: #fff1f0 !important; color: #cf1322 !important; }
+.gate-review_pending, .gate-qa_pending { background: #fff7e6 !important; color: #d46b08 !important; }
+.gate-pm_acceptance_pending { background: #e6f4ff !important; color: #0958d9 !important; }
+.priority-high { background: #fff1f0; color: #cf1322; }
+.priority-medium { background: #fff7e6; color: #d46b08; }
+.priority-low { background: #f6ffed; color: #389e0d; }
+.priority-critical, .priority-urgent { background: #fff1f0; color: #a8071a; }
 
 /* Status badge for current_status != board_status */
 .card-badge {
