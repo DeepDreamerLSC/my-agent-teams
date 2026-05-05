@@ -322,6 +322,7 @@ task_type = normalize_task_type(
 )
 if task_type == 'deployment':
     owner_approval_required = True
+auto_close_policy = 'review_pass_only' if (read_only or task_type == 'design') and not test_required else 'manual_after_review'
 claim_scope = derive_claim_scope(
     agents=agents,
     task_type=task_type,
@@ -365,6 +366,7 @@ obj = {
     'owner_approval_required': owner_approval_required,
     'owner_approved_by': owner_approved_by_raw.strip() or None,
     'owner_approved_at': owner_approved_at,
+    'auto_close_policy': auto_close_policy,
     'write_scope': write_scope,
     'depends_on': [],
     'blocks': [],
@@ -387,6 +389,10 @@ obj = {
     'target_branch': cfg.get('defaults', {}).get('target_branch', 'integration'),
     'result_summary': None,
     'last_error': None,
+    'merge_gate_state': None,
+    'rework_reason': None,
+    'last_gate_actor': None,
+    'last_gate_decision_at': None,
     'created_at': created_at,
     'updated_at': created_at,
     'claim_policy': 'pull' if assigned_agent_is_auto else 'push',

@@ -149,6 +149,13 @@ truncate_utf8() {
     python3 -c "import sys; s=sys.stdin.read(); print(s[:$max_len] if len(s)>$max_len else s)" <<< "$str" 2>/dev/null
 }
 
+now_iso() {
+    python3 - <<'PY'
+from datetime import datetime
+print(datetime.now().astimezone().isoformat(timespec='seconds'))
+PY
+}
+
 legacy_send_tmux() {
     local session="$1"
     local msg="$2"
@@ -686,6 +693,52 @@ auto_push_next_task_for_agent() {
     return 1
 }
 
+auto_push_next_review_for_agent() {
+    local agent_id="$1"
+    local trigger_task_id="${2:-}"
+    [ -n "$agent_id" ] || return 1
+
+    queue_state_current_task "review" "$agent_id" >/dev/null 2>&1 && return 1
+    is_idle_agent "$agent_id" || return 1
+
+    local next_task=""
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        next_task="$candidate"
+        break
+    done <<< "$(list_review_candidates_for_agent "$agent_id")"
+    [ -n "$next_task" ] || return 1
+
+    queue_state_set "review" "$agent_id" "$next_task"
+    notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md 与 result.json，并输出 review.md。"
+    emit_system_chat_event nudge "$next_task" "review 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
+    log "${next_task}: 已自动续推 review 任务给 ${agent_id}"
+    return 0
+}
+
+auto_push_next_qa_for_agent() {
+    local agent_id="$1"
+    local trigger_task_id="${2:-}"
+    [ -n "$agent_id" ] || return 1
+
+    queue_state_current_task "qa" "$agent_id" >/dev/null 2>&1 && return 1
+    is_idle_agent "$agent_id" || return 1
+
+    local next_task=""
+    while IFS= read -r candidate; do
+        [ -n "$candidate" ] || continue
+        next_task="$candidate"
+        break
+    done <<< "$(list_qa_candidates_for_agent "$agent_id")"
+    [ -n "$next_task" ] || return 1
+
+    queue_state_set "qa" "$agent_id" "$next_task"
+    notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md、result/review artifacts，并输出 verify.json。"
+    emit_system_chat_event nudge "$next_task" "QA 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
+    log "${next_task}: 已自动续推 QA 任务给 ${agent_id}"
+    return 0
+}
+
 is_idle_agent() {
     local agent_id="$1"
     local active_count
@@ -768,42 +821,58 @@ sync_if_changed() {
     fi
 }
 
-# 更新 task.json status，并追加 transitions.jsonl 记录
-set_task_status() {
+# 更新 task.json status / gate 字段，并在状态变化时追加 transitions.jsonl 记录
+update_task_record() {
     local task_dir="$1"
-    local new_status="$2"
+    local new_status="${2:-}"
     local reason="${3:-watcher status update}"
+    local patch_json="${4:-{}}"
     local output=""
-    output=$(python3 - "$task_dir" "$new_status" "$reason" <<'PY'
+    output=$(python3 - "$task_dir" "$new_status" "$reason" "$patch_json" <<'PY'
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
 
 task_dir = Path(sys.argv[1])
-new_status = sys.argv[2]
+new_status = sys.argv[2].strip()
 reason = sys.argv[3]
+patch_json = sys.argv[4].strip() or '{}'
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
 task = json.loads(task_path.read_text(encoding='utf-8'))
 old_status = task.get('status', '')
 now = datetime.now().astimezone().isoformat(timespec='seconds')
+patch = json.loads(patch_json)
 
-if old_status == new_status:
-    print(f'status unchanged: {new_status}')
+status_changed = bool(new_status) and old_status != new_status
+fields_changed = False
+
+if new_status:
+    task['status'] = new_status
+
+for key, value in patch.items():
+    if task.get(key) != value:
+        task[key] = value
+        fields_changed = True
+
+if not status_changed and not fields_changed:
+    print(f'unchanged: status={old_status}')
     raise SystemExit(0)
 
-task['status'] = new_status
 task['updated_at'] = now
 task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
-with transitions_path.open('a', encoding='utf-8') as fp:
-    fp.write(json.dumps({
-        'from': old_status,
-        'to': new_status,
-        'at': now,
-        'reason': reason,
-    }, ensure_ascii=False) + '\n')
-print(f'status: {old_status} -> {new_status}')
+if status_changed:
+    with transitions_path.open('a', encoding='utf-8') as fp:
+        fp.write(json.dumps({
+            'from': old_status,
+            'to': new_status,
+            'at': now,
+            'reason': reason,
+        }, ensure_ascii=False) + '\n')
+    print(f'status: {old_status} -> {new_status}')
+else:
+    print(f'fields updated without status change: {",".join(sorted(patch.keys()))}')
 PY
 )
     local status_rc=$?
@@ -811,6 +880,20 @@ PY
         log "$(basename "$task_dir"): $output | reason=$reason"
     fi
     return $status_rc
+}
+
+set_task_status() {
+    local task_dir="$1"
+    local new_status="$2"
+    local reason="${3:-watcher status update}"
+    update_task_record "$task_dir" "$new_status" "$reason" '{}'
+}
+
+set_task_fields() {
+    local task_dir="$1"
+    local patch_json="${2:-{}}"
+    local reason="${3:-watcher metadata update}"
+    update_task_record "$task_dir" "" "$reason" "$patch_json"
 }
 
 # 记录已处理的事件（避免重复通知）
@@ -993,6 +1076,321 @@ PY
 verify_summary() {
     local verify_file="$1"
     json_pick "$verify_file" summary notes message conclusion
+}
+
+resolve_merge_gate_state() {
+    local task_dir="$1"
+    python3 - "$task_dir" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+status = str(task.get('status') or 'pending').strip()
+merge_gate_state = task.get('merge_gate_state')
+review_required = bool(task.get('review_required'))
+test_required = bool(task.get('test_required'))
+review_level = str(task.get('review_level') or '').strip().lower()
+
+def parse_review_file(path: Path) -> str:
+    if not path.exists():
+        return 'missing'
+    text = path.read_text(encoding='utf-8', errors='ignore')
+    lowered = text.lower()
+    has_reject = any(token in lowered for token in ('request changes', 'reject', '不通过', '未通过', '驳回', '不接受'))
+    has_approve = any(token in lowered for token in ('approve', 'approved', '通过', 'lgtm', 'ship it'))
+    if has_reject:
+        return 'fail'
+    if has_approve:
+        return 'pass'
+    return 'pending'
+
+def parse_review_state() -> str:
+    review_main_state = parse_review_file(task_dir / 'review.md')
+    if review_level == 'complex':
+        design_state = parse_review_file(task_dir / 'design-review.md')
+        if review_main_state == 'fail' or design_state == 'fail':
+            return 'fail'
+        if review_main_state == 'pass' and design_state == 'pass':
+            return 'pass'
+        return 'pending'
+    if review_main_state == 'fail':
+        return 'fail'
+    if review_main_state == 'pass':
+        return 'pass'
+    return 'pending'
+
+def parse_verify_state() -> str:
+    path = task_dir / 'verify.json'
+    if not path.exists():
+        return 'missing'
+    payload = json.loads(path.read_text(encoding='utf-8'))
+    values = [
+        payload.get('pass'),
+        payload.get('ok'),
+        payload.get('result'),
+        payload.get('status'),
+        payload.get('verdict'),
+        payload.get('conclusion'),
+    ]
+    for value in values:
+        if isinstance(value, bool):
+            return 'pass' if value else 'fail'
+        if value is None:
+            continue
+        normalized = str(value).strip().lower()
+        if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
+            return 'pass'
+        if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
+            return 'fail'
+    return 'pending'
+
+review_state = parse_review_state()
+verify_state = parse_verify_state()
+
+if status == 'done':
+    print('closed')
+    raise SystemExit(0)
+if status in {'cancelled', 'failed', 'timeout', 'archived'}:
+    print(str(merge_gate_state or status))
+    raise SystemExit(0)
+if status == 'blocked':
+    if verify_state == 'fail':
+        print('qa_failed')
+    elif review_state == 'fail':
+        print('review_rejected')
+    else:
+        print(str(merge_gate_state or 'blocked'))
+    raise SystemExit(0)
+if status != 'ready_for_merge':
+    print(str(merge_gate_state or ''))
+    raise SystemExit(0)
+
+if verify_state == 'fail':
+    print('qa_failed')
+elif review_state == 'fail':
+    print('review_rejected')
+elif test_required and (not review_required or review_state == 'pass'):
+    print('qa_pending')
+elif review_required and review_state != 'pass':
+    print('review_pending')
+elif not test_required and (not review_required or review_state == 'pass'):
+    print('pm_acceptance_pending')
+else:
+    print(str(merge_gate_state or ''))
+PY
+}
+
+list_review_agents() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+for agent_id, payload in (config.get('agents') or {}).items():
+    role = str((payload or {}).get('role') or '').strip().lower()
+    if role in {'reviewer', 'architect'}:
+        print(agent_id)
+PY
+}
+
+list_qa_agents() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+for agent_id, payload in (config.get('agents') or {}).items():
+    role = str((payload or {}).get('role') or '').strip().lower()
+    if role == 'qa':
+        print(agent_id)
+PY
+}
+
+queue_state_file() {
+    local queue_kind="$1"
+    local agent_id="$2"
+    printf '%s/%s-queue-%s.json\n' "$STATE_DIR" "$queue_kind" "$agent_id"
+}
+
+queue_state_current_task() {
+    local queue_kind="$1"
+    local agent_id="$2"
+    python3 - "$(queue_state_file "$queue_kind" "$agent_id")" "$TASKS_ROOT" "$queue_kind" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+tasks_root = Path(sys.argv[2])
+queue_kind = sys.argv[3]
+if not state_path.exists():
+    raise SystemExit(1)
+try:
+    payload = json.loads(state_path.read_text(encoding='utf-8'))
+except Exception:
+    state_path.unlink(missing_ok=True)
+    raise SystemExit(1)
+task_id = str(payload.get('task_id') or '').strip()
+if not task_id:
+    state_path.unlink(missing_ok=True)
+    raise SystemExit(1)
+task_path = tasks_root / task_id / 'task.json'
+if not task_path.exists():
+    state_path.unlink(missing_ok=True)
+    raise SystemExit(1)
+task = json.loads(task_path.read_text(encoding='utf-8'))
+status = str(task.get('status') or '')
+gate = str(task.get('merge_gate_state') or '')
+allowed_gate = 'review_pending' if queue_kind == 'review' else 'qa_pending'
+if status != 'ready_for_merge' or gate != allowed_gate:
+    state_path.unlink(missing_ok=True)
+    raise SystemExit(1)
+print(task_id)
+PY
+}
+
+queue_state_set() {
+    local queue_kind="$1"
+    local agent_id="$2"
+    local task_id="$3"
+    python3 - "$(queue_state_file "$queue_kind" "$agent_id")" "$task_id" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+task_id = sys.argv[2]
+payload = {
+    'task_id': task_id,
+    'assigned_at': datetime.now().astimezone().isoformat(timespec='seconds'),
+}
+state_path.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(state_path.parent), encoding='utf-8') as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, state_path)
+PY
+}
+
+queue_state_clear() {
+    local queue_kind="$1"
+    local agent_id="$2"
+    rm -f "$(queue_state_file "$queue_kind" "$agent_id")"
+}
+
+clear_review_queue_state_for_task() {
+    local task_dir="$1"
+    while IFS= read -r reviewer; do
+        [ -n "$reviewer" ] || continue
+        queue_state_clear "review" "$reviewer"
+    done <<< "$(task_reviewers "$task_dir")"
+}
+
+clear_qa_queue_state() {
+    while IFS= read -r qa_agent; do
+        [ -n "$qa_agent" ] || continue
+        queue_state_clear "qa" "$qa_agent"
+    done <<< "$(list_qa_agents)"
+}
+
+list_review_candidates_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+priority_rank = {'critical': 4, 'urgent': 4, 'high': 3, 'medium': 2, 'low': 1}
+rows = []
+for task_path in tasks_root.glob('*/task.json'):
+    try:
+        task = json.loads(task_path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    if str(task.get('status') or '') != 'ready_for_merge':
+        continue
+    if str(task.get('merge_gate_state') or '') != 'review_pending':
+        continue
+    reviewers = task.get('reviewers') if isinstance(task.get('reviewers'), list) else []
+    reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
+    if not reviewers:
+        reviewer = str(task.get('reviewer') or '').strip()
+        if reviewer:
+            reviewers = [reviewer]
+    if agent_id not in reviewers:
+        continue
+    queued_at = str(task.get('updated_at') or task.get('created_at') or '')
+    rows.append({
+        'task_id': str(task.get('id') or task_path.parent.name),
+        'priority_rank': priority_rank.get(str(task.get('priority') or '').strip().lower(), 0),
+        'queued_at': queued_at,
+    })
+
+def sort_key(item):
+    try:
+        ts = datetime.fromisoformat(item['queued_at'].replace('Z', '+00:00'))
+    except Exception:
+        ts = datetime.max
+    return (-item['priority_rank'], ts, item['task_id'])
+
+for item in sorted(rows, key=sort_key):
+    print(item['task_id'])
+PY
+}
+
+list_qa_candidates_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+priority_rank = {'critical': 4, 'urgent': 4, 'high': 3, 'medium': 2, 'low': 1}
+rows = []
+for task_path in tasks_root.glob('*/task.json'):
+    try:
+        task = json.loads(task_path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    if str(task.get('status') or '') != 'ready_for_merge':
+        continue
+    if str(task.get('merge_gate_state') or '') != 'qa_pending':
+        continue
+    claim_scope = task.get('claim_scope') if isinstance(task.get('claim_scope'), list) else []
+    scope = [str(item).strip() for item in claim_scope if str(item).strip()]
+    if scope and agent_id not in scope:
+        continue
+    queued_at = str(task.get('last_gate_decision_at') or task.get('updated_at') or task.get('created_at') or '')
+    rows.append({
+        'task_id': str(task.get('id') or task_path.parent.name),
+        'priority_rank': priority_rank.get(str(task.get('priority') or '').strip().lower(), 0),
+        'queued_at': queued_at,
+    })
+
+def sort_key(item):
+    try:
+        ts = datetime.fromisoformat(item['queued_at'].replace('Z', '+00:00'))
+    except Exception:
+        ts = datetime.max
+    return (-item['priority_rank'], ts, item['task_id'])
+
+for item in sorted(rows, key=sort_key):
+    print(item['task_id'])
+PY
 }
 
 dispatch_task_to_agent() {
@@ -1184,23 +1582,78 @@ auto_dispatch_review() {
     local task_id="$2"
     local review_level="$3"
     local summary="$4"
+    local pushed=0
 
     while IFS= read -r reviewer; do
         [ -n "$reviewer" ] || continue
-        if [ "$review_level" = "complex" ] && [ "$reviewer" = "arch-1" ]; then
-            notify_agent "$reviewer" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并按任务目录工件执行设计审查，输出 design-review.md。"
-            emit_system_chat_event watcher "$task_id" "已通知 ${reviewer} 执行设计审查。" "$reviewer" info notify
-        else
-            notify_agent "$reviewer" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并按任务目录工件执行代码审查，输出 review.md。"
-            emit_system_chat_event watcher "$task_id" "已通知 ${reviewer} 执行代码审查。" "$reviewer" info notify
+        if auto_push_next_review_for_agent "$reviewer" "$task_id"; then
+            pushed=1
         fi
     done <<< "$(task_reviewers "$task_dir")"
+
+    if [ "$pushed" -eq 0 ]; then
+        emit_system_chat_event watcher "$task_id" "任务已进入 review 队列，等待 reviewer 空闲后自动续推。" "$PM_SESSION" info notify
+    fi
 }
 
 auto_dispatch_qa() {
     local task_id="$1"
-    notify_agent "$QA_SESSION" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md，并结合 result/review artifacts 执行 QA 验证，输出 verify.json。"
-    emit_system_chat_event watcher "$task_id" "已通知 qa-1 执行 QA 验证。" "$QA_SESSION" info notify
+    local pushed=0
+    while IFS= read -r qa_agent; do
+        [ -n "$qa_agent" ] || continue
+        if auto_push_next_qa_for_agent "$qa_agent" "$task_id"; then
+            pushed=1
+        fi
+    done <<< "$(list_qa_agents)"
+    if [ "$pushed" -eq 0 ]; then
+        emit_system_chat_event watcher "$task_id" "任务已进入 QA 队列，等待 QA 空闲后自动续推。" "$PM_SESSION" info notify
+    fi
+}
+
+auto_close_review_only_task() {
+    local task_dir="$1"
+    local task_id="$2"
+    local result_summary
+    result_summary=$(json_pick "$task_dir/result.json" summary)
+    if [ -z "$result_summary" ]; then
+        result_summary="${task_id} 审查已通过并自动收口。"
+    else
+        result_summary="${result_summary}（审查通过自动收口，无 QA）"
+    fi
+    if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after review pass without qa" >/dev/null 2>&1; then
+        log "$task_id: 审查通过且无需 QA，已自动收口"
+        notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，已自动收口。"
+        emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，已自动收口。" "$PM_SESSION" info notify
+        return 0
+    fi
+    log "$task_id: 审查通过自动收口失败"
+    return 1
+}
+
+notify_final_done_if_needed() {
+    local task_dir="$1"
+    local task_id="$2"
+    local done_key="${task_id}_done_notice"
+    if is_notified "$done_key"; then
+        return 0
+    fi
+
+    local result_summary task_type execution_mode target_environment downstream_action
+    result_summary=$(task_json_pick "$task_dir" result_summary)
+    [ -n "$result_summary" ] || result_summary=$(json_pick "$task_dir/result.json" summary)
+    [ -n "$result_summary" ] || result_summary="${task_id} 已进入 done 终态。"
+    task_type=$(task_json_pick "$task_dir" task_type)
+    execution_mode=$(task_json_pick "$task_dir" execution_mode)
+    target_environment=$(task_json_pick "$task_dir" target_environment)
+    downstream_action=$(task_json_pick "$task_dir" downstream_action)
+
+    if [ "$task_type" = "deployment" ] || [ "$execution_mode" = "deploy" ] || [ "$target_environment" = "prod" ]; then
+        push_task_event "【部署完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "请关注生产验证结果与后续用户反馈"
+    else
+        push_task_event "【任务完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "${downstream_action:-生命周期已结束}"
+    fi
+    emit_system_chat_event watcher "$task_id" "任务已进入 done 终态，已发送最终完成通知。" "$PM_SESSION" info notify
+    mark_notified "$done_key"
 }
 
 auto_close_task() {
@@ -1250,6 +1703,7 @@ while true; do
         case "$current_status" in
             done|cancelled|archived)
                 if [ "$current_status" = "done" ]; then
+                    notify_final_done_if_needed "$task_dir" "$task_id" || true
                     assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
                     auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                 fi
@@ -1280,6 +1734,15 @@ while true; do
             current_status=$(get_task_status "$task_dir")
             if [ "$current_status" = "pooled" ]; then
                 nudge_pooled_task "$task_dir" "$task_id" "$current_status" || true
+            fi
+        fi
+
+        if [ "$current_status" = "ready_for_merge" ] || [ "$current_status" = "blocked" ]; then
+            inferred_gate_state=$(resolve_merge_gate_state "$task_dir" 2>/dev/null || true)
+            current_gate_state=$(task_json_pick "$task_dir" merge_gate_state)
+            if [ -n "$inferred_gate_state" ] && [ "$inferred_gate_state" != "$current_gate_state" ]; then
+                now_iso=$(now_iso)
+                set_task_fields "$task_dir" "{\"merge_gate_state\": \"${inferred_gate_state}\", \"last_gate_decision_at\": \"${now_iso}\"}" "watcher normalized merge gate state"
             fi
         fi
 
@@ -1335,32 +1798,42 @@ while true; do
                 task_level=$(task_json_pick "$task_dir" task_level)
                 assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
                 review_level=$(task_json_pick "$task_dir" review_level)
+                review_required=$(task_json_pick "$task_dir" review_required)
+                test_required=$(task_json_pick "$task_dir" test_required)
                 task_type=$(task_json_pick "$task_dir" task_type)
                 execution_mode=$(task_json_pick "$task_dir" execution_mode)
                 target_environment=$(task_json_pick "$task_dir" target_environment)
                 downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
                 if [ "$result_status" = "done" ]; then
-                    set_task_status "$task_dir" "ready_for_merge" "watcher observed result.json status=done"
-                    current_status="ready_for_merge"
-                    if [ "$task_type" = "deployment" ] || [ "$execution_mode" = "deploy" ] || [ "$target_environment" = "prod" ]; then
-                        push_task_event "【部署完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请关注生产验证结果与后续用户反馈"
-                    else
-                        push_task_event "【任务完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "${downstream_action:-请按任务下游动作继续推进}"
+                    gate_decision_at=$(now_iso)
+                    gate_state="pm_acceptance_pending"
+                    if [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; then
+                        gate_state="review_pending"
+                    elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
+                        gate_state="qa_pending"
                     fi
+                    update_task_record "$task_dir" "ready_for_merge" "watcher observed result.json status=done" "{\"merge_gate_state\":\"${gate_state}\",\"rework_reason\":null,\"last_gate_actor\":\"watcher\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    current_status="ready_for_merge"
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                         notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
                         emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
-                    elif [ "$task_level" = "execution" ] && [ "$review_level" = "standard" -o "$review_level" = "complex" ]; then
+                    elif [ "$gate_state" = "review_pending" ]; then
                         auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
-                        log "$task_id: 已自动通知 reviewer，review_level=$review_level"
+                        log "$task_id: 已进入 review 队列，review_level=$review_level"
+                        auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                    elif [ "$gate_state" = "qa_pending" ]; then
+                        auto_dispatch_qa "$task_id"
+                        log "$task_id: 已进入 QA 队列"
                         auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                     else
-                        notify_pm "[task-watcher] $task_id 已完成，请查看 result.json 并决定下游动作。"
-                        emit_system_chat_event watcher "$task_id" "任务已完成，等待 PM 验收与下游推进。" "$PM_SESSION" info notify
+                        notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
+                        emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
                     fi
                 elif [ "$result_status" = "blocked" ]; then
-                    set_task_status "$task_dir" "blocked" "watcher observed result.json status=blocked"
+                    gate_decision_at=$(now_iso)
+                    update_task_record "$task_dir" "blocked" "watcher observed result.json status=blocked" "{\"merge_gate_state\":\"blocked\",\"rework_reason\":\"execution\",\"last_gate_actor\":\"${assigned_agent:-executor}\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    current_status="blocked"
                     notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
                     emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
                     push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因"
@@ -1397,16 +1870,32 @@ while true; do
             review_key="${task_id}_review_route"
             if ! is_notified "$review_key" || is_signature_newer_than_notified "$review_key" "$review_sig"; then
                 state=$(review_state "$task_dir" "$review_level")
+                clear_review_queue_state_for_task "$task_dir"
                 if [ "$state" = "pass" ]; then
                     test_required=$(task_json_pick "$task_dir" test_required)
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
+                        gate_decision_at=$(now_iso)
+                        set_task_fields "$task_dir" "{\"merge_gate_state\":\"qa_pending\",\"rework_reason\":null,\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}" "watcher observed review pass and queued qa"
                         auto_dispatch_qa "$task_id"
-                        log "$task_id: review 通过，已自动通知 qa-1"
+                        log "$task_id: review 通过，已进入 QA 队列"
                     else
-                        notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
-                        emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 验收。" "$PM_SESSION" info notify
+                        auto_close_policy=$(task_json_pick "$task_dir" auto_close_policy)
+                        gate_decision_at=$(now_iso)
+                        set_task_fields "$task_dir" "{\"merge_gate_state\":\"pm_acceptance_pending\",\"rework_reason\":null,\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}" "watcher observed review pass without qa"
+                        if [ "$auto_close_policy" = "review_pass_only" ]; then
+                            if ! auto_close_review_only_task "$task_dir" "$task_id"; then
+                                notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
+                                emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
+                            fi
+                        else
+                            notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
+                            emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
+                        fi
                     fi
                 elif [ "$state" = "fail" ]; then
+                    gate_decision_at=$(now_iso)
+                    update_task_record "$task_dir" "blocked" "watcher observed review fail" "{\"merge_gate_state\":\"review_rejected\",\"rework_reason\":\"review\",\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    current_status="blocked"
                     notify_pm "[task-watcher] $task_id 审查未通过，请查看 review.md 并仲裁。"
                     emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
                     push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修"
@@ -1422,6 +1911,7 @@ while true; do
             if ! is_notified "$verify_key" || is_file_newer_than_notified "$verify_key" "$task_dir/verify.json"; then
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
+                clear_qa_queue_state
                 if [ "$vstate" = "pass" ]; then
                     current_status=$(get_task_status "$task_dir")
                     if [ "$current_status" = "ready_for_merge" ]; then
@@ -1436,6 +1926,9 @@ while true; do
                         continue
                     fi
                 elif [ "$vstate" = "fail" ]; then
+                    gate_decision_at=$(now_iso)
+                    update_task_record "$task_dir" "blocked" "watcher observed qa verify fail" "{\"merge_gate_state\":\"qa_failed\",\"rework_reason\":\"qa\",\"last_gate_actor\":\"qa-1\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    current_status="blocked"
                     notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
                     emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
                     push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证"
@@ -1453,6 +1946,16 @@ while true; do
         sync_if_changed "$task_dir" "$task_dir/design-review.md" "designreview"
         sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
     done
+
+    while IFS= read -r reviewer_agent; do
+        [ -n "$reviewer_agent" ] || continue
+        auto_push_next_review_for_agent "$reviewer_agent" "idle sweep" || true
+    done <<< "$(list_review_agents)"
+
+    while IFS= read -r qa_agent; do
+        [ -n "$qa_agent" ] || continue
+        auto_push_next_qa_for_agent "$qa_agent" "idle sweep" || true
+    done <<< "$(list_qa_agents)"
 
     sleep "$INTERVAL"
 done

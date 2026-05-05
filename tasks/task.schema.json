@@ -174,6 +174,69 @@
         }
       ]
     },
+    "merge_gate_state": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "review_pending",
+            "review_rejected",
+            "qa_pending",
+            "qa_failed",
+            "pm_acceptance_pending",
+            "closed",
+            "blocked"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rework_reason": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "execution",
+            "review",
+            "qa"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_gate_actor": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "last_gate_decision_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "auto_close_policy": {
+      "type": "string",
+      "enum": [
+        "manual_after_review",
+        "review_pass_only"
+      ]
+    },
     "last_error": {
       "anyOf": [
         {

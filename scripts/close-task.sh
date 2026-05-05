@@ -76,6 +76,66 @@ def load_json(path: Path) -> dict:
         fail(f'invalid json: {path}: {exc}')
 
 
+APPROVE_KEYWORDS = ('通过', 'approve', 'approved', 'lgtm', 'ship it')
+REJECT_KEYWORDS = ('驳回', '不通过', '未通过', 'reject', 'request changes', '不接受')
+
+
+def parse_review_file(path: Path) -> str:
+    if not path.exists():
+        return 'missing'
+    text = path.read_text(encoding='utf-8', errors='ignore')
+    lowered = text.lower()
+    has_reject = any(keyword in lowered for keyword in REJECT_KEYWORDS) or any(keyword in text for keyword in REJECT_KEYWORDS)
+    has_approve = any(keyword in lowered for keyword in APPROVE_KEYWORDS) or any(keyword in text for keyword in APPROVE_KEYWORDS)
+    if has_reject:
+        return 'fail'
+    if has_approve:
+        return 'pass'
+    return 'pending'
+
+
+def parse_review_state(task_dir: Path, review_level: str) -> str:
+    review_main_state = parse_review_file(task_dir / 'review.md')
+    if review_level == 'complex':
+        design_state = parse_review_file(task_dir / 'design-review.md')
+        if review_main_state == 'fail' or design_state == 'fail':
+            return 'fail'
+        if review_main_state == 'pass' and design_state == 'pass':
+            return 'pass'
+        return 'pending'
+    if review_main_state == 'fail':
+        return 'fail'
+    if review_main_state == 'pass':
+        return 'pass'
+    return 'pending'
+
+
+def parse_verify_state(task_dir: Path) -> str:
+    path = task_dir / 'verify.json'
+    if not path.exists():
+        return 'missing'
+    payload = load_json(path)
+    values = [
+        payload.get('pass'),
+        payload.get('ok'),
+        payload.get('result'),
+        payload.get('status'),
+        payload.get('verdict'),
+        payload.get('conclusion'),
+    ]
+    for value in values:
+        if isinstance(value, bool):
+            return 'pass' if value else 'fail'
+        if value is None:
+            continue
+        normalized = str(value).strip().lower()
+        if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
+            return 'pass'
+        if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
+            return 'fail'
+    return 'pending'
+
+
 task_dir = Path(sys.argv[1]).expanduser().resolve()
 summary_arg = sys.argv[2]
 reason = sys.argv[3].strip() or 'manual close via close-task.sh'
@@ -94,6 +154,22 @@ current_status = str(task.get('status') or '')
 if current_status != 'ready_for_merge':
     fail(f'task status must be ready_for_merge, got: {current_status or "<empty>"}')
 
+review_required = bool(task.get('review_required'))
+test_required = bool(task.get('test_required'))
+review_level = str(task.get('review_level') or '').strip().lower()
+merge_gate_state = str(task.get('merge_gate_state') or '').strip()
+review_state = parse_review_state(task_dir, review_level)
+verify_state = parse_verify_state(task_dir)
+
+if merge_gate_state in {'review_pending', 'qa_pending'}:
+    fail(f'task merge_gate_state still pending: {merge_gate_state}')
+if merge_gate_state in {'review_rejected', 'qa_failed'}:
+    fail(f'task merge_gate_state is rejected/failed: {merge_gate_state}')
+if review_required and review_state != 'pass':
+    fail(f'review is not approved: {review_state}')
+if test_required and verify_state != 'pass':
+    fail(f'qa verify is not passed: {verify_state}')
+
 summary = summary_arg.strip() if summary_arg.strip() else str(task.get('result_summary') or '').strip()
 if not summary:
     fail('result_summary is empty; provide --summary or ensure task.json.result_summary already has a value')
@@ -109,6 +185,10 @@ updated_task = dict(task)
 updated_task['status'] = 'done'
 updated_task['updated_at'] = now
 updated_task['result_summary'] = summary
+updated_task['merge_gate_state'] = 'closed'
+updated_task['rework_reason'] = None
+updated_task['last_gate_actor'] = 'watcher' if 'watcher' in reason else 'pm-chief'
+updated_task['last_gate_decision_at'] = now
 
 preview = {
     'task_dir': str(task_dir),
@@ -117,6 +197,9 @@ preview = {
     'status_after': 'done',
     'updated_at': now,
     'result_summary': summary,
+    'review_state': review_state,
+    'verify_state': verify_state,
+    'merge_gate_state_after': 'closed',
     'transition': transition,
 }
 print(json.dumps(preview, ensure_ascii=False, indent=2))
