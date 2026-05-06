@@ -20,6 +20,7 @@
     <button class="tab active" data-tab="kanban">看板</button>
     <button class="tab" data-tab="gantt">甘特图</button>
     <button class="tab" data-tab="agents">Agent 统计</button>
+    <button class="tab" data-tab="analytics">分析</button>
   </nav>
 
   <main>
@@ -46,6 +47,24 @@
     <section id="agents" class="view">
       <div id="agent-tasks-chart" class="chart-container half"></div>
       <div id="agent-load-chart" class="chart-container half"></div>
+    </section>
+
+    <!-- Analytics View -->
+    <section id="analytics" class="view">
+      <div class="analytics-summary" id="analytics-summary">
+        <div class="metric-card" id="mc-total"><div class="metric-value">-</div><div class="metric-label">任务总数</div></div>
+        <div class="metric-card" id="mc-done"><div class="metric-value">-</div><div class="metric-label">已完成</div></div>
+        <div class="metric-card" id="mc-rate"><div class="metric-value">-</div><div class="metric-label">完成率</div></div>
+        <div class="metric-card" id="mc-avg-cycle"><div class="metric-value">-</div><div class="metric-label">平均周期</div></div>
+        <div class="metric-card" id="mc-avg-dev"><div class="metric-value">-</div><div class="metric-label">平均开发耗时</div></div>
+        <div class="metric-card" id="mc-blocked"><div class="metric-value">-</div><div class="metric-label">阻塞率</div></div>
+      </div>
+      <div class="analytics-charts">
+        <div id="trend-chart" class="chart-container"></div>
+        <div id="owner-pm-chart" class="chart-container half"></div>
+        <div id="domain-chart" class="chart-container half"></div>
+        <div id="role-efficiency-chart" class="chart-container"></div>
+      </div>
     </section>
 
   </main>

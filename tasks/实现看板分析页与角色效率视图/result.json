@@ -1,0 +1,23 @@
+{
+  "task_id": "实现看板分析页与角色效率视图",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "实现看板分析页与角色效率视图，包含：6个摘要指标卡片（任务总数、已完成、完成率、平均周期、平均开发耗时、阻塞率）、日指标趋势图（完成率/阻塞率/创建数/完成数）、owner_pm/domain 聚合饼图、角色效率对比柱状图（已完成任务/工作时长/沟通记录）",
+  "files_modified": [
+    "dashboard/templates/index.html",
+    "dashboard/static/js/dashboard.js",
+    "dashboard/static/css/style.css",
+    "dashboard/static/js/helpers.js"
+  ],
+  "tests": [
+    "10 个现有 pytest 测试全部通过，无回归",
+    "API 端点 /api/tasks/aggregate 返回正常（含 groupings、owner_pm_counts、domain_counts）",
+    "API 端点 /api/metrics/daily 返回正常（当前 task_metrics 为空，前端优雅降级显示"暂无日指标数据"）",
+    "API 端点 /api/board、/api/gantt、/api/agents 均正常",
+    "所有 4 个静态文件（HTML/CSS/JS）通过 HTTP 验证内容完整"
+  ],
+  "risks": [
+    "日指标数据（task_metrics_daily）当前为空，趋势图会显示空状态；等上游任务"实现看板日指标生成链路"补数据后自动展示"
+  ],
+  "completed_at": "2026-05-06T13:35:00+08:00"
+}

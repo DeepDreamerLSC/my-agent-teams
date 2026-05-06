@@ -13,10 +13,10 @@
     "review-1"
   ],
   "review_deadline": null,
-  "review_round": 0,
+  "review_round": 1,
   "max_review_rounds": 3,
   "test_required": true,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "frontend",
@@ -46,5 +46,9 @@
   "result_summary": null,
   "last_error": null,
   "created_at": "2026-04-25T15:02:31+08:00",
-  "updated_at": "2026-04-25T15:06:50+08:00"
+  "updated_at": "2026-05-06T13:52:50.711973",
+  "merge_gate_state": "closed",
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T11:35:15+08:00",
+  "rework_reason": null
 }

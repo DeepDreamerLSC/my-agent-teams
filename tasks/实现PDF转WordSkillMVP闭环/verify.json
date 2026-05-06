@@ -1,0 +1,59 @@
+{
+  "task_id": "实现PDF转WordSkillMVP闭环",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-06T15:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA PASS。9 个新测试全部通过，23 个现有 skill 测试无回归。manifest 合规（subprocess/.pdf/max_files=1/timeout=900/supports_file_parse=true）。skill.py 输入校验严格，PDFConversionService mock 闭环完整，DOCX 合法 zip。错误边界覆盖无文件/多文件/非PDF/文件不存在/assemble 失败。review-1 APPROVE。",
+  "test_commands": [
+    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_pdf_to_word_skill.py tests/test_pdf_to_word_service.py -v",
+    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_admin_skills.py tests/test_ppt_generator_skill.py tests/test_ppt_generator_image_input.py -q"
+  ],
+  "test_results": {
+    "new_tests": "9 passed in 1.5s",
+    "regression_tests": "23 passed in 2.0s",
+    "manifest_fields": {
+      "runtime_backend": "subprocess",
+      "allowed_extensions": [".pdf"],
+      "max_files": 1,
+      "timeout_sec": 900,
+      "supports_file_parse": true,
+      "output_format": "docx (parameters)"
+    }
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "manifest 合规：runtime_backend=subprocess, .pdf, max_files=1, timeout=900, supports_file_parse=true",
+      "status": "pass",
+      "evidence": "manifest.json 确认：input_capabilities.allowed_extensions=['.pdf'], max_files=1, runtime_backend=subprocess, timeout_sec=900, supports_file_parse=true, parameters.output_format=docx。test_pdf_to_word_manifest_declares_single_pdf_input_and_file_parse_support 通过。"
+    },
+    {
+      "criterion": "skill.py 输入校验 + display_type=file 返回",
+      "status": "pass",
+      "evidence": "test_pdf_to_word_skill_returns_downloadable_docx_with_meta 验证完整执行返回合法 DOCX + file payload (file_name/file_path/file_size/mime_type)。test_pdf_to_word_can_execute_through_skill_manager_subprocess 验证 subprocess 通路。"
+    },
+    {
+      "criterion": "PDFConversionService mock/fixture 生成最小可下载 DOCX",
+      "status": "pass",
+      "evidence": "test_pdf_conversion_service_generates_valid_docx_with_meta 验证 DOCX 为合法 zip 含 word/document.xml，meta 含 page_count/block_count/warnings/mock_backend=fixture。"
+    },
+    {
+      "criterion": "错误边界：无文件/多文件/非PDF/文件不存在/转换异常均返回可读错误",
+      "status": "pass",
+      "evidence": "test_pdf_to_word_skill_rejects_missing_multiple_or_non_pdf_inputs 覆盖 4 种异常。test_pdf_to_word_skill_reports_missing_file_as_readable_error 覆盖文件不存在。test_pdf_conversion_service_does_not_write_half_product_when_assembly_fails 覆盖 assemble 失败不写半成品。"
+    },
+    {
+      "criterion": "现有 skill 不回归",
+      "status": "pass",
+      "evidence": "admin_skills(13) + ppt_generator_skill(6) + ppt_generator_image_input(4) = 23 passed。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "review-1 APPROVE，0 个阻塞问题。代码分层清晰：skill → service → assembler → workspace。",
+    "DOCX 使用 office_export_service.build_docx_bytes 最小 OOXML 生成，无 python-docx 依赖。",
+    "mock_enabled=True 硬编码默认值，后续接入真实 MinerU sidecar 时需切换（已知风险）。",
+    "未修改 chat.py / file_service.py / 通用 skill 执行链路，符合任务边界。"
+  ]
+}

@@ -1,3 +1,4 @@
+;(function () {
 // --- Config ---
 const API_BASE = '/api'
 const BOARD_COLUMNS = ['pending', 'working', 'ready_for_merge', 'blocked', 'done']
@@ -176,6 +177,7 @@ function renderKanban(boardPayload) {
       const statusHours = hoursBetween(task.current_status_at || task.created_at, new Date().toISOString())
       const priorityTag = task.priority ? `<span class="card-priority priority-${esc(String(task.priority).toLowerCase())}">${esc(task.priority)}</span>` : ''
       const envTag = task.target_environment ? `<span class="card-env">${esc(task.target_environment)}</span>` : ''
+      const reviewLevelTag = task.review_level ? `<span class="card-review-level">审查:${esc(task.review_level)}</span>` : ''
       const gateTag = task.merge_gate_state ? `<span class="card-gate gate-${esc(String(task.merge_gate_state).toLowerCase())}">${esc(MERGE_GATE_LABELS[task.merge_gate_state] || task.merge_gate_state)}</span>` : ''
 
       const card = document.createElement('button')
@@ -186,7 +188,7 @@ function renderKanban(boardPayload) {
         ${badge}
         <div class="card-chain">Owner PM: ${esc(task.owner_pm || '-')} · Reviewer: ${esc(task.reviewer || '-')} · Integration: ${esc(task.integration_owner || '-')}</div>
         <div class="card-meta">
-          ${task.project || ''} · ${formatTime(task.created_at)}
+          ${esc(task.project || '')} · ${formatTime(task.created_at)}
         </div>
         <div class="card-meta">
           沟通记录：${commCount} · 当前状态停留：${formatDurationHours(statusHours)}
@@ -195,6 +197,7 @@ function renderKanban(boardPayload) {
           <span class="card-agent">${esc(task.assigned_agent)}</span>
           <span class="card-domain">${esc(task.domain)}</span>
           ${gateTag}
+          ${reviewLevelTag}
           ${priorityTag}
           ${envTag}
         </div>
@@ -515,12 +518,169 @@ function formatHours(value) {
   return `${Number(value).toFixed(2)}h`
 }
 
+// --- Analytics Data Layer ---
+async function fetchAggregate() {
+  return fetchJson(`${API_BASE}/tasks/aggregate`)
+}
+
+async function fetchDailyMetrics() {
+  return fetchJson(`${API_BASE}/metrics/daily`)
+}
+
+// --- Analytics View ---
+function renderAnalytics(aggregatePayload, dailyPayload, agentsPayload) {
+  const agg = transformAggregateForAnalytics(aggregatePayload)
+  const daily = transformDailyMetrics(dailyPayload)
+  const agentEff = computeAgentEfficiency(agentsPayload)
+
+  renderAnalyticsSummary(agg, daily)
+  renderTrendChart(daily)
+  renderAggregationCharts(agg)
+  renderRoleEfficiencyChart(agentEff)
+}
+
+function renderAnalyticsSummary(agg, daily) {
+  const metrics = daily.taskMetrics
+  const latest = metrics && metrics.length ? metrics[metrics.length - 1] : null
+
+  const totalEl = document.querySelector('#mc-total .metric-value')
+  const doneEl = document.querySelector('#mc-done .metric-value')
+  const rateEl = document.querySelector('#mc-rate .metric-value')
+  const avgCycleEl = document.querySelector('#mc-avg-cycle .metric-value')
+  const avgDevEl = document.querySelector('#mc-avg-dev .metric-value')
+  const blockedEl = document.querySelector('#mc-blocked .metric-value')
+
+  if (agg) {
+    if (totalEl) totalEl.textContent = agg.total
+    if (doneEl) doneEl.textContent = agg.done
+    if (rateEl) rateEl.textContent = (agg.completionRate * 100).toFixed(1) + '%'
+    if (blockedEl) blockedEl.textContent = (agg.blockedRate * 100).toFixed(1) + '%'
+
+    const rateCard = document.getElementById('mc-rate')
+    const blockedCard = document.getElementById('mc-blocked')
+    if (rateCard) { rateCard.className = 'metric-card highlight ' + (agg.completionRate >= 0.7 ? 'good' : agg.completionRate >= 0.4 ? 'warn' : 'bad') }
+    if (blockedCard) { blockedCard.className = 'metric-card ' + (agg.blockedRate <= 0.1 ? 'good' : agg.blockedRate <= 0.3 ? 'warn' : 'bad') }
+  }
+
+  if (latest) {
+    if (avgCycleEl) avgCycleEl.textContent = formatSecondsCompact(latest.avg_cycle_seconds)
+    if (avgDevEl) avgDevEl.textContent = formatSecondsCompact(latest.avg_ack_to_result_seconds)
+  }
+}
+
+function renderTrendChart(daily) {
+  const el = document.getElementById('trend-chart')
+  const metrics = daily.taskMetrics || []
+  if (!metrics.length) {
+    el.innerHTML = '<div class="empty-state">暂无日指标数据</div>'
+    return
+  }
+
+  const chart = echarts.init(el)
+  const dates = metrics.map(m => m.metric_date || '')
+  const completionRates = metrics.map(m => m.completion_rate != null ? (m.completion_rate * 100).toFixed(1) : null)
+  const blockedRates = metrics.map(m => m.blocked_rate != null ? (m.blocked_rate * 100).toFixed(1) : null)
+  const createdCounts = metrics.map(m => m.created_task_count || 0)
+  const completedCounts = metrics.map(m => m.completed_task_count || 0)
+
+  chart.setOption({
+    title: { text: '日指标趋势', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['完成率(%)', '阻塞率(%)', '创建数', '完成数'], top: 30 },
+    grid: { left: 60, right: 60, top: 70, bottom: 30 },
+    xAxis: { type: 'category', data: dates },
+    yAxis: [
+      { type: 'value', name: '%', max: 100 },
+      { type: 'value', name: '任务数', position: 'right' },
+    ],
+    series: [
+      { name: '完成率(%)', type: 'line', data: completionRates, smooth: true, itemStyle: { color: '#52c41a' } },
+      { name: '阻塞率(%)', type: 'line', data: blockedRates, smooth: true, itemStyle: { color: '#ff4d4f' } },
+      { name: '创建数', type: 'bar', yAxisIndex: 1, data: createdCounts, itemStyle: { color: '#69b1ff' } },
+      { name: '完成数', type: 'bar', yAxisIndex: 1, data: completedCounts, itemStyle: { color: '#52c41a' } },
+    ],
+  })
+  window.addEventListener('resize', () => chart.resize())
+}
+
+function renderAggregationCharts(agg) {
+  const ownerPmEl = document.getElementById('owner-pm-chart')
+  const domainEl = document.getElementById('domain-chart')
+
+  const ownerPmData = agg ? agg.ownerPmCounts : {}
+  const domainData = agg ? agg.domainCounts : {}
+
+  renderDimensionChart(ownerPmEl, 'Owner PM 任务分布', ownerPmData)
+  renderDimensionChart(domainEl, 'Domain 任务分布', domainData)
+}
+
+function renderDimensionChart(el, title, data) {
+  if (!el) return
+  const keys = Object.keys(data || {})
+  if (!keys.length) {
+    el.innerHTML = `<div class="empty-state">${title}：暂无数据</div>`
+    return
+  }
+  const chart = echarts.init(el)
+  const values = keys.map(k => data[k])
+  const colors = ['#1677ff', '#52c41a', '#faad14', '#722ed1', '#ff4d4f', '#13c2c2', '#eb2f96']
+
+  chart.setOption({
+    title: { text: title, left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    legend: { orient: 'vertical', left: 'left', top: 40, type: 'scroll' },
+    series: [{
+      type: 'pie',
+      radius: ['35%', '65%'],
+      center: ['55%', '55%'],
+      data: keys.map((k, i) => ({ name: k, value: values[i], itemStyle: { color: colors[i % colors.length] } })),
+      label: { formatter: '{b}\n{c}', fontSize: 12 },
+    }],
+  })
+  window.addEventListener('resize', () => chart.resize())
+}
+
+function renderRoleEfficiencyChart(agentEff) {
+  const el = document.getElementById('role-efficiency-chart')
+  if (!el) return
+  if (!agentEff.length) {
+    el.innerHTML = '<div class="empty-state">暂无角色效率数据</div>'
+    return
+  }
+
+  const chart = echarts.init(el)
+  const names = agentEff.map(a => a.agentId)
+  const completed = agentEff.map(a => a.completed)
+  const workHours = agentEff.map(a => Math.round(a.workHours * 10) / 10)
+  const comms = agentEff.map(a => a.communications)
+
+  chart.setOption({
+    title: { text: '角色效率对比', left: 'center', textStyle: { fontSize: 14 } },
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['已完成任务', '工作时长(h)', '沟通记录'], top: 30 },
+    grid: { left: 60, right: 60, top: 70, bottom: 30 },
+    xAxis: { type: 'category', data: names },
+    yAxis: [
+      { type: 'value', name: '任务/沟通' },
+      { type: 'value', name: '小时', position: 'right' },
+    ],
+    series: [
+      { name: '已完成任务', type: 'bar', data: completed, itemStyle: { color: '#52c41a' } },
+      { name: '工作时长(h)', type: 'bar', yAxisIndex: 1, data: workHours, itemStyle: { color: '#722ed1' } },
+      { name: '沟通记录', type: 'bar', data: comms, itemStyle: { color: '#faad14' } },
+    ],
+  })
+  window.addEventListener('resize', () => chart.resize())
+}
+
 // --- Init ---
 async function init() {
-  const [boardPayload, ganttPayload, agentsPayload] = await Promise.all([
+  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload] = await Promise.all([
     fetchBoard(),
     fetchGantt(),
     fetchAgents(),
+    fetchAggregate(),
+    fetchDailyMetrics(),
   ])
 
   document.getElementById('last-update').textContent = `更新: ${new Date().toLocaleTimeString()}`
@@ -528,6 +688,7 @@ async function init() {
   renderKanban(boardPayload)
   renderGantt(ganttPayload)
   renderAgentStats(agentsPayload)
+  renderAnalytics(aggregatePayload, dailyPayload, agentsPayload)
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -541,5 +702,15 @@ if (typeof module !== 'undefined' && module.exports) {
     renderTaskDetailHtml,
     detailItem,
     formatHours,
+    renderKanban,
+    renderKanbanFilters,
+    getActiveFilters,
+    populateFilterSelect,
+    renderAnalytics,
+    renderAnalyticsSummary,
+    renderTrendChart,
+    renderAggregationCharts,
+    renderRoleEfficiencyChart,
   }
 }
+})()

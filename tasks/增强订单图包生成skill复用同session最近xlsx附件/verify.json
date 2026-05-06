@@ -1,0 +1,56 @@
+{
+  "task_id": "增强订单图包生成skill复用同session最近xlsx附件",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-05T15:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。平台层同 session 最近匹配附件复用能力已补齐，order-print-image-pack 接入正常，当前请求附件优先级正确，跨 session / 无历史时不误复用。全部 56 个测试通过（test_chat.py 45 + test_order_print_image_skill.py 11）。",
+  "review_verdict": "APPROVE",
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q"
+  ],
+  "test_results": {
+    "test_chat.py": "45 passed, 4 warnings",
+    "test_order_print_image_skill.py": "11 passed, 4 warnings"
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "同 session 第二次未上传 xlsx 时自动复用最近 xlsx",
+      "status": "pass",
+      "evidence": "_resolve_skill_uploaded_files() 在当前请求无匹配文件时，回看同一 session 最近 20 条消息中的匹配附件并返回。test_chat.py 包含对应测试。"
+    },
+    {
+      "criterion": "当前请求自己带了 xlsx 时优先使用当前请求文件",
+      "status": "pass",
+      "evidence": "_resolve_skill_uploaded_files() L429-431 先判定 current_matching，命中后直接返回，不进入历史扫描。test_chat.py 有对应优先级测试。"
+    },
+    {
+      "criterion": "跨 session / 无历史附件时不误复用",
+      "status": "pass",
+      "evidence": "历史扫描严格限定在 chat_service.get_context_messages(db, session_id)，不跨 session。无匹配时返回 current_files（原始行为）。"
+    },
+    {
+      "criterion": "自动化测试覆盖",
+      "status": "pass",
+      "evidence": "test_chat.py 45 测试（含同 session xlsx 复用 + 当前请求优先级），test_order_print_image_skill.py 11 测试（同模块回归），全部通过。"
+    },
+    {
+      "criterion": "order-print-image-pack 非回归",
+      "status": "pass",
+      "evidence": "11 个 test_order_print_image_skill 测试全部通过，未改动业务计算逻辑。"
+    },
+    {
+      "criterion": "平台层可复用设计",
+      "status": "pass",
+      "evidence": "复用逻辑放在 _execute_skill_path() 的 skill 输入组装层，通过 manifest 的 input_capabilities.supports_files / allowed_extensions 驱动，其他依赖最近上传文件的 skill 可复用同一能力。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "pytest 4 个 warnings 均为 FastAPI on_event 弃用提示，与本次改动无关。",
+    "本次实现未改动 context_assembler.py 和 skill_service.py，复用逻辑落点在 chat.py 的 skill 执行路径中，属有意的平台层设计选择。",
+    "review.md 审查结论为 APPROVE，与本 QA 验证结论一致。"
+  ]
+}

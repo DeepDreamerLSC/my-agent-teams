@@ -1,0 +1,42 @@
+{
+  "task_id": "补齐看板沟通详情前端自动化测试",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-04T15:22:30+08:00",
+  "summary": "已补齐看板详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试，并做了最小可测性补修：抽出纯渲染函数、增加前端时间线排序辅助函数与 Node 环境保护，使 dashboard 前端逻辑可在 unittest 中稳定回归验证。",
+  "modified_files": [
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py"
+  ],
+  "implementation": {
+    "tests_added": [
+      "状态时间线渲染：覆盖事件文案、状态迁移信息、空态 fallback 与排序结果。",
+      "沟通时间线渲染：覆盖 from_actor/to_actor、priority、message_text 展示。",
+      "详情抽屉 HTML：覆盖缺失阶段耗时时显示 '-'，以及空 communication timeline 不报错。",
+      "新增 sortTimelineItems 测试，保证前端时间线按时间与 event_id 稳定排序。"
+    ],
+    "minimal_fixes": [
+      "将 renderTaskDetail 抽为 renderTaskDetailHtml 纯函数。",
+      "将 renderTimeline 抽为 renderTimelineHtml，并补 sortTimelineItems。",
+      "增加无 document 场景保护与 module.exports，允许 Node unittest 直接加载 dashboard.js。"
+    ],
+    "non_regression": [
+      "未新增分析图表。",
+      "未改详情抽屉打开/关闭交互语义。",
+      "未提前启动‘实现看板分析页与角色效率视图’。"
+    ]
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": "cd /Users/lin/Desktop/work/my-agent-teams && python3 -m unittest dashboard.tests.test_dashboard_frontend_timeline",
+        "result": "passed (4 tests)"
+      },
+      {
+        "command": "PYTHONPYCACHEPREFIX=/tmp/dashboard-pyc python3 -m py_compile dashboard/app.py dashboard/query.py dashboard/tests/test_dashboard_frontend_timeline.py",
+        "result": "passed"
+      }
+    ]
+  }
+}

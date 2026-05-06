@@ -1,0 +1,10 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-04T00:58:12+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-04T01:03:35+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "pooled", "at": "2026-05-04T11:10:22+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-04T14:50:46+08:00", "reason": "agent dev-1 claimed pooled task"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-04T14:56:45+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "dispatched", "at": "2026-05-06T06:50:29+08:00", "reason": "PM rework dispatch: review-1驳回：后端未提供integration_owner/target_environment/review_level字段，前端筛选器无数据可用"}
+{"from": "dispatched", "to": "dispatched", "at": "2026-05-06T11:35:15+08:00", "reason": "PM archived stale review/QA artifacts before rework refresh"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-06T11:50:25+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T11:52:28+08:00", "reason": "PM normalized new done result to review_pending"}
+2026-05-06T05:38:38Z pm-chief ready_for_merge -> done gate=closed review=APPROVE_r2 qa=PASS

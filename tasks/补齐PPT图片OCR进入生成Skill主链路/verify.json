@@ -1,0 +1,49 @@
+{
+  "task_id": "补齐PPT图片OCR进入生成Skill主链路",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-06T14:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA PASS。14 个目标测试全部通过。图片 OCR -> parsed_files -> PPT prompt 消费链路闭环：ContextAssembler 统一产出含 attachment_kind/image 元信息的 parsed_files、UploadedFileSchema 暴露 extracted_text/parse_status/parser_source、ppt_generator 优先消费 parsed_files 并按图片标签纳入 prompt、manifest 允许 png/jpg/jpeg/webp。review-1 APPROVE。",
+  "test_commands": [
+    "cd /Users/lin/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py"
+  ],
+  "test_results": {
+    "target_tests": "14 passed, 4 deprecation warnings (FastAPI lifecycle)",
+    "manifest_image_types": "png/jpg/jpeg/webp + image/png,image/jpeg,image/webp confirmed"
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "ContextAssembler 图片 OCR 产出 PPT skill 可消费的 parsed_files",
+      "status": "pass",
+      "evidence": "context_assembler.py 对图片 OCR 结果产出 parsed_files 条目，含 file_type/mime_type/attachment_kind/parse_status 元信息，图片标记 attachment_kind=image。test_context_assembler.py 覆盖。"
+    },
+    {
+      "criterion": "ppt_generator 能读取 OCR 内容并纳入生成 prompt",
+      "status": "pass",
+      "evidence": "skill.py:223 _format_parsed_files() 统一消费 parsed_files，L275 按图片标签输出'图片 OCR 附件'，L232 兜底消费 uploaded_files.extracted_text。test_ppt_generator_image_input.py + test_ppt_generator_skill.py 覆盖。"
+    },
+    {
+      "criterion": "ppt_generator manifest 允许 png/jpg/jpeg/webp 图片输入",
+      "status": "pass",
+      "evidence": "manifest.json:33-36 .png/.jpg/.jpeg/.webp，:42-44 image/png,image/jpeg,image/webp。grep 确认。"
+    },
+    {
+      "criterion": "UploadedFileSummary schema 稳定暴露新字段",
+      "status": "pass",
+      "evidence": "file.py:24-26 extracted_text/parse_status/parser_source Optional 字段，不再依赖原始 dict。"
+    },
+    {
+      "criterion": "不误伤文档/PDF/xlsx 解析",
+      "status": "pass",
+      "evidence": "14 个测试含既有文档解析路径验证，result.json 说明保留原 PDF/docx/xlsx parsed_files 消费路径。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "review-1 APPROVE，0 个阻塞问题。",
+    "已知非阻塞：backend/tests/test_files.py 中 webp parse_status 旧断言与本任务目标冲突，不在 write_scope 内，review-1 已记录为后续契约同步事项。",
+    "真实 OCR 效果依赖 dev 环境 OCR 模型配置与密钥，本次验证基于代码结构与自动化测试。"
+  ]
+}

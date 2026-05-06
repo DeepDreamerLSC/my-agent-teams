@@ -1,0 +1,17 @@
+{
+  "task_id": "优化订单图包生成skill双标签A4打印布局",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "blocked",
+  "completed_at": "2026-05-05T17:05:00+08:00",
+  "summary": "任务当前无法执行：instruction.md 仍是占位模板（目标/边界/输入事实/交付物/验收标准均未填写），且 task.json.write_scope 为空，开发代理无法在遵守规则的前提下做任何代码修改。请 PM 先补齐任务指令与 write_scope 后再重新派发或认领。",
+  "blockers": [
+    "instruction.md 中目标、任务边界、输入事实、交付物、验收标准均为待填写占位内容。",
+    "task.json 的 write_scope 为空，当前无任何允许修改的文件范围。"
+  ],
+  "requested_pm_actions": [
+    "补齐明确的任务目标、边界、输入事实、交付物与验收标准。",
+    "在 task.json 中补充可执行的 write_scope。",
+    "必要时补充参考文件/样例输出/布局规格后重新派发。"
+  ]
+}

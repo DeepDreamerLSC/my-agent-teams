@@ -1,0 +1,6 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-04T00:58:27+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-04T00:59:33+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "pooled", "at": "2026-05-04T11:10:24+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-04T23:13:33+08:00", "reason": "agent dev-1 claimed pooled task"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-04T23:22:30+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-05T20:24:06+08:00", "reason": "task-watcher auto close after qa verify pass"}

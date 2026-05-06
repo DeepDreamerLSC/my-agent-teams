@@ -14,7 +14,7 @@
   "review_round": 0,
   "max_review_rounds": 3,
   "test_required": false,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "backend",
@@ -38,8 +38,12 @@
   "lease_expires_at": "2026-04-29T18:17:06+08:00",
   "workspace_mode": "main",
   "target_branch": "integration",
-  "result_summary": null,
+  "result_summary": "只读诊断结论：当前生产里“智谱（GLM/Zhipu）联网搜索全部失效”的主因不是前端 capability 丢失，也不是生产配置缺失，而是生产后端仍在使用旧版 Zhipu provider-native 健康探针实现。该旧探针走 `chat/completions + 自然语言内容判断`，并把 429 / request_failed 直接判成 `unavailable`；前端聊天页又会在 `zh",
   "last_error": null,
   "created_at": "2026-04-29T18:16:33+08:00",
-  "updated_at": "2026-04-29T18:51:31+08:00"
+  "updated_at": "2026-05-06T06:48:40+08:00",
+  "merge_gate_state": "closed",
+  "rework_reason": null,
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T06:48:40+08:00"
 }

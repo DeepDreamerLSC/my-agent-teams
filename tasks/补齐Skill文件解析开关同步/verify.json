@@ -1,0 +1,60 @@
+{
+  "task_id": "补齐Skill文件解析开关同步",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-06T13:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA PASS。13 个测试全部通过。manifest -> SkillRecord.supports_file_parse 三条同步路径均已验证：文件系统同步新建记录 (L660)、已有记录 false->true 漂移修复 (L692-695)、zip upload 审批流 (L443)。解析 helper 只接受真实 bool，顶层优先、parameters 兜底、缺省 false。review-1 APPROVE，0 个阻塞问题。",
+  "test_commands": [
+    "cd /Users/lin/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_admin_skills.py"
+  ],
+  "test_results": {
+    "pytest": "13 passed, 4 deprecation warnings (FastAPI lifecycle, non-blocking)",
+    "relevant_new_tests": [
+      "test_sync_filesystem_skills_reads_top_level_file_parse_support",
+      "test_sync_filesystem_skills_defaults_file_parse_support_to_false",
+      "test_sync_filesystem_skills_updates_existing_false_when_manifest_true",
+      "test_file_parse_support_uses_boolean_parameters_fallback_only",
+      "test_upload_skill_uses_versioned_pending_directory"
+    ]
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "sync_filesystem_skills_to_db() 新建记录从 manifest 顶层读取 supports_file_parse，缺省 false",
+      "status": "pass",
+      "evidence": "L660: supports_file_parse=_manifest_supports_file_parse(entry.manifest)。helper (L82-101) 优先读顶层 bool，缺省返回 false。"
+    },
+    {
+      "criterion": "upload_skill() 审批流同步同一字段",
+      "status": "pass",
+      "evidence": "L443: supports_file_parse=_manifest_supports_file_parse(manifest)。zip 上传创建 pending SkillRecord 时写入。"
+    },
+    {
+      "criterion": "兼容 parameters.supports_file_parse 兜底",
+      "status": "pass",
+      "evidence": "L96-100: 顶层不存在且 parameters 为 dict 时，读取 parameters.supports_file_parse，只接受 bool。"
+    },
+    {
+      "criterion": "已有 DB 记录 false 且 manifest true 时同步更新",
+      "status": "pass",
+      "evidence": "L692-695: manifest_supports_file_parse=True 且 existing.supports_file_parse=False 时更新为 True。不反向覆盖（保守策略）。"
+    },
+    {
+      "criterion": "单测覆盖至少三类：顶层 true、缺省 false、zip upload true",
+      "status": "pass",
+      "evidence": "5 个相关测试覆盖：顶层 true (sync reads)、缺省 false (defaults)、漂移修复 (updates existing)、parameters fallback (boolean only)、zip upload (versioned pending)。"
+    },
+    {
+      "criterion": "现有未声明 supports_file_parse 的 skill 行为不变",
+      "status": "pass",
+      "evidence": "_manifest_supports_file_parse 对顶层不存在且 parameters 中也无该 key 时返回 false (L101)，与原硬编码 false 行为一致。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "review-1 结论 APPROVE，0 个 CRITICAL/HIGH/MEDIUM/LOW 问题。",
+    "已有 DB 记录只从 false 更新到 true，不反向覆盖。这是保守策略，避免覆盖人工开关，result.json.risks 已说明。",
+    "未运行完整后端测试套件；本次按任务验收范围复跑 test_admin_skills.py，13 passed。"
+  ]
+}

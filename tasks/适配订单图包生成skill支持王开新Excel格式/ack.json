@@ -1,0 +1,7 @@
+{
+  "task_id": "适配订单图包生成skill支持王开新Excel格式",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-05T16:55:24+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将先对比王开新旧 Excel 样本的 sheet / 表头 / 列顺序 / 数值字段差异，再在 order-print-image-pack 中做最小兼容适配并补测试，保持旧成功路径不回归。"
+}

@@ -1,0 +1,23 @@
+{
+  "task_id": "实现PDF转WordSkillMVP闭环",
+  "agent": "dev-2",
+  "status": "acknowledged",
+  "message": "已读取 instruction.md 与 task.json，确认按 write_scope 实现 pdf_to_word custom skill MVP 闭环，result.json.status 仅使用 done/failed/blocked。",
+  "write_scope": [
+    "skills/custom/pdf_to_word/1.0.0/manifest.json",
+    "skills/custom/pdf_to_word/1.0.0/skill.py",
+    "skills/custom/pdf_to_word/1.0.0/SKILL.md",
+    "backend/app/core/config.py",
+    "backend/.env.example",
+    ".env.example",
+    "backend/app/services/pdf_to_word/__init__.py",
+    "backend/app/services/pdf_to_word/settings.py",
+    "backend/app/services/pdf_to_word/models.py",
+    "backend/app/services/pdf_to_word/conversion_service.py",
+    "backend/app/services/pdf_to_word/docx_assembler.py",
+    "backend/app/services/pdf_to_word/workspace.py",
+    "backend/tests/test_pdf_to_word_skill.py",
+    "backend/tests/test_pdf_to_word_service.py"
+  ],
+  "acknowledged_at": "2026-05-06T12:03:28.475561+08:00"
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "审查taskwatcher空闲补推与收口链路修复",
+  "agent": "review-1",
+  "acknowledged_at": "2026-05-05T22:20:55+08:00",
+  "status": "working",
+  "note": "已读取 instruction.md，开始对 13 个目标文件执行只读代码审查，重点覆盖状态机、通知时机、空闲补推与看板字段链路。"
+}

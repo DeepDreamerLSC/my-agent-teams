@@ -1,0 +1,63 @@
+{
+  "task_id": "修正taskwatcher仅在任务最终完成后发飞书通知",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-06T10:15:00+08:00",
+  "status": "fail",
+  "pass": false,
+  "summary": "QA FAIL（第二轮验证）。dev-1 rework 后核心通知方向正确：done 统一分支覆盖了 auto_close 与手工 close-task.sh 路径。但存在一个 HIGH 级部署阻塞（watcher 重启将对 92 个历史 done 任务批量补发【任务完成】飞书通知）和一个 MEDIUM 级文档不一致（design L930 仍描述旧机制），review-1 驳回意见均验证有效。",
+  "acceptance_criteria": {
+    "1_ready_for_merge_no_completion_notice": {
+      "status": "pass",
+      "evidence": "L1794-1846 ready_for_merge 分支仅通知 PM/reviewer/QA 进入下游，不调用 notify_final_done_if_needed。bash -n 语法检查通过。"
+    },
+    "2_review_fail_qa_fail_no_false_complete": {
+      "status": "pass",
+      "evidence": "review fail (L1895-1901) → blocked + review_rejected；QA fail (L1928-1934) → blocked + qa_failed。均不调用 notify_final_done_if_needed。"
+    },
+    "3_only_done_triggers_final_notice": {
+      "status": "pass",
+      "evidence": "notify_final_done_if_needed() 仅在 L1705-1706 done 分支调用。auto_close_task() (L1659-1681) 不发送最终完成飞书。覆盖了 auto_close 与手工 close-task.sh 等所有 done 路径。"
+    },
+    "4_documentation_consistency": {
+      "status": "fail",
+      "evidence": "design/OpenClaw-tmux协作方案优化.md:930 仍写'自动收口到 done，并发送最终完成类飞书通知'，实际实现是 verify 通过 → close-task.sh → done → watcher done 分支 → notify_final_done_if_needed。文档描述的是 verify 检测阶段发送通知，与实际 done 观察分支发送不一致。README L389 已正确。"
+    }
+  },
+  "blocking_issues": [
+    {
+      "severity": "HIGH",
+      "title": "watcher 重启会对 92 个历史 done 任务批量补发完成通知",
+      "evidence": "notify_final_done_if_needed() (L1633-1657) 使用 is_notified/mark_notified 做去重，key 为 ${task_id}_done_notice。当前 STATE_DIR 下 0 个 *_done_notice 文件，任务池 92 个 status=done。watcher 重启后主循环 L1695-1716 扫描每个 done 任务，L1705-1706 调用 notify_final_done_if_needed，is_notified 返回 false，触发 92 条飞书通知。",
+      "reproduction": [
+        "1. ls /Users/lin/.openclaw/workspace/.task-watcher/*_done_notice → 0 matches",
+        "2. 统计 done 任务：for d in tasks/*/; do python3 -c \"import json; d=json.load(open('${d}task.json')); print(d.get('status',''))\" 2>/dev/null; done | sort | uniq -c → 92 done",
+        "3. 重启 watcher → 主循环逐条调用 notify_final_done_if_needed → 92 条飞书推送"
+      ],
+      "suggested_fix": "方案一：watcher 启动时为所有已存在 done 任务预种 *_done_notice sentinel 文件，跳过历史任务。方案二：notify_final_done_if_needed 增加 transitions.jsonl 时间判定，只对 watcher 启动后新近进入 done 的任务发送。"
+    },
+    {
+      "severity": "MEDIUM",
+      "title": "主方案文档 L930 与实现不一致",
+      "evidence": "design/OpenClaw-tmux协作方案优化.md:930 写'出现 verify.json（通过） | 自动收口到 done，并发送最终完成类飞书通知'，但实际是 verify 通过只触发 close-task.sh 收口到 done，最终通知由 watcher done 观察分支统一发送。",
+      "suggested_fix": "将 L930 改为'出现 verify.json（通过） | 自动收口到 done；最终完成类通知由 watcher done 观察分支统一发送'。"
+    }
+  ],
+  "test_commands": [
+    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "grep -n 'notify_final_done_if_needed' /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "ls /Users/lin/.openclaw/workspace/.task-watcher/*_done_notice 2>/dev/null | wc -l"
+  ],
+  "test_results": {
+    "shell_syntax": "passed",
+    "done_notice_sentinel_count": 0,
+    "historical_done_task_count": 92
+  },
+  "regressions_found": [],
+  "notes": [
+    "本轮验证基于 dev-1 rework 后的代码（result.json 2026-05-06T09:20:00+08:00）。",
+    "review-1 驳回的两个阻塞问题（HIGH 历史任务补发 + MEDIUM 文档不一致）均验证有效。",
+    "核心逻辑方向正确（done-only 通知、覆盖所有 done 路径），阻塞问题为部署安全性与文档同步。",
+    "task.json.merge_gate_state=review_rejected，与 review-1 结论一致。"
+  ]
+}

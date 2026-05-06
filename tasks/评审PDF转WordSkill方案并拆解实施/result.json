@@ -1,0 +1,269 @@
+{
+  "status": "done",
+  "completed_at": "2026-05-06T07:32:16.937212+08:00",
+  "summary": "设计总体可实施，且与 chiralium 当前 custom skill、subprocess runtime、chat file result 注册链路匹配；但需先补齐 manifest -> DB 的 supports_file_parse 同步，否则 PDF 转 Word skill 启用后仍会被 chat 通用 PDF 预解析链路拦截/拖慢。MinerU 与 MiniCPM-V 不应放进 skill.py 或默认 docker runtime，MVP 先用 mock/fixture 跑通 skill + service + DOCX 闭环，真实接入优先使用长期运行的 HTTP sidecar/service，CLI 仅作为开发兜底。",
+  "design_doc": "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
+  "review_conclusion": {
+    "implementable": true,
+    "blocking_level": "non_blocking_with_required_pre_mvp_fix",
+    "must_fix_before_enabling_skill": [
+      "admin_skill_service.sync_filesystem_skills_to_db() 与 upload_skill() 当前把 SkillRecord.supports_file_parse 硬编码为 false；PDF 转 Word manifest 必须能同步该 DB 字段。",
+      "设计文档中关于 skill context 不暴露 stored_path 的判断需要修正：chat._build_skill_uploaded_files() 已向 skill context 传 stored_path，现有 order-print-image-pack skill 也按该方式读取原始文件；MVP 无需修改 chat.py 暴露新字段。",
+      "manifest 建议把 supports_file_parse 放在顶层字段；同步逻辑可兼容 parameters.supports_file_parse，避免文档示例与实现脱节。",
+      "backend/requirements.txt 当前没有 python-docx；按项目规则不要在 MVP 默认新增依赖。若要高质量表格/图片 DOCX 装配，应由 PM 单独确认依赖引入，或先用现有 office_export_service 风格的最小 OOXML 输出。"
+    ],
+    "first_phase_mvp_must_change_admin_skill_service": true,
+    "supports_file_parse_decision": "必须改。否则 sync/upload 后 DB 仍为 false，chat.py::_execute_skill_path 会在执行 skill 前调用 _ensure_parsed_files()，PDF 会先走通用 PyMuPDF/文本解析；扫描件、加密 PDF 或大文件可能在进入转换 skill 前失败或产生明显延迟。",
+    "mineru_minicpmv_first_integration_mode": "MVP 使用 mock/fixture；真实集成优先 MinerU HTTP sidecar/service + MiniCPM-V HTTP/OpenAI-compatible sidecar/service。不要使用默认 docker skill runtime（当前 SKILL_DOCKER_NETWORK=none），不要每次 skill 执行时启动模型。MinerU CLI 只建议作为开发环境兜底适配器，不作为首选生产接入。",
+    "api_route_decision": "后续内部 API 可复用同一 PDFConversionService；对外 API 必须等内部异步 job、鉴权、限流、结果过期、审计稳定后再开放。"
+  },
+  "implementation_slices": [
+    {
+      "title": "补齐 Skill 文件解析开关同步",
+      "agent_or_pool": "be-1 或 auto-dev/backend",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+      ],
+      "dependencies": [],
+      "acceptance": [
+        "sync_filesystem_skills_to_db() 新建 custom skill DB 记录时，从 manifest 顶层 supports_file_parse 读取布尔值；缺省保持 false。",
+        "upload_skill() 审批流创建 SkillRecord 时也同步同一字段；可兼容 parameters.supports_file_parse 作为临时兜底，但新 manifest 统一使用顶层字段。",
+        "已有记录在 manifest 显式声明 supports_file_parse=true 且 DB 仍为 false 时有明确策略：同步更新或输出需要手动迁移的说明；建议同步更新以避免环境漂移。",
+        "新增/更新 test_admin_skills.py 覆盖 manifest true、manifest 缺省 false、upload zip true 三种情况。",
+        "不改变现有没有声明 supports_file_parse 的 skill 行为。"
+      ]
+    },
+    {
+      "title": "PDF 转 Word Skill MVP（mock/fixture 闭环）",
+      "agent_or_pool": "be-1 或 auto-dev/backend",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/manifest.json",
+        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
+        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md",
+        "/Users/lin/Desktop/work/chiralium/backend/app/core/config.py",
+        "/Users/lin/Desktop/work/chiralium/backend/.env.example",
+        "/Users/lin/Desktop/work/chiralium/.env.example",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/__init__.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/workspace.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py"
+      ],
+      "dependencies": [
+        "补齐 Skill 文件解析开关同步"
+      ],
+      "acceptance": [
+        "新增 pdf_to_word custom skill，manifest 使用 runtime_backend=subprocess、allowed_extensions=[\".pdf\"]、max_files=1、timeout_sec 约 900、顶层 supports_file_parse=true。",
+        "skill.py 只做输入校验、模式解析、调用 PDFConversionService、返回 display_type=file；从 context.uploaded_files 中选择唯一 PDF，并复用现有 stored_path，不修改 chat.py/file_service.py。",
+        "PDFConversionService 先以 mock/fixture MinerU 结果生成最小可下载 DOCX；输出至少包含段落、表格降级文本/占位、warnings 与转换说明。",
+        "返回 file payload 包含 file_name、file_path、file_size、DOCX MIME；chat 现有 register_generated_file 链路可注册 generated file。",
+        "无文件、多文件、非 PDF、文件不存在、超时/转换异常均返回可读错误，不生成半成品。",
+        "测试验证 SkillManager 可发现 manifest、skill 执行返回合法文件结果、DOCX 是合法 zip、meta 含 page_count/block_count/warnings、现有 docx_generator/order-print skill 不受影响。",
+        "不新增第三方依赖；如必须引入 python-docx，需在任务中显式列为依赖审批点。"
+      ]
+    },
+    {
+      "title": "MinerU HTTP sidecar Adapter 接入",
+      "agent_or_pool": "be-1 或 auto-dev/backend",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_content_list.json",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_middle.json"
+      ],
+      "dependencies": [
+        "PDF 转 Word Skill MVP（mock/fixture 闭环）"
+      ],
+      "acceptance": [
+        "优先实现 HTTP sidecar/service client，读取 MINERU_BASE_URL、timeout、parse_mode 等配置；不在请求内启动 MinerU 模型或重型进程。",
+        "将 MinerU content_list/middle_json/layout/images 映射为 DocumentIR，保留 page、bbox、kind、image_path、warnings。",
+        "服务不可用、超时、输出缺字段时返回结构化错误/降级 warning；临时工作目录按 job 清理。",
+        "测试只使用 mocked HTTP/fixture，不依赖真实 MinerU 安装或网络服务。",
+        "若确需 CLI，新增为显式 dev fallback，并默认关闭；生产首选仍是 sidecar service。"
+      ]
+    },
+    {
+      "title": "MiniCPM-V 局部增强器接入",
+      "agent_or_pool": "be-1 或 auto-dev/backend",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/minicpmv_client.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/enhancement.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_enhancement.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/minicpmv_enhancement.json"
+      ],
+      "dependencies": [
+        "MinerU HTTP sidecar Adapter 接入"
+      ],
+      "acceptance": [
+        "按 fast/balanced/quality 模式选择增强候选；fast 不调 MiniCPM-V，balanced/quality 按配置限制最大 block 数。",
+        "MiniCPM-V 通过 HTTP/OpenAI-compatible sidecar/service 调用，输入局部 crop 或整页+bbox，输出必须解析为严格 JSON。",
+        "非法 JSON、超时、单 block 失败时保留 MinerU 结果并追加 warning，不使整体转换失败。",
+        "合并策略禁止新增 PDF 中不存在的内容；修正文本文字时保留 original_text/source/enhancement_reason。",
+        "meta 输出 enhanced_block_count、enhancement_mode、warnings；单测覆盖表格修正、caption 补充、失败降级与禁幻觉策略。"
+      ]
+    },
+    {
+      "title": "内部 PDF 转 Word 异步 Job API",
+      "agent_or_pool": "be-1 或 auto-dev/backend；接口契约由 arch-1 复核",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/schemas/pdf_to_word.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/job_service.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/db/models/pdf_to_word_job.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/db/models/__init__.py",
+        "/Users/lin/Desktop/work/chiralium/backend/alembic/versions/016_pdf_to_word_jobs.py",
+        "/Users/lin/Desktop/work/chiralium/backend/app/main.py",
+        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
+      ],
+      "dependencies": [
+        "PDF 转 Word Skill MVP（mock/fixture 闭环）",
+        "MinerU HTTP sidecar Adapter 接入"
+      ],
+      "acceptance": [
+        "新增内部接口 POST /api/pdf-to-word/jobs、GET /api/pdf-to-word/jobs/{job_id}、GET /api/pdf-to-word/jobs/{job_id}/download，复用 session 用户鉴权。",
+        "job/result 与 user_id 隔离；非本人 job 不可查询/下载。",
+        "API 复用 PDFConversionService，不复制 skill.py 逻辑；测试中 mock 转换服务。",
+        "状态至少支持 queued/running/succeeded/failed/cancelled；失败返回错误码与用户可读信息。",
+        "下载返回现有 /api/files/{file_id} 生成文件或文件流；不暴露内部 stored_path。",
+        "该切片仅做内部 API，不做外部 API key、配额、webhook、计费。"
+      ]
+    },
+    {
+      "title": "PDF 转 Word 端到端 QA 与质量报告",
+      "agent_or_pool": "qa-1",
+      "task_type": "verification",
+      "write_scope": [
+        "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-qa-report.md"
+      ],
+      "dependencies": [
+        "PDF 转 Word Skill MVP（mock/fixture 闭环）",
+        "MinerU HTTP sidecar Adapter 接入",
+        "MiniCPM-V 局部增强器接入"
+      ],
+      "acceptance": [
+        "准备/记录 5 类样本：纯文本论文、扫描件、多表格、图文混排产品手册、双栏复杂版式。",
+        "通过聊天 skill 链路验证上传 PDF -> skill 执行 -> assistant message 带 generated DOCX file；如内部 API 已完成，同时验证 API job 创建、查询、下载。",
+        "验证 supports_file_parse=true 后不会触发通用 PDF 预解析阻塞转换 skill。",
+        "回归 docx_generator、ppt_generator、order-print-image-pack 至少各 1 个核心用例，确认文件型 skill 链路未回退。",
+        "报告文本覆盖率、表格准确率、图片/图注匹配、阅读顺序抽检、耗时、warnings 命中情况与上线风险。"
+      ]
+    }
+  ],
+  "recommended_first_task": {
+    "title": "补齐 Skill 文件解析开关同步",
+    "reason": "这是最小、低风险且会阻塞 PDF 转 Word skill 正常启用的前置项；不先修，MVP 即使 skill.py 可用，也可能在 chat.py 执行 skill 前被通用 PDF parser 拦截或拖慢。",
+    "write_scope": [
+      "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+      "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+    ]
+  },
+  "risks": [
+    {
+      "severity": "high",
+      "item": "supports_file_parse 未同步",
+      "impact": "PDF 会在 skill 前走通用 parser；大文件、扫描件、加密 PDF 可能失败或延迟明显。",
+      "mitigation": "先做 recommended_first_task；manifest 顶层声明 supports_file_parse=true。"
+    },
+    {
+      "severity": "high",
+      "item": "MinerU/MiniCPM-V 服务未就绪",
+      "impact": "真实转换质量无法保证，MVP 只能 mock/fixture 或 MinerU-only。",
+      "mitigation": "明确 sidecar URL、超时、资源、模型版本；MVP 不假设生产可用。"
+    },
+    {
+      "severity": "medium",
+      "item": "同步 skill 超时与聊天体验",
+      "impact": "长 PDF 在 WebSocket skill 执行期间可能超时或用户等待过久。",
+      "mitigation": "MVP 限制页数/大小/timeout；第二阶段改内部异步 job。"
+    },
+    {
+      "severity": "medium",
+      "item": "DOCX 生成能力与依赖",
+      "impact": "backend/requirements.txt 当前没有 python-docx，复杂表格/图片排版若强行实现会引入新依赖或大量 OOXML 代码。",
+      "mitigation": "MVP 使用最小 OOXML/现有模式；若引入 python-docx，PM 单独批准并纳入依赖变更验收。"
+    },
+    {
+      "severity": "medium",
+      "item": "MiniCPM-V 幻觉或覆盖正确文本",
+      "impact": "DOCX 可能出现 PDF 不存在内容。",
+      "mitigation": "只增强高风险 block；严格 JSON；合并策略默认保留 MinerU，禁止自由新增。"
+    },
+    {
+      "severity": "medium",
+      "item": "stored_path 暴露给 custom subprocess",
+      "impact": "现有 skill context 已包含 stored_path，若未来允许不可信 skill，会扩大文件读取风险。",
+      "mitigation": "本 MVP 仅批准内置/受信 pdf_to_word skill；服务端校验 file_id/user_id/路径在 upload root 内；后续考虑按 file_service.load_file_bytes 封装。"
+    }
+  ],
+  "active_write_scope_conflicts": [
+    {
+      "task_id": "实现PPT生成skill图片OCR输入链路",
+      "status": "blocked",
+      "conflict": "该任务 write_scope 包含 backend/app/services/file_service.py；本拆分刻意不修改 file_service.py。若后续想把 PDF 读取封装到 file_service，需要等该任务合入或重新协调。"
+    },
+    {
+      "task_id": "优化订单图包生成skill双标签A4打印布局",
+      "status": "dispatched",
+      "conflict": "触及 skills/custom/order-print-image-pack/1.0.0/skill.py 和 backend/tests/test_order_print_image_skill.py；本拆分仅做回归，不修改该 skill。"
+    },
+    {
+      "task_id": "实现PPT精美模式入口与CogView页图渲染Demo",
+      "status": "dispatched",
+      "conflict": "触及 ppt_generator skill 与 ppt_page_render_service；与 PDF 转 Word 新 skill/package 无直接重叠。"
+    },
+    {
+      "task_id": "评估GLM联网搜索退化缓解方案",
+      "status": "ready_for_merge",
+      "conflict": "只写设计文档，无代码 write_scope 冲突。"
+    },
+    {
+      "task_id": "验证PPT精美模式Demo闭环",
+      "status": "working",
+      "conflict": "QA 只读/结果型任务，无 write_scope 冲突。"
+    }
+  ],
+  "notes": [
+    "当前设计文档建议路线正确：skill 入口 + 可复用转换服务 + 后续 API 外壳，不应把转换能力堆在 skill.py。",
+    "chat.py::_build_skill_uploaded_files() 已传 stored_path，现有 order-print-image-pack skill 也依赖该字段；MVP 可以不改 chat.py。",
+    "chat.py::_execute_skill_path() 的 display_type=file 注册逻辑已满足 PDF 转 Word 输出：skill 返回临时 file_path 后，chat 会 register_generated_file 并把 generated file 挂到 assistant message。",
+    "SkillManager subprocess runner 在 backend cwd 下执行 app.services.skill_runner，custom skill 可以 import app.services.*；runtime_backend=subprocess 与本需求匹配。",
+    "默认 docker skill runtime 的 network 为 none，不适合第一阶段访问 MinerU/MiniCPM-V sidecar。",
+    "不安排生产部署；外部 API、API key、配额、webhook、计费均不进入 MVP。",
+    "设计文档本身目前是 chiralium 工作树未跟踪文件；PM 若要纳入版本管理，应单独创建文档提交/合入任务。"
+  ],
+  "evidence": [
+    "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/skill_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/skill_runner.py",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/docx_generator/1.0.0/manifest.json",
+    "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
+    "/Users/lin/Desktop/work/chiralium/backend/requirements.txt",
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/*/task.json active chiralium task scan"
+  ],
+  "verification": {
+    "result_json_validated": true,
+    "code_modified": false,
+    "business_code_modified": false,
+    "tests_run": "未运行；本任务为只读架构评审，仅写任务 ack/result。"
+  },
+  "task_id": "评审PDF转WordSkill方案并拆解实施",
+  "agent": "arch-1",
+  "files_modified": [],
+  "tests": [
+    "python3 -m json.tool /Users/lin/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json",
+    "python3 -m json.tool /Users/lin/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/ack.json",
+    "未运行业务测试；本任务为只读架构评审，仅写任务 ack/result。"
+  ]
+}

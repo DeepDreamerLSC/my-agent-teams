@@ -1,0 +1,6 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-04T00:59:24+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-04T01:01:06+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "pooled", "at": "2026-05-04T11:10:27+08:00", "reason": "pm queued task into claim pool"}
+2026-05-06T05:19:39Z pm-chief dispatched -> dispatched agent=dev-1
+2026-05-06T05:33:35Z pm-chief dispatched -> ready_for_merge agent=dev-1 result.json received
+2026-05-06T05:42:22Z pm-chief ready_for_merge -> done gate=closed review=APPROVE_r1 qa=PASS

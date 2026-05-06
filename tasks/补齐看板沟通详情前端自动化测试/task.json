@@ -1,0 +1,71 @@
+{
+  "id": "补齐看板沟通详情前端自动化测试",
+  "title": "补齐看板沟通详情前端自动化测试",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": "2026-05-05T18:00:00+08:00",
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "task_type": "development",
+  "read_only": false,
+  "downstream_action": "review",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "write_scope": [
+    "dashboard/static/js",
+    "dashboard/static/css",
+    "dashboard/templates/dashboard",
+    "dashboard/tests"
+  ],
+  "depends_on": [
+    "增强看板卡片责任链与筛选器"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/补齐看板沟通详情前端自动化测试/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "补齐看板沟通详情前端自动化测试",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 90,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-04T23:13:33+08:00",
+  "lease_expires_at": "2026-05-04T23:13:33+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已补齐看板详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试，并做了最小可测性补修：抽出纯渲染函数、增加前端时间线排序辅助函数与 Node 环境保护，使 dashboard 前端逻辑可在 unittest 中稳定回归验证。（QA 已通过自动收口） QA 结论：QA 验证通过。详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试已补齐。dashboard.js 已抽取纯渲染函数 (renderTaskDetailHtml / renderTimelineHtml / sortTimelineItems) 并增加 Node 环境保护，4 个 unittest 全部通过。",
+  "last_error": null,
+  "created_at": "2026-05-04T00:55:42+08:00",
+  "updated_at": "2026-05-05T20:24:06+08:00",
+  "claim_scope": [
+    "dev-1"
+  ],
+  "claim_policy": "pull",
+  "claim_max_concurrency": 1,
+  "dependency_policy": "ready_for_merge_ok",
+  "pool_timeout_minutes": 120,
+  "pool_entered_at": "2026-05-04T11:10:24+08:00",
+  "claimed_by": "dev-1",
+  "claimed_at": "2026-05-04T23:13:33+08:00",
+  "claim_reason": "上一条前端主线已完成，继续执行下一条前端测试任务"
+}

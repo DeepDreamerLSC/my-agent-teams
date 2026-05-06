@@ -1,0 +1,7 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-05T16:53:08+08:00", "reason": "watcher auto-claimed pending execution task"}
+{"from": "dispatched", "to": "working", "at": "2026-05-05T16:54:19+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "blocked", "at": "2026-05-05T16:54:21+08:00", "reason": "watcher observed result.json status=blocked"}
+{"from": "blocked", "to": "pooled", "at": "2026-05-05T16:57:33+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-06T06:50:39+08:00", "reason": "PM dispatch: 依赖已满足，分配给dev-2(订单图包领域经验)"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-06T10:36:25+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-06T10:45:49+08:00", "reason": "task-watcher auto close after qa verify pass"}

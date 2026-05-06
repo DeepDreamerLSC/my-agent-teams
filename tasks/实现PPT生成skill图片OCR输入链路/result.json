@@ -2,49 +2,27 @@
   "task_id": "实现PPT生成skill图片OCR输入链路",
   "agent": "dev-1",
   "agent_id": "dev-1",
-  "status": "done",
-  "completed_at": "2026-04-30T13:12:00+08:00",
-  "summary": "已补齐 PPT 生成 skill 的图片 OCR 输入链路：png/jpg/jpeg/webp 现在会走图片 OCR 解析，解析结果持久化到 uploaded_files.extracted_text，并通过 uploaded_file_summary 稳定暴露 extracted_text / parse_status / parser_source，供后续 skill 作为等效结构消费。",
-  "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/parser_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py"
+  "status": "blocked",
+  "completed_at": "2026-05-06T09:28:00+08:00",
+  "summary": "按当前返工要求，本任务在现有 write_scope 下无法闭环修复。review 驳回要求补齐‘图片 → OCR → PPT skill 消费’完整主链，但缺失的关键文件（ContextAssembler、chat skill 输入链、ppt_generator manifest/skill、稳定 schema）均不在本任务允许修改范围内。现有 write_scope 仅覆盖 parser_service/file_service 与对应测试，最多只能完成 OCR 落库，无法让 PPT skill 当前主链真正消费图片 OCR 结果。",
+  "blockers": [
+    "review 要求补齐 ContextAssembler.ensure_parsed_files 对图片的解析接入，但该文件不在 write_scope。",
+    "review 要求让 ppt_generator 当前主链实际消费图片 OCR 结果，而 skill.py / manifest.json 不在 write_scope。",
+    "review 要求把 uploaded_file_summary 新增字段变成稳定 schema 契约，但 app/schemas/file.py 不在 write_scope。"
   ],
-  "implementation": {
-    "image_ocr": [
-      "在 parser_service.py 中把 .png/.jpg/.jpeg/.webp 纳入 parser 可处理类型。",
-      "图片文件不再走文档 parser，而是走 _parse_image_with_model()：选择一个支持 image_input 的活跃文本模型，构造 image_url(data URL) + OCR 提示词，请模型返回图片文字与关键要点。",
-      "OCR 成功后仍复用现有 store_parsed_result()，把内容写回 uploaded_files.extracted_text，保持和文档/PDF 的 extracted_text 契约一致。"
+  "requested_pm_actions": [
+    "扩大本返工任务 write_scope，至少包含：backend/app/services/context_assembler.py、backend/app/api/chat.py（如确有需要）、backend/app/schemas/file.py、skills/custom/ppt_generator/1.0.0/skill.py、skills/custom/ppt_generator/1.0.0/manifest.json。",
+    "或者将本返工任务拆成‘OCR落库层’与‘PPT skill 消费层’两条子任务，分别派发。"
+  ],
+  "current_code_state": {
+    "already_done": [
+      "图片可经 ParserService OCR 并写回 uploaded_files.extracted_text。",
+      "uploaded_file_summary 已尝试带出 extracted_text / parse_status / parser_source。"
     ],
-    "stable_output_structure": {
-      "persisted_field": "uploaded_files.extracted_text",
-      "summary_fields": [
-        "uploaded_file_summary().extracted_text",
-        "uploaded_file_summary().parse_status",
-        "uploaded_file_summary().parser_source"
-      ],
-      "why": "在不额外引入割裂结构的前提下，让后续 PPT skill 至少能从 uploaded_files 等效结构中读取 OCR 结果。"
-    },
-    "non_regression": [
-      "docx/pdf/xls/xlsx 现有解析逻辑未改。",
-      "图片上传不再标记为 skipped，而是 pending，符合后续 OCR 解析语义。"
-    ]
-  },
-  "verification": {
-    "commands": [
-      {
-        "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py -q",
-        "result": "passed (4 passed, 4 warnings)"
-      },
-      {
-        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/services/parser_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
-        "result": "passed"
-      }
-    ],
-    "tests_added": [
-      "图片输入可被 ParserService 通过 OCR 模型处理并写回 extracted_text。",
-      "uploaded_file_summary 会把 extracted_text / parse_status / parser_source 暴露给后续 skill 消费。"
+    "still_missing": [
+      "图片不会进入当前 parsed_files 主链。",
+      "PPT skill 当前仍只消费 parsed_files，不消费 uploaded_files[].extracted_text。",
+      "新增字段尚未进入稳定 schema。"
     ]
   }
 }

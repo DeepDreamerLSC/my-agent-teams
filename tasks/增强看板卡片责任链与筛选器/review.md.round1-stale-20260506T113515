@@ -1,0 +1,48 @@
+# Code Review - 增强看板卡片责任链与筛选器
+
+## 结论
+- **审查结论：驳回（REQUEST CHANGES）**
+- 依据：`instruction.md`、`result.json`、`dashboard/static/js/dashboard.js`、`dashboard/static/js/helpers.js`、当前 dashboard 数据层代码审查。
+- 说明：任务目录当前 **无 `verify.json`**；本次结论基于代码与工件审查给出，未自行执行功能测试。
+
+## 通过项
+- 前端已增加 project / domain / assigned_agent / owner_pm / review_level 客户端筛选器 UI：
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html:25-31`
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:83-118,431-447`
+- 卡片已尝试展示责任链文本、状态停留时长、priority / target_environment 标签：
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:154-181`
+
+## 阻塞问题
+
+### 1. 后端任务 payload 当前并没有提供 `integration_owner / target_environment / review_level`，部分责任链与筛选器实际上无数据可用
+- 位置：
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py:11-42`
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py:374-408`
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:58-86`
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:160-169`
+  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js:133-140`
+- 当前 dashboard 任务表与 query payload 里：
+  - 有 `owner_pm`
+  - 有 `reviewer`
+  - 但没有 `integration_owner`
+  - 没有 `target_environment`
+  - 没有 `review_level`
+- 结果：
+  - 卡片上的 `Integration:` 只能长期显示 `-`
+  - `target_environment` 标签无法真实展示
+  - `review_level` 筛选器不会有有效选项，也无法真正筛选
+- 这与任务验收标准“Kanban 卡片能显示责任链关键字段与状态停留信息”“至少支持按 ... review_level 做筛选”不符。
+
+## 测试问题
+
+### 2. 当前验证只覆盖 helpers 级别，没有证明卡片增强与筛选器在真实 dashboard.js 渲染路径下成立
+- `result.json` 里的验证主要是：
+  - `helpers.js` 级别的 Node 命令
+  - Python 侧 py_compile
+- 但没有覆盖：
+  - `dashboard.js` 实际卡片渲染后的 DOM 结果
+  - 筛选器与 `latestBoardPayload` 联动行为
+- 对这种纯前端显示任务来说，这个验证强度偏弱。
+
+## 最终意见
+当前实现把前端 UI 壳子搭出来了，但**关键字段并未从后端 payload 真正提供**，导致 `integration_owner / target_environment / review_level` 三项能力实际不可用。建议先补齐数据口径或调整任务目标后再合入。

@@ -1,0 +1,38 @@
+{
+  "task_id": "补齐看板Schema迁移与回填策略",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-04T01:14:30+08:00",
+  "summary": "已补齐任务协作看板的 schema version、migrate/backfill/rebuild-all 边界设计：新增独立迁移策略文档，并同步更新主方案与任务拆解，使后续 dev-2 可以按统一规则实现版本检查、有限保守迁移、幂等重建与全量回填逻辑。",
+  "changed_files": [
+    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
+    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
+    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
+  ],
+  "deliverables": {
+    "migration_strategy_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
+    "updated_solution_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
+    "updated_breakdown_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
+  },
+  "key_points": [
+    "明确 SCHEMA_VERSION 分为代码期望版本与数据库实际版本，并定义数据库不存在、版本相等、低于代码版本、高于代码版本四种处理语义。",
+    "明确 initialize、migrate、backfill、rebuild-all 四类动作的职责边界，禁止把 schema 决策隐式塞进普通 sync/query 路径。",
+    "明确当前阶段默认策略：开发/本地库 rebuild-first，共享库 migrate-first，必要时人工确认 rebuild。",
+    "明确哪些变更允许自动 migrate（增表、加索引、新非必填列），哪些变更默认优先 rebuild（主键变化、payload 重写、表语义重构等）。",
+    "明确 sync-task、sync-chat、rebuild-metrics 只负责事实同步/派生重算，不承担 schema version 迁移决策。"
+  ],
+  "constraints_respected": [
+    "仅修改 instruction 指定 write_scope 内的设计文档",
+    "未修改 dashboard 运行时代码",
+    "方案与现有 Chat Hub / communication_events 事件模型保持兼容"
+  ],
+  "verification": {
+    "doc_consistency": "已对照 design/任务协作看板优化方案.md、design/任务协作看板-任务拆解.md、design/任务协作看板-架构审查.md 与现有 dashboard/db.py 进行口径校对",
+    "git_status_scope": "仅出现 2 个 design 文档修改 + 1 个新 design 文档新增，均在 write_scope 内"
+  },
+  "next_action": "review",
+  "risks": [
+    "本次仅完成策略设计，尚未实现 migration runner、rebuild-all 命令与失败回滚机制。",
+    "当前仓库中的 dashboard/db.py 已先行出现更高 SCHEMA_VERSION 与 communication_events 相关代码，review 时需确认代码实现与本次文档策略完全对齐。"
+  ]
+}

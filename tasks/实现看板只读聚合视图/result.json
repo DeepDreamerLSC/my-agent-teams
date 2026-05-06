@@ -1,0 +1,93 @@
+{
+  "task_id": "实现看板只读聚合视图",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-05T09:10:33+08:00",
+  "summary": "已补齐看板只读聚合视图后端闭环：新增 `/api/tasks/aggregate` 与 `scripts/task-aggregate.py`，按 owner_pm/domain/task_level/parent_task_id/root_request_id 输出只读聚合摘要、task tree drill-down 与拥塞分布；同时在 query 层对 `task_level` 做 task.json 回退读取，避免当前 SQLite 快照未持久化该字段时聚合失真。",
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
+      "action": "modified",
+      "description": "新增 `build_task_aggregate_payload()` 及聚合辅助函数；按 owner_pm/domain/task_level/parent_task_id/root_request_id 构建只读汇总与 `request_trees`；当 SQLite 任务快照未持久化 `task_level` 时，回退读取对应 task.json 做层级补齐。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
+      "action": "modified",
+      "description": "新增 `/api/tasks/aggregate` 只读接口，支持 project/owner_pm/domain/task_level/parent_task_id/root_request_id 过滤。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py",
+      "action": "added",
+      "description": "新增 CLI 聚合脚本，支持表格输出与 `--json` 输出，并可选 `--sync-first` 先同步 tasks/ 到 SQLite read model。"
+    }
+  ],
+  "api_added": [
+    "/api/tasks/aggregate"
+  ],
+  "cli_added": {
+    "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py",
+    "supports": [
+      "--json",
+      "--sync-first",
+      "--project",
+      "--owner-pm",
+      "--domain",
+      "--task-level",
+      "--parent-task-id",
+      "--root-request-id",
+      "--group-limit"
+    ]
+  },
+  "payload_contract": {
+    "top_level_fields": [
+      "generated_at",
+      "read_only",
+      "source",
+      "filters",
+      "summary",
+      "tasks",
+      "groupings",
+      "request_trees"
+    ],
+    "groupings": [
+      "owner_pm",
+      "domain",
+      "task_level",
+      "parent_task_id",
+      "root_request_id"
+    ],
+    "read_only_guard": "payload.source.note 明确声明该聚合仅供巡检，不替代 task.json / task 状态事实源。",
+    "tree_shape": "`request_trees` 以 root_request_id 聚合，并给出 parent_groups/task_ids/root_task_ids，便于 PM 观察任务树膨胀与拥塞点。"
+  },
+  "implementation_notes": [
+    "当前 `tasks` SQLite read model 尚未持久化 `task_level` 列；本次在 query 层按 `task_json_path` 回退读取 task.json，保证聚合维度完整，同时不改写 task 事实源。",
+    "聚合摘要同时返回 current_status / board_status 分布、blocked_count、active_count、ready_for_merge_count，便于 PM 直接识别 domain 与层级拥塞。",
+    "本次只收口后端只读聚合查询/API/脚本，不涉及前端分析页。"
+  ],
+  "validation": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/app.py /Users/lin/Desktop/work/my-agent-teams/dashboard/query.py /Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 -m unittest discover -s /Users/lin/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
+      "result": "passed (7 tests)"
+    },
+    {
+      "command": "python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py --group-limit 3",
+      "result": "passed；成功输出 owner_pm/domain/task_level/parent_task_id/root_request_id 五个维度摘要与 request tree 文本报告"
+    },
+    {
+      "command": "python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py --json --group-limit 1 | python3 -c 'import json,sys; payload=json.load(sys.stdin); print(payload[\"read_only\"], list(payload[\"groupings\"].keys())[:5])'",
+      "result": "passed；JSON 输出可解析，包含五个聚合维度"
+    },
+    {
+      "command": "python3 - <<'PY' ... build_task_aggregate_payload(conn, project=\"my-agent-teams\") ... PY",
+      "result": "passed；`summary.task_count == 36`，并返回 `task_level_counts` / `request_trees` 数据"
+    },
+    {
+      "command": "python3 - <<'PY' ... Flask test_client GET /api/tasks/aggregate?project=my-agent-teams ... PY",
+      "result": "passed；aggregate API smoke 验证返回 200，且能通过 task.json 回退识别 `task_level=execution`"
+    }
+  ]
+}

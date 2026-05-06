@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐看板详情时间线独立接口与后端单测",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-04T01:33:30+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将基于现有 /api/tasks/<id>/detail 补齐独立的 timeline / communications 只读接口，并新增后端自动化测试，保持返回口径与 detail 一致。"
+}

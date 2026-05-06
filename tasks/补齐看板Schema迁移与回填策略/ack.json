@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐看板Schema迁移与回填策略",
+  "agent": "arch-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-04T01:08:00+08:00",
+  "note": "已读取 design 任务说明，开始补齐看板 schema version、migration、rebuild 与 backfill 策略文档，并同步更新方案与任务拆解。"
+}

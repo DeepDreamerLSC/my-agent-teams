@@ -1,0 +1,50 @@
+{
+  "task_id": "实现看板只读聚合视图",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-05T20:35:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。API /api/tasks/aggregate 与 CLI task-aggregate.py 已补齐，支持按 owner_pm/domain/task_level/parent_task_id/root_request_id 五维度只读聚合、request_tree drill-down 与拥塞分布。8 个 dashboard 测试全部通过，aggregate CLI JSON 输出可解析、维度完整。",
+  "review_verdict": "APPROVE",
+  "test_commands": [
+    "PYTHONPATH=/Users/lin/Desktop/work/my-agent-teams python3 -m unittest discover -s dashboard/tests -p 'test_*.py' -v",
+    "python3 scripts/task-aggregate.py --json --group-limit 1"
+  ],
+  "test_results": {
+    "dashboard_tests": "8 passed (4 frontend + 4 backend)",
+    "aggregate_cli_json": "passed (read_only=True, 5 dimensions, summary fields correct)"
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "至少支持按 5 个维度汇总",
+      "status": "pass",
+      "evidence": "API/CLI/query 均支持 owner_pm / domain / task_level / parent_task_id / root_request_id。aggregate CLI JSON 输出包含全部 5 个 groupings 维度。"
+    },
+    {
+      "criterion": "PM 可通过脚本或 API 获得只读摘要",
+      "status": "pass",
+      "evidence": "/api/tasks/aggregate 支持 GET 参数过滤；task-aggregate.py 支持 --json / --sync-first / --group-limit 等选项。实测 CLI 输出 task_count=122，含 current_status_counts / board_status_counts / request_trees。"
+    },
+    {
+      "criterion": "不把聚合视图误当成状态事实源",
+      "status": "pass",
+      "evidence": "payload 显式声明 read_only: true 与 source.note: 'derived for inspection only'。task_level 回退读取 task.json 但不改写任务事实源。"
+    },
+    {
+      "criterion": "task_level 回退策略兼容当前 SQLite 快照缺口",
+      "status": "pass",
+      "evidence": "_coalesce_task_field() 按 task_json_path 回退读取 task.json，确保 task_level / parent_task_id / root_request_id 聚合维度完整。"
+    },
+    {
+      "criterion": "非回归",
+      "status": "pass",
+      "evidence": "8 个 dashboard 测试全部通过，既有 detail / timeline / communications / 前端测试均未受影响。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "review.md 审查结论为 APPROVE，与本 QA 结论一致。",
+    "review.md 非阻塞备注指出未新增聚合专用的 dashboard 自动化测试文件，后续扩展时可补。"
+  ]
+}

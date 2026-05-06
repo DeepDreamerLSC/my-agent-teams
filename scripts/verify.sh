@@ -75,8 +75,8 @@ if result.get('task_id') != task.get('id'):
     errors.append('result.task_id mismatch')
 if result.get('agent') != task.get('assigned_agent'):
     errors.append('result.agent mismatch with assigned_agent')
-if result.get('status') not in {'ready_for_merge', 'blocked', 'failed'}:
-    errors.append('result.status invalid')
+if result.get('status') not in {'done', 'blocked', 'failed'}:
+    errors.append('result.status invalid; expected one of done/blocked/failed')
 if not isinstance(result.get('summary'), str) or not result['summary'].strip():
     errors.append('result.summary missing')
 files_modified = result.get('files_modified')

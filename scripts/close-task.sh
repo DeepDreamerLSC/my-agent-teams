@@ -57,6 +57,7 @@ fi
 
 python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" <<'PY'
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -76,22 +77,81 @@ def load_json(path: Path) -> dict:
         fail(f'invalid json: {path}: {exc}')
 
 
-APPROVE_KEYWORDS = ('通过', 'approve', 'approved', 'lgtm', 'ship it')
-REJECT_KEYWORDS = ('驳回', '不通过', '未通过', 'reject', 'request changes', '不接受')
+CONCLUSION_LABEL_RE = re.compile(
+    r'^\s*(?:#{1,6}\s*)?'
+    r'(?:审查结论|复审结论|最终结论|最终意见|结论|review conclusion|conclusion|verdict|decision)'
+    r'\s*(?:[:：\-—]\s*)?(.*)$',
+    re.IGNORECASE,
+)
+APPROVE_PATTERNS = (
+    re.compile(r'\bapprove(?:d)?\b', re.IGNORECASE),
+    re.compile(r'\blgtm\b', re.IGNORECASE),
+    re.compile(r'\bship\s+it\b', re.IGNORECASE),
+    re.compile(r'通过|同意合入|批准|可以合入'),
+)
+REJECT_PATTERNS = (
+    re.compile(r'\brequest\s+changes\b', re.IGNORECASE),
+    re.compile(r'\bchanges\s+requested\b', re.IGNORECASE),
+    re.compile(r'\breject(?:ed)?\b', re.IGNORECASE),
+    re.compile(r'驳回|不通过|未通过|不接受|请求修改|要求修改'),
+)
+
+
+def classify_review_snippet(snippet: str) -> str:
+    """Classify an explicit review verdict snippet.
+
+    Review files often mention state names such as ``review_rejected`` or
+    ``qa_failed`` in explanatory text.  Those must not override an explicit
+    APPROVE conclusion, so matching is limited to conclusion snippets and
+    English reject words require token boundaries instead of substring scans.
+    """
+    if not snippet.strip():
+        return 'pending'
+    if any(pattern.search(snippet) for pattern in REJECT_PATTERNS):
+        return 'fail'
+    if any(pattern.search(snippet) for pattern in APPROVE_PATTERNS):
+        return 'pass'
+    return 'pending'
+
+
+def classify_review_text(text: str) -> str:
+    lines = text.splitlines()
+
+    # Prefer explicit verdict/conclusion sections.  For heading-only forms
+    # such as "## 结论", inspect only the next few non-empty lines rather
+    # than the whole review body.
+    for index, line in enumerate(lines[:60]):
+        match = CONCLUSION_LABEL_RE.match(line)
+        if not match:
+            continue
+        snippets = []
+        suffix = match.group(1).strip()
+        if suffix:
+            snippets.append(suffix)
+        for following in lines[index + 1:index + 8]:
+            stripped = following.strip()
+            if not stripped:
+                continue
+            if stripped.startswith('#') and snippets:
+                break
+            snippets.append(stripped)
+            if len(snippets) >= 4:
+                break
+        state = classify_review_snippet('\n'.join(snippets))
+        if state != 'pending':
+            return state
+
+    # Backward-compatible fallback for old terse review files that only put
+    # APPROVE / REQUEST CHANGES near the top.  Do not scan the full document.
+    first_nonempty_lines = [line.strip() for line in lines if line.strip()][:20]
+    return classify_review_snippet('\n'.join(first_nonempty_lines))
 
 
 def parse_review_file(path: Path) -> str:
     if not path.exists():
         return 'missing'
     text = path.read_text(encoding='utf-8', errors='ignore')
-    lowered = text.lower()
-    has_reject = any(keyword in lowered for keyword in REJECT_KEYWORDS) or any(keyword in text for keyword in REJECT_KEYWORDS)
-    has_approve = any(keyword in lowered for keyword in APPROVE_KEYWORDS) or any(keyword in text for keyword in APPROVE_KEYWORDS)
-    if has_reject:
-        return 'fail'
-    if has_approve:
-        return 'pass'
-    return 'pending'
+    return classify_review_text(text)
 
 
 def parse_review_state(task_dir: Path, review_level: str) -> str:
@@ -161,7 +221,12 @@ merge_gate_state = str(task.get('merge_gate_state') or '').strip()
 review_state = parse_review_state(task_dir, review_level)
 verify_state = parse_verify_state(task_dir)
 
-if merge_gate_state in {'review_pending', 'qa_pending'}:
+if merge_gate_state == 'review_pending':
+    fail(f'task merge_gate_state still pending: {merge_gate_state}')
+# QA pass is represented by verify.json.  task-watcher may invoke this script
+# while task.json still says qa_pending, so allow that single pending gate only
+# when the current verify artifact has already passed.
+if merge_gate_state == 'qa_pending' and not (test_required and verify_state == 'pass'):
     fail(f'task merge_gate_state still pending: {merge_gate_state}')
 if merge_gate_state in {'review_rejected', 'qa_failed'}:
     fail(f'task merge_gate_state is rejected/failed: {merge_gate_state}')

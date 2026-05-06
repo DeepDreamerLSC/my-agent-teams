@@ -1,0 +1,7 @@
+{
+  "task_id": "增强订单图包生成skill复用同session最近xlsx附件",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-05T14:35:46+08:00",
+  "status": "accepted",
+  "notes": "已读取 instruction.md 与 task.json。将优先在平台层补同 session 最近 xlsx 附件回填，保持当前请求附件优先、无历史附件时维持原错误提示，并补自动化测试验证。"
+}

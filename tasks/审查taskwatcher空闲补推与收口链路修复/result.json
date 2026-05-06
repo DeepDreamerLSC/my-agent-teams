@@ -1,0 +1,54 @@
+{
+  "task_id": "审查taskwatcher空闲补推与收口链路修复",
+  "agent": "review-1",
+  "status": "done",
+  "completed_at": "2026-05-05T22:20:55+08:00",
+  "summary": "REQUEST CHANGES：13 个目标文件已完成只读审查；review/QA 补推、merge gate 字段链路与 ready_for_merge 通知时机总体正确，但最终完成类飞书通知目前只覆盖 QA 自动收口路径，未覆盖所有进入 done 的合法收口路径。",
+  "verdict": "REQUEST CHANGES",
+  "reviewed_files": [
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh",
+    "/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh",
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/task.schema.json",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css",
+    "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py"
+  ],
+  "passed_checks": [
+    "result -> ready_for_merge 阶段不再发送最终完成类飞书通知",
+    "review fail 自动回退 blocked + review_rejected",
+    "QA fail 自动回退 blocked + qa_failed",
+    "review / QA 空闲补推逻辑存在并以 merge_gate_state 为准",
+    "integration_owner / target_environment / review_level / merge_gate_state 等字段已打通到 dashboard read model 和前端展示"
+  ],
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "title": "最终完成类飞书通知未覆盖所有进入 done 的合法收口路径",
+      "files": [
+        "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+        "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh"
+      ],
+      "evidence": [
+        "task-watcher.sh 仅在 auto_close_task() 中发送 【任务完成】/【部署完成】 飞书通知",
+        "close-task.sh 本身只负责状态落盘到 done，不发送通知",
+        "watcher 在 done 分支只做同步与续推，不会对手工 close 的任务补发最终完成通知"
+      ],
+      "impact": "手工 close-task.sh 收口或无需 QA 的手工 done 路径，可能没有最终完成类飞书通知，导致“真正完成但未通知”"
+    }
+  ],
+  "artifacts_written": [
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/review-note.md",
+    "/Users/lin/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/result.json"
+  ],
+  "verification_context": [
+    "已对照任务给定的本地验证命令结果进行代码层复核",
+    "本次审查未修改业务代码，仅产出审查结论与审查说明"
+  ]
+}

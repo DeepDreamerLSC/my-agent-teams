@@ -1,0 +1,73 @@
+{
+  "id": "补齐Skill文件解析开关同步",
+  "title": "补齐 Skill 文件解析开关同步",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "task_type": "development",
+  "read_only": false,
+  "downstream_action": "完成后 PM 创建/入池 PDF 转 Word Skill MVP 任务，并将本任务作为其依赖。",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "auto_close_policy": "manual_after_review",
+  "write_scope": [
+    "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+    "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+  ],
+  "depends_on": [],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/补齐Skill文件解析开关同步/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "补齐Skill文件解析开关同步",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "medium",
+  "timeout_minutes": 30,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-06T11:45:27+08:00",
+  "lease_expires_at": "2026-05-06T11:45:27+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已补齐 custom skill manifest -> SkillRecord.supports_file_parse 同步：新增布尔解析 helper，优先读取 manifest 顶层 supports_file_parse，兼容 parameters.supports_file_parse 布尔旧草案；文件系统同步新建记录和 zip 上传审批流均写入该字段；已有 DB 记录为 false 且 manifest 显式 true 时同步更新为 true；缺省或非布尔值保持 false，避免误开启通用文件预解析。（QA 已通过自动收口） QA 结论：QA PASS。13 个测试全部通过。manifest -> SkillRecord.supports_file_parse 三条同步路径均已验证：文件系统同步新建记录 (L660)、已有记录 false->true 漂移修复 (L692-695)、zip upload 审批流 (L443)。解析 helper 只接受真实 bool，顶层优先、parameters 兜底、缺省 false。review-1 APPROVE，0 个阻塞问题。",
+  "last_error": null,
+  "merge_gate_state": "closed",
+  "rework_reason": null,
+  "last_gate_actor": "watcher",
+  "last_gate_decision_at": "2026-05-06T11:58:42+08:00",
+  "created_at": "2026-05-06T07:35:54+08:00",
+  "updated_at": "2026-05-06T11:58:42+08:00",
+  "claim_policy": "pull",
+  "claim_scope": [
+    "dev-1",
+    "dev-2"
+  ],
+  "claim_max_concurrency": 1,
+  "dependency_policy": "done_only",
+  "pool_timeout_minutes": 120,
+  "pool_entered_at": "2026-05-06T07:35:54+08:00",
+  "claimed_by": "dev-2",
+  "claimed_at": "2026-05-06T11:45:27+08:00",
+  "claim_reason": "PM按优先级派发：PDF转WordSkill前置依赖；dev-2完成上一条补修后续推"
+}

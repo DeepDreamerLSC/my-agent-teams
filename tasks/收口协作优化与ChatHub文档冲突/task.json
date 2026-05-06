@@ -14,7 +14,7 @@
   "review_round": 0,
   "max_review_rounds": 3,
   "test_required": false,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "quality",
@@ -40,8 +40,12 @@
   "lease_expires_at": "2026-04-30T08:02:14+08:00",
   "workspace_mode": "main",
   "target_branch": "integration",
-  "result_summary": null,
+  "result_summary": "已对协作优化主文档与 Chat-Hub 落地清单做最小范围收口：统一版本头与 A-Lite 表述，删除私聊误导示例，并进一步明确验证期不过则不进入 B/C 阶段。",
   "last_error": null,
   "created_at": "2026-04-30T08:00:49+08:00",
-  "updated_at": "2026-04-30T08:06:49+08:00"
+  "updated_at": "2026-05-06T06:48:40+08:00",
+  "merge_gate_state": "closed",
+  "rework_reason": null,
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T06:48:40+08:00"
 }

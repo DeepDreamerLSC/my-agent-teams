@@ -16,7 +16,7 @@
   "review_round": 0,
   "max_review_rounds": 3,
   "test_required": false,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "domain",
   "owner_pm": "pm-chief",
   "domain": "backend",
@@ -42,8 +42,12 @@
   "lease_expires_at": "2026-04-26T10:22:11+08:00",
   "workspace_mode": "main",
   "target_branch": "integration",
-  "result_summary": null,
+  "result_summary": "已完成 GLM 联网搜索退化缓解方案文档。结论为：当前更像智谱 provider-native 搜索上游退化，不建议立刻重写本地搜索链路，优先补 provider 级健康探针、降级状态与用户提示。（审查通过自动收口，无 QA）",
   "last_error": null,
   "created_at": "2026-04-26T10:22:11+08:00",
-  "updated_at": "2026-04-26T10:26:19+08:00"
+  "updated_at": "2026-05-06T12:52:07+08:00",
+  "merge_gate_state": "closed",
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T12:52:07+08:00",
+  "rework_reason": null
 }

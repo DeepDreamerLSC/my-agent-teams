@@ -30,11 +30,11 @@
   "lease_expires_at": "2026-05-01T02:13:42+08:00",
   "workspace_mode": "main",
   "target_branch": "integration",
-  "result_summary": null,
+  "result_summary": "初版 polished/CogView demo 的 review 驳回项已由「修正PPT精美模式Demo归档截断与CogView约束」修复并通过 review/QA，最终 PPTX 闭环也已由「收口PPT精美模式Demo最终PPTX闭环」通过 review/QA；PM 将该原始任务按后续补修证据收口。",
   "last_error": null,
   "created_at": "2026-05-01T02:13:42+08:00",
-  "updated_at": "2026-05-01T02:57:46+08:00",
-  "review_round": 0,
+  "updated_at": "2026-05-06T11:35:15+08:00",
+  "review_round": 1,
   "max_review_rounds": 3,
   "depends_on": [
     "分析banana-slides并设计PPT精美模式升级方案"
@@ -52,10 +52,14 @@
   ],
   "review_deadline": "2026-05-01T23:30:00+08:00",
   "test_required": true,
-  "status": "ready_for_merge",
+  "status": "done",
   "task_level": "execution",
   "priority": "high",
   "timeout_minutes": 90,
   "read_only": false,
-  "downstream_action": "review"
+  "downstream_action": "review",
+  "rework_reason": null,
+  "merge_gate_state": "closed",
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T11:35:15+08:00"
 }

@@ -33,6 +33,7 @@ RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
 WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
 
 LAST_LOG_ROTATE_DAY=""
+WATCHER_STARTED_AT_EPOCH="$(date +%s)"
 
 mkdir -p "$STATE_DIR"
 
@@ -908,6 +909,40 @@ mark_notified() {
     echo "$(date +%s)" > "$STATE_DIR/$key"
 }
 
+final_done_transition_epoch() {
+    local task_dir="$1"
+    python3 - "$task_dir/transitions.jsonl" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+transitions_path = Path(sys.argv[1])
+latest_epoch = 0
+
+if transitions_path.exists():
+    for line in transitions_path.read_text(encoding='utf-8', errors='ignore').splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except Exception:
+            continue
+        if str(event.get('from') or '') != 'ready_for_merge' or str(event.get('to') or '') != 'done':
+            continue
+        raw_at = str(event.get('at') or '').strip()
+        if not raw_at:
+            continue
+        try:
+            epoch = int(datetime.fromisoformat(raw_at.replace('Z', '+00:00')).timestamp())
+        except Exception:
+            continue
+        latest_epoch = max(latest_epoch, epoch)
+
+print(latest_epoch)
+PY
+}
+
 # Check if a file has been updated since last notification
 is_file_newer_than_notified() {
     local key="$1"
@@ -1635,6 +1670,19 @@ notify_final_done_if_needed() {
     local task_id="$2"
     local done_key="${task_id}_done_notice"
     if is_notified "$done_key"; then
+        return 0
+    fi
+
+    local done_transition_epoch
+    done_transition_epoch=$(final_done_transition_epoch "$task_dir" 2>/dev/null || echo 0)
+    if [ -z "$done_transition_epoch" ] || [ "$done_transition_epoch" -le 0 ] 2>/dev/null; then
+        mark_notified "$done_key"
+        log "$task_id: done 终态缺少 ready_for_merge->done 迁移记录，已补种最终通知 sentinel 并跳过历史通知"
+        return 0
+    fi
+    if [ "$done_transition_epoch" -lt "$WATCHER_STARTED_AT_EPOCH" ] 2>/dev/null; then
+        mark_notified "$done_key"
+        log "$task_id: done 终态早于本轮 watcher 启动，已补种最终通知 sentinel 并跳过历史通知"
         return 0
     fi
 

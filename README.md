@@ -386,7 +386,7 @@ pending → dispatched → working → ready_for_merge → merged → archived
 | pending | PM / 开罗尔 | 任务已创建 |
 | dispatched | dispatch-task.sh | 已通过 tmux 发送给 agent |
 | working | watcher | 检测到 ack.json |
-| ready_for_merge | watcher | 检测到 result.json + verify 通过 |
+| ready_for_merge | watcher | 检测到 result.json，进入待审 / 待验阶段 |
 | merged | PM / integrator | 代码已合入集成分支 |
 | failed | agent / watcher | 执行失败 |
 | blocked | agent | 上游依赖未满足 |

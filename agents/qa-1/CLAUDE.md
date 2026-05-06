@@ -112,6 +112,39 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 - **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
 - 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
 
+### result.json 规范（硬性）
+
+Agent 完成、失败或阻塞任务时，必须在任务目录写 `result.json`，且 `status` 字段只能使用以下三个值：
+
+| status | 含义 | watcher 行为 |
+|--------|------|--------------|
+| `done` | 执行者认为任务已完成，等待 PM / review / QA 进入合并门禁 | task-watcher 将 `task.json.status` 推进到 `ready_for_merge` |
+| `failed` | 执行失败且无法自行恢复 | PM 介入处理失败原因 |
+| `blocked` | 被外部条件阻塞，需要 PM 协调 | task-watcher 将任务标记为 `blocked` 并通知 PM |
+
+禁止在 `result.json.status` 中使用 `success`、`ready_for_merge`、`completed`、`ok` 等非规范值。
+
+推荐最小结构：
+
+```json
+{
+  "task_id": "任务ID",
+  "agent": "当前 agent-id",
+  "status": "done",
+  "summary": "完成内容摘要",
+  "files_modified": [],
+  "tests": ["已运行的验证命令或未运行原因"],
+  "risks": ["剩余风险，没有则为空数组"],
+  "completed_at": "ISO-8601 时间"
+}
+```
+
+规则：
+- `result.json.status=done` 是“执行完成”的信号，不等于任务最终关闭；最终关闭由 PM / review / QA 门禁推进。
+- 如果任务没有修改文件，`files_modified` 写空数组。
+- 如果没有运行测试，必须在 `tests` 中写明原因，不要省略。
+- 写完 `result.json` 后不要自行修改 `task.json.status`，除非任务指令明确授权。
+
 ---
 ## qa 角色规则
 

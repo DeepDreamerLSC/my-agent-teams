@@ -1,0 +1,202 @@
+{
+  "task_id": "排查王开订单图包生成skill失败",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-05T13:56:41+08:00",
+  "read_only": true,
+  "summary": "本次问题可以明确锁定为 `order-print-image-pack` 本身，不涉及 PPT / CogView / box-calculator。三次生产失败里，真正需要优先修的主错误是两次 `invalid literal for int() with base 10: '0.5'`：我已用生产上传的同一个 xlsx 文件复现，并定位到**第 111 行（箱号 189022）**。这行数据在 `箱数=2`、`箱量=10`、`数量=20` 的前提下，尺码列 `26/27/28/29/30 = 1/2/3/3/1`，总和只有 10，导致代码先计算出每箱分配 `0.5/1/1.5/1.5/0.5`，随后又在写标签阶段对这些字符串做 `int('0.5')`，直接抛异常。中间那次“请先上传一个 .xlsx 订单汇总文件”是同一 session 里用户二次点击/重发时没有重新带附件造成的次级问题：skill 只读取本次请求的 `uploaded_files`，不会复用同 session 上一次上传的 xlsx。",
+  "three_failures": [
+    {
+      "occurred_at": "2026-05-05T11:46:42+08:00",
+      "session_id": "57c57394-1cb4-4035-ae82-20e444fbbe5d",
+      "query": "请生成",
+      "model_used": "skill:order-print-image-pack",
+      "files_uploaded": [
+        {
+          "file_id": "a3fec5f6-63b6-4138-9ddc-c9599219079c",
+          "file_name": "佳佳丽订单汇总5.5.xlsx"
+        }
+      ],
+      "error_message": "标签导出失败：invalid literal for int() with base 10: '0.5'"
+    },
+    {
+      "occurred_at": "2026-05-05T11:48:27+08:00",
+      "session_id": "57c57394-1cb4-4035-ae82-20e444fbbe5d",
+      "query": "请生成",
+      "model_used": "skill:order-print-image-pack",
+      "files_uploaded": [],
+      "error_message": "请先上传一个 .xlsx 订单汇总文件"
+    },
+    {
+      "occurred_at": "2026-05-05T12:03:21+08:00",
+      "session_id": "57c57394-1cb4-4035-ae82-20e444fbbe5d",
+      "query": "请生成",
+      "model_used": "skill:order-print-image-pack",
+      "files_uploaded": [
+        {
+          "file_id": "28404380-e2ac-47e8-91cb-b44e64879d7f",
+          "file_name": "佳佳丽订单汇总5.5.xlsx"
+        }
+      ],
+      "error_message": "标签导出失败：invalid literal for int() with base 10: '0.5'"
+    }
+  ],
+  "primary_error_judgement": {
+    "primary_error": "`invalid literal for int() with base 10: '0.5'`",
+    "why": [
+      "它出现了两次，而且两次都带着 xlsx 附件进入了 skill 主流程，说明这是稳定可复现的真实主故障。",
+      "我已对两次上传的生产 xlsx 做本地只读复现，两个文件字节级一致（同 size、同 sha256），都会在同一行数据上触发完全相同的异常。"
+    ],
+    "secondary_error": "`请先上传一个 .xlsx 订单汇总文件`",
+    "why_secondary": "第二次重发的 user message `file_ids=[]`，而 skill 只从当前请求的 `uploaded_files` 读取 xlsx，不会自动复用同 session 上一次附件，所以这是同 session 下的二次触发/重试行为带来的输入缺失。"
+  },
+  "production_context": {
+    "session_id": "57c57394-1cb4-4035-ae82-20e444fbbe5d",
+    "chat_messages": [
+      {
+        "created_at": "2026-05-05T11:46:29+08:00",
+        "role": "user",
+        "content": "请生成",
+        "file_ids": [
+          "a3fec5f6-63b6-4138-9ddc-c9599219079c"
+        ]
+      },
+      {
+        "created_at": "2026-05-05T11:48:24+08:00",
+        "role": "user",
+        "content": "请生成",
+        "file_ids": []
+      },
+      {
+        "created_at": "2026-05-05T12:03:09+08:00",
+        "role": "user",
+        "content": "请生成",
+        "file_ids": [
+          "28404380-e2ac-47e8-91cb-b44e64879d7f"
+        ]
+      }
+    ],
+    "uploaded_file_facts": [
+      {
+        "file_id": "a3fec5f6-63b6-4138-9ddc-c9599219079c",
+        "original_name": "佳佳丽订单汇总5.5.xlsx",
+        "stored_path": "/Users/lin/Desktop/prod/chiralium/uploads/original/a3fec5f6-63b6-4138-9ddc-c9599219079c.xlsx",
+        "sha256": "79b5114a431462f70a4676781e1ffea35832b082b6caa68d0a7cfd09364919ef"
+      },
+      {
+        "file_id": "28404380-e2ac-47e8-91cb-b44e64879d7f",
+        "original_name": "佳佳丽订单汇总5.5.xlsx",
+        "stored_path": "/Users/lin/Desktop/prod/chiralium/uploads/original/28404380-e2ac-47e8-91cb-b44e64879d7f.xlsx",
+        "sha256": "79b5114a431462f70a4676781e1ffea35832b082b6caa68d0a7cfd09364919ef"
+      }
+    ],
+    "implication": "第一次和第三次其实是在用同一个 workbook 重试，因此两次命中同一数据行、同一异常是符合事实的。"
+  },
+  "shortest_root_cause_path": [
+    {
+      "step": 1,
+      "type": "evidence",
+      "detail": "生产 xlsx 的第 111 行（`__row_number__=111`，箱号 `189022`）字段为：`箱数=2`、`箱量=10`、`数量=20`、尺码列 `26=1, 27=2, 28=3, 29=3, 30=1`，尺码列合计只有 10。"
+    },
+    {
+      "step": 2,
+      "type": "evidence",
+      "detail": "`_compute_per_box_sizes()` 先把尺码数量除以 `箱数`，得到每箱数量 `0.5 / 1 / 1.5 / 1.5 / 0.5`，并已写入 warning：`尺码 xx 每箱数量不是整数`。"
+    },
+    {
+      "step": 3,
+      "type": "evidence",
+      "detail": "尽管已经识别出 warning，`_build_order_rows()` 仍把该行加入结果集；后续 `_write_label_block()` 在 `pairs_total = sum(int(q) for _, q in per_box_sizes)` 处直接对 `'0.5'` 做 `int()`，抛出异常。"
+    },
+    {
+      "step": 4,
+      "type": "inference",
+      "detail": "所以主代码根因不是 xlsx 无法识别，而是：**skill 对“每箱分配非整数”的异常行只有 warning、没有终止或跳过；随后又假设这些值必为整数并强制 `int()`**。"
+    }
+  ],
+  "suspicious_code_paths": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:934-965",
+      "why": "`_compute_per_box_sizes()` 会把非整数每箱数量格式化成字符串 `0.5/1.5`，同时仅追加 warning，不阻断后续流程。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:867-908",
+      "why": "`_build_order_rows()` 即使拿到 warning 行，也仍然 append 到最终 `result`，没有 skip / fail-fast。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:506-528",
+      "why": "`_write_label_block()` 在 `pairs_total = sum(int(q) for _, q in per_box_sizes)` 处是本次生产异常的直接抛出点。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:686-699",
+      "why": "即使修掉 `pairs_total` 这处，`_write_quantity_row()` 仍会对 `qty_str` 执行 `int(qty_str)`，同样会被 `0.5` / `1.5` 重新击穿。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:716-723",
+      "why": "`_select_xlsx_source_file()` 只看当前 `context.uploaded_files`；没有当前附件时，必然返回“请先上传一个 .xlsx 订单汇总文件”。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py:380-389,1788-1829",
+      "why": "聊天执行链只把本次请求的 `file_ids` 转成 `skill_uploaded_files` 传给 skill，不会自动回填同 session 上一次的附件，因此第二次空附件重发会命中 xlsx 缺失错误。"
+    }
+  ],
+  "concrete_reproduction_evidence": {
+    "replayed_file": "a3fec5f6-63b6-4138-9ddc-c9599219079c.xlsx（与第三次上传文件字节一致）",
+    "valid_rows": 315,
+    "fractional_rows_found": 1,
+    "fractional_row": {
+      "row_number": 111,
+      "box_no": "189022",
+      "box_count": 2,
+      "pairs_per_box": 10,
+      "total_quantity": 20,
+      "size_total": 10,
+      "sizes": {
+        "26": "1",
+        "27": "2",
+        "28": "3",
+        "29": "3",
+        "30": "1"
+      },
+      "computed_per_box_sizes": [
+        ["26", "0.5"],
+        ["27", "1"],
+        ["28", "1.5"],
+        ["29", "1.5"],
+        ["30", "0.5"]
+      ]
+    },
+    "exception_stack_top": "_build_excel_zip() -> _build_excel_workbook() -> _write_label_block() -> pairs_total = sum(int(q) for _, q in per_box_sizes)"
+  },
+  "why_same_session_has_two_error_types": {
+    "main_reason": "同一 session 的三次 user message 都是同一句 `请生成`，但附件状态不同。第一次/第三次带了 xlsx，所以进入了导出链路并撞上 `0.5` 整型转换错误；第二次没有带任何附件，因此在更前面的 xlsx 选择阶段就失败。",
+    "evidence": [
+      "`chat_messages.session_id=57c57394-1cb4-4035-ae82-20e444fbbe5d` 的第二条 user message `file_ids=[]`。",
+      "对应 `chat_logs.files_uploaded=[]`。",
+      "skill 本身不复用上一次上传文件，只认当前请求的 `uploaded_files`。"
+    ]
+  },
+  "test_coverage_gap": {
+    "judgement": "当前测试没有覆盖‘每箱数量非整数’的异常行。",
+    "evidence": "`backend/tests/test_order_print_image_skill.py` 现有用例基本只覆盖成功导出、版式布局、空行错误等 happy path；没有包含 `箱数>1` 且尺码分摊后出现 `0.5/1.5` 的回归样例。"
+  },
+  "need_followup_fix": true,
+  "suggested_followup_tasks": [
+    {
+      "title": "修复订单图包生成skill对非整数每箱尺码分配的容错并消除 int('0.5') 崩溃",
+      "priority": "high",
+      "why": "这是两次生产失败的直接主因；至少需要让 warning 行不再把整个导出流程打崩。"
+    },
+    {
+      "title": "增强订单图包生成skill复用同session最近xlsx附件",
+      "priority": "medium",
+      "why": "可避免用户在同 session 点击重试但未重新附带 xlsx 时，立即报‘请先上传一个 .xlsx 订单汇总文件’。"
+    }
+  ],
+  "overall_judgement": {
+    "skill": "order-print-image-pack",
+    "confidence": "high",
+    "resolved": false,
+    "why": "生产日志、同 session 上下文、实际上传文件与本地只读复现都指向同一条 skill 代码路径；且当前问题显然仍需修复任务收口。"
+  }
+}

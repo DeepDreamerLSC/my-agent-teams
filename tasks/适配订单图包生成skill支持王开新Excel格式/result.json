@@ -1,0 +1,109 @@
+{
+  "task_id": "适配订单图包生成skill支持王开新Excel格式",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-05T17:14:56+08:00",
+  "summary": "已完成 `order-print-image-pack` 对王开新 Excel 格式的最小兼容适配。核心改动不是业务分配算法，而是 Excel 解析层：现在会遍历 workbook 中所有业务工作表（跳过 `WpsReserved_*` 保留页），并把新格式中‘第 2 列空表头但实际承载 DISPIMG 公式’标准化映射为 `客户货号`。这样 skill 不再只吃第一张 sheet，也不会因为空表头把商品图引用列丢掉；对旧单 sheet 格式与旧多 sheet 格式都保持兼容。",
+  "new_vs_old_format_diff": {
+    "old_single_sheet": {
+      "sample_file_id": "39659b84-6f25-46c8-89a7-9898aa585176",
+      "file_name": "订单汇总总单(1).xlsx",
+      "facts": [
+        "只有 1 张业务 sheet（`Sheet1`）。",
+        "表头显式包含 `鞋底上方颜色 / 下方底片颜色 / 客户货号 / 船期 / 客户`。",
+        "尺码列从 19 开始，一直到 41。"
+      ]
+    },
+    "old_multi_sheet": {
+      "sample_file_id": "71b39b50-5270-4e4e-8e27-dc7be6eca71a",
+      "file_name": "短款分品牌订单.xlsx",
+      "facts": [
+        "有 9 张业务 sheet，按品牌拆分。",
+        "第 2 列也是空表头，但数据行里实际放的是 `DISPIMG(...)` 公式。",
+        "没有旧单 sheet 样本里的 `鞋底上方颜色 / 下方底片颜色 / 船期 / 客户货号` 那组完整显式列。"
+      ]
+    },
+    "new_wangkai_format": {
+      "sample_file_id": "44960e88-b8cb-49e8-866b-07a2d2f743e5",
+      "file_name": "佳佳丽订单汇总5.5.xlsx",
+      "facts": [
+        "共有 8 张 sheet，其中 7 张是业务 sheet，另有 `WpsReserved_CellImgList` 保留页。",
+        "首张业务 sheet 表头变为 `货号 / (空列) / 品牌 / 颜色 / 长短靴 / 码段 / 尺码 / 鞋盒大小分配 / ... / 箱数 / 箱量 / 箱号 / 数量 / 鞋底 / 工厂发货时间 / 客户 / 下单时间 / (空列) / 外箱长宽高 / 外箱数量`。",
+        "第 2 列空表头但数据行里承载 `DISPIMG(...)` 公式；如果不做表头归一化，这一列会被当前解析器直接丢掉。",
+        "业务数据分散在多张品牌 sheet 中，不再只在第一张 sheet。",
+        "日期列命名从旧格式的 `船期` 变成了 `工厂发货时间` / `完货时间` 一类别名。"
+      ]
+    }
+  },
+  "current_skill_mismatch_before_fix": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:754-787（修复前）",
+      "problem": "`_read_sheet_rows()` 只读取 `workbook.find('a:sheets/a:sheet')` 找到的第一张 sheet，因此王开新样本后续 6 张业务 sheet 完全不会进入 skill。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:783-785（修复前）",
+      "problem": "`row_data = {header: ... for ... if header}` 会把空表头列直接丢掉；而新格式恰好把 `DISPIMG(...)` 放在空表头第 2 列，导致 `客户货号` / 商品图引用信息丢失。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:893-897",
+      "problem": "图片提取逻辑依赖 `row.get('客户货号')`；空表头列被丢掉后，这里拿不到 DISPIMG id，只会退化成‘未找到对应的商品图’。"
+    }
+  ],
+  "minimal_compat_change": {
+    "parser_change": [
+      "新增 `_list_order_sheet_infos()`：遍历 workbook 全部 sheet，并跳过 `WpsReserved_*` 保留 sheet。",
+      "重写 `_read_sheet_rows()`：按所有业务 sheet 累积行数据，并给每行附加 `__sheet_name__`。",
+      "新增 `_normalize_headers()`：把新格式/旧多 sheet 格式中‘第 2 列空表头’标准化映射为 `客户货号`；同时把 `工厂发货时间` / `完货时间` 归一到 `船期` 别名。"
+    ],
+    "business_rule_change": "无。没有改动箱量计算、分组规则、图包生成业务逻辑。",
+    "why_minimal": "问题根源在格式解析，不在导出布局或计算公式；只修 sheet 遍历与表头兼容即可让新格式进入现有成功路径。"
+  },
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
+      "action": "modified",
+      "description": "适配多 sheet Excel 读取、跳过 WpsReserved sheet、空表头第 2 列映射为 `客户货号`、日期别名归一。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+      "action": "modified",
+      "description": "新增 synthetic 新格式多 sheet 回归测试，并保留/跑通旧格式与同模块既有测试。"
+    }
+  ],
+  "post_fix_evidence": {
+    "new_sample_after_fix": [
+      "`44960e88-...` 现在可解析出 7 张业务 sheet、791 行原始记录、657 行有效订单行。",
+      "`客户货号` 字段在新格式行上已恢复，可从第 2 列拿到 `=DISPIMG(...)` 公式。",
+      "构建 order rows 时，首行已能同时拿到 `__sheet_name__=MULAN`、`客户货号=...DISPIMG(...)`，且商品图映射可命中。"
+    ],
+    "old_samples_after_fix": [
+      "旧单 sheet 样本 `39659b84-...` 仍能解析：487 行原始记录、380 行有效订单行。",
+      "旧多 sheet 样本 `71b39b50-...` 现在也能完整遍历全部品牌 sheet：228 行原始记录、218 行有效订单行，而不是只吃第一张 sheet。"
+    ]
+  },
+  "validation": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q",
+      "result": "passed (12 passed, 4 warnings)"
+    }
+  ],
+  "new_test_added": {
+    "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+    "name": "test_skill_supports_wangkai_new_multisheet_excel_format",
+    "covers": [
+      "多业务 sheet 遍历",
+      "跳过 `WpsReserved_CellImgList`",
+      "空表头第 2 列映射为 `客户货号`",
+      "新格式 workbook 能成功走完整个 skill 主流程"
+    ]
+  },
+  "notes": [
+    "当前 `skill.py` / `test_order_print_image_skill.py` 工作树里还叠加了前一条‘非整数分配友好错误提示’任务的本地改动；本次适配没有回退它，并已确保同文件测试整体通过。",
+    "本任务未处理同 session 最近 xlsx 复用，也未做生产部署。",
+    "pytest warnings 为现有 FastAPI `on_event` 弃用提示，与本次 Excel 格式兼容改动无关。"
+  ]
+}

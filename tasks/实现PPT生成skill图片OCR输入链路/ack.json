@@ -3,7 +3,7 @@
   "agent": "dev-1",
   "agent_id": "dev-1",
   "status": "working",
-  "acknowledged_at": "2026-04-30T13:05:00+08:00",
-  "acked_at": "2026-04-30T13:05:00+08:00",
-  "summary": "已读取 instruction.md，正按现有 parser / extracted_text 思路补齐图片 OCR 输入链路，并补充图片解析与可供后续 skill 消费的测试。"
+  "acknowledged_at": "2026-05-06T09:28:00+08:00",
+  "acked_at": "2026-05-06T09:28:00+08:00",
+  "summary": "已按返工顺序读取 review.md 并复核当前实现。当前发现 reviewer 要求的主链路补全涉及 ContextAssembler、chat skill 输入链路与 manifest/稳定 schema，但这些文件不在本任务 write_scope 内。先将该返工状态反馈给 PM。"
 }

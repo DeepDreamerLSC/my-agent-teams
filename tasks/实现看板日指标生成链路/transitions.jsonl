@@ -1,0 +1,8 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-04T00:58:55+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-04T01:08:18+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-04T01:28:47+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "dispatched", "at": "2026-05-06T06:50:29+08:00", "reason": "PM rework dispatch: review-1驳回：--project单项目重建会错误覆盖__all__聚合行，需在rebuild时保护全局口径"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-06T11:35:15+08:00", "reason": "PM routed completed rework result back to review after archiving stale review.md"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T12:50:45+08:00", "reason": "PM expanded write_scope to include dashboard/tests/test_dashboard_metrics.py after review/QA confirmed functional fix; requeue for review approval"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T12:56:32+08:00", "reason": "PM normalized review-approved + verify-pass task from stale review_pending to qa_pending to unblock close-task"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-06T12:56:32+08:00", "reason": "PM manual close after QA pass; auto close blocked by stale review_pending gate"}

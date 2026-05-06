@@ -1,0 +1,56 @@
+{
+  "task_id": "补修taskwatcher历史Done通知去重",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-06T12:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA PASS。5 个验收标准全部通过：历史 done 任务重启不触发通知（96 done / 0 would notify）、新近合法收口仍可触发一次通知（done 观察分支完整）、去重逻辑基于 transition 时间 + sentinel 双重判定、bash -n 通过、设计文档已修正。review-1 APPROVE，0 个阻塞问题。",
+  "test_commands": [
+    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "python3 历史 done 扫描：模拟 watcher 以当前时间启动，统计 would_notify / no_transition / transition_before_start"
+  ],
+  "test_results": {
+    "shell_syntax": "passed",
+    "historical_done_scan": {
+      "done_tasks_scanned": 96,
+      "has_ready_for_merge_to_done_transition": 94,
+      "no_ready_for_merge_to_done_transition": 2,
+      "would_notify_if_watcher_restarted_now": 0
+    }
+  },
+  "scenarios_verified": [
+    {
+      "criterion": "watcher 启动/重启不会对历史 done 任务批量发送最终完成通知",
+      "status": "pass",
+      "evidence": "notify_final_done_if_needed() (L1668-1705) 在发送前校验：(1) 无 ready_for_merge->done 迁移 → 补种 sentinel 跳过 (L1678-1681)；(2) 迁移早于 WATCHER_STARTED_AT_EPOCH → 补种 sentinel 跳过 (L1683-1686)。模拟扫描确认：96 个 done 任务中 0 个会触发通知。"
+    },
+    {
+      "criterion": "新近从 ready_for_merge -> done 收口的任务仍能触发一次最终完成通知",
+      "status": "pass",
+      "evidence": "done 观察分支 (L1753-1754) 对 status=done 调用 notify_final_done_if_needed。合法收口通过 close-task.sh 写入 ready_for_merge->done transition，transition 时间 >= WATCHER_STARTED_AT_EPOCH，通过两个校验后发送通知并写 sentinel 去重。"
+    },
+    {
+      "criterion": "去重逻辑有明确 sentinel 或时间/transition 判定依据",
+      "status": "pass",
+      "evidence": "双重判定机制：(1) done_notice sentinel 去重 (L1671-1673)，每个 task 最多通知一次；(2) final_done_transition_epoch() (L912-944) 从 transitions.jsonl 读取最新 ready_for_merge->done 迁移时间；(3) WATCHER_STARTED_AT_EPOCH (L36) 作为本轮 watcher 实例边界。三者联合确保只有本轮启动后新近收口的任务才发送。"
+    },
+    {
+      "criterion": "bash -n scripts/task-watcher.sh 通过",
+      "status": "pass",
+      "evidence": "语法检查通过，无错误。"
+    },
+    {
+      "criterion": "设计文档已修正：verify 通过只负责收口到 done，最终完成类通知由 done 观察分支统一发送",
+      "status": "pass",
+      "evidence": "design/OpenClaw-tmux协作方案优化.md:930 '只负责自动收口到 done；不在 verify 分支发送最终完成类飞书通知'；:932 'done 观察分支统一发送一次通知'；:939 补充 sentinel + transition 时间判定说明。"
+    }
+  ],
+  "regressions_found": [],
+  "notes": [
+    "2 个 done 任务缺少 ready_for_merge->done 迁移（合入DeepSeek联网搜索回退修复到集成、实现PPT精美模式入口与CogView页图渲染Demo），属历史数据特征，guard 会安全补种 sentinel 并跳过。",
+    "该方案会跳过 watcher 停机期间已收口到 done 的任务通知，符合 instruction.md '宁可少发历史通知' 的取舍原则。result.json.risks 已如实记录。",
+    "review-1 结论 APPROVE，0 个 CRITICAL/HIGH/MEDIUM/LOW 问题。",
+    "本任务解决了前序任务「修正taskwatcher仅在任务最终完成后发飞书通知」review/QA 指出的两个阻塞点（HIGH 历史刷屏 + MEDIUM 文档不一致）。"
+  ]
+}

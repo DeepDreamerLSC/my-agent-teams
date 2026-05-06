@@ -2,3 +2,4 @@
 {"from": "dispatched", "to": "working", "at": "2026-04-26T10:42:48+08:00", "reason": "watcher observed ack.json"}
 {"from": "working", "to": "ready_for_merge", "at": "2026-04-26T10:53:55+08:00", "reason": "watcher observed result.json status=done"}
 {"from": "ready_for_merge", "to": "blocked", "at": "2026-04-27T08:19:03+08:00", "reason": "pm blocked after comparing production behavior with Zhipu Web Search API docs"}
+{"from": "blocked", "to": "cancelled", "at": "2026-05-06T06:49:04+08:00", "reason": "PM cancel: 已被修正GLM健康探针改用智谱WebSearchAPI(done)替代"}

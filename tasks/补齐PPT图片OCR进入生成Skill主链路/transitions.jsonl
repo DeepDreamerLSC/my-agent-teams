@@ -1,0 +1,7 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-06T11:36:14+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-06T11:59:07+08:00", "reason": "agent dev-1 claimed pooled task"}
+{"from": "dispatched", "to": "working", "at": "2026-05-06T12:00:14+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-06T12:10:03+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T12:13:32+08:00", "reason": "PM normalized done result to review_pending"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T12:54:44+08:00", "reason": "PM normalized review-approved + verify-pass task from stale review_pending to qa_pending to unblock close-task"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-06T12:54:45+08:00", "reason": "PM manual close after QA pass; auto close blocked by stale review_pending gate"}

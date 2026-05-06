@@ -1,0 +1,55 @@
+{
+  "task_id": "实现看板日指标生成链路",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-05T20:44:34+08:00",
+  "summary": "已按 review 驳回意见完成补修：`rebuild_daily_metrics(project=...)` 不再生成或覆盖 `project='__all__'` 的聚合行，因此 project 范围重建不会污染默认 API 的全局口径；同时补了自动化测试，验证 project 定向重建后 `__all__` 仍保持全量聚合结果。",
+  "review_fix_focus": {
+    "blocked_issue": "`--project` 范围重建把单项目任务集错误写回到 `project='__all__'`，导致 `/api/metrics/daily` 默认查询读到伪全局聚合。",
+    "fix": "仅在全量重建（`project is None`）时生成/更新 `__all__` 行；当指定 `project` 时，只重建该项目自己的 task/agent metrics 行。"
+  },
+  "modified_files": [
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/metrics.py",
+      "action": "modified",
+      "description": "修正 `rebuild_daily_metrics()` 的 project / `__all__` 生成逻辑：project 定向重建时不再把 `__all__` 插回 `projects`。"
+    },
+    {
+      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
+      "action": "added",
+      "description": "新增回归测试，覆盖 project 范围重建不污染 `__all__`，以及 `/api/metrics/daily` 默认查询继续返回真实全局口径。"
+    }
+  ],
+  "behavior_before_after": {
+    "before": "`rebuild_daily_metrics(project='proj-a')` 会先把任务集裁成 `proj-a`，再仍然生成 `project='__all__'` 行，导致 `__all__` 被单项目覆盖。",
+    "after": "`rebuild_daily_metrics(project='proj-a')` 仅删除并重建 `proj-a` 自己的 daily metrics；`__all__` 只在全量重建时生成，因此默认查询口径稳定。"
+  },
+  "tests_added": [
+    {
+      "name": "test_project_rebuild_does_not_overwrite_all_aggregate_rows",
+      "covers": "全量重建后，再做单项目重建时，`task_metrics_daily.project='__all__'` 的 completed/touched 统计不变。"
+    },
+    {
+      "name": "test_api_metrics_default_query_keeps_all_scope_after_project_rebuild",
+      "covers": "`/api/metrics/daily` 在 `project=None` 默认查询下，仍读取真实 `__all__` 聚合，而不是被单项目污染。"
+    }
+  ],
+  "validation": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/metrics.py /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 -m unittest /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py -v",
+      "result": "passed (2 tests)"
+    },
+    {
+      "command": "python3 -m unittest discover -s /Users/lin/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
+      "result": "passed (10 tests)"
+    }
+  ],
+  "notes": [
+    "本次补修没有改动 `/api/board`、`/api/gantt`、`/api/tasks/<id>/detail` 等既有接口行为。",
+    "修复目标严格收敛在 review 阻塞点：project 定向重建与 `__all__` 全局聚合的口径隔离。"
+  ]
+}

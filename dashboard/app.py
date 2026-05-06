@@ -18,6 +18,10 @@ from .query import (
     build_gantt_payload,
     build_health_payload,
     build_task_detail_payload,
+    build_task_timeline_payload,
+    build_task_communications_payload,
+    build_daily_metrics_payload,
+    build_task_aggregate_payload,
 )
 
 
@@ -127,6 +131,22 @@ def create_app(db_path: str | None = None):
             })
         return jsonify(items)
 
+
+    @app.get('/api/tasks/aggregate')
+    def api_tasks_aggregate():
+        payload = _with_connection(
+            lambda conn: build_task_aggregate_payload(
+                conn,
+                project=request.args.get('project'),
+                owner_pm=request.args.get('owner_pm'),
+                domain=request.args.get('domain'),
+                task_level=request.args.get('task_level'),
+                parent_task_id=request.args.get('parent_task_id'),
+                root_request_id=request.args.get('root_request_id'),
+            )
+        )
+        return jsonify(payload)
+
     @app.get('/api/tasks/<task_id>/detail')
     def api_task_detail(task_id: str):
         payload = _with_connection(
@@ -134,6 +154,38 @@ def create_app(db_path: str | None = None):
         )
         if payload.get('task') is None:
             return jsonify({'error': 'task not found', 'task_id': task_id}), 404
+        return jsonify(payload)
+
+
+    @app.get('/api/tasks/<task_id>/timeline')
+    def api_task_timeline(task_id: str):
+        payload = _with_connection(
+            lambda conn: build_task_timeline_payload(conn, task_id)
+        )
+        if payload.get('task') is None:
+            return jsonify({'error': 'task not found', 'task_id': task_id}), 404
+        return jsonify(payload)
+
+    @app.get('/api/tasks/<task_id>/communications')
+    def api_task_communications(task_id: str):
+        payload = _with_connection(
+            lambda conn: build_task_communications_payload(conn, task_id)
+        )
+        if payload.get('task') is None:
+            return jsonify({'error': 'task not found', 'task_id': task_id}), 404
+        return jsonify(payload)
+
+
+    @app.get('/api/metrics/daily')
+    def api_metrics_daily():
+        payload = _with_connection(
+            lambda conn: build_daily_metrics_payload(
+                conn,
+                project=request.args.get('project'),
+                start_date=request.args.get('start_date'),
+                end_date=request.args.get('end_date'),
+            )
+        )
         return jsonify(payload)
 
     @app.get('/api/agents/stats')

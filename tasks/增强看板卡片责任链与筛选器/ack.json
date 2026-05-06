@@ -1,0 +1,9 @@
+{
+  "task_id": "增强看板卡片责任链与筛选器",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-06T11:49:56+08:00",
+  "acked_at": "2026-05-06T11:49:56+08:00",
+  "summary": "已按 PM 重派补修要求重新读取 AGENT.md、instruction.md 和当前 dashboard 前端代码；在 write_scope 内复核并补齐看板卡片责任链展示与筛选器行为。"
+}

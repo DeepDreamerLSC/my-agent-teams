@@ -1,3 +1,5 @@
 {"from": "pending", "to": "dispatched", "at": "2026-04-25T15:03:59+08:00", "reason": "pm dispatch"}
 {"from": "dispatched", "to": "working", "at": "2026-04-25T15:05:42+08:00", "reason": "watcher observed ack.json"}
 {"from": "working", "to": "ready_for_merge", "at": "2026-04-25T15:06:50+08:00", "reason": "watcher observed result.json status=done"}
+{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T11:35:15+08:00", "reason": "PM normalized ready_for_merge gate: waiting review"}
+2026-05-06T05:52:50Z pm-chief ready_for_merge -> done gate=closed review=APPROVE no_code_change

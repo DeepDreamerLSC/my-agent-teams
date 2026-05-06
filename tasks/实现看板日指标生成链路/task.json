@@ -1,0 +1,70 @@
+{
+  "id": "实现看板日指标生成链路",
+  "title": "实现看板日指标生成链路",
+  "project": "my-agent-teams",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "dev-2",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": "2026-05-06T18:00:00+08:00",
+  "review_round": 1,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "task_type": "development",
+  "read_only": false,
+  "downstream_action": "review",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "write_scope": [
+    "dashboard/metrics.py",
+    "scripts/dashboard-metrics.py",
+    "dashboard/db.py",
+    "dashboard/query.py",
+    "dashboard/app.py",
+    "dashboard/tests/test_dashboard_metrics.py"
+  ],
+  "depends_on": [
+    "验证看板第一期详情与沟通闭环"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/实现看板日指标生成链路/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "实现看板日指标生成链路",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "medium",
+  "timeout_minutes": 120,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-04T00:58:55+08:00",
+  "lease_expires_at": "2026-05-04T00:58:55+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已按 review 驳回意见完成补修：rebuild_daily_metrics(project=...) 不再生成或覆盖 project='__all__' 的聚合行，因此 project 范围重建不会污染默认 API 的全局口径；同时补了自动化测试，验证 project 定向重建后 __all__ 仍保持全量聚合结果。（QA 已通过自动收口） QA 结论：QA PASS（本轮重验证）。此前 write_scope 越界阻塞已由 PM 扩容解除，review-1 复审 APPROVE。10 个 dashboard 测试全部通过。project 定向重建不再污染 __all__ 全局聚合，功能逻辑正确。",
+  "last_error": null,
+  "created_at": "2026-05-04T00:55:42+08:00",
+  "updated_at": "2026-05-06T12:56:32+08:00",
+  "claim_scope": [
+    "dev-2"
+  ],
+  "dependency_policy": "done_only",
+  "rework_reason": null,
+  "merge_gate_state": "closed",
+  "last_gate_actor": "pm-chief",
+  "last_gate_decision_at": "2026-05-06T12:56:32+08:00"
+}

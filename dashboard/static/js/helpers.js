@@ -142,6 +142,54 @@ function applyTaskFilters(tasks, filters) {
   })
 }
 
+// --- Analytics helpers ---
+
+function formatSecondsCompact(seconds) {
+  if (seconds == null || Number.isNaN(seconds)) return '-'
+  const hours = seconds / 3600
+  if (hours < 24) return `${hours.toFixed(1)}h`
+  return `${(hours / 24).toFixed(1)}d`
+}
+
+function transformAggregateForAnalytics(payload) {
+  if (!payload || !payload.summary) return null
+  const s = payload.summary
+  const total = s.task_count || 0
+  const done = s.done_count || 0
+  const rate = total > 0 ? done / total : 0
+  const blockedRate = total > 0 ? (s.blocked_count || 0) / total : 0
+  return {
+    total, done,
+    completionRate: rate,
+    blockedRate,
+    activeCount: s.active_count || 0,
+    blockedCount: s.blocked_count || 0,
+    readyForMergeCount: s.ready_for_merge_count || 0,
+    ownerPmCounts: s.owner_pm_counts || {},
+    domainCounts: s.domain_counts || {},
+    groupings: payload.groupings || {},
+  }
+}
+
+function transformDailyMetrics(payload) {
+  if (!payload) return { taskMetrics: [], agentMetrics: [] }
+  return {
+    taskMetrics: (payload.task_metrics || []).sort((a, b) => (a.metric_date || '').localeCompare(b.metric_date || '')),
+    agentMetrics: payload.agent_metrics || [],
+  }
+}
+
+function computeAgentEfficiency(agentsPayload) {
+  const agents = (agentsPayload && agentsPayload.agents) || []
+  return agents.map(a => ({
+    agentId: a.agent_id,
+    completed: a.completed_task_count || 0,
+    active: a.current_load_count || 0,
+    workHours: ((a.total_tracked_work_seconds || 0) / 3600),
+    communications: a.total_communication_count || 0,
+  }))
+}
+
 // Export for Node.js test environment
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -150,5 +198,6 @@ if (typeof module !== 'undefined' && module.exports) {
     hoursBetween, formatDurationHours, buildFilterOptions, applyTaskFilters,
     BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, STATUS_TO_BOARD,
     GANTT_PHASES,
+    formatSecondsCompact, transformAggregateForAnalytics, transformDailyMetrics, computeAgentEfficiency,
   }
 }
