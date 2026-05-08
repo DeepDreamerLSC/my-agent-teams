@@ -28,12 +28,12 @@ const CURRENT_STATUS_LABELS = {
 
 // Gantt phases: key matches backend milestones keys, color/label for chart rendering
 const GANTT_PHASES = [
-  { key: 'created', label: '创建', color: '#bfbfbf' },
-  { key: 'dispatched', label: '派发', color: '#69b1ff' },
-  { key: 'ack', label: '接单', color: '#1677ff' },
-  { key: 'completed', label: '交付', color: '#52c41a' },
-  { key: 'review_completed', label: '审查通过', color: '#722ed1' },
-  { key: 'verify_completed', label: '验证通过', color: '#fa8c16' },
+  { key: 'created', label: '创建', color: '#1677ff' },
+  { key: 'dispatched', label: '派发', color: '#13c2c2' },
+  { key: 'ack', label: '接单', color: '#722ed1' },
+  { key: 'completed', label: '交付', color: '#faad14' },
+  { key: 'review_completed', label: '审查通过', color: '#52c41a' },
+  { key: 'verify_completed', label: '验证通过', color: '#ff4d4f' },
 ]
 
 // Map raw current_status to board_status (5 columns)

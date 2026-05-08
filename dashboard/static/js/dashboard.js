@@ -35,6 +35,15 @@ const EVENT_TYPE_LABELS = {
   dispatch: '派发事件',
   nudge: '强制唤醒',
 }
+const GANTT_PHASES = [
+  { key: 'created', label: '创建', color: '#1677ff' },
+  { key: 'dispatched', label: '派发', color: '#13c2c2' },
+  { key: 'ack', label: '接单', color: '#722ed1' },
+  { key: 'completed', label: '交付', color: '#faad14' },
+  { key: 'review_completed', label: '审查通过', color: '#52c41a' },
+  { key: 'verify_completed', label: '验证通过', color: '#ff4d4f' },
+]
+
 
 const docRef = typeof document !== 'undefined' ? document : null
 const detailDrawer = docRef ? docRef.getElementById('task-detail-drawer') : null
@@ -50,9 +59,15 @@ const filterOwnerPm = docRef ? docRef.getElementById('filter-owner-pm') : null
 const filterReviewLevel = docRef ? docRef.getElementById('filter-review-level') : null
 const filterMergeGate = docRef ? docRef.getElementById('filter-merge-gate') : null
 const filterReset = docRef ? docRef.getElementById('filter-reset') : null
+const ganttRangeButtons = docRef ? Array.from(docRef.querySelectorAll('[data-gantt-range]')) : []
+const ganttStartDate = docRef ? docRef.getElementById('gantt-start-date') : null
+const ganttEndDate = docRef ? docRef.getElementById('gantt-end-date') : null
+const ganttFilterHint = docRef ? docRef.getElementById('gantt-filter-hint') : null
 
 let currentDetailTaskId = null
 let latestBoardPayload = null
+let latestGanttPayload = null
+let ganttFilterState = { mode: 'all', customStart: '', customEnd: '' }
 
 // --- Tab switching ---
 if (docRef) {
@@ -213,29 +228,136 @@ function renderKanban(boardPayload) {
 }
 
 // --- Gantt View ---
+function startOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)
+}
+
+function endOfLocalDay(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999)
+}
+
+function parseLocalDateInput(value, endOfDay) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const [year, month, day] = value.split('-').map(Number)
+  const parsed = endOfDay
+    ? new Date(year, month - 1, day, 23, 59, 59, 999)
+    : new Date(year, month - 1, day, 0, 0, 0, 0)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function getGanttDateRange(state = ganttFilterState, now = new Date()) {
+  const mode = state.mode || 'all'
+  if (mode === 'all') {
+    return { start: null, end: null, label: '显示全部时间', warning: '' }
+  }
+  if (mode === 'custom') {
+    const start = parseLocalDateInput(state.customStart, false)
+    const end = parseLocalDateInput(state.customEnd, true)
+    if (!start && !end) return { start: null, end: null, label: '自定义日期为空，显示全部时间', warning: '请选择自定义开始或结束日期' }
+    if (start && end && start.getTime() > end.getTime()) {
+      return { start: null, end: null, label: '自定义日期非法，显示全部时间', warning: '开始日期不能晚于结束日期' }
+    }
+    return { start, end, label: `自定义：${state.customStart || '不限'} 至 ${state.customEnd || '不限'}`, warning: '' }
+  }
+
+  const end = endOfLocalDay(now)
+  const daysByMode = { today: 1, '3d': 3, '7d': 7, '30d': 30 }
+  const labels = { today: '今天', '3d': '近三天', '7d': '近七天', '30d': '近一个月' }
+  const days = daysByMode[mode] || 1
+  const startBase = startOfLocalDay(now)
+  const start = new Date(startBase.getTime())
+  start.setDate(start.getDate() - (days - 1))
+  return { start, end, label: labels[mode] || '今天', warning: '' }
+}
+
+function getTaskGanttIntervals(task) {
+  const milestones = (task && task.milestones) || {}
+  return GANTT_PHASES.map((phase, index) => {
+    const start = milestones[phase.key]
+    if (!start) return null
+    const nextPhase = GANTT_PHASES.slice(index + 1).find(p => milestones[p.key])
+    const startDate = new Date(start)
+    const endDate = nextPhase ? new Date(milestones[nextPhase.key]) : new Date(startDate.getTime() + 1800000)
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null
+    return { start: startDate, end: endDate }
+  }).filter(Boolean)
+}
+
+function intervalIntersectsRange(interval, range) {
+  const rangeStart = range.start ? range.start.getTime() : -Infinity
+  const rangeEnd = range.end ? range.end.getTime() : Infinity
+  return interval.end.getTime() >= rangeStart && interval.start.getTime() <= rangeEnd
+}
+
+function applyGanttTimeFilter(items, state = ganttFilterState, now = new Date()) {
+  const range = getGanttDateRange(state, now)
+  if (!range.start && !range.end) return { items: items || [], range }
+  return {
+    range,
+    items: (items || []).filter(task => getTaskGanttIntervals(task).some(interval => intervalIntersectsRange(interval, range))),
+  }
+}
+
+function setGanttFilterHint(range, count, total) {
+  if (!ganttFilterHint) return
+  const warning = range.warning ? `（${range.warning}）` : ''
+  ganttFilterHint.textContent = `${range.label}${warning} · ${count}/${total} 个任务`
+  ganttFilterHint.classList.toggle('warning', Boolean(range.warning))
+}
+
+function rerenderGanttFromState() {
+  if (latestGanttPayload) renderGantt(latestGanttPayload)
+}
+
+function setGanttFilterMode(mode) {
+  ganttFilterState = {
+    ...ganttFilterState,
+    mode,
+    customStart: ganttStartDate?.value || ganttFilterState.customStart,
+    customEnd: ganttEndDate?.value || ganttFilterState.customEnd,
+  }
+  ganttRangeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.ganttRange === mode))
+  rerenderGanttFromState()
+}
+
+function bindGanttFilters() {
+  ganttRangeButtons.forEach(btn => {
+    btn.addEventListener('click', () => setGanttFilterMode(btn.dataset.ganttRange || 'all'))
+  })
+  ;[ganttStartDate, ganttEndDate].forEach(input => {
+    if (!input) return
+    input.addEventListener('change', () => {
+      ganttFilterState = { ...ganttFilterState, mode: 'custom', customStart: ganttStartDate?.value || '', customEnd: ganttEndDate?.value || '' }
+      ganttRangeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.ganttRange === 'custom'))
+      rerenderGanttFromState()
+    })
+  })
+}
+
 function renderGantt(ganttPayload) {
+  latestGanttPayload = ganttPayload
   const el = document.getElementById('gantt-chart')
-  const items = (ganttPayload && ganttPayload.items) || []
+  const allItems = (ganttPayload && ganttPayload.items) || []
+  const filtered = applyGanttTimeFilter(allItems, ganttFilterState)
+  const items = filtered.items
+  setGanttFilterHint(filtered.range, items.length, allItems.length)
 
   if (!items.length) {
-    el.innerHTML = '<div class="empty-state">暂无甘特图数据</div>'
+    const existing = echarts.getInstanceByDom ? echarts.getInstanceByDom(el) : null
+    if (existing) existing.dispose()
+    el.innerHTML = '<div class="empty-state">当前时间范围暂无甘特图数据</div>'
     return
   }
 
-  const chart = echarts.init(el)
+  const existingChart = echarts.getInstanceByDom ? echarts.getInstanceByDom(el) : null
+  if (!existingChart) el.innerHTML = ''
+  const chart = existingChart || echarts.init(el)
   const sorted = [...items].sort((a, b) => new Date(a.display_start_at || a.milestones.created) - new Date(b.display_start_at || b.milestones.created))
 
   const categories = sorted.map(t => t.title.length > 16 ? t.title.slice(0, 16) + '…' : t.title)
   const baseTime = Math.min(...sorted.map(t => new Date(t.milestones.created).getTime()))
 
-  const phases = [
-    { key: 'created', label: '创建', color: '#bfbfbf' },
-    { key: 'dispatched', label: '派发', color: '#69b1ff' },
-    { key: 'ack', label: '接单', color: '#1677ff' },
-    { key: 'completed', label: '交付', color: '#52c41a' },
-    { key: 'review_completed', label: '审查通过', color: '#722ed1' },
-    { key: 'verify_completed', label: '验证通过', color: '#fa8c16' },
-  ]
+  const phases = GANTT_PHASES
 
   const series = phases.map(phase => ({
     name: phase.label,
@@ -692,6 +814,7 @@ async function init() {
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  bindGanttFilters()
   init()
 }
 
@@ -706,6 +829,10 @@ if (typeof module !== 'undefined' && module.exports) {
     renderKanbanFilters,
     getActiveFilters,
     populateFilterSelect,
+    GANTT_PHASES,
+    getGanttDateRange,
+    getTaskGanttIntervals,
+    applyGanttTimeFilter,
     renderAnalytics,
     renderAnalyticsSummary,
     renderTrendChart,

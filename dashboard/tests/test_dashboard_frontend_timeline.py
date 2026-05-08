@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DASHBOARD_JS = REPO_ROOT / "dashboard" / "static" / "js" / "dashboard.js"
+INDEX_HTML = REPO_ROOT / "dashboard" / "templates" / "index.html"
 
 
 def _run_node(script: str) -> dict:
@@ -23,6 +24,15 @@ def _run_node(script: str) -> dict:
 
 
 class DashboardFrontendTimelineTests(unittest.TestCase):
+
+    def test_gantt_filter_bar_markup_contains_quick_ranges_and_date_inputs(self):
+        html = INDEX_HTML.read_text(encoding="utf-8")
+        self.assertIn('id="gantt-filters"', html)
+        for mode in ["today", "3d", "7d", "30d", "custom"]:
+            self.assertIn(f'data-gantt-range="{mode}"', html)
+        self.assertIn('id="gantt-start-date" type="date"', html)
+        self.assertIn('id="gantt-end-date" type="date"', html)
+
     def test_sort_timeline_items_orders_by_timestamp_then_event_id(self):
         script = textwrap.dedent(
             f"""
@@ -125,3 +135,68 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertTrue(result["hasEmptyCommunication"])
         self.assertTrue(result["hasTaskId"])
         self.assertTrue(result["hasOwnerPm"])
+
+    def test_gantt_time_filter_includes_intersecting_phase_intervals(self):
+        script = textwrap.dedent(
+            f"""
+            const mod = require({json.dumps(str(DASHBOARD_JS))});
+            const payload = [
+              {{ title: 'old', milestones: {{ created: '2026-05-01T09:00:00', dispatched: '2026-05-01T10:00:00' }} }},
+              {{ title: 'match', milestones: {{ created: '2026-05-04T09:00:00', dispatched: '2026-05-04T10:00:00' }} }},
+              {{ title: 'span', milestones: {{ created: '2026-05-03T23:00:00', dispatched: '2026-05-04T01:00:00' }} }}
+            ];
+            const filtered = mod.applyGanttTimeFilter(payload, {{ mode: 'custom', customStart: '2026-05-04', customEnd: '2026-05-04' }});
+            console.log(JSON.stringify({{
+              titles: filtered.items.map(item => item.title).sort(),
+              label: filtered.range.label,
+              hasWarning: Boolean(filtered.range.warning)
+            }}));
+            """
+        )
+        result = _run_node(script)
+        self.assertEqual(result["titles"], ["match", "span"])
+        self.assertIn("2026-05-04", result["label"])
+        self.assertFalse(result["hasWarning"])
+
+    def test_gantt_custom_filter_warns_and_degrades_for_invalid_range(self):
+        script = textwrap.dedent(
+            f"""
+            const mod = require({json.dumps(str(DASHBOARD_JS))});
+            const payload = [{{ title: 'task', milestones: {{ created: '2026-05-04T09:00:00' }} }}];
+            const filtered = mod.applyGanttTimeFilter(payload, {{ mode: 'custom', customStart: '2026-05-05', customEnd: '2026-05-04' }});
+            console.log(JSON.stringify({{
+              count: filtered.items.length,
+              warning: filtered.range.warning,
+              startIsNull: filtered.range.start === null,
+              endIsNull: filtered.range.end === null
+            }}));
+            """
+        )
+        result = _run_node(script)
+        self.assertEqual(result["count"], 1)
+        self.assertIn("开始日期", result["warning"])
+        self.assertTrue(result["startIsNull"])
+        self.assertTrue(result["endIsNull"])
+
+    def test_gantt_quick_ranges_include_today_and_phase_palette_matches_design_tokens(self):
+        script = textwrap.dedent(
+            f"""
+            const mod = require({json.dumps(str(DASHBOARD_JS))});
+            const range = mod.getGanttDateRange({{ mode: '3d' }}, new Date(2026, 4, 7, 12, 0, 0));
+            console.log(JSON.stringify({{
+              label: range.label,
+              startDay: range.start.getDate(),
+              endDay: range.end.getDate(),
+              startHour: range.start.getHours(),
+              endHour: range.end.getHours(),
+              colors: mod.GANTT_PHASES.map(phase => phase.color)
+            }}));
+            """
+        )
+        result = _run_node(script)
+        self.assertEqual(result["label"], "近三天")
+        self.assertEqual(result["startDay"], 5)
+        self.assertEqual(result["endDay"], 7)
+        self.assertEqual(result["startHour"], 0)
+        self.assertEqual(result["endHour"], 23)
+        self.assertEqual(result["colors"], ["#1677ff", "#13c2c2", "#722ed1", "#faad14", "#52c41a", "#ff4d4f"])
