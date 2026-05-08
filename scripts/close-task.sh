@@ -57,8 +57,10 @@ fi
 
 python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" <<'PY'
 import json
+import os
 import re
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -221,7 +223,7 @@ merge_gate_state = str(task.get('merge_gate_state') or '').strip()
 review_state = parse_review_state(task_dir, review_level)
 verify_state = parse_verify_state(task_dir)
 
-if merge_gate_state == 'review_pending':
+if merge_gate_state == 'review_pending' and not (review_required and review_state == 'pass'):
     fail(f'task merge_gate_state still pending: {merge_gate_state}')
 # QA pass is represented by verify.json.  task-watcher may invoke this script
 # while task.json still says qa_pending, so allow that single pending gate only
@@ -272,7 +274,11 @@ print(json.dumps(preview, ensure_ascii=False, indent=2))
 if dry_run:
     raise SystemExit(0)
 
-task_json_path.write_text(json.dumps(updated_task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_json_path.parent), encoding='utf-8') as tmp:
+    json.dump(updated_task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_json_path)
 with transitions_path.open('a', encoding='utf-8') as fp:
     fp.write(json.dumps(transition, ensure_ascii=False) + '\n')
 PY

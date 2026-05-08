@@ -1,22 +1,139 @@
 #!/bin/bash
 # task-watcher-watchdog.sh - 监控 task-watcher 进程与 heartbeat，并在退出/卡死时自动重启。
 
-STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
-TASK_WATCHER_SCRIPT="${TASK_WATCHER_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+LEGACY_OPENCLAW_ROOT="${LEGACY_OPENCLAW_ROOT:-$HOME/.openclaw/workspace}"
+LEGACY_STATE_DIR="${LEGACY_STATE_DIR:-$LEGACY_OPENCLAW_ROOT/.task-watcher}"
+LEGACY_LOG_DIR="${LEGACY_LOG_DIR:-$LEGACY_OPENCLAW_ROOT/logs}"
+
+LEGACY_PROJECT_OMX_STATE_DIR="${LEGACY_PROJECT_OMX_STATE_DIR:-$WORKSPACE_ROOT/.omx/state/task-watcher}"
+LEGACY_PROJECT_OMX_LOG_DIR="${LEGACY_PROJECT_OMX_LOG_DIR:-$WORKSPACE_ROOT/.omx/logs}"
+STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
+TASK_WATCHER_SCRIPT="${TASK_WATCHER_SCRIPT:-$WORKSPACE_ROOT/scripts/task-watcher.sh}"
 WATCHDOG_INTERVAL="${WATCHDOG_INTERVAL:-15}"
-HEARTBEAT_TIMEOUT_SECONDS="${HEARTBEAT_TIMEOUT_SECONDS:-120}"
+HEARTBEAT_TIMEOUT_SECONDS="${HEARTBEAT_TIMEOUT_SECONDS:-300}"
 WATCHDOG_RUN_ONCE="${WATCHDOG_RUN_ONCE:-0}"
 PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
 RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.txt}"
 WATCHER_STDOUT_LOG="${WATCHER_STDOUT_LOG:-$STATE_DIR/task-watcher.stdout.log}"
-LOG_DIR="${LOG_DIR:-/Users/lin/.openclaw/workspace/logs}"
+MIGRATION_SENTINEL_FILE="${MIGRATION_SENTINEL_FILE:-$STATE_DIR/migration-complete.json}"
+LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/task-watcher.log}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 
 LAST_LOG_ROTATE_DAY=""
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+migrate_legacy_task_watcher_runtime() {
+    [ -f "$MIGRATION_SENTINEL_FILE" ] && return 0
+
+    local migration_lock="$STATE_DIR/.runtime-migration.lockdir"
+    if ! mkdir "$migration_lock" 2>/dev/null; then
+        return 0
+    fi
+
+    LEGACY_STATE_DIR="$LEGACY_STATE_DIR" \
+    LEGACY_LOG_DIR="$LEGACY_LOG_DIR" \
+    LEGACY_PROJECT_OMX_STATE_DIR="$LEGACY_PROJECT_OMX_STATE_DIR" \
+    LEGACY_PROJECT_OMX_LOG_DIR="$LEGACY_PROJECT_OMX_LOG_DIR" \
+    STATE_DIR="$STATE_DIR" \
+    LOG_DIR="$LOG_DIR" \
+    MIGRATION_SENTINEL_FILE="$MIGRATION_SENTINEL_FILE" \
+    python3 - <<'PY_MIGRATE_RUNTIME'
+import json
+import os
+import shutil
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+legacy_state_dir = Path(os.environ["LEGACY_STATE_DIR"]).expanduser()
+legacy_log_dir = Path(os.environ["LEGACY_LOG_DIR"]).expanduser()
+legacy_project_omx_state_dir = Path(os.environ["LEGACY_PROJECT_OMX_STATE_DIR"]).expanduser()
+legacy_project_omx_log_dir = Path(os.environ["LEGACY_PROJECT_OMX_LOG_DIR"]).expanduser()
+state_dir = Path(os.environ["STATE_DIR"]).expanduser()
+log_dir = Path(os.environ["LOG_DIR"]).expanduser()
+sentinel_path = Path(os.environ["MIGRATION_SENTINEL_FILE"]).expanduser()
+
+state_dir.mkdir(parents=True, exist_ok=True)
+log_dir.mkdir(parents=True, exist_ok=True)
+
+SKIP_STATE_NAMES = {
+    'task-watcher.pid',
+    'task-watcher-heartbeat.json',
+    'task-watcher-restart-cause.txt',
+    'task-watcher.stdout.log',
+}
+SKIP_SUFFIXES = ('.lock', '.tmp')
+SKIP_PREFIXES = ('.', 'patch.', 'gate_err.')
+
+def should_skip_state(source: Path) -> bool:
+    name = source.name
+    return name in SKIP_STATE_NAMES or name.endswith(SKIP_SUFFIXES) or any(name.startswith(prefix) for prefix in SKIP_PREFIXES)
+
+def copy_files(source_dir: Path, target_dir: Path, patterns: list[str], *, state_files: bool = False):
+    copied = []
+    if not source_dir.exists():
+        return copied
+    for pattern in patterns:
+        for source in sorted(source_dir.glob(pattern)):
+            if not source.is_file():
+                continue
+            if state_files and should_skip_state(source):
+                continue
+            target = target_dir / source.name
+            if target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(str(source), str(target))
+                copied.append({"from": str(source), "to": str(target)})
+            except Exception:
+                continue
+    return copied
+
+state_patterns = ["*"]
+log_patterns = [
+    "task-watcher.log",
+    "task-watcher.*.log",
+    "task-watcher.stdout.log",
+]
+
+copied_state = []
+for source in [legacy_state_dir, legacy_project_omx_state_dir]:
+    copied_state.extend(copy_files(source, state_dir, state_patterns, state_files=True))
+copied_logs = []
+for source in [legacy_log_dir, legacy_project_omx_log_dir]:
+    copied_logs.extend(copy_files(source, log_dir, log_patterns))
+
+payload = {
+    "migrated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "mode": "copy-once",
+    "legacy_state_dir": str(legacy_state_dir),
+    "legacy_log_dir": str(legacy_log_dir),
+    "legacy_project_omx_state_dir": str(legacy_project_omx_state_dir),
+    "legacy_project_omx_log_dir": str(legacy_project_omx_log_dir),
+    "state_dir": str(state_dir),
+    "log_dir": str(log_dir),
+    "copied_state_files": copied_state,
+    "copied_log_files": copied_logs,
+}
+sentinel_path.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.NamedTemporaryFile("w", delete=False, dir=str(sentinel_path.parent), encoding="utf-8") as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write("\n")
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, sentinel_path)
+PY_MIGRATE_RUNTIME
+    local rc=$?
+    rmdir "$migration_lock" 2>/dev/null || true
+    return "$rc"
+}
+
+migrate_legacy_task_watcher_runtime
 
 rotate_watcher_log_if_needed() {
     local today file_day archive_file retention_days

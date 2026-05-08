@@ -8,7 +8,13 @@ tasks/_system/
 
 .omc/
 .omx/
-.watcher-lock/# Agent task symlinks (point to shared tasks/)
+.runtime/
+.codex/
+.pytest_cache/
+config.local.json
+.watcher-lock/
+
+# Agent task symlinks (point to shared tasks/)
 agents/*/tasks
 # Runtime task data
 tasks/T-*/

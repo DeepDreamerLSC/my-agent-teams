@@ -3,31 +3,93 @@
 # 每 3 秒轮询所有活跃 session，跳过 omx-detached 和自己
 # 使用 session ID 操作，避免中文名在 list-sessions 中显示为 ____ 的问题
 
-PUSH_SCRIPT="/Users/lin/.openclaw/workspace/scripts/feishu-push.sh"
-USER_ID="ou_f95ee559a38a607c5f312e7b64304143"
-KEYWORDS=("Do you want to " "Allow this tool" "Allow the " "Allow for this session" "Yes, proceed" "enter to confirm" "requires approval" "Permission requested" "MCP server to run tool" "Allow the omx" "Allow the omx_wiki" "Allow the omx_memory")
+KEYWORDS=(
+    "Do you want to "
+    "Allow this tool"
+    "Allow the "
+    "Allow for this session"
+    "Yes, proceed"
+    "Press enter to confirm"
+    "enter to confirm"
+    "requires approval"
+    "Permission requested"
+    "MCP server to run tool"
+    "Allow the omx"
+    "Allow the omx_wiki"
+    "Allow the omx_memory"
+)
+DANGEROUS_KEYWORDS=(
+    "don't ask again"
+    "make the following edits"
+    "Would you like to make the following edits?"
+    "Yes, and don't ask again"
+)
 INTERVAL=3
 STATE_DIR="/Users/lin/.openclaw/workspace/.tmux-watcher"
-mkdir -p "$STATE_DIR"
+PID_FILE="${PID_FILE:-$STATE_DIR/tmux-watcher.pid}"
+HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/tmux-watcher-heartbeat.json}"
+LOG_DIR="${LOG_DIR:-/Users/lin/.openclaw/workspace/logs}"
+LOG_FILE="${LOG_FILE:-$LOG_DIR/tmux-watcher.log}"
+MATCH_LINES="${MATCH_LINES:-40}"
+mkdir -p "$STATE_DIR" "$LOG_DIR"
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+    local line
+    line="$(date '+%Y-%m-%d %H:%M:%S') $*"
+    echo "$line"
+    printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-push_feishu() {
-    local msg="$1"
-    if [ -x "$PUSH_SCRIPT" ]; then
-        tmpfile=$(mktemp)
-        echo "$msg" > "$tmpfile"
-        FEISHU_RECEIVE_ID="$USER_ID" "$PUSH_SCRIPT" < "$tmpfile" 2>/dev/null &
-        disown
-        rm -f "$tmpfile"
+write_heartbeat() {
+    python3 - "$HEARTBEAT_FILE" "$$" "$INTERVAL" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+heartbeat_path = Path(sys.argv[1])
+payload = {
+    "pid": int(sys.argv[2]),
+    "interval_seconds": int(sys.argv[3]),
+    "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "updated_ts": int(datetime.now(timezone.utc).timestamp()),
+}
+heartbeat_path.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.NamedTemporaryFile("w", delete=False, dir=str(heartbeat_path.parent), encoding="utf-8") as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write("\n")
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, heartbeat_path)
+PY
+}
+
+ensure_single_instance() {
+    local existing_pid=""
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && kill -0 "$existing_pid" 2>/dev/null; then
+        log "tmux-watcher 已在运行（pid=$existing_pid），当前实例退出"
+        exit 0
+    fi
+    printf '%s\n' "$$" > "$PID_FILE"
+}
+
+cleanup_tmux_watcher_runtime() {
+    local existing_pid=""
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [ "$existing_pid" = "$$" ]; then
+        rm -f "$PID_FILE"
     fi
 }
 
+trap cleanup_tmux_watcher_runtime EXIT INT TERM
+
+ensure_single_instance
 log "tmux-watcher 启动，间隔 ${INTERVAL}s"
 
 while true; do
+    write_heartbeat
     # 获取所有 session 的 id 和 name
     my_session_name="$(tmux display-message -p '#{session_name}' 2>/dev/null)"
 
@@ -39,23 +101,43 @@ while true; do
         # 跳过自己
         [ "$sname" = "$my_session_name" ] && continue
         # 跳过 omx-detached 残留
-        case "$sname" in omx-lin-detached*) continue ;; esac
+        case "$sname" in
+            omx-lin-detached*|tmux-watcher|task-watcher)
+                continue
+                ;;
+        esac
 
         # 用 session ID 操作（避免中文名 ____ 问题）
-        content=$(tmux capture-pane -t "$sname" -p -S -30 2>/dev/null)
+        content=$(tmux capture-pane -t "$sname" -p -S -80 2>/dev/null)
         [ -z "$content" ] && continue
 
-        # 检查底部 15 行是否包含确认关键字（Claude Code 底部有 UI 状态栏，确认提示会被推到中间）
-        bottom_lines=$(echo "$content" | tail -15)
+        # 检查底部若干行是否包含确认关键字（提示可能不总在最后 15 行）
+        bottom_lines=$(printf '%s\n' "$content" | tail -"$MATCH_LINES")
         matched=0
+        matched_kw=""
         for kw in "${KEYWORDS[@]}"; do
-            if echo "$bottom_lines" | grep -q "$kw"; then
+            if printf '%s\n' "$bottom_lines" | grep -Fq "$kw"; then
                 matched=1
+                matched_kw="$kw"
                 break
             fi
         done
 
         [ "$matched" -eq 0 ] && continue
+
+        dangerous_match=0
+        dangerous_kw=""
+        for danger_kw in "${DANGEROUS_KEYWORDS[@]}"; do
+            if printf '%s\n' "$bottom_lines" | grep -Fq "$danger_kw"; then
+                dangerous_match=1
+                dangerous_kw="$danger_kw"
+                break
+            fi
+        done
+        if [ "$dangerous_match" -eq 1 ]; then
+            log "检测到需要人工确认的高风险提示 $sname（sid=$sid，keyword=$dangerous_kw），跳过自动确认"
+            continue
+        fi
 
         # 用 session 级别冷却时间去重（默认 60 秒内不重复触发）
         safe_sid=$(echo "$sid" | tr '$' 'S')
@@ -67,7 +149,7 @@ while true; do
         fi
         echo "$now" > "$cooldown_file"
 
-        # 新的确认项，静默自动确认
+        log "自动确认 $sname（sid=$sid，keyword=$matched_kw）"
         tmux send-keys -t "$sname" Enter
     done < "$SESSIONS_FILE"
     rm -f "$SESSIONS_FILE"

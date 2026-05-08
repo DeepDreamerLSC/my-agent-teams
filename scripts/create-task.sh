@@ -38,8 +38,10 @@ mkdir -p "$TASK_DIR"
 
 python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" "$REVIEW_LEVEL" "$TASK_LEVEL" "$REVIEWERS_CSV" "$REVIEW_DEADLINE" "$STRICT_WRITE_SCOPE_CONFLICT" "$TASK_TYPE_RAW" "$READ_ONLY_RAW" "$DOWNSTREAM_ACTION_RAW" "$OWNER_APPROVAL_REQUIRED_RAW" "$OWNER_APPROVED_BY_RAW" "$OWNER_APPROVED_AT_RAW" <<'PY'
 import json
+import os
 import re
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -405,7 +407,12 @@ obj = {
     'claimed_at': None,
     'claim_reason': None,
 }
-Path(task_dir, 'task.json').write_text(json.dumps(obj, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+task_json_path = Path(task_dir, 'task.json')
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_json_path.parent), encoding='utf-8') as tmp:
+    json.dump(obj, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_json_path)
 instruction_lines = [
     f'# 任务：{title}',
     '',

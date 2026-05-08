@@ -7,25 +7,36 @@
 # - verify 通过 → 自动执行 close-task.sh 收口
 # - review 驳回 / QA 失败 → 通知 PM 仲裁
 
-TASKS_ROOT="${TASKS_ROOT:-/Users/lin/Desktop/work/my-agent-teams/tasks}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+LEGACY_OPENCLAW_ROOT="${LEGACY_OPENCLAW_ROOT:-$HOME/.openclaw/workspace}"
+LEGACY_STATE_DIR="${LEGACY_STATE_DIR:-$LEGACY_OPENCLAW_ROOT/.task-watcher}"
+LEGACY_LOG_DIR="${LEGACY_LOG_DIR:-$LEGACY_OPENCLAW_ROOT/logs}"
+
+TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
 PM_SESSION="${PM_SESSION:-pm-chief}"
 QA_SESSION="${QA_SESSION:-qa-1}"
-PUSH_SCRIPT="${PUSH_SCRIPT:-/Users/lin/.openclaw/workspace/scripts/feishu-push.sh}"
-USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
-STATE_DIR="${STATE_DIR:-/Users/lin/.openclaw/workspace/.task-watcher}"
-BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py}"
-SEND_SCRIPT="${SEND_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh}"
-SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh}"
-CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh}"
-CONFIG_PATH="${CONFIG_PATH:-/Users/lin/Desktop/work/my-agent-teams/config.json}"
+PUSH_SCRIPT="${PUSH_SCRIPT:-}"
+USER_ID="${USER_ID:-}"
+LEGACY_PROJECT_OMX_STATE_DIR="${LEGACY_PROJECT_OMX_STATE_DIR:-$WORKSPACE_ROOT/.omx/state/task-watcher}"
+LEGACY_PROJECT_OMX_LOG_DIR="${LEGACY_PROJECT_OMX_LOG_DIR:-$WORKSPACE_ROOT/.omx/logs}"
+STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
+BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-$WORKSPACE_ROOT/scripts/task-board-sync.py}"
+SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
+SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
+CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/close-task.sh}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
 DEV_AUTO_CLAIM="${DEV_AUTO_CLAIM:-1}"
 INTERVAL="${INTERVAL:-5}"
+HEARTBEAT_EVERY_TASKS="${HEARTBEAT_EVERY_TASKS:-10}"
+TERMINAL_SWEEP_EVERY_LOOPS="${TERMINAL_SWEEP_EVERY_LOOPS:-12}"
 PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
 RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.txt}"
-LOG_DIR="${LOG_DIR:-/Users/lin/.openclaw/workspace/logs}"
+MIGRATION_SENTINEL_FILE="${MIGRATION_SENTINEL_FILE:-$STATE_DIR/migration-complete.json}"
+LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/task-watcher.log}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 DISPATCH_RESEND_AFTER_SECONDS="${DISPATCH_RESEND_AFTER_SECONDS:-300}"
@@ -35,7 +46,148 @@ WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
 LAST_LOG_ROTATE_DAY=""
 WATCHER_STARTED_AT_EPOCH="$(date +%s)"
 
-mkdir -p "$STATE_DIR"
+mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+resolve_notifications_config() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+if not config_path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(config_path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+notifications = payload.get('notifications') or {}
+push_script = str(notifications.get('push_script') or '').strip()
+open_id = str(notifications.get('feishu_open_id') or '').strip()
+print(f"{push_script}\n{open_id}")
+PY
+}
+
+if [ -z "$PUSH_SCRIPT" ] || [ -z "$USER_ID" ]; then
+    notifications_config="$(resolve_notifications_config 2>/dev/null || true)"
+    if [ -n "$notifications_config" ]; then
+        if [ -z "$PUSH_SCRIPT" ]; then
+            PUSH_SCRIPT="$(printf '%s\n' "$notifications_config" | sed -n '1p')"
+        fi
+        if [ -z "$USER_ID" ]; then
+            USER_ID="$(printf '%s\n' "$notifications_config" | sed -n '2p')"
+        fi
+    fi
+fi
+PUSH_SCRIPT="${PUSH_SCRIPT:-$LEGACY_OPENCLAW_ROOT/scripts/feishu-push.sh}"
+USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
+
+migrate_legacy_task_watcher_runtime() {
+    [ -f "$MIGRATION_SENTINEL_FILE" ] && return 0
+
+    local migration_lock="$STATE_DIR/.runtime-migration.lockdir"
+    if ! mkdir "$migration_lock" 2>/dev/null; then
+        return 0
+    fi
+
+    LEGACY_STATE_DIR="$LEGACY_STATE_DIR" \
+    LEGACY_LOG_DIR="$LEGACY_LOG_DIR" \
+    LEGACY_PROJECT_OMX_STATE_DIR="$LEGACY_PROJECT_OMX_STATE_DIR" \
+    LEGACY_PROJECT_OMX_LOG_DIR="$LEGACY_PROJECT_OMX_LOG_DIR" \
+    STATE_DIR="$STATE_DIR" \
+    LOG_DIR="$LOG_DIR" \
+    MIGRATION_SENTINEL_FILE="$MIGRATION_SENTINEL_FILE" \
+    python3 - <<'PY_MIGRATE_RUNTIME'
+import json
+import os
+import shutil
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+legacy_state_dir = Path(os.environ["LEGACY_STATE_DIR"]).expanduser()
+legacy_log_dir = Path(os.environ["LEGACY_LOG_DIR"]).expanduser()
+legacy_project_omx_state_dir = Path(os.environ["LEGACY_PROJECT_OMX_STATE_DIR"]).expanduser()
+legacy_project_omx_log_dir = Path(os.environ["LEGACY_PROJECT_OMX_LOG_DIR"]).expanduser()
+state_dir = Path(os.environ["STATE_DIR"]).expanduser()
+log_dir = Path(os.environ["LOG_DIR"]).expanduser()
+sentinel_path = Path(os.environ["MIGRATION_SENTINEL_FILE"]).expanduser()
+
+state_dir.mkdir(parents=True, exist_ok=True)
+log_dir.mkdir(parents=True, exist_ok=True)
+
+SKIP_STATE_NAMES = {
+    'task-watcher.pid',
+    'task-watcher-heartbeat.json',
+    'task-watcher-restart-cause.txt',
+    'task-watcher.stdout.log',
+}
+SKIP_SUFFIXES = ('.lock', '.tmp')
+SKIP_PREFIXES = ('.', 'patch.', 'gate_err.')
+
+def should_skip_state(source: Path) -> bool:
+    name = source.name
+    return name in SKIP_STATE_NAMES or name.endswith(SKIP_SUFFIXES) or any(name.startswith(prefix) for prefix in SKIP_PREFIXES)
+
+def copy_files(source_dir: Path, target_dir: Path, patterns: list[str], *, state_files: bool = False):
+    copied = []
+    if not source_dir.exists():
+        return copied
+    for pattern in patterns:
+        for source in sorted(source_dir.glob(pattern)):
+            if not source.is_file():
+                continue
+            if state_files and should_skip_state(source):
+                continue
+            target = target_dir / source.name
+            if target.exists() and target.stat().st_mtime >= source.stat().st_mtime:
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.copy2(str(source), str(target))
+                copied.append({"from": str(source), "to": str(target)})
+            except Exception:
+                continue
+    return copied
+
+state_patterns = ["*"]
+log_patterns = [
+    "task-watcher.log",
+    "task-watcher.*.log",
+]
+
+copied_state = []
+for source in [legacy_state_dir, legacy_project_omx_state_dir]:
+    copied_state.extend(copy_files(source, state_dir, state_patterns, state_files=True))
+copied_logs = []
+for source in [legacy_log_dir, legacy_project_omx_log_dir]:
+    copied_logs.extend(copy_files(source, log_dir, log_patterns))
+
+payload = {
+    "migrated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    "mode": "copy-once",
+    "legacy_state_dir": str(legacy_state_dir),
+    "legacy_log_dir": str(legacy_log_dir),
+    "legacy_project_omx_state_dir": str(legacy_project_omx_state_dir),
+    "legacy_project_omx_log_dir": str(legacy_project_omx_log_dir),
+    "state_dir": str(state_dir),
+    "log_dir": str(log_dir),
+    "copied_state_files": copied_state,
+    "copied_log_files": copied_logs,
+}
+sentinel_path.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.NamedTemporaryFile("w", delete=False, dir=str(sentinel_path.parent), encoding="utf-8") as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write("\n")
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, sentinel_path)
+PY_MIGRATE_RUNTIME
+    local rc=$?
+    rmdir "$migration_lock" 2>/dev/null || true
+    return "$rc"
+}
+
+migrate_legacy_task_watcher_runtime
 
 rotate_watcher_log_if_needed() {
     local today file_day archive_file retention_days
@@ -213,14 +365,27 @@ notify_agent() {
 # 飞书推送（给林总工）
 push_feishu() {
     local msg="$1"
-    if [ -x "$PUSH_SCRIPT" ]; then
-        local tmpfile
-        tmpfile=$(mktemp)
-        echo "$msg" > "$tmpfile"
-        FEISHU_RECEIVE_ID="$USER_ID" "$PUSH_SCRIPT" < "$tmpfile" 2>/dev/null &
-        disown
-        rm -f "$tmpfile"
+    local event_label="${2:-generic}"
+    local task_id="${3:-unknown}"
+    if [ ! -x "$PUSH_SCRIPT" ]; then
+        log "飞书推送跳过: push script 不可执行 ($PUSH_SCRIPT)"
+        return 1
     fi
+
+    local tmpfile output rc
+    tmpfile=$(mktemp)
+    printf '%s\n' "$msg" > "$tmpfile"
+    output="$(FEISHU_RECEIVE_ID="$USER_ID" "$PUSH_SCRIPT" < "$tmpfile" 2>&1)"
+    rc=$?
+    rm -f "$tmpfile"
+
+    if [ "$rc" -eq 0 ]; then
+        log "飞书推送成功: task=${task_id} event=${event_label} $(truncate_utf8 "$output" 120)"
+        return 0
+    fi
+
+    log "飞书推送失败: task=${task_id} event=${event_label} rc=${rc} $(truncate_utf8 "$output" 200)"
+    return "$rc"
 }
 
 push_task_event() {
@@ -238,7 +403,7 @@ push_task_event() {
         message="${message}
 下一步：${next_action}"
     fi
-    push_feishu "$message"
+    push_feishu "$message" "$title" "$task_id"
 }
 
 emit_system_chat_event() {
@@ -740,6 +905,34 @@ auto_push_next_qa_for_agent() {
     return 0
 }
 
+reconcile_open_merge_gate() {
+    local task_dir="$1"
+    local task_id="$2"
+    local current_status="$3"
+    [ "$current_status" = "ready_for_merge" ] || return 1
+
+    local gate review_level summary
+    gate=$(task_json_pick "$task_dir" merge_gate_state)
+    review_level=$(task_json_pick "$task_dir" review_level)
+    summary=$(json_pick "$task_dir/result.json" summary)
+
+    case "$gate" in
+        review_pending)
+            if [ ! -f "$task_dir/review.md" ] && [ ! -f "$task_dir/design-review.md" ]; then
+                auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
+                return $?
+            fi
+            ;;
+        qa_pending)
+            if [ ! -f "$task_dir/verify.json" ]; then
+                auto_dispatch_qa "$task_id"
+                return $?
+            fi
+            ;;
+    esac
+    return 1
+}
+
 is_idle_agent() {
     local agent_id="$1"
     local active_count
@@ -754,6 +947,36 @@ is_idle_agent() {
         return $?
     fi
     return 1
+}
+
+normalize_legacy_task_status() {
+    local task_dir="$1"
+    local current_status="$2"
+    case "$current_status" in
+        in_review|reviewing) ;;
+        *) return 1 ;;
+    esac
+
+    local inferred_gate_state now_iso new_status
+    inferred_gate_state=$(resolve_merge_gate_state "$task_dir" 2>/dev/null || true)
+    [ -n "$inferred_gate_state" ] || inferred_gate_state="review_pending"
+    now_iso=$(now_iso)
+
+    case "$inferred_gate_state" in
+        review_rejected|qa_failed|blocked)
+            set_task_gate_state "$task_dir" "blocked" "watcher normalized legacy review status" "$inferred_gate_state" "$( [ "$inferred_gate_state" = "review_rejected" ] && echo review || { [ "$inferred_gate_state" = "qa_failed" ] && echo qa || echo ""; } )" "watcher" "$now_iso"
+            ;;
+        review_pending|qa_pending|pm_acceptance_pending)
+            set_task_gate_state "$task_dir" "ready_for_merge" "watcher normalized legacy review status" "$inferred_gate_state" "" "watcher" "$now_iso"
+            ;;
+        closed)
+            set_task_gate_state "$task_dir" "done" "watcher normalized legacy closed status" "closed" "" "watcher" "$now_iso"
+            ;;
+        *)
+            set_task_gate_state "$task_dir" "ready_for_merge" "watcher normalized legacy review status" "review_pending" "" "watcher" "$now_iso"
+            ;;
+    esac
+    return 0
 }
 
 select_idle_dev_agent() {
@@ -828,17 +1051,23 @@ update_task_record() {
     local new_status="${2:-}"
     local reason="${3:-watcher status update}"
     local patch_json="${4:-{}}"
+    local patch_file=""
     local output=""
-    output=$(python3 - "$task_dir" "$new_status" "$reason" "$patch_json" <<'PY'
+    patch_file=$(mktemp "${STATE_DIR}/patch.XXXXXX.json" 2>/dev/null || mktemp)
+    printf '%s' "$patch_json" > "$patch_file"
+    output=$(python3 - "$task_dir" "$new_status" "$reason" "$patch_file" <<'PY'
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 task_dir = Path(sys.argv[1])
 new_status = sys.argv[2].strip()
 reason = sys.argv[3]
-patch_json = sys.argv[4].strip() or '{}'
+patch_path = Path(sys.argv[4])
+patch_json = patch_path.read_text(encoding='utf-8').strip() or '{}'
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -862,7 +1091,11 @@ if not status_changed and not fields_changed:
     raise SystemExit(0)
 
 task['updated_at'] = now
-task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_path)
 if status_changed:
     with transitions_path.open('a', encoding='utf-8') as fp:
         fp.write(json.dumps({
@@ -877,6 +1110,7 @@ else:
 PY
 )
     local status_rc=$?
+    rm -f "$patch_file"
     if [ -n "$output" ]; then
         log "$(basename "$task_dir"): $output | reason=$reason"
     fi
@@ -897,6 +1131,87 @@ set_task_fields() {
     update_task_record "$task_dir" "" "$reason" "$patch_json"
 }
 
+set_task_gate_state() {
+    local task_dir="$1"
+    local new_status="${2:-}"
+    local reason="${3:-watcher gate update}"
+    local merge_gate_state="${4:-}"
+    local rework_reason="${5:-__KEEP__}"
+    local last_gate_actor="${6:-}"
+    local last_gate_decision_at="${7:-}"
+    local output=""
+    output=$(python3 - "$task_dir" "$new_status" "$reason" "$merge_gate_state" "$rework_reason" "$last_gate_actor" "$last_gate_decision_at" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+new_status = sys.argv[2].strip()
+reason = sys.argv[3]
+merge_gate_state = sys.argv[4]
+rework_reason = sys.argv[5]
+last_gate_actor = sys.argv[6]
+last_gate_decision_at = sys.argv[7]
+
+task_path = task_dir / 'task.json'
+transitions_path = task_dir / 'transitions.jsonl'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+old_status = str(task.get('status') or '')
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+status_changed = bool(new_status) and old_status != new_status
+fields_changed = False
+
+if new_status:
+    task['status'] = new_status
+if merge_gate_state != "__KEEP__" and task.get('merge_gate_state') != merge_gate_state:
+    task['merge_gate_state'] = merge_gate_state
+    fields_changed = True
+if rework_reason != "__KEEP__":
+    value = None if rework_reason in {"", "null", "None"} else rework_reason
+    if task.get('rework_reason') != value:
+        task['rework_reason'] = value
+        fields_changed = True
+if last_gate_actor != "__KEEP__" and task.get('last_gate_actor') != last_gate_actor:
+    task['last_gate_actor'] = last_gate_actor
+    fields_changed = True
+if last_gate_decision_at != "__KEEP__" and task.get('last_gate_decision_at') != last_gate_decision_at:
+    task['last_gate_decision_at'] = last_gate_decision_at
+    fields_changed = True
+
+if not status_changed and not fields_changed:
+    print(f'unchanged: status={old_status}')
+    raise SystemExit(0)
+
+task['updated_at'] = now
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_path)
+if status_changed:
+    with transitions_path.open('a', encoding='utf-8') as fp:
+        fp.write(json.dumps({
+            'from': old_status,
+            'to': new_status,
+            'at': now,
+            'reason': reason,
+        }, ensure_ascii=False) + '\n')
+    print(f'status: {old_status} -> {new_status}')
+else:
+    print('fields updated without status change: gate-related fields')
+PY
+)
+    local status_rc=$?
+    if [ -n "$output" ]; then
+        log "$(basename "$task_dir"): $output | reason=$reason"
+    fi
+    return $status_rc
+}
+
 # 记录已处理的事件（避免重复通知）
 is_notified() {
     local key="$1"
@@ -913,7 +1228,9 @@ final_done_transition_epoch() {
     local task_dir="$1"
     python3 - "$task_dir/transitions.jsonl" <<'PY'
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -987,50 +1304,59 @@ review_file_state() {
     local review_file="$1"
     [ -f "$review_file" ] || { echo "missing"; return 0; }
 
-    # 优先提取明确的结论行（## 结论 / ## 最终意见 / 结论： 等标题下的内容）
+    # 优先提取明确结论块：标题「结论/审查结论/最终意见」及紧随其后的几行。
     local conclusion_block
-    conclusion_block=$(awk '/^(#{1,4}\s*(结论|最终意见|审查结论|Conclusion|Summary|Verdict))/,/^#{1,3}\s/ {print}' "$review_file" 2>/dev/null)
-    local scan_text
-    scan_text="${conclusion_block:-$(cat "$review_file")}"
+    conclusion_block=$(python3 - "$review_file" <<'PY'
+from pathlib import Path
+import re
+import sys
 
-    # 在结论块（或全文）中检测通过/驳回信号
-    local pass=""
-    local fail=""
-    # 通过信号
-    echo "$scan_text" | grep -qi '通过\|approve\|approved\|lgtm\|ship it' && pass="pass" || true
-    # 驳回信号 — 使用更精确的模式，避免「review blocker」等上下文词误触发
-    #   - 不通过 / 未通过：完整词组
-    #   - 驳回 / reject / block：后面紧跟标点或空白（即独立词），
-    #     或以 blocked / blocking 形式出现但不在「review blocker」上下文中
-    #   - 不接受 / request changes：完整词组
-    echo "$scan_text" | grep -qiwE '不通过|未通过|驳回|reject|不接受|request.changes' && fail="fail" || true
-    if [ -z "$fail" ]; then
-        # block 独立词检测（非 blocker/blocking 等衍生词，排除 review blocker 上下文）
-        echo "$scan_text" | grep -qiwE '\<block\>' && fail="fail" || true
+path = Path(sys.argv[1])
+text = path.read_text(encoding='utf-8', errors='ignore')
+lines = text.splitlines()
+label_re = re.compile(r'^\s*(?:#{1,6}\s*)?(?:审查结论|复审结论|最终结论|最终意见|结论|review conclusion|conclusion|verdict|decision)\s*(?:[:：\-—]\s*)?(.*)$', re.I)
+blocks = []
+for idx, line in enumerate(lines[:80]):
+    m = label_re.match(line)
+    if not m:
+        continue
+    snippets = []
+    suffix = (m.group(1) or '').strip()
+    if suffix:
+        snippets.append(suffix)
+    for follow in lines[idx + 1: idx + 8]:
+        stripped = follow.strip()
+        if not stripped:
+            continue
+        if stripped.startswith('#') and snippets:
+            break
+        snippets.append(stripped)
+        if len(snippets) >= 5:
+            break
+    if snippets:
+        blocks.append('\n'.join(snippets))
+if blocks:
+    print('\n---\n'.join(blocks))
+PY
+)
+
+    local scan_text
+    if [ -n "$conclusion_block" ]; then
+        scan_text="$conclusion_block"
+    else
+        scan_text="$(grep -v '^[[:space:]]*$' "$review_file" | head -40)"
     fi
-    if [ -n "$fail" ] && [ -n "$pass" ]; then
-        # 两者同时出现时：看谁出现在结论块更靠后的位置（结论块优先）
-        if [ -n "$conclusion_block" ]; then
-            local last_pass_line last_fail_line
-            last_pass_line=$(echo "$conclusion_block" | grep -ni '通过\|approve\|approved' | tail -1 | cut -d: -f1)
-            last_fail_line=$(echo "$conclusion_block" | grep -niE '不通过|未通过|驳回|reject|\\<block\\>|不接受|request.changes' | tail -1 | cut -d: -f1)
-            if [ -n "$last_pass_line" ] && [ -n "$last_fail_line" ]; then
-                if [ "$last_pass_line" -ge "$last_fail_line" ] 2>/dev/null; then
-                    echo "pass"
-                    return 0
-                fi
-            fi
-        fi
-        # 无法区分优先级时，默认通过（宁可多走 QA 也不误报驳回）
+
+    # 先判驳回，再判通过；避免「通过项」误把 REQUEST CHANGES 覆盖掉。
+    if printf '%s\n' "$scan_text" | grep -qiE 'request[[:space:]_-]*changes|changes[[:space:]_-]*requested|驳回|不通过|未通过|不接受|reject(ed)?'; then
+        echo "fail"
+        return 0
+    fi
+    if printf '%s\n' "$scan_text" | grep -qiE 'approve(d)?|lgtm|ship[[:space:]]+it|通过|同意合入|批准'; then
         echo "pass"
         return 0
-    elif [ -n "$fail" ]; then
-        echo "fail"
-    elif [ -n "$pass" ]; then
-        echo "pass"
-    else
-        echo "pending"
     fi
+    echo "pending"
 }
 
 review_state() {
@@ -1117,6 +1443,7 @@ resolve_merge_gate_state() {
     local task_dir="$1"
     python3 - "$task_dir" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -1128,18 +1455,61 @@ review_required = bool(task.get('review_required'))
 test_required = bool(task.get('test_required'))
 review_level = str(task.get('review_level') or '').strip().lower()
 
+_CONCLUSION_LABEL_RE = re.compile(
+    r'^\s*(?:#{1,6}\s*)?'
+    r'(?:审查结论|复审结论|最终结论|最终意见|结论|review conclusion|conclusion|verdict|decision)'
+    r'\s*(?:[:：\-—]\s*)?(.*)$',
+    re.IGNORECASE,
+)
+_APPROVE_PATTERNS = (
+    re.compile(r'\bapprove(?:d)?\b', re.IGNORECASE),
+    re.compile(r'\blgtm\b', re.IGNORECASE),
+    re.compile(r'\bship\s+it\b', re.IGNORECASE),
+    re.compile(r'通过|同意合入|批准|可以合入'),
+)
+_REJECT_PATTERNS = (
+    re.compile(r'\brequest\s+changes\b', re.IGNORECASE),
+    re.compile(r'\bchanges\s+requested\b', re.IGNORECASE),
+    re.compile(r'\breject(?:ed)?\b', re.IGNORECASE),
+    re.compile(r'驳回|不通过|未通过|不接受|请求修改|要求修改'),
+)
+
+def _classify_review_snippet(snippet: str) -> str:
+    if not snippet.strip():
+        return 'pending'
+    if any(p.search(snippet) for p in _REJECT_PATTERNS):
+        return 'fail'
+    if any(p.search(snippet) for p in _APPROVE_PATTERNS):
+        return 'pass'
+    return 'pending'
+
 def parse_review_file(path: Path) -> str:
     if not path.exists():
         return 'missing'
     text = path.read_text(encoding='utf-8', errors='ignore')
-    lowered = text.lower()
-    has_reject = any(token in lowered for token in ('request changes', 'reject', '不通过', '未通过', '驳回', '不接受'))
-    has_approve = any(token in lowered for token in ('approve', 'approved', '通过', 'lgtm', 'ship it'))
-    if has_reject:
-        return 'fail'
-    if has_approve:
-        return 'pass'
-    return 'pending'
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:60]):
+        match = _CONCLUSION_LABEL_RE.match(line)
+        if not match:
+            continue
+        snippets = []
+        suffix = match.group(1).strip()
+        if suffix:
+            snippets.append(suffix)
+        for following in lines[index + 1:index + 8]:
+            stripped = following.strip()
+            if not stripped:
+                continue
+            if stripped.startswith('#') and snippets:
+                break
+            snippets.append(stripped)
+            if len(snippets) >= 4:
+                break
+        state = _classify_review_snippet('\n'.join(snippets))
+        if state != 'pending':
+            return state
+    first_nonempty = [l.strip() for l in lines if l.strip()][:20]
+    return _classify_review_snippet('\n'.join(first_nonempty))
 
 def parse_review_state() -> str:
     review_main_state = parse_review_file(task_dir / 'review.md')
@@ -1207,7 +1577,10 @@ if verify_state == 'fail':
 elif review_state == 'fail':
     print('review_rejected')
 elif test_required and (not review_required or review_state == 'pass'):
-    print('qa_pending')
+    if verify_state == 'pass':
+        print('pm_acceptance_pending')
+    else:
+        print('qa_pending')
 elif review_required and review_state != 'pass':
     print('review_pending')
 elif not test_required and (not review_required or review_state == 'pass'):
@@ -1437,7 +1810,9 @@ dispatch_task_to_agent() {
     local claim_reason="${6:-}"
     python3 - "$task_dir" "$assigned_agent" "$reason" "$claimed_by" "$claimed_at" "$claim_reason" <<'PY'
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -1467,7 +1842,11 @@ if claim_reason:
     task['claim_reason'] = claim_reason
 task['pool_entered_at'] = task.get('pool_entered_at')
 
-task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_path)
 with transitions_path.open('a', encoding='utf-8') as fp:
     fp.write(json.dumps({
         'from': old_status,
@@ -1736,20 +2115,35 @@ fi
 write_heartbeat "startup"
 log "task-watcher 启动，间隔 ${INTERVAL}s"
 
+loop_count=0
 while true; do
+    loop_count=$((loop_count + 1))
     write_heartbeat "running"
     [ -d "$TASKS_ROOT" ] || { sleep "$INTERVAL"; continue; }
+    task_scan_count=0
+    terminal_scan_enabled=0
+    if [ $(( loop_count % TERMINAL_SWEEP_EVERY_LOOPS )) -eq 0 ]; then
+        terminal_scan_enabled=1
+    fi
 
     for task_dir in "$TASKS_ROOT"/*/; do
         [ -d "$task_dir" ] || continue
         task_id=$(basename "$task_dir")
         [ -f "$task_dir/task.json" ] || continue
+        task_scan_count=$((task_scan_count + 1))
+        if [ $(( task_scan_count % HEARTBEAT_EVERY_TASKS )) -eq 0 ]; then
+            write_heartbeat "running:${task_id}"
+        fi
 
         current_status=$(get_task_status "$task_dir")
+        if normalize_legacy_task_status "$task_dir" "$current_status" >/dev/null 2>&1; then
+            current_status=$(get_task_status "$task_dir")
+        fi
 
         # 已关闭任务不再触发自动流转，但仍需在文件变更后同步到任务看板 SQLite
         case "$current_status" in
             done|cancelled|archived)
+                [ "$terminal_scan_enabled" = "1" ] || continue
                 if [ "$current_status" = "done" ]; then
                     notify_final_done_if_needed "$task_dir" "$task_id" || true
                     assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
@@ -1786,12 +2180,22 @@ while true; do
         fi
 
         if [ "$current_status" = "ready_for_merge" ] || [ "$current_status" = "blocked" ]; then
-            inferred_gate_state=$(resolve_merge_gate_state "$task_dir" 2>/dev/null || true)
+            _gate_err_file=$(mktemp "${STATE_DIR}/gate_err.XXXXXX" 2>/dev/null || mktemp)
+            inferred_gate_state=$(resolve_merge_gate_state "$task_dir" 2>"$_gate_err_file" || true)
+            if [ -s "$_gate_err_file" ]; then
+                log "$(basename "$task_dir"): gate 归一化异常 - $(head -c 500 "$_gate_err_file")"
+            fi
+            rm -f "$_gate_err_file"
             current_gate_state=$(task_json_pick "$task_dir" merge_gate_state)
             if [ -n "$inferred_gate_state" ] && [ "$inferred_gate_state" != "$current_gate_state" ]; then
                 now_iso=$(now_iso)
-                set_task_fields "$task_dir" "{\"merge_gate_state\": \"${inferred_gate_state}\", \"last_gate_decision_at\": \"${now_iso}\"}" "watcher normalized merge gate state"
+                set_task_gate_state "$task_dir" "" "watcher normalized merge gate state" "$inferred_gate_state" "__KEEP__" "__KEEP__" "$now_iso"
+                current_status=$(get_task_status "$task_dir")
             fi
+        fi
+
+        if [ "$current_status" = "ready_for_merge" ]; then
+            reconcile_open_merge_gate "$task_dir" "$task_id" "$current_status" || true
         fi
 
         # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令
@@ -1826,20 +2230,21 @@ while true; do
         # 检测 ack.json → 状态应为 working
         if [ -f "$task_dir/ack.json" ] && [ "$current_status" = "dispatched" ]; then
             ack_key="${task_id}_ack"
+            agent=$(json_pick "$task_dir/ack.json" agent agent_id)
+            set_task_status "$task_dir" "working" "watcher observed ack.json"
+            current_status="working"
             if ! is_notified "$ack_key"; then
-                agent=$(json_pick "$task_dir/ack.json" agent agent_id)
-                set_task_status "$task_dir" "working" "watcher observed ack.json"
                 log "$task_id: agent ${agent:-?} 已确认，状态 working"
                 sync_task_board "$task_dir" "ack-detected"
                 mark_notified "$ack_key"
-                current_status="working"
             fi
         fi
 
         # 检测 result.json → 自动流转到 PM / reviewer
         if [ -f "$task_dir/result.json" ]; then
             result_key="${task_id}_result_route"
-            if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json"; then
+            if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json" || { [ "$current_status" != "ready_for_merge" ] && [ "$current_status" != "blocked" ] && [ "$current_status" != "done" ] && [ "$current_status" != "cancelled" ] && [ "$current_status" != "archived" ]; }; then
+                route_event_ok=1
                 agent=$(json_pick "$task_dir/result.json" agent agent_id)
                 result_status=$(json_pick "$task_dir/result.json" status)
                 summary=$(json_pick "$task_dir/result.json" summary)
@@ -1856,35 +2261,40 @@ while true; do
                 if [ "$result_status" = "done" ]; then
                     gate_decision_at=$(now_iso)
                     gate_state="pm_acceptance_pending"
+                    next_status="ready_for_merge"
                     if [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; then
                         gate_state="review_pending"
                     elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         gate_state="qa_pending"
                     fi
-                    update_task_record "$task_dir" "ready_for_merge" "watcher observed result.json status=done" "{\"merge_gate_state\":\"${gate_state}\",\"rework_reason\":null,\"last_gate_actor\":\"watcher\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
-                    current_status="ready_for_merge"
+                    set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=done" "$gate_state" "" "watcher" "$gate_decision_at"
+                    current_status="$next_status"
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                         notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
                         emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
+                        push_task_event "【技术方案完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 汇总并确认后续动作" || route_event_ok=0
                     elif [ "$gate_state" = "review_pending" ]; then
                         auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                         log "$task_id: 已进入 review 队列，review_level=$review_level"
+                        push_task_event "【进入审查】" "$task_id" "$(truncate_utf8 "$summary" 300)" "已通知 reviewer 开始审查" || route_event_ok=0
                         auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                     elif [ "$gate_state" = "qa_pending" ]; then
                         auto_dispatch_qa "$task_id"
                         log "$task_id: 已进入 QA 队列"
+                        push_task_event "【进入QA】" "$task_id" "$(truncate_utf8 "$summary" 300)" "已通知 QA 开始验证" || route_event_ok=0
                         auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                     else
                         notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
                         emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
+                        push_task_event "【实现完成待验收】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 决定是否最终收口" || route_event_ok=0
                     fi
                 elif [ "$result_status" = "blocked" ]; then
                     gate_decision_at=$(now_iso)
-                    update_task_record "$task_dir" "blocked" "watcher observed result.json status=blocked" "{\"merge_gate_state\":\"blocked\",\"rework_reason\":\"execution\",\"last_gate_actor\":\"${assigned_agent:-executor}\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=blocked" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
                     current_status="blocked"
                     notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
                     emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
-                    push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因"
+                    push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因" || route_event_ok=0
                 else
                     notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
                     emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
@@ -1917,19 +2327,22 @@ while true; do
             review_sig=$(review_signature "$task_dir")
             review_key="${task_id}_review_route"
             if ! is_notified "$review_key" || is_signature_newer_than_notified "$review_key" "$review_sig"; then
+                review_event_ok=1
                 state=$(review_state "$task_dir" "$review_level")
                 clear_review_queue_state_for_task "$task_dir"
                 if [ "$state" = "pass" ]; then
                     test_required=$(task_json_pick "$task_dir" test_required)
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         gate_decision_at=$(now_iso)
-                        set_task_fields "$task_dir" "{\"merge_gate_state\":\"qa_pending\",\"rework_reason\":null,\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}" "watcher observed review pass and queued qa"
+                        set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed review pass and queued qa" "qa_pending" "" "review" "$gate_decision_at"
+                        current_status="ready_for_merge"
                         auto_dispatch_qa "$task_id"
                         log "$task_id: review 通过，已进入 QA 队列"
+                        push_task_event "【审查通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "已通知 QA 开始验证" || review_event_ok=0
                     else
                         auto_close_policy=$(task_json_pick "$task_dir" auto_close_policy)
                         gate_decision_at=$(now_iso)
-                        set_task_fields "$task_dir" "{\"merge_gate_state\":\"pm_acceptance_pending\",\"rework_reason\":null,\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}" "watcher observed review pass without qa"
+                        set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at"
                         if [ "$auto_close_policy" = "review_pass_only" ]; then
                             if ! auto_close_review_only_task "$task_dir" "$task_id"; then
                                 notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
@@ -1938,15 +2351,16 @@ while true; do
                         else
                             notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
                             emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
+                            push_task_event "【审查通过待收口】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "无需 QA，等待 PM 最终验收" || review_event_ok=0
                         fi
                     fi
                 elif [ "$state" = "fail" ]; then
                     gate_decision_at=$(now_iso)
-                    update_task_record "$task_dir" "blocked" "watcher observed review fail" "{\"merge_gate_state\":\"review_rejected\",\"rework_reason\":\"review\",\"last_gate_actor\":\"review\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
                     current_status="blocked"
                     notify_pm "[task-watcher] $task_id 审查未通过，请查看 review.md 并仲裁。"
                     emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
-                    push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修"
+                    push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修" || review_event_ok=0
                 fi
                 sync_task_board "$task_dir" "review-detected"
                 mark_signature_notified "$review_key" "$review_sig"
@@ -1957,17 +2371,35 @@ while true; do
         if [ -f "$task_dir/verify.json" ]; then
             verify_key="${task_id}_verify_route"
             if ! is_notified "$verify_key" || is_file_newer_than_notified "$verify_key" "$task_dir/verify.json"; then
+                verify_event_ok=1
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
                 clear_qa_queue_state
                 if [ "$vstate" = "pass" ]; then
                     current_status=$(get_task_status "$task_dir")
                     if [ "$current_status" = "ready_for_merge" ]; then
-                        if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
-                            notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败，请检查 close-task.sh 与任务状态。"
-                            emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败。" "$PM_SESSION" degraded notify
+                        _auto_close_retry_key="${task_id}_auto_close_retry"
+                        _retry_count=0
+                        if [ -f "$STATE_DIR/$_auto_close_retry_key" ]; then
+                            _retry_count=$(cat "$STATE_DIR/$_auto_close_retry_key" 2>/dev/null || echo 0)
+                        fi
+                        if [ "$_retry_count" -ge 3 ]; then
+                            _gate_decision_at=$(now_iso)
+                            set_task_gate_state "$task_dir" "blocked" "auto_close failed 3 times" "blocked" "auto_close_failure" "watcher" "$_gate_decision_at"
+                            notify_pm "[task-watcher] $task_id 自动收口连续失败 3 次，已标记 blocked，请检查 close-task.sh 与任务状态。"
+                            emit_system_chat_event watcher "$task_id" "自动收口连续失败 3 次，已标记 blocked。" "$PM_SESSION" degraded notify
+                            rm -f "$STATE_DIR/$_auto_close_retry_key"
+                            current_status="blocked"
                             continue
                         fi
+                        if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
+                            _retry_count=$(( _retry_count + 1 ))
+                            echo "$_retry_count" > "$STATE_DIR/$_auto_close_retry_key"
+                            notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败（第 ${_retry_count}/3 次），请检查 close-task.sh 与任务状态。"
+                            emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败（${_retry_count}/3）。" "$PM_SESSION" degraded notify
+                            continue
+                        fi
+                        rm -f "$STATE_DIR/$_auto_close_retry_key"
                     else
                         notify_pm "[task-watcher] $task_id QA 已通过但未自动收口，请检查任务状态。"
                         emit_system_chat_event watcher "$task_id" "QA 已通过但未自动收口。" "$PM_SESSION" degraded notify
@@ -1975,11 +2407,11 @@ while true; do
                     fi
                 elif [ "$vstate" = "fail" ]; then
                     gate_decision_at=$(now_iso)
-                    update_task_record "$task_dir" "blocked" "watcher observed qa verify fail" "{\"merge_gate_state\":\"qa_failed\",\"rework_reason\":\"qa\",\"last_gate_actor\":\"qa-1\",\"last_gate_decision_at\":\"${gate_decision_at}\"}"
+                    set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at"
                     current_status="blocked"
                     notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
                     emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
-                    push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证"
+                    push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证" || verify_event_ok=0
                 fi
                 sync_task_board "$task_dir" "verify-detected"
                 mark_notified "$verify_key"
@@ -2005,5 +2437,6 @@ while true; do
         auto_push_next_qa_for_agent "$qa_agent" "idle sweep" || true
     done <<< "$(list_qa_agents)"
 
+    write_heartbeat "sleeping"
     sleep "$INTERVAL"
 done

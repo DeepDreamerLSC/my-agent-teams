@@ -15,7 +15,9 @@ fi
 
 DISPATCH_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$ALLOW_WRITE_SCOPE_CONFLICT" <<'PY'
 import json
+import os
 import sys
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -300,7 +302,11 @@ with (task_path.parent / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
         'at': now,
         'reason': 'pm dispatch'
     }, ensure_ascii=False) + '\n')
-task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_path)
 print(json.dumps({
     'task_id': task.get('id'),
     'assigned_agent': assigned_agent,

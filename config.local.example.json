@@ -1,0 +1,7 @@
+{
+  "notifications": {
+    "feishu_receive_id": "ou_xxx",
+    "feishu_app_id": "cli_xxx",
+    "feishu_app_secret": "replace-with-local-secret"
+  }
+}

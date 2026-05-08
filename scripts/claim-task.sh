@@ -142,7 +142,10 @@ try:
     task['claimed_by'] = agent_id
     task['claimed_at'] = claim_payload['claimed_at']
     task['claim_reason'] = reason or None
-    task_path.write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+        json.dump(task, tmp, ensure_ascii=False, indent=2)
+        tmp.write('\n')
+    os.replace(tmp.name, task_path)
 
     with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
         fp.write(json.dumps({
