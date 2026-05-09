@@ -671,6 +671,10 @@ def _build_aggregate_task(task: dict[str, Any], metadata: dict[str, Any]) -> dic
         'verify_completed_at': task.get('verify_completed_at'),
         'current_status_at': task.get('current_status_at'),
         'communication_count': int(task.get('communication_count', 0) or 0),
+        'rework_reason': task.get('rework_reason'),
+        'pool_entered_at': metadata.get('pool_entered_at'),
+        'resume_round': metadata.get('resume_round') or 0,
+        'claimed_at': metadata.get('claimed_at'),
         'task_json_path': task.get('task_json_path'),
         'task_dir': task.get('task_dir'),
         'last_synced_at': task.get('last_synced_at'),
@@ -712,6 +716,33 @@ def _filter_aggregate_tasks(
 
 
 def _summarize_aggregate_tasks(tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    pool_waits = [
+        _seconds_between(task.get('pool_entered_at'), _now_iso())
+        for task in tasks
+        if task.get('current_status') == 'pooled' and task.get('pool_entered_at')
+    ]
+    pool_waits = [value for value in pool_waits if value is not None]
+    claim_latencies = [
+        _seconds_between(task.get('pool_entered_at'), task.get('dispatched_at'))
+        for task in tasks
+        if task.get('pool_entered_at') and task.get('dispatched_at')
+    ]
+    claim_latencies = [value for value in claim_latencies if value is not None]
+    review_waits = [
+        task.get('persisted_stage_durations', {}).get('result_to_review_seconds')
+        for task in tasks
+        if task.get('persisted_stage_durations', {}).get('result_to_review_seconds') is not None
+    ]
+    qa_waits = [
+        task.get('persisted_stage_durations', {}).get('review_to_verify_seconds')
+        for task in tasks
+        if task.get('persisted_stage_durations', {}).get('review_to_verify_seconds') is not None
+    ]
+    rework_count = sum(
+        1
+        for task in tasks
+        if task.get('rework_reason') or int(task.get('resume_round') or 0) > 0
+    )
     return {
         'task_count': len(tasks),
         'blocked_count': sum(
@@ -735,6 +766,14 @@ def _summarize_aggregate_tasks(tasks: list[dict[str, Any]]) -> dict[str, Any]:
         'owner_pm_counts': _aggregate_count_map(tasks, 'owner_pm'),
         'domain_counts': _aggregate_count_map(tasks, 'domain'),
         'task_level_counts': _aggregate_count_map(tasks, 'task_level'),
+        'collaboration_metrics': {
+            'avg_pool_wait_minutes': round((sum(pool_waits) / len(pool_waits)) / 60, 2) if pool_waits else None,
+            'avg_claim_latency_minutes': round((sum(claim_latencies) / len(claim_latencies)) / 60, 2) if claim_latencies else None,
+            'avg_review_wait_hours': _duration_hours(sum(review_waits) / len(review_waits)) if review_waits else None,
+            'avg_qa_wait_hours': _duration_hours(sum(qa_waits) / len(qa_waits)) if qa_waits else None,
+            'rework_rate': round(rework_count / len(tasks), 4) if tasks else 0.0,
+            'rework_count': rework_count,
+        },
     }
 
 

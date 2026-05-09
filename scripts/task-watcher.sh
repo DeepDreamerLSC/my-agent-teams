@@ -1890,6 +1890,38 @@ nudge_pooled_task() {
     return 0
 }
 
+notify_pooled_timeout_if_needed() {
+    local task_dir="$1"
+    local task_id="$2"
+    local status="$3"
+    [ "$status" = "pooled" ] || return 1
+    local timeout_minutes entered_at entered_epoch now timeout_key
+    timeout_minutes=$(task_json_pick "$task_dir" pool_timeout_minutes)
+    entered_at=$(task_json_pick "$task_dir" pool_entered_at)
+    [ -n "$timeout_minutes" ] || return 1
+    [ -n "$entered_at" ] || return 1
+    entered_epoch=$(python3 - <<'PY' "$entered_at"
+import sys
+from datetime import datetime
+try:
+    print(int(datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00')).timestamp()))
+except Exception:
+    print(0)
+PY
+)
+    [ "${entered_epoch:-0}" -gt 0 ] || return 1
+    now=$(date +%s)
+    [ $(( now - entered_epoch )) -gt $(( timeout_minutes * 60 )) ] || return 1
+    timeout_key="${task_id}_pool_timeout_notice"
+    if ! is_notified "$timeout_key"; then
+        notify_pm "[task-watcher] $task_id 在任务池中等待已超 ${timeout_minutes} 分钟，请判断转派、拆分或提优先级。"
+        emit_system_chat_event watcher "$task_id" "pooled 超时，建议 PM 转派/拆小/提高优先级。" "$PM_SESSION" degraded notify
+        push_task_event "【任务池超时】" "$task_id" "任务在 pooled 中等待超过 ${timeout_minutes} 分钟" "请 PM 判断转派、拆小或提高优先级" || true
+        mark_notified "$timeout_key"
+    fi
+    return 0
+}
+
 auto_dispatch_review() {
     local task_dir="$1"
     local task_id="$2"
@@ -2028,6 +2060,9 @@ while true; do
     for task_dir in "$TASKS_ROOT"/*/; do
         [ -d "$task_dir" ] || continue
         task_id=$(basename "$task_dir")
+        case "$task_id" in
+            _* ) continue ;;
+        esac
         [ -f "$task_dir/task.json" ] || continue
         task_scan_count=$((task_scan_count + 1))
         if [ $(( task_scan_count % HEARTBEAT_EVERY_TASKS )) -eq 0 ]; then
@@ -2075,6 +2110,7 @@ while true; do
             current_status=$(get_task_status "$task_dir")
             if [ "$current_status" = "pooled" ]; then
                 nudge_pooled_task "$task_dir" "$task_id" "$current_status" || true
+                notify_pooled_timeout_if_needed "$task_dir" "$task_id" "$current_status" || true
             fi
         fi
 

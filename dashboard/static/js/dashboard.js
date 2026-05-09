@@ -737,12 +737,20 @@ function renderAnalyticsSummary(agg, daily) {
   const avgCycleEl = document.querySelector('#mc-avg-cycle .metric-value')
   const avgDevEl = document.querySelector('#mc-avg-dev .metric-value')
   const blockedEl = document.querySelector('#mc-blocked .metric-value')
+  const poolWaitEl = document.querySelector('#mc-pool-wait .metric-value')
+  const claimLatencyEl = document.querySelector('#mc-claim-latency .metric-value')
+  const reviewWaitEl = document.querySelector('#mc-review-wait .metric-value')
+  const reworkRateEl = document.querySelector('#mc-rework-rate .metric-value')
 
   if (agg) {
     if (totalEl) totalEl.textContent = agg.total
     if (doneEl) doneEl.textContent = agg.done
     if (rateEl) rateEl.textContent = (agg.completionRate * 100).toFixed(1) + '%'
     if (blockedEl) blockedEl.textContent = (agg.blockedRate * 100).toFixed(1) + '%'
+    if (poolWaitEl) poolWaitEl.textContent = agg.collaborationMetrics?.avgPoolWaitMinutes != null ? `${Number(agg.collaborationMetrics.avgPoolWaitMinutes).toFixed(1)}m` : '-'
+    if (claimLatencyEl) claimLatencyEl.textContent = agg.collaborationMetrics?.avgClaimLatencyMinutes != null ? `${Number(agg.collaborationMetrics.avgClaimLatencyMinutes).toFixed(1)}m` : '-'
+    if (reviewWaitEl) reviewWaitEl.textContent = agg.collaborationMetrics?.avgReviewWaitHours != null ? `${Number(agg.collaborationMetrics.avgReviewWaitHours).toFixed(2)}h` : '-'
+    if (reworkRateEl) reworkRateEl.textContent = agg.collaborationMetrics?.reworkRate != null ? `${(Number(agg.collaborationMetrics.reworkRate) * 100).toFixed(1)}%` : '-'
 
     const rateCard = document.getElementById('mc-rate')
     const blockedCard = document.getElementById('mc-blocked')

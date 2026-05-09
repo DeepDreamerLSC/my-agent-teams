@@ -203,6 +203,13 @@
     "nudge_cooldown_seconds": 900,
     "allow_ready_for_merge_dependency": false
   },
+  "artifact_contract": {
+    "schema_version": 1,
+    "legacy_markdown_review_fallback": true,
+    "legacy_result_done_mapping": true,
+    "new_tasks_require_review_json_after": "2026-05-10T00:00:00+08:00",
+    "invalid_artifact_notify_once": true
+  },
   "wip_limits": {
     "pm-chief": 5,
     "dev": 1,

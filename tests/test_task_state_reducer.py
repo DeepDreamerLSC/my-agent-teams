@@ -59,6 +59,12 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertFalse(payload['artifacts']['result']['is_current_round'])
         self.assertFalse(payload['artifacts']['ack']['is_current_round'])
 
+    def test_new_tasks_require_review_json_instead_of_markdown_fallback(self):
+        task_dir = self._copy_fixture('review-json-required')
+        payload = run_reducer(task_dir)
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
+        self.assertEqual(payload['artifacts']['review']['normalized_status'], 'missing')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -35,6 +36,27 @@ class TaskContext:
     task_dir: Path
     task: dict[str, Any]
     resume_epoch: int
+
+
+def _workspace_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _control_config_path() -> Path:
+    env_path = os.environ.get("TASK_CONTROL_CONFIG_PATH")
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    return (_workspace_root() / "config.json").resolve()
+
+
+def load_control_config() -> dict[str, Any]:
+    path = _control_config_path()
+    if not path.exists():
+        return {}
+    payload, error = load_json(path)
+    if error or not isinstance(payload, dict):
+        return {}
+    return payload
 
 
 def sha256_file(path: Path) -> str | None:
@@ -85,6 +107,17 @@ def task_context(task_dir: Path) -> TaskContext:
         _latest_resume_transition_epoch(task_dir / "transitions.jsonl"),
     )
     return TaskContext(task_dir=task_dir, task=task, resume_epoch=resume_epoch)
+
+
+def review_json_required_for_task(task: dict[str, Any]) -> bool:
+    config = load_control_config()
+    artifact_contract = config.get("artifact_contract") or {}
+    threshold = artifact_contract.get("new_tasks_require_review_json_after")
+    if not threshold:
+        return False
+    created_epoch = iso_to_epoch(task.get("created_at"))
+    threshold_epoch = iso_to_epoch(threshold)
+    return bool(created_epoch and threshold_epoch and created_epoch >= threshold_epoch and task.get("review_required"))
 
 
 def _latest_resume_transition_epoch(path: Path) -> int:
@@ -396,6 +429,11 @@ def parse_review(task_dir: Path) -> dict[str, Any]:
         result.update({"valid": True, "normalized_status": status, "source": "json"})
         if any(not src["is_current_round"] for src in existing_json_sources):
             result["warnings"].append("stale_round")
+        return result
+
+    if review_json_required_for_task(ctx.task):
+        result["errors"].append("review_json_required_for_new_task")
+        result.update({"valid": False, "normalized_status": "missing", "source": "json_required"})
         return result
 
     if review_level == "complex":

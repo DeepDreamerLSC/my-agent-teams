@@ -168,6 +168,7 @@ function transformAggregateForAnalytics(payload) {
     ownerPmCounts: s.owner_pm_counts || {},
     domainCounts: s.domain_counts || {},
     groupings: payload.groupings || {},
+    collaborationMetrics: s.collaboration_metrics || {},
   }
 }
 

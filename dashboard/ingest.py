@@ -3,9 +3,14 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+SCRIPT_DIR = Path(__file__).resolve().parent.parent / 'scripts'
+sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
+import task_artifacts  # type: ignore
 
 from .db import (
     connect_db,
@@ -47,7 +52,7 @@ def discover_task_dirs(tasks_root: str | Path) -> list[Path]:
         return []
     return sorted(
         task_dir for task_dir in root.iterdir()
-        if task_dir.is_dir() and (task_dir / 'task.json').exists()
+        if task_dir.is_dir() and not task_dir.name.startswith('_') and (task_dir / 'task.json').exists()
     )
 
 
@@ -248,6 +253,10 @@ def _build_events(
     result: dict[str, Any] | None,
     review_text: str | None,
     verify: dict[str, Any] | None,
+    parsed_ack: dict[str, Any] | None = None,
+    parsed_result: dict[str, Any] | None = None,
+    parsed_review: dict[str, Any] | None = None,
+    parsed_verify: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     observed_at = utcnow_iso()
     events: list[dict[str, Any]] = []
@@ -300,7 +309,7 @@ def _build_events(
             'artifact_path': str(task_dir / 'ack.json'),
             'payload_json': _json_dumps({
                 'agent': _coalesce(_get_first(ack, 'agent_id', 'agent'), task.get('assigned_agent')),
-                'status': ack.get('status'),
+                'status': (parsed_ack or {}).get('normalized_status') or ack.get('status'),
             }),
             'observed_at': observed_at,
         })
@@ -320,23 +329,27 @@ def _build_events(
             'artifact_path': str(task_dir / 'result.json'),
             'payload_json': _json_dumps({
                 'agent': _coalesce(_get_first(result, 'agent_id', 'agent'), task.get('assigned_agent')),
-                'status': result.get('status'),
+                'status': (parsed_result or {}).get('normalized_status') or result.get('status'),
                 'summary': result.get('summary'),
             }),
             'observed_at': observed_at,
         })
 
-    if review_text is not None:
+    if review_text is not None or (parsed_review and (parsed_review.get('sources') or {}).get('review_json', {}).get('exists')):
         events.append({
             'event_key': f'{task_id}:review',
             'task_id': task_id,
             'event_type': 'review_completed',
-            'event_at': _file_mtime(task_dir / 'review.md'),
-            'source': 'review_md',
+            'event_at': _coalesce(
+                (((parsed_review or {}).get('sources') or {}).get('review_json') or {}).get('reviewed_at'),
+                _file_mtime(task_dir / 'review.json'),
+                _file_mtime(task_dir / 'review.md'),
+            ),
+            'source': 'review_json' if (((parsed_review or {}).get('sources') or {}).get('review_json') or {}).get('exists') else 'review_md',
             'status_from': None,
             'status_to': task.get('status'),
-            'artifact_path': str(task_dir / 'review.md'),
-            'payload_json': _json_dumps({'review_state': _review_state(review_text)}),
+            'artifact_path': str(task_dir / ('review.json' if (((parsed_review or {}).get('sources') or {}).get('review_json') or {}).get('exists') else 'review.md')),
+            'payload_json': _json_dumps({'review_state': (parsed_review or {}).get('normalized_status') or _review_state(review_text)}),
             'observed_at': observed_at,
         })
 
@@ -346,14 +359,14 @@ def _build_events(
             'task_id': task_id,
             'event_type': 'verify_completed',
             'event_at': _coalesce(
-                _normalize_time(_get_first(verify, 'verified_at', 'completed_at', 'reported_at')),
+                ((parsed_verify or {}).get('verified_at')),
                 _file_mtime(task_dir / 'verify.json'),
             ),
             'source': 'verify_json',
             'status_from': None,
             'status_to': task.get('status'),
             'artifact_path': str(task_dir / 'verify.json'),
-            'payload_json': _json_dumps({'ok': _bool_value(verify, 'ok', 'pass')}),
+            'payload_json': _json_dumps({'status': (parsed_verify or {}).get('normalized_status')}),
             'observed_at': observed_at,
         })
 
@@ -369,6 +382,10 @@ def _build_task_record(
     result: dict[str, Any] | None,
     review_text: str | None,
     verify: dict[str, Any] | None,
+    parsed_ack: dict[str, Any] | None,
+    parsed_result: dict[str, Any] | None,
+    parsed_review: dict[str, Any] | None,
+    parsed_verify: dict[str, Any] | None,
     source: str,
 ) -> dict[str, Any]:
     task_id = str(task.get('id') or task_dir.name)
@@ -381,25 +398,27 @@ def _build_task_record(
         _normalize_time(task.get('lease_acquired_at')) if task.get('status') in {'dispatched', 'working', 'ready_for_merge', 'blocked', 'merged', 'archived'} else None,
     )
     ack_at = _coalesce(
-        _normalize_time(_get_first(ack, 'acknowledged_at', 'acked_at', 'timestamp')),
+        (parsed_ack or {}).get('acked_at'),
         _first_transition_at(transitions, to_status='working'),
     )
     completed_at = _coalesce(
-        _normalize_time(_get_first(result, 'completed_at', 'reported_at')),
+        (parsed_result or {}).get('finished_at'),
         _file_mtime(task_dir / 'result.json') if result is not None else None,
         _first_transition_at(transitions, to_status='ready_for_merge'),
     )
     review_completed_at = _coalesce(
         _latest_review_transition_at(transitions),
+        (((parsed_review or {}).get('sources') or {}).get('review_json') or {}).get('reviewed_at'),
         _file_mtime(task_dir / 'review.md') if review_text is not None else None,
     )
     verify_completed_at = _coalesce(
-        _normalize_time(_get_first(verify, 'verified_at', 'completed_at', 'reported_at')),
+        (parsed_verify or {}).get('verified_at'),
         _file_mtime(task_dir / 'verify.json') if verify is not None else None,
     )
     current_status = str(task.get('status') or 'pending')
-    review_state = _review_state(review_text)
-    verify_ok = _bool_value(verify, 'ok', 'pass')
+    review_state = (parsed_review or {}).get('normalized_status') or _review_state(review_text)
+    verify_state = (parsed_verify or {}).get('normalized_status')
+    verify_ok = 1 if verify_state == 'pass' else 0 if verify_state in {'fail', 'blocked'} else _bool_value(verify, 'ok', 'pass')
     current_status_at = _coalesce(
         _last_transition_at(transitions, to_status=current_status),
         _normalize_time(task.get('updated_at')),
@@ -445,8 +464,8 @@ def _build_task_record(
         'review_completed_at': review_completed_at,
         'verify_completed_at': verify_completed_at,
         'current_status_at': current_status_at,
-        'ack_agent': _coalesce(_get_first(ack, 'agent_id', 'agent'), task.get('assigned_agent')),
-        'result_agent': _coalesce(_get_first(result, 'agent_id', 'agent'), _get_first(ack, 'agent_id', 'agent'), task.get('assigned_agent')),
+        'ack_agent': _coalesce((parsed_ack or {}).get('agent'), _get_first(ack, 'agent_id', 'agent'), task.get('assigned_agent')),
+        'result_agent': _coalesce((parsed_result or {}).get('agent'), (parsed_ack or {}).get('agent'), _get_first(result, 'agent_id', 'agent'), _get_first(ack, 'agent_id', 'agent'), task.get('assigned_agent')),
         'lease_acquired_at': _normalize_time(task.get('lease_acquired_at')),
         'updated_at': _normalize_time(task.get('updated_at')),
         'summary': _coalesce(_get_first(result, 'summary'), task.get('result_summary')),
@@ -512,6 +531,10 @@ def sync_task_dir(
     verify = _load_json(task_dir_path / 'verify.json')
     review_path = task_dir_path / 'review.md'
     review_text = review_path.read_text(encoding='utf-8') if review_path.exists() else None
+    parsed_ack = task_artifacts.parse_ack(task_dir_path)
+    parsed_result = task_artifacts.parse_result(task_dir_path)
+    parsed_review = task_artifacts.parse_review(task_dir_path)
+    parsed_verify = task_artifacts.parse_verify(task_dir_path)
     task_id = str(task.get('id') or task_dir_path.name)
 
     task_record = _build_task_record(
@@ -522,6 +545,10 @@ def sync_task_dir(
         result=result,
         review_text=review_text,
         verify=verify,
+        parsed_ack=parsed_ack,
+        parsed_result=parsed_result,
+        parsed_review=parsed_review,
+        parsed_verify=parsed_verify,
         source=source,
     )
     stage_duration_record = _build_task_stage_duration_record(task_record)
@@ -534,6 +561,10 @@ def sync_task_dir(
         result=result,
         review_text=review_text,
         verify=verify,
+        parsed_ack=parsed_ack,
+        parsed_result=parsed_result,
+        parsed_review=parsed_review,
+        parsed_verify=parsed_verify,
     )
 
     own_connection = conn is None
