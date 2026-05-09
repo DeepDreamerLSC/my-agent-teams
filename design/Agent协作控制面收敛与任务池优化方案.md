@@ -564,6 +564,7 @@ for idle_agent in agents:
     {"name": "pytest", "status": "pass", "evidence": "..."}
   ],
   "risks": [],
+  "follow_up_items": [],
   "finished_at": "2026-05-09T10:30:00+08:00"
 }
 ```
@@ -581,6 +582,11 @@ for idle_agent in agents:
 - `status` 为空、缺失、拼写未知、JSON 损坏、`task_id/agent` 不匹配，都输出 `artifact_invalid`。
 - `artifact_invalid` 不应让 watcher 反复走普通 result route；只发一次 L2 降级告警，提示执行者修正 `result.json`。
 - 如果该 `result.json` 早于最近一次 `resume-task`，parser 应标记 `is_current_round=false`，watcher 必须忽略它。
+
+非阻塞后续项：
+- `follow_up_items[]` 用于记录执行者在完成任务后发现的可优化项、技术债、观测改进或体验增强。
+- `follow_up_items[]` 不影响本任务 gate，不得被 watcher 解释为 `blocked` / `request_changes`。
+- PM 可在验收阶段选择忽略、合并到既有任务，或转成 `task_type=optimization` 的新任务进入任务池。
 
 ### 5.5 `review.json`
 
@@ -623,6 +629,7 @@ for idle_agent in agents:
   ],
   "evidence": ["日志路径或截图路径"],
   "risks": [],
+  "non_blocking_findings": [],
   "verified_at": "2026-05-09T11:10:00+08:00"
 }
 ```
@@ -801,6 +808,52 @@ Dashboard 增加 PM Inbox 卡片/页面：
 - `artifact_invalid`、`timeout` 等 L2 事项应进入 Inbox 并只通知一次；PM 打开 Inbox 时仍能看到，不依赖刷屏提醒。
 - L3 事项既进入 Inbox，也必须强触达 PM；critical/prod 按现有规则必要时飞书通知林总工。
 
+#### 6.4.5 Optimization Backlog / 优化建议池（非阻塞优化流程）
+
+PM Inbox 只承载“需要 PM 处理，否则当前任务/队列会卡住”的事项。审查或开发完成后提出的体验优化、重构建议、观测增强、性能余量、测试补强等，如果不影响当前任务验收，应进入独立的 **Optimization Backlog / 优化建议池**，避免把“必须处理”和“可择期优化”混在一起。
+
+##### 进入优化建议池的来源
+
+| 来源 artifact | 推荐字段 | 典型内容 | 是否影响当前 gate |
+|---|---|---|---|
+| `result.json` | `follow_up_items[]` | 开发者完成后发现的技术债、可简化点、后续性能/体验优化 | 否 |
+| `review.json` / `design-review.json` | `non_blocking_findings[]` | reviewer 认为可优化但不构成阻塞的问题 | 否 |
+| `verify.json` | `non_blocking_findings[]` | QA 发现的体验瑕疵、测试补强建议、边界场景观察 | 否 |
+| `review-summary.md` | “建议项 / 后续优化”段落 | owner 轨道中 PM 汇总出的非阻塞建议 | 否 |
+
+建议项结构推荐：
+
+```json
+{
+  "id": "opt-001",
+  "title": "补充复杂审查双 JSON 场景的 dashboard 提示",
+  "summary": "当前 CLI 已能识别，但 dashboard 未突出缺失的 design-review.json。",
+  "category": "ux|performance|test|refactor|observability|docs",
+  "priority_hint": "low|medium|high",
+  "source_artifact": "review.json",
+  "source_task_id": "任务ID",
+  "suggested_owner": "pm-chief",
+  "suggested_scope": ["dashboard/static/js/dashboard.js"],
+  "evidence": "review.json#non_blocking_findings[0]"
+}
+```
+
+##### PM 处理流程
+
+1. 当前任务 gate 仍按 `status`、`blocking_findings`、`verify.status` 等硬事实推进；非阻塞建议不得阻断 `approve/pass/pm_acceptance_pending`。
+2. PM 在验收或周度整理时打开优化建议池，按业务价值、风险和上下游时机做三选一：
+   - `ignore`：明确不做，可在源任务 timeline 留一句说明。
+   - `merge`：合并到已有 task / epic，保留 `source_task_id`。
+   - `promote`：转成正式任务，`task_type=optimization`，默认 `status=pooled`，进入任务池等待认领。
+3. 转成任务时必须保留来源链路：`source_task_id`、`source_artifact`、原建议摘要、推荐范围和验收标准。
+4. 优化建议池默认只读，不保存独立 resolved 状态；是否已转任务可通过 `source_task_id` / `source_suggestion_id` 反查。
+
+##### 与 PM Inbox 的边界
+
+- `blocking_findings[]` 非空且 `status=request_changes/blocked`：进入 PM Inbox，属于必须处理。
+- `non_blocking_findings[]` 或 `follow_up_items[]`：进入 Optimization Backlog，属于择期优化。
+- 同一条建议如果后来被 PM 提升为 P0/P1 修复任务，才进入正常 task lifecycle；提升前不参与 WIP gate、超时告警和自动续推。
+
 ### 6.5 ChatHub 事件补全
 
 不再把入池伪装成 `announce`。新增或约定 system event：
@@ -912,6 +965,7 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 | P1-4 | 自动 close 重试退避 | watcher/close runner | close 失败最多 3 次，之后 blocked，不刷屏 |
 | P1-5 | reviewer/QA 输出模板更新 | agent 指南/模板 | review-1/qa-1 默认输出机器 JSON，PM 不重新解释 Markdown |
 | P1-6 | Dashboard PM Inbox 卡片/页面 | dashboard ingest/query/frontend | dashboard 可按 reason/severity/age 聚合待 PM 处理事项，且不直接写任务事实 |
+| P1-7 | 优化建议池只读入口 | parser / `list-optimization-backlog.sh` / dashboard 可选 | 汇总 `follow_up_items[]`、`non_blocking_findings[]`，PM 可筛选、忽略、合并或提升为 `task_type=optimization` 的正式任务 |
 
 ### 8.3 P2：watcher 拆分与任务池视图（3 - 5 天）
 

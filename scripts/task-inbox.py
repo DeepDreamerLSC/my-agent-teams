@@ -136,10 +136,14 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     if status == 'ready_for_merge':
         gate_changed_at = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
         gate_wait_minutes = age_minutes(gate_changed_at, now)
+        review_deadline = parse_iso(str(task_payload.get('review_deadline') or ''))
         review_timeout_minutes = 120
         qa_timeout_minutes = 120
-        if gate == 'review_pending' and gate_wait_minutes > review_timeout_minutes:
-            items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now))
+        if gate == 'review_pending':
+            if review_deadline and now > review_deadline:
+                items.append(make_item(task_dir, 'timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', now))
+            elif gate_wait_minutes > review_timeout_minutes:
+                items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now))
         if gate == 'qa_pending' and gate_wait_minutes > qa_timeout_minutes:
             items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now))
 

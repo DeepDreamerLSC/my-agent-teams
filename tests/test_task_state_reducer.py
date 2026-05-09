@@ -85,6 +85,38 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertFalse(payload['artifacts']['review']['valid'])
         self.assertIn('design_review_json_missing_for_complex', payload['artifacts']['review']['errors'])
 
+    def test_complex_review_reject_wins_even_when_design_review_json_missing(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['review_level'] = 'complex'
+        task['status'] = 'ready_for_merge'
+        task['merge_gate_state'] = 'review_pending'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['artifacts']['review']['normalized_status'], 'request_changes')
+        self.assertEqual(payload['patches']['status'], 'blocked')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_rejected')
+        self.assertEqual(payload['patches']['rework_reason'], 'review')
+
+    def test_complex_markdown_fallback_single_approve_stays_review_pending(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['review_level'] = 'complex'
+        task['status'] = 'ready_for_merge'
+        task['merge_gate_state'] = 'review_pending'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').unlink(missing_ok=True)
+        (task_dir / 'review.md').write_text('# Code Review\n\n## 结论\n审查结论：通过\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['artifacts']['review']['source'], 'markdown_fallback')
+        self.assertEqual(payload['artifacts']['review']['normalized_status'], 'pending')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
+        self.assertTrue(any(item['type'] == 'dispatch_review' for item in payload['actions']))
+
 
 if __name__ == '__main__':
     unittest.main()
