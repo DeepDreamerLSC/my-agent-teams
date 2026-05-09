@@ -118,6 +118,31 @@ class DashboardMetricsTests(unittest.TestCase):
         self.assertEqual(payload['task_metrics'][0]['completed_task_count'], 2)
         self.assertEqual(payload['task_metrics'][0]['touched_task_count'], 2)
 
+    def test_aggregate_summary_includes_collaboration_metrics(self):
+        from dashboard.query import build_task_aggregate_payload
+
+        with self.conn:
+            upsert_task(self.conn, {
+                **_task_record(
+                    task_id="task-c",
+                    project="proj-a",
+                    assigned_agent="review-1",
+                    created_at="2026-05-01T13:00:00+08:00",
+                    ack_at="2026-05-01T13:10:00+08:00",
+                    completed_at="2026-05-01T14:00:00+08:00",
+                ),
+                "current_status": "ready_for_merge",
+                "board_status": "ready_for_merge",
+                "review_completed_at": "2026-05-01T15:00:00+08:00",
+                "verify_completed_at": "2026-05-01T16:00:00+08:00",
+                "current_status_at": "2026-05-01T16:30:00+08:00",
+                "last_synced_at": "2026-05-01T16:30:00+08:00",
+            })
+        payload = build_task_aggregate_payload(self.conn)
+        metrics = payload['summary']['collaboration_metrics']
+        self.assertIsNotNone(metrics['avg_review_wait_hours'])
+        self.assertIsNotNone(metrics['avg_qa_wait_hours'])
+
 
 if __name__ == '__main__':
     unittest.main()

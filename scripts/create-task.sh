@@ -401,7 +401,7 @@ obj = {
     'claim_scope': claim_scope,
     'claim_max_concurrency': 1 if assigned_agent_is_auto else None,
     'dependency_policy': 'done_only' if assigned_agent_is_auto else None,
-    'pool_timeout_minutes': cfg.get('task_pool', {}).get('pool_timeout_minutes', 120) if assigned_agent_is_auto else None,
+    'pool_timeout_minutes': cfg.get('task_pool', {}).get('default_pool_timeout_minutes', 120) if assigned_agent_is_auto else None,
     'pool_entered_at': None,
     'claimed_by': None,
     'claimed_at': None,

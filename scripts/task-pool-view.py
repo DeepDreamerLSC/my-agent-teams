@@ -185,6 +185,7 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
         "title": str(task.get("title") or task_dir.name),
         "priority": priority,
         "pool_wait_minutes": wait,
+        "pool_timeout_minutes": int(task.get("pool_timeout_minutes") or 0),
         "claim_scope": scope,
         "eligible_agents": eligible,
         "by_agent": by_agent,
@@ -197,7 +198,11 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
 def human_print(rows: list[dict], agent_filter: str | None) -> None:
     pooled = len(rows)
     blocked = sum(1 for row in rows if not row["eligible_agents"])
-    timed_out = 0
+    timed_out = sum(
+        1
+        for row in rows
+        if int(row.get("pool_timeout_minutes") or 0) > 0 and int(row.get("pool_wait_minutes") or 0) > int(row.get("pool_timeout_minutes") or 0)
+    )
     print(f"任务池 | 可认领 {pooled - blocked} | 阻塞 {blocked} | 超时 {timed_out}")
     print()
     for row in rows:

@@ -81,17 +81,6 @@ with transitions_path.open('a', encoding='utf-8') as fp:
 
 shutil.move(str(task_dir), str(archive_dir))
 
-if board_sync_script.exists():
-    try:
-        subprocess.run(
-            [sys.executable, str(board_sync_script), 'sync-task', '--task-dir', str(archive_dir)],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError as exc:
-        raise SystemExit(f'failed to sync archived task into dashboard db: {exc.stderr or exc.stdout or exc}') from exc
-
 index_dir = tasks_root / '_index'
 index_dir.mkdir(parents=True, exist_ok=True)
 index_path = index_dir / 'archived-tasks.jsonl'
@@ -106,5 +95,17 @@ with index_path.open('a', encoding='utf-8') as fp:
         'final_summary': task.get('result_summary') or '',
     }, ensure_ascii=False) + '\n')
 
-print(json.dumps({'task_id': task_id, 'archive_path': str(archive_dir), 'archived_at': now_iso}, ensure_ascii=False))
+warning = None
+if board_sync_script.exists():
+    try:
+        subprocess.run(
+            [sys.executable, str(board_sync_script), 'sync-task', '--task-dir', str(archive_dir)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        warning = f'archive synced to filesystem but dashboard db update failed: {exc.stderr or exc.stdout or exc}'
+
+print(json.dumps({'task_id': task_id, 'archive_path': str(archive_dir), 'archived_at': now_iso, 'warning': warning}, ensure_ascii=False))
 PY

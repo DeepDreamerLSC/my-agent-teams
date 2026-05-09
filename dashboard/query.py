@@ -671,6 +671,7 @@ def _build_aggregate_task(task: dict[str, Any], metadata: dict[str, Any]) -> dic
         'verify_completed_at': task.get('verify_completed_at'),
         'current_status_at': task.get('current_status_at'),
         'communication_count': int(task.get('communication_count', 0) or 0),
+        'persisted_stage_durations': task.get('persisted_stage_durations') or {},
         'rework_reason': task.get('rework_reason'),
         'pool_entered_at': metadata.get('pool_entered_at'),
         'resume_round': metadata.get('resume_round') or 0,
@@ -728,16 +729,16 @@ def _summarize_aggregate_tasks(tasks: list[dict[str, Any]]) -> dict[str, Any]:
         if task.get('pool_entered_at') and task.get('dispatched_at')
     ]
     claim_latencies = [value for value in claim_latencies if value is not None]
-    review_waits = [
-        task.get('persisted_stage_durations', {}).get('result_to_review_seconds')
-        for task in tasks
-        if task.get('persisted_stage_durations', {}).get('result_to_review_seconds') is not None
-    ]
-    qa_waits = [
-        task.get('persisted_stage_durations', {}).get('review_to_verify_seconds')
-        for task in tasks
-        if task.get('persisted_stage_durations', {}).get('review_to_verify_seconds') is not None
-    ]
+    review_waits = []
+    qa_waits = []
+    for task in tasks:
+        stage_durations = _build_stage_durations(task)
+        review_wait = stage_durations.get('result_to_review_seconds')
+        qa_wait = stage_durations.get('review_to_verify_seconds')
+        if review_wait is not None:
+            review_waits.append(review_wait)
+        if qa_wait is not None:
+            qa_waits.append(qa_wait)
     rework_count = sum(
         1
         for task in tasks

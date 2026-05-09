@@ -9,6 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 POOL_ROUTER = REPO_ROOT / 'scripts' / 'task-pool-router.py'
 QUEUE_ROUTER = REPO_ROOT / 'scripts' / 'task-queue-router.py'
+POOL_VIEW = REPO_ROOT / 'scripts' / 'task-pool-view.py'
 
 
 class TaskPoolAndQueueRouterTests(unittest.TestCase):
@@ -69,6 +70,19 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         )
         self.assertEqual(review.stdout.strip(), 'review-task')
         self.assertEqual(qa.stdout.strip(), 'qa-task')
+
+    def test_pool_view_counts_timed_out_tasks(self):
+        self._write_task('pooled-timeout', {
+            'id': 'pooled-timeout', 'title': '池任务超时', 'status': 'pooled', 'priority': 'medium',
+            'claim_scope': ['dev-1'], 'pool_entered_at': '2026-05-09T08:00:00+08:00',
+            'pool_timeout_minutes': 60,
+            'task_type': 'development', 'domain': 'development', 'write_scope': ['/tmp/b'],
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_VIEW), '--tasks-root', str(self.tasks_root), '--config', str(self.config)],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        self.assertIn('超时 1', completed.stdout)
 
 
 if __name__ == '__main__':
