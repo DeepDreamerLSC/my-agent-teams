@@ -65,6 +65,26 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
         self.assertEqual(payload['artifacts']['review']['normalized_status'], 'missing')
 
+    def test_complex_review_requires_both_review_json_files(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['review_level'] = 'complex'
+        task['status'] = 'ready_for_merge'
+        task['merge_gate_state'] = 'review_pending'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').write_text(json.dumps({
+            'task_id': 'task-review-rejected',
+            'reviewer': 'review-1',
+            'status': 'approve',
+            'summary': '通过',
+            'reviewed_at': '2026-05-09T10:20:00+08:00',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.md').unlink(missing_ok=True)
+        payload = run_reducer(task_dir)
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
+        self.assertFalse(payload['artifacts']['review']['valid'])
+        self.assertIn('design_review_json_missing_for_complex', payload['artifacts']['review']['errors'])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -416,6 +416,14 @@ def parse_review(task_dir: Path) -> dict[str, Any]:
         return result
 
     existing_json_sources = [src for src in json_sources if src["exists"]]
+    if review_level == "complex" and existing_json_sources:
+        if not review_json["exists"]:
+            result["errors"].append("review_json_missing_for_complex")
+        if not design_json["exists"]:
+            result["errors"].append("design_review_json_missing_for_complex")
+        if result["errors"]:
+            result.update({"valid": False, "normalized_status": "missing", "source": "json_incomplete"})
+            return result
     if existing_json_sources:
         statuses = [src["normalized_status"] for src in existing_json_sources]
         if "blocked" in statuses:

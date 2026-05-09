@@ -109,7 +109,7 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     ack_info = task_artifacts.parse_ack(task_dir)
 
     for kind, info in [('result', result_info), ('review', review_info), ('verify', verify_info), ('ack', ack_info)]:
-        if info.get('normalized_status') == 'invalid':
+        if info.get('valid') is False and info.get('errors'):
             detail = ','.join(info.get('errors') or ['unknown'])
             items.append(make_item(task_dir, 'artifact_invalid', 'L2', f'{kind} 产物非法：{detail}', now))
 
@@ -133,6 +133,15 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         timeout_minutes = int(task_payload.get('pool_timeout_minutes') or 0)
         if pool_entered_at and timeout_minutes > 0 and age_minutes(pool_entered_at, now) > timeout_minutes:
             items.append(make_item(task_dir, 'timeout', 'L2', f'pooled 超过 {timeout_minutes} 分钟仍未认领', now))
+    if status == 'ready_for_merge':
+        gate_changed_at = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
+        gate_wait_minutes = age_minutes(gate_changed_at, now)
+        review_timeout_minutes = 120
+        qa_timeout_minutes = 120
+        if gate == 'review_pending' and gate_wait_minutes > review_timeout_minutes:
+            items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now))
+        if gate == 'qa_pending' and gate_wait_minutes > qa_timeout_minutes:
+            items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now))
 
     return items
 

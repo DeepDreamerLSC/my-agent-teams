@@ -4,6 +4,7 @@ set -euo pipefail
 TASK_DIR=""
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
 TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
+BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-$WORKSPACE_ROOT/scripts/task-board-sync.py}"
 
 usage() {
   cat <<'EOF'
@@ -24,10 +25,11 @@ if [ -z "$TASK_DIR" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$TASKS_ROOT" <<'PY'
+python3 - "$TASK_DIR" "$TASKS_ROOT" "$BOARD_SYNC_SCRIPT" <<'PY'
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -47,6 +49,7 @@ def atomic_write(path: Path, payload: dict) -> None:
 
 task_dir = Path(sys.argv[1]).expanduser().resolve()
 tasks_root = Path(sys.argv[2]).expanduser().resolve()
+board_sync_script = Path(sys.argv[3]).expanduser().resolve()
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
 if not task_path.exists():
@@ -77,6 +80,18 @@ with transitions_path.open('a', encoding='utf-8') as fp:
     fp.write(json.dumps({'from': old_status, 'to': 'archived', 'at': now_iso, 'reason': 'archive-task'}, ensure_ascii=False) + '\n')
 
 shutil.move(str(task_dir), str(archive_dir))
+
+if board_sync_script.exists():
+    try:
+        subprocess.run(
+            [sys.executable, str(board_sync_script), 'sync-task', '--task-dir', str(archive_dir)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit(f'failed to sync archived task into dashboard db: {exc.stderr or exc.stdout or exc}') from exc
+
 index_dir = tasks_root / '_index'
 index_dir.mkdir(parents=True, exist_ok=True)
 index_path = index_dir / 'archived-tasks.jsonl'
