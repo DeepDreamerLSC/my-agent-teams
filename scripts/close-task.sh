@@ -156,10 +156,26 @@ def parse_review_file(path: Path) -> str:
     return classify_review_text(text)
 
 
+def parse_review_json(path: Path) -> str:
+    if not path.exists():
+        return 'missing'
+    payload = load_json(path)
+    status = str(payload.get('status') or '').strip().lower()
+    if status == 'approve':
+        return 'pass'
+    if status in {'request_changes', 'blocked'}:
+        return 'fail'
+    return 'pending'
+
+
 def parse_review_state(task_dir: Path, review_level: str) -> str:
-    review_main_state = parse_review_file(task_dir / 'review.md')
+    review_main_state = parse_review_json(task_dir / 'review.json')
+    if review_main_state == 'missing':
+        review_main_state = parse_review_file(task_dir / 'review.md')
     if review_level == 'complex':
-        design_state = parse_review_file(task_dir / 'design-review.md')
+        design_state = parse_review_json(task_dir / 'design-review.json')
+        if design_state == 'missing':
+            design_state = parse_review_file(task_dir / 'design-review.md')
         if review_main_state == 'fail' or design_state == 'fail':
             return 'fail'
         if review_main_state == 'pass' and design_state == 'pass':

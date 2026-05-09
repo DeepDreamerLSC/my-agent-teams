@@ -1,0 +1,160 @@
+#!/bin/bash
+set -euo pipefail
+
+TASK_DIR=""
+AGENT_ID=""
+REASON=""
+KEEP_RESULT_HISTORY=0
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
+STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
+
+usage() {
+  cat <<'EOF'
+usage: resume-task.sh --task-dir <task-dir> --agent <agent-id> --reason <reason> [--keep-result-history]
+EOF
+}
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --task-dir) TASK_DIR="${2:-}"; shift 2 ;;
+    --agent) AGENT_ID="${2:-}"; shift 2 ;;
+    --reason) REASON="${2:-}"; shift 2 ;;
+    --keep-result-history) KEEP_RESULT_HISTORY=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [ -z "$TASK_DIR" ] || [ -z "$AGENT_ID" ] || [ -z "$REASON" ]; then
+  usage >&2
+  exit 2
+fi
+
+python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$STATE_DIR" "$KEEP_RESULT_HISTORY" <<'PY'
+import json
+import os
+import shutil
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+
+def load_json(path: Path):
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def atomic_write(path: Path, payload: dict):
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=str(path.parent), encoding='utf-8') as tmp:
+        json.dump(payload, tmp, ensure_ascii=False, indent=2)
+        tmp.write('\n')
+    os.replace(tmp.name, path)
+
+
+task_dir = Path(sys.argv[1]).expanduser().resolve()
+agent_id = sys.argv[2]
+reason = sys.argv[3].strip()
+state_dir = Path(sys.argv[4]).expanduser().resolve()
+keep_result_history = sys.argv[5] == '1'
+
+task_path = task_dir / 'task.json'
+transitions_path = task_dir / 'transitions.jsonl'
+if not task_path.exists():
+    raise SystemExit(f'missing task.json: {task_path}')
+
+task = load_json(task_path)
+old_status = str(task.get('status') or '')
+if old_status in {'done', 'cancelled', 'archived'}:
+    raise SystemExit(f'task status {old_status} is not resumable')
+
+now = datetime.now().astimezone()
+now_iso = now.isoformat(timespec='seconds')
+stamp = now.strftime('%Y%m%dT%H%M%S')
+history_dir = task_dir / 'history'
+history_dir.mkdir(parents=True, exist_ok=True)
+
+resume_record = {
+    'task_id': str(task.get('id') or task_dir.name),
+    'resumed_at': now_iso,
+    'resumed_by': 'pm-chief',
+    'assigned_agent': agent_id,
+    'reason': reason,
+    'archived_files': [],
+}
+
+archive_names = [
+    'ack.json', 'claim.json', 'review.json', 'design-review.json', 'review.md', 'design-review.md', 'verify.json'
+]
+for name in archive_names:
+    src = task_dir / name
+    if not src.exists():
+        continue
+    dst = history_dir / f"{src.stem}.{stamp}{src.suffix}"
+    shutil.move(str(src), str(dst))
+    resume_record['archived_files'].append(dst.name)
+
+result_path = task_dir / 'result.json'
+if result_path.exists():
+    dst = history_dir / f"{result_path.stem}.{stamp}{result_path.suffix}"
+    if keep_result_history:
+        shutil.copy2(str(result_path), str(dst))
+        result_path.unlink()
+    else:
+        shutil.move(str(result_path), str(dst))
+    resume_record['archived_files'].append(dst.name)
+
+resume_meta = history_dir / f'resume.{stamp}.json'
+atomic_write(resume_meta, resume_record)
+
+prefix = f"{task.get('id') or task_dir.name}_"
+clear_keys = {
+    f'{prefix}ack',
+    f'{prefix}result_route',
+    f'{prefix}review_route',
+    f'{prefix}verify_route',
+    f'{prefix}working_timeout_notice',
+    f'{prefix}done_notice',
+    f'{prefix}resend',
+    f'{prefix}auto_close_retry',
+}
+if state_dir.exists():
+    for path in state_dir.iterdir():
+        if path.name in clear_keys:
+            path.unlink(missing_ok=True)
+            continue
+        if path.name.startswith(('review-queue-', 'qa-queue-')):
+            try:
+                payload = load_json(path)
+            except Exception:
+                path.unlink(missing_ok=True)
+                continue
+            if str(payload.get('task_id') or '') == resume_record['task_id']:
+                path.unlink(missing_ok=True)
+
+resume_round = int(task.get('resume_round') or 0) + 1
+task['status'] = 'dispatched'
+task['assigned_agent'] = agent_id
+task['updated_at'] = now_iso
+task['merge_gate_state'] = None
+task['rework_reason'] = reason
+task['last_gate_actor'] = 'pm-chief'
+task['last_gate_decision_at'] = now_iso
+task['resume_round'] = resume_round
+task['last_resumed_at'] = now_iso
+task['last_resumed_by'] = 'pm-chief'
+task['lease_owner'] = task.get('owner_pm') or 'pm-chief'
+task['lease_acquired_at'] = now_iso
+task['lease_expires_at'] = now_iso
+atomic_write(task_path, task)
+
+with transitions_path.open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': old_status,
+        'to': 'dispatched',
+        'at': now_iso,
+        'reason': f'resume-task: {reason}',
+        'actor': 'pm-chief',
+    }, ensure_ascii=False) + '\n')
+
+print(json.dumps({'task_id': resume_record['task_id'], 'resume_round': resume_round, 'archived_files': resume_record['archived_files']}, ensure_ascii=False))
+PY

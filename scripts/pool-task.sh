@@ -118,7 +118,10 @@ echo "pooled ${TASK_ID}"
 if [ -x "$SEND_CHAT_SCRIPT" ]; then
   TITLE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("title") or "")' "$TASK_DIR/task.json")
   ANNOUNCE_MESSAGE="任务入池：${TITLE}（待认领）"
-  TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="pm-chief" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "${PRIORITY:-medium}" >/dev/null 2>&1 || true
+  if ! TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="pm-chief" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "${PRIORITY:-medium}" >/dev/null 2>&1; then
+    echo "WARNING: pooled task announce failed for ${TASK_ID}" >&2
+    TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="watcher" "$SEND_CHAT_SCRIPT" watcher "$TASK_ID" "任务已进入 pooled，但 ChatHub 入池公告写入失败，请检查 send-chat / ingest 链路。" --type notify --severity degraded --source-type system --source-name task-pool >/dev/null 2>&1 || true
+  fi
 fi
 
 if [ -x "$SEND_SCRIPT" ] && [ "$PRIORITY" = "critical" ]; then

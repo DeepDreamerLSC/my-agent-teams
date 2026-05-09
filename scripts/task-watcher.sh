@@ -25,6 +25,7 @@ BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-$WORKSPACE_ROOT/scripts/task-board-sync.
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/close-task.sh}"
+ARTIFACTS_PY="${ARTIFACTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_artifacts.py}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
@@ -478,7 +479,7 @@ task_working_reference_epoch() {
 
 task_has_progress_artifact() {
     local task_dir="$1"
-    [ -f "$task_dir/result.json" ] || [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ] || [ -f "$task_dir/verify.json" ]
+    [ -f "$task_dir/result.json" ] || [ -f "$task_dir/review.json" ] || [ -f "$task_dir/design-review.json" ] || [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ] || [ -f "$task_dir/verify.json" ]
 }
 
 agent_has_working_signal() {
@@ -512,6 +513,45 @@ for key in keys:
     if value not in (None, ''):
         print(value)
         raise SystemExit(0)
+PY
+}
+
+artifact_parse_json() {
+    local artifact="$1"
+    local task_dir="$2"
+    python3 "$ARTIFACTS_PY" "$artifact" --task-dir "$task_dir" 2>/dev/null || echo '{}'
+}
+
+artifact_pick() {
+    local artifact="$1"
+    local task_dir="$2"
+    shift 2
+    artifact_parse_json "$artifact" "$task_dir" | python3 - "$@" <<'PY'
+import json
+import sys
+
+keys = sys.argv[1:]
+try:
+    payload = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+
+for key in keys:
+    value = payload
+    missing = False
+    for part in key.split('.'):
+        if isinstance(value, dict) and part in value:
+            value = value[part]
+        else:
+            missing = True
+            break
+    if missing or value in (None, ''):
+        continue
+    if isinstance(value, bool):
+        print('true' if value else 'false')
+    else:
+        print(value)
+    raise SystemExit(0)
 PY
 }
 
@@ -1279,9 +1319,13 @@ review_signature() {
     local task_dir="$1"
     local review_mtime="0"
     local design_review_mtime="0"
+    local review_json_mtime="0"
+    local design_review_json_mtime="0"
+    [ -f "$task_dir/review.json" ] && review_json_mtime=$(stat -f %m "$task_dir/review.json" 2>/dev/null || echo 0)
+    [ -f "$task_dir/design-review.json" ] && design_review_json_mtime=$(stat -f %m "$task_dir/design-review.json" 2>/dev/null || echo 0)
     [ -f "$task_dir/review.md" ] && review_mtime=$(stat -f %m "$task_dir/review.md" 2>/dev/null || echo 0)
     [ -f "$task_dir/design-review.md" ] && design_review_mtime=$(stat -f %m "$task_dir/design-review.md" 2>/dev/null || echo 0)
-    echo "${review_mtime}:${design_review_mtime}"
+    echo "${review_json_mtime}:${design_review_json_mtime}:${review_mtime}:${design_review_mtime}"
 }
 
 is_signature_newer_than_notified() {
@@ -1361,233 +1405,102 @@ PY
 
 review_state() {
     local task_dir="$1"
-    local review_level="$2"
-
-    local review_main_state
-    review_main_state=$(review_file_state "$task_dir/review.md")
-
-    if [ "$review_level" = "complex" ]; then
-        local design_state
-        design_state=$(review_file_state "$task_dir/design-review.md")
-        if [ "$review_main_state" = "fail" ] || [ "$design_state" = "fail" ]; then
-            echo "fail"
-        elif [ "$review_main_state" = "pass" ] && [ "$design_state" = "pass" ]; then
-            echo "pass"
-        else
-            echo "pending"
-        fi
-    else
-        if [ "$review_main_state" = "fail" ]; then
-            echo "fail"
-        elif [ "$review_main_state" = "pass" ]; then
-            echo "pass"
-        else
-            echo "pending"
-        fi
-    fi
+    local normalized
+    normalized=$(artifact_pick review "$task_dir" normalized_status)
+    case "$normalized" in
+        approve) echo "pass" ;;
+        request_changes|blocked) echo "fail" ;;
+        invalid) echo "invalid" ;;
+        pending|missing|"") echo "pending" ;;
+        *) echo "pending" ;;
+    esac
 }
 
 first_review_conclusion() {
     local task_dir="$1"
+    local summary
+    summary=$(artifact_pick review "$task_dir" sources.review_json.summary sources.design_review_json.summary)
+    if [ -n "$summary" ]; then
+        echo "$summary"
+        return 0
+    fi
     local line
     line=$(grep -i '不通过\|未通过\|驳回\|reject\|block\|不接受\|request changes\|通过\|approve' "$task_dir/review.md" "$task_dir/design-review.md" 2>/dev/null | head -1)
     echo "$line"
 }
 
 verify_state() {
-    local verify_file="$1"
-    python3 - "$verify_file" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-if not path.exists():
-    print('missing')
-    raise SystemExit(0)
-
-payload = json.loads(path.read_text(encoding='utf-8'))
-values = [
-    payload.get('pass'),
-    payload.get('ok'),
-    payload.get('result'),
-    payload.get('status'),
-    payload.get('verdict'),
-    payload.get('conclusion'),
-]
-
-for value in values:
-    if isinstance(value, bool):
-        print('pass' if value else 'fail')
-        raise SystemExit(0)
-    if value is None:
-        continue
-    normalized = str(value).strip().lower()
-    if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
-        print('pass')
-        raise SystemExit(0)
-    if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
-        print('fail')
-        raise SystemExit(0)
-
-print('pending')
-PY
+    local task_dir="${1%/verify.json}"
+    local normalized
+    normalized=$(artifact_pick verify "$task_dir" normalized_status)
+    case "$normalized" in
+        pass) echo "pass" ;;
+        fail|blocked) echo "fail" ;;
+        invalid) echo "invalid" ;;
+        missing|"") echo "missing" ;;
+        *) echo "pending" ;;
+    esac
 }
 
 verify_summary() {
     local verify_file="$1"
-    json_pick "$verify_file" summary notes message conclusion
+    local task_dir="${verify_file%/verify.json}"
+    artifact_pick verify "$task_dir" summary
 }
 
 resolve_merge_gate_state() {
     local task_dir="$1"
-    python3 - "$task_dir" <<'PY'
-import json
-import re
-import sys
-from pathlib import Path
+    local status merge_gate_state review_required test_required review_level rstate vstate
+    status=$(get_task_status "$task_dir")
+    merge_gate_state=$(task_json_pick "$task_dir" merge_gate_state)
+    review_required=$(task_json_pick "$task_dir" review_required)
+    test_required=$(task_json_pick "$task_dir" test_required)
+    review_level=$(task_json_pick "$task_dir" review_level)
+    rstate=$(review_state "$task_dir" "$review_level")
+    vstate=$(verify_state "$task_dir/verify.json")
 
-task_dir = Path(sys.argv[1])
-task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
-status = str(task.get('status') or 'pending').strip()
-merge_gate_state = task.get('merge_gate_state')
-review_required = bool(task.get('review_required'))
-test_required = bool(task.get('test_required'))
-review_level = str(task.get('review_level') or '').strip().lower()
+    if [ "$status" = "done" ]; then
+        echo "closed"
+        return 0
+    fi
+    case "$status" in
+        cancelled|failed|timeout|archived)
+            echo "${merge_gate_state:-$status}"
+            return 0
+            ;;
+    esac
+    if [ "$status" = "blocked" ]; then
+        if [ "$vstate" = "fail" ]; then
+            echo "qa_failed"
+        elif [ "$rstate" = "fail" ]; then
+            echo "review_rejected"
+        else
+            echo "${merge_gate_state:-blocked}"
+        fi
+        return 0
+    fi
+    if [ "$status" != "ready_for_merge" ]; then
+        echo "${merge_gate_state:-}"
+        return 0
+    fi
 
-_CONCLUSION_LABEL_RE = re.compile(
-    r'^\s*(?:#{1,6}\s*)?'
-    r'(?:审查结论|复审结论|最终结论|最终意见|结论|review conclusion|conclusion|verdict|decision)'
-    r'\s*(?:[:：\-—]\s*)?(.*)$',
-    re.IGNORECASE,
-)
-_APPROVE_PATTERNS = (
-    re.compile(r'\bapprove(?:d)?\b', re.IGNORECASE),
-    re.compile(r'\blgtm\b', re.IGNORECASE),
-    re.compile(r'\bship\s+it\b', re.IGNORECASE),
-    re.compile(r'通过|同意合入|批准|可以合入'),
-)
-_REJECT_PATTERNS = (
-    re.compile(r'\brequest\s+changes\b', re.IGNORECASE),
-    re.compile(r'\bchanges\s+requested\b', re.IGNORECASE),
-    re.compile(r'\breject(?:ed)?\b', re.IGNORECASE),
-    re.compile(r'驳回|不通过|未通过|不接受|请求修改|要求修改'),
-)
-
-def _classify_review_snippet(snippet: str) -> str:
-    if not snippet.strip():
-        return 'pending'
-    if any(p.search(snippet) for p in _REJECT_PATTERNS):
-        return 'fail'
-    if any(p.search(snippet) for p in _APPROVE_PATTERNS):
-        return 'pass'
-    return 'pending'
-
-def parse_review_file(path: Path) -> str:
-    if not path.exists():
-        return 'missing'
-    text = path.read_text(encoding='utf-8', errors='ignore')
-    lines = text.splitlines()
-    for index, line in enumerate(lines[:60]):
-        match = _CONCLUSION_LABEL_RE.match(line)
-        if not match:
-            continue
-        snippets = []
-        suffix = match.group(1).strip()
-        if suffix:
-            snippets.append(suffix)
-        for following in lines[index + 1:index + 8]:
-            stripped = following.strip()
-            if not stripped:
-                continue
-            if stripped.startswith('#') and snippets:
-                break
-            snippets.append(stripped)
-            if len(snippets) >= 4:
-                break
-        state = _classify_review_snippet('\n'.join(snippets))
-        if state != 'pending':
-            return state
-    first_nonempty = [l.strip() for l in lines if l.strip()][:20]
-    return _classify_review_snippet('\n'.join(first_nonempty))
-
-def parse_review_state() -> str:
-    review_main_state = parse_review_file(task_dir / 'review.md')
-    if review_level == 'complex':
-        design_state = parse_review_file(task_dir / 'design-review.md')
-        if review_main_state == 'fail' or design_state == 'fail':
-            return 'fail'
-        if review_main_state == 'pass' and design_state == 'pass':
-            return 'pass'
-        return 'pending'
-    if review_main_state == 'fail':
-        return 'fail'
-    if review_main_state == 'pass':
-        return 'pass'
-    return 'pending'
-
-def parse_verify_state() -> str:
-    path = task_dir / 'verify.json'
-    if not path.exists():
-        return 'missing'
-    payload = json.loads(path.read_text(encoding='utf-8'))
-    values = [
-        payload.get('pass'),
-        payload.get('ok'),
-        payload.get('result'),
-        payload.get('status'),
-        payload.get('verdict'),
-        payload.get('conclusion'),
-    ]
-    for value in values:
-        if isinstance(value, bool):
-            return 'pass' if value else 'fail'
-        if value is None:
-            continue
-        normalized = str(value).strip().lower()
-        if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
-            return 'pass'
-        if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
-            return 'fail'
-    return 'pending'
-
-review_state = parse_review_state()
-verify_state = parse_verify_state()
-
-if status == 'done':
-    print('closed')
-    raise SystemExit(0)
-if status in {'cancelled', 'failed', 'timeout', 'archived'}:
-    print(str(merge_gate_state or status))
-    raise SystemExit(0)
-if status == 'blocked':
-    if verify_state == 'fail':
-        print('qa_failed')
-    elif review_state == 'fail':
-        print('review_rejected')
-    else:
-        print(str(merge_gate_state or 'blocked'))
-    raise SystemExit(0)
-if status != 'ready_for_merge':
-    print(str(merge_gate_state or ''))
-    raise SystemExit(0)
-
-if verify_state == 'fail':
-    print('qa_failed')
-elif review_state == 'fail':
-    print('review_rejected')
-elif test_required and (not review_required or review_state == 'pass'):
-    if verify_state == 'pass':
-        print('pm_acceptance_pending')
-    else:
-        print('qa_pending')
-elif review_required and review_state != 'pass':
-    print('review_pending')
-elif not test_required and (not review_required or review_state == 'pass'):
-    print('pm_acceptance_pending')
-else:
-    print(str(merge_gate_state or ''))
-PY
+    if [ "$vstate" = "fail" ]; then
+        echo "qa_failed"
+    elif [ "$rstate" = "fail" ]; then
+        echo "review_rejected"
+    elif { [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; } && { [ "$review_required" != "True" ] && [ "$review_required" != "true" ] && [ "$review_required" != "1" ] || [ "$rstate" = "pass" ]; }; then
+        if [ "$vstate" = "pass" ]; then
+            echo "pm_acceptance_pending"
+        else
+            echo "qa_pending"
+        fi
+    elif { [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; } && [ "$rstate" != "pass" ]; then
+        echo "review_pending"
+    elif { [ "$test_required" != "True" ] && [ "$test_required" != "true" ] && [ "$test_required" != "1" ]; } && { [ "$review_required" != "True" ] && [ "$review_required" != "true" ] && [ "$review_required" != "1" ] || [ "$rstate" = "pass" ]; }; then
+        echo "pm_acceptance_pending"
+    else
+        echo "${merge_gate_state:-}"
+    fi
 }
 
 list_review_agents() {
@@ -2227,27 +2140,50 @@ while true; do
             fi
         fi
 
-        # 检测 ack.json → 状态应为 working
+        # 检测 ack.json → 状态应为 working（恢复后旧 ack 需忽略）
         if [ -f "$task_dir/ack.json" ] && [ "$current_status" = "dispatched" ]; then
             ack_key="${task_id}_ack"
-            agent=$(json_pick "$task_dir/ack.json" agent agent_id)
-            set_task_status "$task_dir" "working" "watcher observed ack.json"
-            current_status="working"
-            if ! is_notified "$ack_key"; then
-                log "$task_id: agent ${agent:-?} 已确认，状态 working"
-                sync_task_board "$task_dir" "ack-detected"
-                mark_notified "$ack_key"
+            ack_invalid_key="${task_id}_artifact_invalid_ack"
+            ack_stale_key="${task_id}_reopen_with_stale_state_ack"
+            ack_agent=$(artifact_pick ack "$task_dir" agent)
+            ack_state=$(artifact_pick ack "$task_dir" normalized_status)
+            ack_current_round=$(artifact_pick ack "$task_dir" is_current_round)
+            ack_errors=$(artifact_pick ack "$task_dir" errors.0)
+            if [ "$ack_state" = "invalid" ]; then
+                if ! is_notified "$ack_invalid_key"; then
+                    notify_pm "[task-watcher] $task_id 的 ack.json 非法，请修正后重试。"
+                    emit_system_chat_event watcher "$task_id" "ack.json 非法：${ack_errors:-unknown}" "$PM_SESSION" degraded notify
+                    mark_notified "$ack_invalid_key"
+                fi
+            elif [ "$ack_current_round" = "false" ]; then
+                if ! is_notified "$ack_stale_key"; then
+                    notify_pm "[task-watcher] $task_id 恢复后仍存在旧 ack.json，请使用 resume-task 或让 agent 重新 ack。"
+                    emit_system_chat_event watcher "$task_id" "恢复后检测到旧 ack.json，已忽略当前轮次前的 ack。" "$PM_SESSION" degraded notify
+                    mark_notified "$ack_stale_key"
+                fi
+            else
+                set_task_status "$task_dir" "working" "watcher observed ack.json"
+                current_status="working"
+                if ! is_notified "$ack_key"; then
+                    log "$task_id: agent ${ack_agent:-?} 已确认，状态 working"
+                    sync_task_board "$task_dir" "ack-detected"
+                    mark_notified "$ack_key"
+                fi
             fi
         fi
 
         # 检测 result.json → 自动流转到 PM / reviewer
         if [ -f "$task_dir/result.json" ]; then
             result_key="${task_id}_result_route"
+            result_invalid_key="${task_id}_artifact_invalid_result"
+            result_stale_key="${task_id}_reopen_with_stale_state_result"
             if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json" || { [ "$current_status" != "ready_for_merge" ] && [ "$current_status" != "blocked" ] && [ "$current_status" != "done" ] && [ "$current_status" != "cancelled" ] && [ "$current_status" != "archived" ]; }; then
                 route_event_ok=1
-                agent=$(json_pick "$task_dir/result.json" agent agent_id)
-                result_status=$(json_pick "$task_dir/result.json" status)
-                summary=$(json_pick "$task_dir/result.json" summary)
+                agent=$(artifact_pick result "$task_dir" agent)
+                result_status=$(artifact_pick result "$task_dir" normalized_status)
+                result_current_round=$(artifact_pick result "$task_dir" is_current_round)
+                result_errors=$(artifact_pick result "$task_dir" errors.0)
+                summary=$(artifact_pick result "$task_dir" summary)
                 task_level=$(task_json_pick "$task_dir" task_level)
                 assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
                 review_level=$(task_json_pick "$task_dir" review_level)
@@ -2258,7 +2194,19 @@ while true; do
                 target_environment=$(task_json_pick "$task_dir" target_environment)
                 downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
-                if [ "$result_status" = "done" ]; then
+                if [ "$result_status" = "invalid" ]; then
+                    if ! is_notified "$result_invalid_key"; then
+                        notify_pm "[task-watcher] $task_id 的 result.json 非法，请修正后重试。"
+                        emit_system_chat_event watcher "$task_id" "result.json 非法：${result_errors:-unknown}" "$PM_SESSION" degraded notify
+                        mark_notified "$result_invalid_key"
+                    fi
+                elif [ "$result_current_round" = "false" ]; then
+                    if ! is_notified "$result_stale_key"; then
+                        notify_pm "[task-watcher] $task_id 恢复后仍存在旧 result.json，当前已忽略，请使用 resume-task 规范恢复。"
+                        emit_system_chat_event watcher "$task_id" "恢复后检测到旧 result.json，watcher 已忽略旧轮次产物。" "$PM_SESSION" degraded notify
+                        mark_notified "$result_stale_key"
+                    fi
+                elif [ "$result_status" = "success" ]; then
                     gate_decision_at=$(now_iso)
                     gate_state="pm_acceptance_pending"
                     next_status="ready_for_merge"
@@ -2267,7 +2215,7 @@ while true; do
                     elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         gate_state="qa_pending"
                     fi
-                    set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=done" "$gate_state" "" "watcher" "$gate_decision_at"
+                    set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at"
                     current_status="$next_status"
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                         notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
@@ -2295,13 +2243,22 @@ while true; do
                     notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
                     emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
                     push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因" || route_event_ok=0
+                elif [ "$result_status" = "failed" ]; then
+                    gate_decision_at=$(now_iso)
+                    set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=failed" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
+                    current_status="blocked"
+                    notify_pm "[task-watcher] $task_id 执行失败，请查看 result.json 处理。"
+                    emit_system_chat_event watcher "$task_id" "任务执行失败，需 PM 判断补修、重试或关闭。" "$PM_SESSION" degraded notify
+                    push_task_event "【任务失败】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 判断补修、重试或关闭" || route_event_ok=0
                 else
                     notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
                     emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
                 fi
 
                 sync_task_board "$task_dir" "result-detected"
-                mark_notified "$result_key"
+                if [ "$result_status" != "invalid" ] && [ "$result_current_round" != "false" ]; then
+                    mark_notified "$result_key"
+                fi
             fi
         fi
 
@@ -2322,7 +2279,7 @@ while true; do
         fi
 
         # 检测 review 结果 → 自动通知 QA 或通知 PM 仲裁
-        if [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ]; then
+        if [ -f "$task_dir/review.json" ] || [ -f "$task_dir/design-review.json" ] || [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ]; then
             review_level=$(task_json_pick "$task_dir" review_level)
             review_sig=$(review_signature "$task_dir")
             review_key="${task_id}_review_route"
@@ -2330,7 +2287,14 @@ while true; do
                 review_event_ok=1
                 state=$(review_state "$task_dir" "$review_level")
                 clear_review_queue_state_for_task "$task_dir"
-                if [ "$state" = "pass" ]; then
+                if [ "$state" = "invalid" ]; then
+                    review_invalid_key="${task_id}_artifact_invalid_review"
+                    if ! is_notified "$review_invalid_key"; then
+                        notify_pm "[task-watcher] $task_id 的 review 机器产物非法，请修正 review.json 后重试。"
+                        emit_system_chat_event watcher "$task_id" "review.json 非法或缺关键字段，已停止自动推进。" "$PM_SESSION" degraded notify
+                        mark_notified "$review_invalid_key"
+                    fi
+                elif [ "$state" = "pass" ]; then
                     test_required=$(task_json_pick "$task_dir" test_required)
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         gate_decision_at=$(now_iso)
@@ -2375,7 +2339,14 @@ while true; do
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
                 clear_qa_queue_state
-                if [ "$vstate" = "pass" ]; then
+                if [ "$vstate" = "invalid" ]; then
+                    verify_invalid_key="${task_id}_artifact_invalid_verify"
+                    if ! is_notified "$verify_invalid_key"; then
+                        notify_pm "[task-watcher] $task_id 的 verify.json 非法，请修正后重试。"
+                        emit_system_chat_event watcher "$task_id" "verify.json 非法或缺关键字段，已停止自动推进。" "$PM_SESSION" degraded notify
+                        mark_notified "$verify_invalid_key"
+                    fi
+                elif [ "$vstate" = "pass" ]; then
                     current_status=$(get_task_status "$task_dir")
                     if [ "$current_status" = "ready_for_merge" ]; then
                         _auto_close_retry_key="${task_id}_auto_close_retry"
@@ -2422,6 +2393,8 @@ while true; do
         sync_if_changed "$task_dir" "$task_dir/transitions.jsonl" "transitions"
         sync_if_changed "$task_dir" "$task_dir/ack.json" "ack"
         sync_if_changed "$task_dir" "$task_dir/result.json" "result"
+        sync_if_changed "$task_dir" "$task_dir/review.json" "reviewjson"
+        sync_if_changed "$task_dir" "$task_dir/design-review.json" "designreviewjson"
         sync_if_changed "$task_dir" "$task_dir/review.md" "review"
         sync_if_changed "$task_dir" "$task_dir/design-review.md" "designreview"
         sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"

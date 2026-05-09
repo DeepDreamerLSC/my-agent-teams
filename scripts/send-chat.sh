@@ -305,8 +305,8 @@ if channel == 'announce':
     for name in ['任务类型', '目标', '任务边界', '验收标准', '下游动作']:
         if name not in sections or is_placeholder_text(compact_section(sections[name])):
             raise SystemExit(f'task_announce blocked: instruction.md section `{name}` is missing or still placeholder')
-    if str(task_meta.get('status') or '').strip() not in {'dispatched', 'working', 'ready_for_merge', 'blocked'}:
-        raise SystemExit(f'task_announce blocked: task status must be dispatched/working/ready_for_merge/blocked, got {task_meta.get("status")}')
+    if str(task_meta.get('status') or '').strip() not in {'pooled', 'dispatched', 'working', 'ready_for_merge', 'blocked'}:
+        raise SystemExit(f'task_announce blocked: task status must be pooled/dispatched/working/ready_for_merge/blocked, got {task_meta.get("status")}')
 
 ts = datetime.now().astimezone().isoformat(timespec='seconds')
 prefix = {
