@@ -26,6 +26,8 @@ SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/close-task.sh}"
 ARTIFACTS_PY="${ARTIFACTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_artifacts.py}"
+TASK_POOL_ROUTER="${TASK_POOL_ROUTER:-$WORKSPACE_ROOT/scripts/task-pool-router.py}"
+TASK_QUEUE_ROUTER="${TASK_QUEUE_ROUTER:-$WORKSPACE_ROOT/scripts/task-queue-router.py}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
@@ -876,15 +878,7 @@ auto_push_next_task_for_agent() {
     [ "${active_count:-0}" -eq 0 ] || return 1
 
     local next_task=""
-    while IFS= read -r candidate; do
-        [ -n "$candidate" ] || continue
-        local candidate_dir="$TASKS_ROOT/$candidate"
-        [ -f "$candidate_dir/task.json" ] || continue
-        if claim_agent_can_accept_task "$candidate_dir" "$agent_id"; then
-            next_task="$candidate"
-            break
-        fi
-    done <<< "$(list_pooled_candidates_for_agent "$agent_id")"
+    next_task=$(python3 "$TASK_POOL_ROUTER" --tasks-root "$TASKS_ROOT" --config "$CONFIG_PATH" --agent "$agent_id" --next 2>/dev/null || true)
 
     [ -n "$next_task" ] || return 1
 
@@ -908,15 +902,11 @@ auto_push_next_review_for_agent() {
     is_idle_agent "$agent_id" || return 1
 
     local next_task=""
-    while IFS= read -r candidate; do
-        [ -n "$candidate" ] || continue
-        next_task="$candidate"
-        break
-    done <<< "$(list_review_candidates_for_agent "$agent_id")"
+    next_task=$(python3 "$TASK_QUEUE_ROUTER" --tasks-root "$TASKS_ROOT" --queue review --agent "$agent_id" --next 2>/dev/null || true)
     [ -n "$next_task" ] || return 1
 
     queue_state_set "review" "$agent_id" "$next_task"
-    notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md 与 result.json，并输出 review.md。"
+    notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md 与 result.json，并输出 review.json（必需）与 review.md（人读说明，可选但推荐）。"
     emit_system_chat_event nudge "$next_task" "review 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
     log "${next_task}: 已自动续推 review 任务给 ${agent_id}"
     return 0
@@ -931,11 +921,7 @@ auto_push_next_qa_for_agent() {
     is_idle_agent "$agent_id" || return 1
 
     local next_task=""
-    while IFS= read -r candidate; do
-        [ -n "$candidate" ] || continue
-        next_task="$candidate"
-        break
-    done <<< "$(list_qa_candidates_for_agent "$agent_id")"
+    next_task=$(python3 "$TASK_QUEUE_ROUTER" --tasks-root "$TASKS_ROOT" --queue qa --agent "$agent_id" --next 2>/dev/null || true)
     [ -n "$next_task" ] || return 1
 
     queue_state_set "qa" "$agent_id" "$next_task"
@@ -958,7 +944,7 @@ reconcile_open_merge_gate() {
 
     case "$gate" in
         review_pending)
-            if [ ! -f "$task_dir/review.md" ] && [ ! -f "$task_dir/design-review.md" ]; then
+            if [ ! -f "$task_dir/review.json" ] && [ ! -f "$task_dir/design-review.json" ] && [ ! -f "$task_dir/review.md" ] && [ ! -f "$task_dir/design-review.md" ]; then
                 auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                 return $?
             fi
@@ -2322,7 +2308,7 @@ while true; do
                     gate_decision_at=$(now_iso)
                     set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
                     current_status="blocked"
-                    notify_pm "[task-watcher] $task_id 审查未通过，请查看 review.md 并仲裁。"
+                    notify_pm "[task-watcher] $task_id 审查未通过，请查看 review 产物并仲裁。"
                     emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
                     push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修" || review_event_ok=0
                 fi

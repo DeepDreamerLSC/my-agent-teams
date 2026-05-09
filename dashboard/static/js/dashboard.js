@@ -108,6 +108,14 @@ async function fetchAgents() {
   return fetchJson(`${API_BASE}/agents`)
 }
 
+async function fetchPool() {
+  return fetchJson(`${API_BASE}/pool`)
+}
+
+async function fetchPmInbox() {
+  return fetchJson(`${API_BASE}/pm-inbox`)
+}
+
 async function fetchTaskDetail(taskId) {
   return fetchJson(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/detail`)
 }
@@ -640,6 +648,64 @@ function formatHours(value) {
   return `${Number(value).toFixed(2)}h`
 }
 
+function renderSummaryCards(container, cards) {
+  if (!container) return
+  container.innerHTML = cards.map(card => `
+    <div class="summary-card">
+      <div class="summary-value">${esc(String(card.value ?? '-'))}</div>
+      <div class="summary-label">${esc(card.label)}</div>
+    </div>
+  `).join('')
+}
+
+function renderPoolView(payload) {
+  const items = (payload && payload.items) || []
+  const summaryEl = document.getElementById('pool-summary')
+  const tbody = document.querySelector('#pool-table tbody')
+  const blocked = items.filter(item => !(item.eligible_agents || []).length).length
+  renderSummaryCards(summaryEl, [
+    { label: '池中任务', value: items.length },
+    { label: '可认领', value: items.length - blocked },
+    { label: '阻塞', value: blocked },
+    { label: '最久等待(分)', value: items.reduce((max, item) => Math.max(max, Number(item.pool_wait_minutes || 0)), 0) },
+  ])
+  if (!tbody) return
+  tbody.innerHTML = items.length ? items.map(item => `
+    <tr>
+      <td>${esc(item.title || item.task_id)}</td>
+      <td>${esc(item.priority || '-')}</td>
+      <td>${esc(String(item.pool_wait_minutes || 0))}m</td>
+      <td>${esc((item.claim_scope || []).join(', ') || '-')}</td>
+      <td>${esc((item.eligible_agents || []).join(', ') || '-')}</td>
+      <td>${esc((item.blocked_reasons || []).join(', ') || '-')}</td>
+      <td>${esc(item.next_action || '-')}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty-state small">暂无 pooled 任务</td></tr>'
+}
+
+function renderPmInboxView(payload) {
+  const items = (payload && payload.items) || []
+  const summaryEl = document.getElementById('pm-inbox-summary')
+  const tbody = document.querySelector('#pm-inbox-table tbody')
+  renderSummaryCards(summaryEl, [
+    { label: '待处理事项', value: items.length },
+    { label: 'L3', value: items.filter(item => item.severity === 'L3').length },
+    { label: 'L2', value: items.filter(item => item.severity === 'L2').length },
+    { label: '最久等待(分)', value: items.reduce((max, item) => Math.max(max, Number(item.age_minutes || 0)), 0) },
+  ])
+  if (!tbody) return
+  tbody.innerHTML = items.length ? items.map(item => `
+    <tr>
+      <td>${esc(item.severity || '-')}</td>
+      <td>${esc(item.title || item.task_id)}</td>
+      <td>${esc(item.reason_type || '-')}</td>
+      <td>${esc(item.summary || '-')}</td>
+      <td>${esc(String(item.age_minutes || 0))}m</td>
+      <td>${esc(item.recommended_action || '-')}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="6" class="empty-state small">暂无待 PM 处理事项</td></tr>'
+}
+
 // --- Analytics Data Layer ---
 async function fetchAggregate() {
   return fetchJson(`${API_BASE}/tasks/aggregate`)
@@ -797,12 +863,14 @@ function renderRoleEfficiencyChart(agentEff) {
 
 // --- Init ---
 async function init() {
-  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload] = await Promise.all([
+  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload, poolPayload, pmInboxPayload] = await Promise.all([
     fetchBoard(),
     fetchGantt(),
     fetchAgents(),
     fetchAggregate(),
     fetchDailyMetrics(),
+    fetchPool(),
+    fetchPmInbox(),
   ])
 
   document.getElementById('last-update').textContent = `更新: ${new Date().toLocaleTimeString()}`
@@ -811,6 +879,8 @@ async function init() {
   renderGantt(ganttPayload)
   renderAgentStats(agentsPayload)
   renderAnalytics(aggregatePayload, dailyPayload, agentsPayload)
+  renderPoolView(poolPayload)
+  renderPmInboxView(pmInboxPayload)
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -838,6 +908,8 @@ if (typeof module !== 'undefined' && module.exports) {
     renderTrendChart,
     renderAggregationCharts,
     renderRoleEfficiencyChart,
+    renderPoolView,
+    renderPmInboxView,
   }
 }
 })()

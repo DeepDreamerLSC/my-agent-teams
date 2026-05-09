@@ -1,0 +1,11 @@
+{
+  "id": "task-resume-stale",
+  "status": "dispatched",
+  "assigned_agent": "dev-1",
+  "owner_pm": "pm-chief",
+  "review_required": false,
+  "test_required": false,
+  "resume_round": 1,
+  "last_resumed_at": "2026-05-09T10:30:00+08:00",
+  "updated_at": "2026-05-09T10:30:00+08:00"
+}

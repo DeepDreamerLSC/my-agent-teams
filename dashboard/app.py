@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import os
+import json
+import subprocess
+import sys
 from contextlib import closing
+from pathlib import Path
 
 try:
     from flask import Flask, jsonify, render_template, request
@@ -11,7 +15,7 @@ except ImportError:  # pragma: no cover - exercised only when Flask is absent.
     render_template = None
     request = None
 
-from .db import connect_db, resolve_db_path
+from .db import connect_db, resolve_db_path, utcnow_iso
 from .query import (
     build_agent_stats_payload,
     build_board_payload,
@@ -24,8 +28,12 @@ from .query import (
     build_task_aggregate_payload,
 )
 
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_TASKS_ROOT = WORKSPACE_ROOT / 'tasks'
+DEFAULT_CONFIG_PATH = WORKSPACE_ROOT / 'config.json'
 
-def create_app(db_path: str | None = None):
+
+def create_app(db_path: str | None = None, *, tasks_root: str | None = None, control_config_path: str | None = None):
     if Flask is None or jsonify is None or render_template is None or request is None:
         raise RuntimeError('Flask is not installed. Install dependencies from dashboard/requirements.txt first.')
 
@@ -37,6 +45,8 @@ def create_app(db_path: str | None = None):
         static_url_path='/static',
     )
     app.config['TASK_BOARD_DB_PATH'] = resolved_db_path
+    app.config['TASKS_ROOT'] = str(Path(tasks_root).expanduser().resolve()) if tasks_root else str(DEFAULT_TASKS_ROOT)
+    app.config['TASK_CONTROL_CONFIG_PATH'] = str(Path(control_config_path).expanduser().resolve()) if control_config_path else str(DEFAULT_CONFIG_PATH)
 
     # Initialize the schema once at startup. Request handlers should use
     # read-only style connections that do not rewrite metadata on every GET.
@@ -46,6 +56,17 @@ def create_app(db_path: str | None = None):
     def _with_connection(callback):
         with closing(connect_db(app.config['TASK_BOARD_DB_PATH'], initialize=False)) as conn:
             return callback(conn)
+
+    def _run_control_script(script_name: str, *args: str):
+        script_path = WORKSPACE_ROOT / 'scripts' / script_name
+        completed = subprocess.run(
+            [sys.executable, str(script_path), *args],
+            cwd=str(WORKSPACE_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return json.loads(completed.stdout)
 
     def _board_payload():
         return _with_connection(
@@ -108,6 +129,34 @@ def create_app(db_path: str | None = None):
                 compat_task['verify_at'] = task.get('verify_completed_at')
                 tasks.append(compat_task)
         return jsonify(tasks)
+
+    @app.get('/api/pool')
+    def api_pool():
+        payload = _run_control_script(
+            'task-pool-view.py',
+            '--json',
+            '--tasks-root',
+            app.config['TASKS_ROOT'],
+            '--config',
+            app.config['TASK_CONTROL_CONFIG_PATH'],
+        )
+        return jsonify({
+            'generated_at': utcnow_iso(),
+            'items': payload,
+        })
+
+    @app.get('/api/pm-inbox')
+    def api_pm_inbox():
+        payload = _run_control_script(
+            'task-inbox.py',
+            '--json',
+            '--tasks-root',
+            app.config['TASKS_ROOT'],
+        )
+        return jsonify({
+            'generated_at': utcnow_iso(),
+            'items': payload,
+        })
 
     @app.get('/api/tasks/gantt')
     def api_tasks_gantt_compat():

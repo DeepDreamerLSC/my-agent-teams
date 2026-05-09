@@ -1,0 +1,6 @@
+{
+  "task_id": "task-resume-stale",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acked_at": "2026-05-09T10:00:00+08:00"
+}

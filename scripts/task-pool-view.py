@@ -127,6 +127,21 @@ def agent_acceptance(task: dict, agent_id: str, agents: dict[str, dict], active_
     if working_count > 0:
         reasons.append("agent_has_working_task")
     max_concurrency = int(task.get("claim_max_concurrency") or default_concurrency or 1)
+    role = str((agents.get(agent_id) or {}).get("role") or "").strip().lower()
+    role_limits = {
+        "fullstack_dev": "dev",
+        "reviewer": "reviewer",
+        "qa": "qa",
+        "architect": "architect",
+        "pm": "pm-chief",
+    }
+    wip_limits = task.get("__wip_limits__") or {}
+    mapped = role_limits.get(role, agent_id if agent_id in wip_limits else '')
+    role_limit = wip_limits.get(agent_id)
+    if role_limit is None and mapped:
+        role_limit = wip_limits.get(mapped)
+    if role_limit not in (None, ''):
+        max_concurrency = min(max_concurrency, int(role_limit))
     if len(active) >= max_concurrency:
         reasons.append(f"claim_max_concurrency_reached:{max_concurrency}")
     return not reasons, reasons
@@ -223,10 +238,14 @@ def main() -> int:
     config = load_json(Path(args.config).expanduser().resolve())
     agents = config.get("agents") or {}
     default_concurrency = int((config.get("task_pool") or {}).get("default_claim_max_concurrency", 1))
+    wip_limits = config.get("wip_limits") or {}
     active_by_agent = active_tasks_by_agent(tasks_root)
     now = datetime.now().astimezone()
 
-    rows = [build_row(task_dir, task, agents, active_by_agent, tasks_root, default_concurrency, now) for task_dir, task in pooled_tasks(tasks_root)]
+    rows = []
+    for task_dir, task in pooled_tasks(tasks_root):
+        task["__wip_limits__"] = wip_limits
+        rows.append(build_row(task_dir, task, agents, active_by_agent, tasks_root, default_concurrency, now))
     rows.sort(key=lambda row: (-PRIORITY_RANK.get(row["priority"], 0), -row["pool_wait_minutes"], row["task_id"]))
 
     if args.explain:

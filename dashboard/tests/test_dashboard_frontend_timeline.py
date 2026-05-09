@@ -25,6 +25,13 @@ def _run_node(script: str) -> dict:
 
 class DashboardFrontendTimelineTests(unittest.TestCase):
 
+    def test_index_markup_contains_pool_and_pm_inbox_tabs(self):
+        html = INDEX_HTML.read_text(encoding="utf-8")
+        self.assertIn('data-tab="pool"', html)
+        self.assertIn('data-tab="pm-inbox"', html)
+        self.assertIn('id="pool-table"', html)
+        self.assertIn('id="pm-inbox-table"', html)
+
     def test_gantt_filter_bar_markup_contains_quick_ranges_and_date_inputs(self):
         html = INDEX_HTML.read_text(encoding="utf-8")
         self.assertIn('id="gantt-filters"', html)
@@ -89,6 +96,58 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertTrue(result["hasActors"])
         self.assertTrue(result["hasMessage"])
         self.assertTrue(result["hasPriority"])
+
+    def test_render_pool_and_pm_inbox_views(self):
+        script = textwrap.dedent(
+            f"""
+            const mod = require({json.dumps(str(DASHBOARD_JS))});
+            global.document = {{
+              getElementById(id) {{
+                if (!this.nodes) this.nodes = {{}};
+                if (!this.nodes[id]) this.nodes[id] = {{ innerHTML: '' }};
+                return this.nodes[id];
+              }},
+              querySelector(selector) {{
+                return this.getElementById(selector);
+              }},
+              createElement() {{
+                return {{ textContent: '', innerHTML: '' }};
+              }}
+            }};
+            mod.renderPoolView({{
+              items: [{{
+                task_id: 'pool-1',
+                title: '待认领',
+                priority: 'high',
+                pool_wait_minutes: 12,
+                claim_scope: ['dev-1'],
+                eligible_agents: ['dev-1'],
+                blocked_reasons: [],
+                next_action: '等待认领'
+              }}]
+            }});
+            mod.renderPmInboxView({{
+              items: [{{
+                task_id: 'blocked-1',
+                title: '需仲裁',
+                severity: 'L3',
+                reason_type: 'blocked',
+                summary: 'review_rejected',
+                age_minutes: 8,
+                recommended_action: '补修'
+              }}]
+            }});
+            console.log(JSON.stringify({{
+              poolHtml: document.getElementById('#pool-table tbody').innerHTML,
+              inboxHtml: document.getElementById('#pm-inbox-table tbody').innerHTML
+            }}));
+            """
+        )
+        result = _run_node(script)
+        self.assertIn('待认领', result['poolHtml'])
+        self.assertIn('dev-1', result['poolHtml'])
+        self.assertIn('需仲裁', result['inboxHtml'])
+        self.assertIn('review_rejected', result['inboxHtml'])
 
     def test_render_task_detail_html_handles_missing_durations_and_empty_communication(self):
         script = textwrap.dedent(

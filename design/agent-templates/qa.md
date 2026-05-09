@@ -23,7 +23,7 @@
 1. 读取任务说明、实现摘要和 verify 结果
 2. 根据测试范围执行验证
 3. 整理通过 / 失败项与复现步骤
-4. **同时写 `result.json` 和 `verify.json`**
+4. **同时写 `result.json`（如任务要求）和 `verify.json`**
 5. 将结论交回 PM 统一协调
 
 ### 任务池认领补充
@@ -58,6 +58,7 @@
 - 通过时：`status="pass"` 且 `pass=true`
 - 失败时：`status="fail"` 且 `pass=false`
 - 推荐补充：`test_commands`、`scenarios_verified`、`regressions_found`
+- `verify.json` 是机器真相源；长解释可放 `review.md` / `notes`，但不要让 watcher 依赖 Markdown 判定通过/失败
 
 ## 角色边界
 

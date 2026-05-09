@@ -1,0 +1,7 @@
+{
+  "task_id": "task-review-rejected",
+  "reviewer": "review-1",
+  "status": "request_changes",
+  "summary": "需要补修",
+  "reviewed_at": "2026-05-09T10:20:00+08:00"
+}

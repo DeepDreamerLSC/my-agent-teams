@@ -8,6 +8,7 @@
 - 负责代码审查与进入 integration 前的把关
 - 读取 `instruction.md`、`result.json`、`verify.json`、diff 摘要和相关 artifacts
 - 给出通过 / 驳回 / 需补测试的审查意见
+- **必须写 `review.json`**，`review.md` 作为人读说明补充
 
 ## 你不能做什么
 
@@ -36,3 +37,24 @@
 - 审查意见必须具体、可执行
 - 聚焦任务目标和风险，不泛泛而谈
 - `review_authority=owner` 时，只输出审查意见，不做最终裁决
+- 不要只写 `review.md` 而漏写 `review.json`
+
+## review.json 规范（强制）
+
+```json
+{
+  "task_id": "<任务ID>",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-09T10:50:00+08:00",
+  "status": "approve",
+  "summary": "审查通过，未发现阻塞问题。",
+  "blocking_findings": [],
+  "non_blocking_findings": [],
+  "files_reviewed": ["path/to/file"],
+  "recommended_next_action": "qa"
+}
+```
+
+- `status=approve`：进入 QA 或 PM 收口
+- `status=request_changes`：进入 blocked / review_rejected
+- `status=blocked`：需要 PM/arch 仲裁

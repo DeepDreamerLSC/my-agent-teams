@@ -176,11 +176,47 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .timeline-meta { font-size: 11px; color: #888; margin-bottom: 6px; }
 .timeline-text { font-size: 13px; line-height: 1.6; color: #333; }
 
+.panel-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.summary-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.summary-value { font-size: 24px; font-weight: 700; color: #222; margin-bottom: 4px; }
+.summary-label { font-size: 12px; color: #888; }
+.panel-table-wrap {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  overflow: auto;
+}
+.panel-table { width: 100%; border-collapse: collapse; }
+.panel-table th,
+.panel-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+  font-size: 13px;
+  vertical-align: top;
+}
+.panel-table th {
+  font-size: 12px;
+  color: #666;
+  background: #fafafa;
+}
+
 @media (max-width: 960px) {
   .kanban-board { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr 1fr; }
   .timeline-item { grid-template-columns: 1fr; }
   .analytics-summary { grid-template-columns: repeat(2, 1fr); }
+  .panel-summary { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Analytics */

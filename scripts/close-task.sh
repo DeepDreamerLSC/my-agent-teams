@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="${LIB_DIR:-$SCRIPT_DIR/lib}"
+
 TASK_DIR=""
 SUMMARY=""
 REASON="manual close via close-task.sh"
@@ -55,14 +58,16 @@ if [ -z "$TASK_DIR" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" <<'PY'
+python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" "$LIB_DIR" <<'PY'
 import json
 import os
-import re
 import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, sys.argv[5])
+import task_artifacts  # type: ignore
 
 
 def fail(message: str, exit_code: int = 1) -> None:
@@ -78,139 +83,27 @@ def load_json(path: Path) -> dict:
     except json.JSONDecodeError as exc:
         fail(f'invalid json: {path}: {exc}')
 
-
-CONCLUSION_LABEL_RE = re.compile(
-    r'^\s*(?:#{1,6}\s*)?'
-    r'(?:审查结论|复审结论|最终结论|最终意见|结论|review conclusion|conclusion|verdict|decision)'
-    r'\s*(?:[:：\-—]\s*)?(.*)$',
-    re.IGNORECASE,
-)
-APPROVE_PATTERNS = (
-    re.compile(r'\bapprove(?:d)?\b', re.IGNORECASE),
-    re.compile(r'\blgtm\b', re.IGNORECASE),
-    re.compile(r'\bship\s+it\b', re.IGNORECASE),
-    re.compile(r'通过|同意合入|批准|可以合入'),
-)
-REJECT_PATTERNS = (
-    re.compile(r'\brequest\s+changes\b', re.IGNORECASE),
-    re.compile(r'\bchanges\s+requested\b', re.IGNORECASE),
-    re.compile(r'\breject(?:ed)?\b', re.IGNORECASE),
-    re.compile(r'驳回|不通过|未通过|不接受|请求修改|要求修改'),
-)
-
-
-def classify_review_snippet(snippet: str) -> str:
-    """Classify an explicit review verdict snippet.
-
-    Review files often mention state names such as ``review_rejected`` or
-    ``qa_failed`` in explanatory text.  Those must not override an explicit
-    APPROVE conclusion, so matching is limited to conclusion snippets and
-    English reject words require token boundaries instead of substring scans.
-    """
-    if not snippet.strip():
-        return 'pending'
-    if any(pattern.search(snippet) for pattern in REJECT_PATTERNS):
-        return 'fail'
-    if any(pattern.search(snippet) for pattern in APPROVE_PATTERNS):
-        return 'pass'
-    return 'pending'
-
-
-def classify_review_text(text: str) -> str:
-    lines = text.splitlines()
-
-    # Prefer explicit verdict/conclusion sections.  For heading-only forms
-    # such as "## 结论", inspect only the next few non-empty lines rather
-    # than the whole review body.
-    for index, line in enumerate(lines[:60]):
-        match = CONCLUSION_LABEL_RE.match(line)
-        if not match:
-            continue
-        snippets = []
-        suffix = match.group(1).strip()
-        if suffix:
-            snippets.append(suffix)
-        for following in lines[index + 1:index + 8]:
-            stripped = following.strip()
-            if not stripped:
-                continue
-            if stripped.startswith('#') and snippets:
-                break
-            snippets.append(stripped)
-            if len(snippets) >= 4:
-                break
-        state = classify_review_snippet('\n'.join(snippets))
-        if state != 'pending':
-            return state
-
-    # Backward-compatible fallback for old terse review files that only put
-    # APPROVE / REQUEST CHANGES near the top.  Do not scan the full document.
-    first_nonempty_lines = [line.strip() for line in lines if line.strip()][:20]
-    return classify_review_snippet('\n'.join(first_nonempty_lines))
-
-
-def parse_review_file(path: Path) -> str:
-    if not path.exists():
-        return 'missing'
-    text = path.read_text(encoding='utf-8', errors='ignore')
-    return classify_review_text(text)
-
-
-def parse_review_json(path: Path) -> str:
-    if not path.exists():
-        return 'missing'
-    payload = load_json(path)
-    status = str(payload.get('status') or '').strip().lower()
-    if status == 'approve':
-        return 'pass'
-    if status in {'request_changes', 'blocked'}:
-        return 'fail'
-    return 'pending'
-
-
 def parse_review_state(task_dir: Path, review_level: str) -> str:
-    review_main_state = parse_review_json(task_dir / 'review.json')
-    if review_main_state == 'missing':
-        review_main_state = parse_review_file(task_dir / 'review.md')
-    if review_level == 'complex':
-        design_state = parse_review_json(task_dir / 'design-review.json')
-        if design_state == 'missing':
-            design_state = parse_review_file(task_dir / 'design-review.md')
-        if review_main_state == 'fail' or design_state == 'fail':
-            return 'fail'
-        if review_main_state == 'pass' and design_state == 'pass':
-            return 'pass'
-        return 'pending'
-    if review_main_state == 'fail':
-        return 'fail'
-    if review_main_state == 'pass':
+    review = task_artifacts.parse_review(task_dir)
+    normalized = str(review.get('normalized_status') or '').strip().lower()
+    if normalized == 'approve':
         return 'pass'
+    if normalized in {'request_changes', 'blocked'}:
+        return 'fail'
+    if normalized in {'pending', 'missing'}:
+        return 'pending'
     return 'pending'
 
 
 def parse_verify_state(task_dir: Path) -> str:
-    path = task_dir / 'verify.json'
-    if not path.exists():
+    verify = task_artifacts.parse_verify(task_dir)
+    normalized = str(verify.get('normalized_status') or '').strip().lower()
+    if normalized == 'pass':
+        return 'pass'
+    if normalized in {'fail', 'blocked'}:
+        return 'fail'
+    if normalized in {'missing', 'pending'}:
         return 'missing'
-    payload = load_json(path)
-    values = [
-        payload.get('pass'),
-        payload.get('ok'),
-        payload.get('result'),
-        payload.get('status'),
-        payload.get('verdict'),
-        payload.get('conclusion'),
-    ]
-    for value in values:
-        if isinstance(value, bool):
-            return 'pass' if value else 'fail'
-        if value is None:
-            continue
-        normalized = str(value).strip().lower()
-        if normalized in {'pass', 'passed', 'approve', 'approved', 'ok', 'true', '1', 'success', 'done'}:
-            return 'pass'
-        if normalized in {'fail', 'failed', 'false', '0', 'reject', 'rejected', 'error', 'blocked'}:
-            return 'fail'
     return 'pending'
 
 

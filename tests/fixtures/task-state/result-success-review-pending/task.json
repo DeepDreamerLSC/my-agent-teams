@@ -1,0 +1,10 @@
+{
+  "id": "task-success-review",
+  "status": "working",
+  "assigned_agent": "dev-1",
+  "owner_pm": "pm-chief",
+  "review_required": true,
+  "test_required": true,
+  "reviewer": "review-1",
+  "updated_at": "2026-05-09T10:00:00+08:00"
+}

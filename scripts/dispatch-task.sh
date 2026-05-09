@@ -24,6 +24,13 @@ from typing import Optional
 
 ACTIVE_DISPATCH_STATUSES = {'dispatched', 'working', 'ready_for_merge', 'blocked'}
 AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
+ROLE_WIP_KEYS = {
+    'fullstack_dev': 'dev',
+    'reviewer': 'reviewer',
+    'qa': 'qa',
+    'architect': 'architect',
+    'pm': 'pm-chief',
+}
 TASK_TYPE_ALIASES = {
     'investigation': 'investigation',
     'diagnosis': 'investigation',
@@ -181,6 +188,25 @@ if assigned_agent in AUTO_ASSIGNED_AGENTS:
     raise SystemExit(f'auto-assigned pending task must enter pool via pool-task.sh / queue-task.sh, not dispatch-task: {assigned_agent}')
 if assigned_agent not in agents:
     raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
+
+agent_payload = agents.get(assigned_agent) or {}
+agent_role = str(agent_payload.get('role') or '').strip().lower()
+wip_limits = config.get('wip_limits') or {}
+wip_key = ROLE_WIP_KEYS.get(agent_role)
+role_limit = wip_limits.get(assigned_agent)
+if role_limit in (None, '') and wip_key:
+    role_limit = wip_limits.get(wip_key)
+if role_limit not in (None, ''):
+    active_count = 0
+    for other_task_json in sorted(task_path.parent.parent.glob('*/task.json')):
+        other_task = json.loads(other_task_json.read_text(encoding='utf-8'))
+        if str(other_task.get('assigned_agent') or '') != assigned_agent:
+            continue
+        if str(other_task.get('status') or '') not in {'dispatched', 'working'}:
+            continue
+        active_count += 1
+    if active_count >= int(role_limit):
+        raise SystemExit(f'assigned_agent {assigned_agent} already reached wip_limit={int(role_limit)}')
 
 execution_mode = task.get('execution_mode')
 target_environment = task.get('target_environment')

@@ -49,6 +49,14 @@ task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
 config = json.loads(config_path.read_text(encoding='utf-8'))
 
+ROLE_WIP_KEYS = {
+    'fullstack_dev': 'dev',
+    'reviewer': 'reviewer',
+    'qa': 'qa',
+    'architect': 'architect',
+    'pm': 'pm-chief',
+}
+
 status = str(task.get('status') or '')
 if status != 'pooled':
     raise SystemExit(f'task status must be pooled to claim, got {status}')
@@ -70,6 +78,14 @@ for dep in task.get('depends_on') or []:
         raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep.get("status")}')
 
 max_concurrency = int(task.get('claim_max_concurrency') or config.get('task_pool', {}).get('default_claim_max_concurrency', 1))
+wip_limits = config.get('wip_limits') or {}
+agent_role = str(((config.get('agents') or {}).get(agent_id) or {}).get('role') or '').strip().lower()
+wip_key = ROLE_WIP_KEYS.get(agent_role)
+role_limit = wip_limits.get(agent_id)
+if role_limit in (None, '') and wip_key:
+    role_limit = wip_limits.get(wip_key)
+if role_limit not in (None, ''):
+    max_concurrency = min(max_concurrency, int(role_limit))
 active_count = 0
 working_count = 0
 target_scope = [str(item).strip() for item in (task.get('write_scope') or []) if str(item).strip()]

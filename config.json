@@ -203,6 +203,13 @@
     "nudge_cooldown_seconds": 900,
     "allow_ready_for_merge_dependency": false
   },
+  "wip_limits": {
+    "pm-chief": 5,
+    "dev": 1,
+    "reviewer": 2,
+    "qa": 2,
+    "architect": 2
+  },
   "notifications": {
     "enabled": true,
     "feishu_open_id": "ou_f95ee559a38a607c5f312e7b64304143",

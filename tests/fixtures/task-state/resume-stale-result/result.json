@@ -1,0 +1,7 @@
+{
+  "task_id": "task-resume-stale",
+  "agent": "dev-1",
+  "status": "success",
+  "summary": "旧轮次结果",
+  "finished_at": "2026-05-09T10:05:00+08:00"
+}
