@@ -892,6 +892,164 @@ PM Inbox 只承载“需要 PM 处理，否则当前任务/队列会卡住”的
 - `send-chat.sh announce` 允许 `pooled`，或 `pool-task.sh` 不再调用 `announce`。
 - `pool-task.sh` 不得吞掉 ChatHub 写入失败，至少要写 log 或 system degraded event。
 
+### 6.7 Dashboard / 看板信息架构优化
+
+当前 dashboard 已经有 Kanban、甘特图、Agent 统计、分析、任务池、PM Inbox 等入口，但整体仍偏“数据展示”，没有充分服务 PM 的日常控制动作；甘特图也因使用相对小时轴、任务名 Y 轴和多段 custom series，导致视觉拥挤且难以定位瓶颈。看板应升级为 **PM Cockpit + 队列治理 + 生命周期分析 + Agent 负载分析**。
+
+#### 6.7.1 首页改为 PM Cockpit / 今日控制塔
+
+首页第一屏不应先展示所有任务卡片，而应先回答 PM 最关心的三个问题：
+
+1. 今天必须处理什么？
+2. 哪个队列正在变慢？
+3. 哪些 agent 空闲或过载？
+
+推荐首屏结构：
+
+| 区块 | 内容 | 数据来源 |
+|---|---|---|
+| 顶部 KPI | L3/L2 待处理数、blocked 数、timeout 数、pooled 数、review/QA backlog、今日新增/完成、返工率 | `task-inbox.py`、`task-pool-view.py`、`task_metrics_daily`、`task_stage_durations` |
+| PM Inbox 摘要 | L3 必处理、L2 降级告警、待验收事项，按 severity/priority/age 排序 | `task-inbox.py` |
+| 队列健康 | pooled、review_pending、qa_pending、pm_acceptance_pending 的数量、最老等待、超 SLA 数 | `task.json` + `merge_gate_state` + stage durations |
+| Agent 负载 | 每个 agent 当前 WIP、可接任务数、今日完成、平均执行耗时、是否被 WIP gate 限制 | `tasks` + `task-pool-view.py` + `agent_metrics_daily` |
+
+控制塔只读，不直接改 `task.json`；操作层先提供“复制推荐脚本命令”，例如 `resume-task.sh`、`dispatch-task.sh`、`pool-task.sh`、`close-task.sh`。
+
+#### 6.7.2 Kanban 改为 status + gate 双层视图
+
+当前 Kanban 的 `pending / working / ready_for_merge / blocked / done` 对 PM 来说太粗，`ready_for_merge` 内部实际包含 review、QA、PM acceptance 三种完全不同的等待。建议列改为：
+
+```text
+待定义/待派发
+待认领
+执行中
+待审查
+待 QA
+待 PM 收口
+阻塞/返工
+已完成
+```
+
+映射规则：
+
+| 列 | 触发事实 |
+|---|---|
+| 待定义/待派发 | `status=pending` 且未入池 |
+| 待认领 | `status=pooled` |
+| 执行中 | `status=dispatched/working` |
+| 待审查 | `status=ready_for_merge` 且 `merge_gate_state=review_pending` |
+| 待 QA | `status=ready_for_merge` 且 `merge_gate_state=qa_pending` |
+| 待 PM 收口 | `merge_gate_state=pm_acceptance_pending` |
+| 阻塞/返工 | `status=blocked` 或 `merge_gate_state=review_rejected/qa_failed/blocked` |
+| 已完成 | `status=done/archived/merged` |
+
+任务卡片应从“任务名 + agent”增强为“当前为什么在这里”：
+
+- 当前阶段停留时长 / 是否超 SLA。
+- priority、assigned_agent、reviewer、owner_pm。
+- `merge_gate_state`、`review_level`、`rework_reason`。
+- 最近一次 system event / artifact 结论。
+- `recommended_action`（来自 Inbox、pool view 或 reducer actions）。
+
+#### 6.7.3 甘特图重构：从“任务条形图”改为三类时间视图
+
+##### 当前问题
+
+- X 轴是相对最早任务的小时数，不是自然时间，PM 难以关联“今天/昨天/本周”。
+- Y 轴任务名过长且截断，任务多时难以阅读。
+- 阶段条分散在多个 series，颜色多但含义不突出。
+- 不突出等待、执行、审查、QA、blocked 哪个阶段最慢。
+
+##### 视图 A：任务生命周期泳道图
+
+用真实时间轴展示每个任务的阶段：
+
+```text
+任务 A | 创建 ─ 等待派发 ─ 执行 ─ review ─ QA ─ PM收口
+任务 B |       创建 ─ pooled等待 ─ 执行 ─ blocked
+任务 C |              创建 ─ 执行 ─ PM收口
+```
+
+颜色建议：
+
+| 阶段 | 颜色 |
+|---|---|
+| 等待/排队 | 灰色 |
+| pooled/认领等待 | 青色 |
+| 执行 | 蓝色 |
+| review | 紫色 |
+| QA | 橙色 |
+| PM acceptance | 绿色 |
+| blocked/failed | 红色 |
+| 超 SLA 风险 | 黄色描边或斜纹 |
+
+数据来源：`task_stage_durations` + `tasks.created_at/dispatched_at/ack_at/completed_at/review_completed_at/verify_completed_at/current_status_at`。X 轴使用真实日期时间，并保留今天/近三天/近七天/自定义筛选。
+
+##### 视图 B：Agent 负载泳道图
+
+按 agent 分行展示任务占用：
+
+```text
+dev-1     | 任务A执行 | 空闲 | 任务D执行
+dev-2     | 任务B执行 | 任务E执行
+review-1  | review A | 等待 | review D
+qa-1      | QA A | QA D
+```
+
+用途：
+- 看谁空闲、谁过载。
+- 看 review/QA 是否成为单线程瓶颈。
+- 验证自动续推是否真的减少空闲时间。
+- 与 WIP gate 联动展示“不可接原因”。
+
+##### 视图 C：阶段耗时瀑布图 / 瓶颈条形图
+
+按任务或按队列展示阶段耗时：
+
+```text
+创建→派发      10m
+派发→ACK       3m
+ACK→结果       48m
+结果→审查      90m
+审查→QA        15m
+QA→收口        20m
+```
+
+这比传统甘特更适合回答“慢在哪里”。默认展示 Top N 慢任务和整体 P50/P75/P90。
+
+#### 6.7.4 数据分析增强
+
+已有数据可以进一步分析，不必先引入新事实源。推荐新增以下只读分析：
+
+| 分析 | 指标 | 用途 |
+|---|---|---|
+| 阶段瓶颈 | 各阶段 P50/P75/P90/max，平均值只作辅助 | 找出系统性慢点，避免被少量极端值误导 |
+| 队列老化 | pooled/review_pending/qa_pending/pm_acceptance_pending 的 0-30m、30-60m、1-2h、2-6h、6h+ 分桶 | 判断哪些队列正在积压 |
+| Agent 负载 | 当前 WIP、今日完成、平均 ACK 延迟、平均执行耗时、claim 成功/失败、空闲时长 | 判断是否需要转派或调整 WIP |
+| 质量指标 | review request_changes 率、QA fail 率、artifact_invalid 率、resume/rework 率、complex review 缺件率 | 判断返工来源和产物契约健康度 |
+| 沟通成本 | 每任务沟通条数、PM mention 数、unanswered question 数、system event 噪音趋势 | 衡量 PM 是否真正减负 |
+| 优化建议 | `follow_up_items[]`、`non_blocking_findings[]` 数量、已 promote 比例 | 管理非阻塞优化而不污染 PM Inbox |
+
+#### 6.7.5 可补充的数据字段
+
+为了让看板从“展示”升级到“治理”，后续可补充：
+
+| 类别 | 字段 | 作用 |
+|---|---|---|
+| SLA | `sla_deadline`、`review_deadline`、`qa_deadline` | 风险预警和超时排序 |
+| 业务优先级 | `business_priority`、`risk_level`、`source_request_id` | 区分技术 priority 与业务紧急度 |
+| 工作量估计 | `complexity_estimate`、`expected_effort_minutes` | 预测任务是否会拖慢队列 |
+| 认领快照 | claim rejected reason、candidate agents snapshot、nudge 时间 | 分析为什么池中任务没人接 |
+| 质量分类 | `request_changes_reason_type`、`qa_fail_reason_type` | 区分需求遗漏、实现缺陷、测试环境、产物格式等原因 |
+| 优化建议 | `source_suggestion_id`、`source_artifact`、`promoted_task_id` | 追踪非阻塞建议是否被转任务 |
+
+#### 6.7.6 Dashboard 操作边界
+
+- Dashboard 短期只读；实际状态变更仍走标准脚本。
+- 允许展示“推荐命令”和“复制命令”按钮，但不直接写 `task.json`。
+- 若中期增加按钮操作，也必须调用脚本 API，而不是在 dashboard 后端绕过脚本写状态。
+- Dashboard 的聚合项应可从 `tasks/`、`transitions.jsonl`、artifact JSON、ChatHub events 重建，避免出现第五套事实源。
+
 ---
 
 ## 7. WIP 与自动续推策略
@@ -966,10 +1124,11 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 | P1-5 | reviewer/QA 输出模板更新 | agent 指南/模板 | review-1/qa-1 默认输出机器 JSON，PM 不重新解释 Markdown |
 | P1-6 | Dashboard PM Inbox 卡片/页面 | dashboard ingest/query/frontend | dashboard 可按 reason/severity/age 聚合待 PM 处理事项，且不直接写任务事实 |
 | P1-7 | 优化建议池只读入口 | parser / `list-optimization-backlog.sh` / dashboard 可选 | 汇总 `follow_up_items[]`、`non_blocking_findings[]`，PM 可筛选、忽略、合并或提升为 `task_type=optimization` 的正式任务 |
+| P1-8 | PM Cockpit 首屏重排 | dashboard frontend/query | 首页展示 L3/L2、blocked、timeout、pooled、review/QA backlog、今日新增/完成、返工率与最老等待，不再让 PM 先翻任务卡片 |
 
 ### 8.3 P2：watcher 拆分与任务池视图（3 - 5 天）
 
-目标：把任务池、review/QA 队列、通知从 watcher 主体中拆出来。
+目标：把任务池、review/QA 队列、通知从 watcher 主体中拆出来，并让 dashboard 从“任务展示”升级为“队列治理”。
 
 | 编号 | 任务 | 改动范围 | 验收 |
 |---|---|---|---|
@@ -978,6 +1137,8 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 | P2-3 | 拆 `task-queue-router.py` | review/QA 队列 | review/QA 可见队列与自动续推一致 |
 | P2-4 | Dashboard 任务池页 | dashboard ingest/query/frontend | 可按 agent/priority/阻塞原因看任务池 |
 | P2-5 | WIP gate | config + claim/dispatch/router | 超 WIP 不派发，给出等待/转派建议 |
+| P2-6 | Kanban status+gate 双层列 | dashboard frontend/query | `ready_for_merge` 拆成待审查、待 QA、待 PM 收口；卡片展示阶段停留时长、gate、最近事件与 recommended_action |
+| P2-7 | 甘特图改真实时间生命周期泳道 | dashboard frontend/query | X 轴用真实时间；任务阶段按等待/pooled/执行/review/QA/PM收口/blocked 着色；支持今天/近三天/近七天/自定义筛选 |
 
 ### 8.4 P3：清理 legacy 与分析增强（3 - 5 天）
 
@@ -990,6 +1151,8 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 | P3-3 | 任务池超时升级 | pool router + notifier | pooled 超时产生 degraded event 并提示 PM 转派 |
 | P3-4 | 协作指标 | dashboard metrics | 可看 pool wait、claim latency、review/QA wait、rework rate |
 | P3-5 | 删除重复解析逻辑 | watcher/close/dashboard | 解析逻辑只剩统一 parser |
+| P3-6 | Agent 负载泳道与阶段耗时瀑布图 | dashboard frontend/query | 可按 agent 看任务占用/空闲；可按任务或阶段看耗时 Top N |
+| P3-7 | 瓶颈与质量分析增强 | dashboard metrics/query | 输出阶段 P50/P75/P90/max、队列老化分桶、request_changes/QA fail/artifact_invalid/rework/沟通成本指标 |
 
 ---
 
@@ -1058,6 +1221,10 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 12. watcher 主体职责减少，状态归约可以用 fixture 测试，fixture 覆盖 resume/stale artifact。
 13. Dashboard/CLI 都能重建任务池、PM Inbox 与协作时间线，不修改任务事实源。
 14. 归档前，watcher 不因历史 done/cancelled 任务持续产生误触发或明显性能负担。
+15. Dashboard 首页能作为 PM Cockpit 使用，直接展示待 PM 处理、队列健康、Agent 负载和今日吞吐，而不是只展示任务列表。
+16. Kanban 能按 `status + merge_gate_state` 拆分待审查、待 QA、待 PM 收口等真实队列。
+17. 甘特图不再使用相对小时轴作为唯一视图，至少提供真实时间生命周期泳道；P3 后补 Agent 负载泳道和阶段耗时瀑布图。
+18. 分析页能识别主要瓶颈阶段、队列老化、质量返工和沟通噪音，支持 PM 判断是否需要转派、拆分、提优先级或调整 WIP。
 
 ---
 
