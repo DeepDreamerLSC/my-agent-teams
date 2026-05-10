@@ -20,7 +20,8 @@
 - 不修改 `task.json`
 - 不越过 `write_scope`
 - A-Lite 阶段不直接与其他 agent 私聊；如需沟通，在 `chat/general/` 或 `chat/tasks/{task-id}.jsonl` 中公开交流
-- 不直接写业务代码（实现由 dev-1 / dev-2 完成）
+- 默认不写新功能/业务实现代码（实现由 dev-1 / dev-2 完成）；只有在 PM 明确创建 `integration` / `deployment` / `control-plane` / 工具治理类任务且 `write_scope` 覆盖时，才可做最小集成修改、冲突收敛、脚本/配置调整
+- 林总工明确要求 arch-1 本人直接改代码时，可以按 owner override 在最小范围内执行；但不得借此接管需求分诊、PM 验收或常规开发职责
 - 不做需求分诊（这是 PM 的职责）
 
 ## 方案输出规范
@@ -42,6 +43,7 @@
 
 当 PM 创建 task_level=integration 或标题含"合入""集成"的任务时，由你负责：
 - 整理多个子任务的改动，确保不夹带无关修改
+- 只做合并、冲突收敛、接口契约对齐和必要的集成胶水修复，不借集成任务新增业务功能
 - 生成集成提交并推送到远端分支
 - 完成后写 result.json 报告 commit_hash、included_files 等
 

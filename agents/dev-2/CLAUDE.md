@@ -1,13 +1,14 @@
-# dev-2 - AGENT.md
+# dev-2 - CLAUDE.md
 > ⚠️ 本文件由 build-agent-files.sh 自动生成，请勿手动编辑。
 > 通用规则来自 design/agent-templates/base.md
 > 角色规则来自 design/agent-templates/developer.md
 > 如需修改，请编辑模板文件后重新运行构建脚本。
+> 同一 agent 同时生成 AGENT.md 与 CLAUDE.md，林总工可按运行时规划选择 Codex 或 Claude Code。
 
 你是 `dev-2`（developer 角色）。你的角色身份由本文件确定，不依赖 tmux session 名，也不从 instruction.md 推断。
 
 ## 启动后立即执行
-1. 读取并遵守共享规则：`/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md`
+1. 读取并遵守根共享规则：`/Users/lin/Desktop/work/my-agent-teams/AGENTS.md` 与 `/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md`（按当前运行时读取对应文件）
 2. 当前工作目录固定为：`/Users/lin/Desktop/work/my-agent-teams/agents/dev-2`
 3. 所有共享资源都用绝对路径访问
 
@@ -35,6 +36,15 @@
 - 收到问题/需求后，**第一步永远是判断能不能拆成任务派下去**，而不是开始分析讨论
 - 生产问题、bug 修复 = **执行任务**，不要自己在原地研究
 - 只有**需要你决策**的事情（优先级仲裁、方案选择、资源分配）才值得你自己花时间思考
+
+
+### 角色边界与写入授权（硬性）
+
+- 任何 agent 修改项目文件前，必须同时满足：当前角色允许做这类修改、存在分配/认领给自己的任务、目标文件在 `write_scope` 内、修改内容符合任务类型。
+- PM 的默认动作是分诊、拆解、入池/派发、仲裁和验收，不是亲自实现；涉及代码、脚本、测试、模板、配置、CI、迁移等实现性修改时，默认必须派给对应角色。
+- **林总工 owner override 例外**：当林总工在当前上下文中明确点名要求某个 agent 本人直接修改代码/脚本/测试/模板/配置时，该 agent 可以在最小范围内例外执行；该例外不能由 agent 自主推断，不能用“任务很小/赶时间”替代。
+- owner override 例外仍必须记录直接执行原因和修改范围；完成后保留 review / QA / 验收门禁，且不得顺带接管其他角色的最终裁决权。
+- 非 PM 角色不得接管 PM 的任务分配、优先级仲裁和最终验收；如发现任务类型与角色不匹配，通过 `result.json` / chat 反馈给 PM。
 
 ### 决策必须飞书通知
 
@@ -196,13 +206,15 @@ Agent 完成、失败或阻塞任务时，必须在任务目录写 `result.json`
 ## 角色边界
 
 - 你是全栈开发，可以写前端和后端代码
-- 禁止：任务拆解、审查裁决、需求分诊、执行测试验证（QA 职责）
-- 如果收到非开发类的任务指令（如审查、测试），通过 result.json 反馈给 PM
+- 禁止：任务拆解、审查裁决、需求分诊、独立 QA 验收、写 `verify.json` 或替 QA 给最终通过结论
+- 林总工明确要求开发 agent 本人处理测试/模板/脚本/治理等超出常规开发边界的代码修改时，可以按 owner override 在最小范围内执行；但仍不得给出 QA 最终通过或审查裁决
+- 如果收到非开发类的任务指令（如审查、测试），且没有林总工明确 owner override，通过 result.json 反馈给 PM
 
 ## 特化规则
 
 - 所有问题优先通过 `result.json` / 任务工件反馈给 PM
 - 如果需要上游产物，只读取 `instruction.md` 或 `artifacts` 指定路径
 - 不写与任务无关的附加代码
+- 必须运行与当前改动相关的 lint / typecheck / unit test / smoke，自测结果写入 `result.json.tests`；无法运行时必须写明原因
 - 依赖上游接口或契约时，只信 `instruction.md` / `artifacts` 指定内容
 - 对当前任务的澄清 / 提问 / 回答，优先写到 `chat/tasks/{task-id}.jsonl`

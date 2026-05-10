@@ -69,9 +69,10 @@ cd /Users/lin/Desktop/work/my-agent-teams/agents/qa-1
 cd /Users/lin/Desktop/work/my-agent-teams/agents/review-1
 ```
 
-各 agent 启动后先读取各自目录下的角色文件再按其中规则工作：
-- Claude Code：`CLAUDE.md`（`pm-chief`、`qa-1`）
-- Codex：`AGENT.md`（`arch-1`、`dev-1`、`dev-2`、`review-1`）
+各 agent 启动后先读取各自目录下与运行时匹配的角色文件再按其中规则工作：
+- Claude Code 自动读取：`CLAUDE.md`
+- Codex 自动读取：`AGENT.md`
+- 每个 agent 目录都同时保留 `AGENT.md` 和 `CLAUDE.md`，林总工可按规划切换运行时。
 
 > ⚠️ agent 角色文件由模板自动生成，请勿手动编辑。见下方「角色模板系统」。
 
@@ -402,17 +403,23 @@ my-agent-teams/
 ├── AGENTS.md                        # 根共享规则（Codex）
 ├── agents/                          # agent 独立工作目录
 │   ├── pm-chief/
-│   │   └── AGENT.md                 # PM 角色文件（自动生成）
+│   │   ├── AGENT.md                 # PM 角色文件（Codex，自动生成）
+│   │   └── CLAUDE.md                # PM 角色文件（Claude Code，自动生成）
 │   ├── arch-1/
-│   │   └── AGENT.md                 # 架构师角色文件（自动生成）
+│   │   ├── AGENT.md                 # 架构师角色文件（Codex，自动生成）
+│   │   └── CLAUDE.md                # 架构师角色文件（Claude Code，自动生成）
 │   ├── dev-1/
-│   │   └── AGENT.md                 # 全栈开发角色文件（自动生成）
+│   │   ├── AGENT.md                 # 全栈开发角色文件（Codex，自动生成）
+│   │   └── CLAUDE.md                # 全栈开发角色文件（Claude Code，自动生成）
 │   ├── dev-2/
-│   │   └── AGENT.md                 # 全栈开发角色文件（自动生成）
+│   │   ├── AGENT.md                 # 全栈开发角色文件（Codex，自动生成）
+│   │   └── CLAUDE.md                # 全栈开发角色文件（Claude Code，自动生成）
 │   ├── qa-1/
-│   │   └── CLAUDE.md                # QA 角色文件（自动生成）
+│   │   ├── AGENT.md                 # QA 角色文件（Codex，自动生成）
+│   │   └── CLAUDE.md                # QA 角色文件（Claude Code，自动生成）
 │   └── review-1/
-│       └── AGENT.md                 # 审查角色文件（自动生成）
+│       ├── AGENT.md                 # 审查角色文件（Codex，自动生成）
+│       └── CLAUDE.md                # 审查角色文件（Claude Code，自动生成）
 ├── tasks/                           # 所有任务
 │   ├── _system/                     # watcher 运行时状态
 │   │   ├── notifications.jsonl      # 通知记录
@@ -534,7 +541,7 @@ my-agent-teams/
 
 ## 角色模板系统
 
-所有 agent 的行为准则统一由 `design/agent-templates/` 下的模板管理，**不要手动编辑 agent 目录下的 AGENT.md / CLAUDE.md**。
+所有 agent 的行为准则统一由 `design/agent-templates/` 下的模板管理，**不要手动编辑 agent 目录下的 AGENT.md / CLAUDE.md**。每个 agent 同时生成两个入口文件：`AGENT.md` 供 Codex 使用，`CLAUDE.md` 供 Claude Code 使用。
 
 ### 模板结构
 

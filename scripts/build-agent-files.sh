@@ -47,11 +47,12 @@ build_agent() {
     echo "> 通用规则来自 design/agent-templates/base.md"
     echo "> 角色规则来自 design/agent-templates/${role_template}.md"
     echo "> 如需修改，请编辑模板文件后重新运行构建脚本。"
+    echo "> 同一 agent 同时生成 AGENT.md 与 CLAUDE.md，林总工可按运行时规划选择 Codex 或 Claude Code。"
     echo ""
     echo "你是 \`${agent_id}\`（${role_template} 角色）。你的角色身份由本文件确定，不依赖 tmux session 名，也不从 instruction.md 推断。"
     echo ""
     echo "## 启动后立即执行"
-    echo "1. 读取并遵守共享规则：\`${WORKSPACE}/CLAUDE.md\`"
+    echo "1. 读取并遵守根共享规则：\`${WORKSPACE}/AGENTS.md\` 与 \`${WORKSPACE}/CLAUDE.md\`（按当前运行时读取对应文件）"
     echo "2. 当前工作目录固定为：\`${target_dir}\`"
     echo "3. 所有共享资源都用绝对路径访问"
     echo ""
@@ -70,13 +71,20 @@ build_agent() {
   count=$((count + 1))
 }
 
-# agent_id, role_template, agent_file
-build_agent "pm-chief" "pm" "AGENT.md"
-build_agent "arch-1" "architect" "AGENT.md"
-build_agent "dev-1" "developer" "AGENT.md"
-build_agent "dev-2" "developer" "AGENT.md"
-build_agent "qa-1" "qa" "CLAUDE.md"
-build_agent "review-1" "reviewer" "AGENT.md"
+build_agent_pair() {
+  local agent_id="$1"
+  local role_template="$2"
+  build_agent "$agent_id" "$role_template" "AGENT.md"
+  build_agent "$agent_id" "$role_template" "CLAUDE.md"
+}
+
+# agent_id, role_template. 每个 agent 同时生成 Codex/Claude 两个入口。
+build_agent_pair "pm-chief" "pm"
+build_agent_pair "arch-1" "architect"
+build_agent_pair "dev-1" "developer"
+build_agent_pair "dev-2" "developer"
+build_agent_pair "qa-1" "qa"
+build_agent_pair "review-1" "reviewer"
 
 echo ""
 echo "Done. $count agent file(s) generated."
