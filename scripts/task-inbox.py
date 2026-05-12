@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE_ROOT = SCRIPT_DIR.parent
+DEFAULT_GOVERNANCE_FILE = WORKSPACE_ROOT / '.omx' / 'task-board' / 'pm-inbox-governance.json'
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
 import task_artifacts  # type: ignore
 
@@ -159,6 +161,16 @@ def sort_key(item: dict) -> tuple:
     )
 
 
+def load_governance_items(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding='utf-8'))
+    except Exception:
+        return []
+    return payload if isinstance(payload, list) else []
+
+
 def print_human(items: list[dict]) -> None:
     by_level = {'L3': 0, 'L2': 0, 'L1': 0}
     for item in items:
@@ -183,6 +195,7 @@ def main() -> int:
     parser.add_argument('--explain', default='')
     parser.add_argument('--dispatch-timeout-seconds', type=int, default=300)
     parser.add_argument('--working-timeout-seconds', type=int, default=1800)
+    parser.add_argument('--governance-file', default=str(DEFAULT_GOVERNANCE_FILE))
     args = parser.parse_args()
 
     tasks_root = Path(args.tasks_root).expanduser().resolve()
@@ -190,6 +203,7 @@ def main() -> int:
     items: list[dict] = []
     for task_path in sorted(tasks_root.glob('*/task.json')):
         items.extend(task_items(task_path.parent, now, args.dispatch_timeout_seconds, args.working_timeout_seconds))
+    items.extend(load_governance_items(Path(args.governance_file).expanduser()))
 
     if args.explain:
         items = [item for item in items if item['task_id'] == args.explain]

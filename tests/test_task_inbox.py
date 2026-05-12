@@ -52,6 +52,36 @@ class TaskInboxTests(unittest.TestCase):
         self.assertEqual(timeouts[0]['task_id'], 'deadline-review-task')
         self.assertIn('review_deadline 已过', timeouts[0]['summary'])
 
+    def test_loads_governance_items_from_generated_file(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            governance_path = Path(tmp) / 'pm-inbox-governance.json'
+            governance_path.write_text(json.dumps([
+                {
+                    'item_id': 'task-1:invalid_timeline',
+                    'task_id': 'task-1',
+                    'title': '任务一',
+                    'reason_type': 'invalid_timeline',
+                    'severity': 'L2',
+                    'priority': 'high',
+                    'status': 'ready_for_merge',
+                    'merge_gate_state': 'review_pending',
+                    'summary': '阶段时间倒挂',
+                    'recommended_action': '修正时间线',
+                    'owner': 'pm-chief',
+                    'first_seen_at': '2026-05-09T11:00:00+08:00',
+                    'last_seen_at': '2026-05-09T11:00:00+08:00',
+                    'age_minutes': 5,
+                    'links': {'task_dir': '/tmp/task-1', 'timeline': 'chat/tasks/task-1.jsonl'},
+                }
+            ], ensure_ascii=False), encoding='utf-8')
+
+            items = task_inbox.load_governance_items(governance_path)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['reason_type'], 'invalid_timeline')
+        self.assertEqual(items[0]['summary'], '阶段时间倒挂')
+
 
 if __name__ == '__main__':
     unittest.main()
