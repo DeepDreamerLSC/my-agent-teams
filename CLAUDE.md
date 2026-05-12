@@ -35,7 +35,7 @@
   sleep 0.1
   tmux send-keys -t <session> Enter
   ```
-- **向 Claude Code 会话发消息**（仅 qa-1）：直接 send-keys 即可，不需要 `i`
+- **向 Claude Code 会话发消息**：直接 send-keys 即可，不需要 `i`
 
 ## 项目说明
 
@@ -47,7 +47,7 @@
 - **绝对路径**：访问 `tasks/`、`scripts/`、`config.json`、`prompts/` 等共享资源时，一律使用绝对路径，不依赖当前 cwd。
 - **保护路径**：禁止修改 `/Users/lin/Desktop/work/my-agent-teams/tasks`、`/Users/lin/Desktop/work/my-agent-teams/scripts`、`/Users/lin/Desktop/work/my-agent-teams/prompts`、`/Users/lin/Desktop/work/my-agent-teams/config.json`、根目录 `CLAUDE.md` / `AGENTS.md`，除非上级明确下达此类任务。
 - **write_scope**：只能修改 `task.json.write_scope` 中声明的文件范围。
-- **A-Lite 阶段不互相私聊**：不启用 agent 私聊；但允许所有 agent 在 `chat/general/` 和 `chat/tasks/{task-id}.jsonl` 中公开沟通，不必每条消息都经过 PM 中转。
+- **A-Lite 阶段不互相私聊**：不启用 agent 私聊；允许所有 agent 在 `chat/general/` 和 `chat/tasks/{task-id}.jsonl` 中公开沟通，关键结论必须回写任务上下文。
 
 ## 任务管理流程
 

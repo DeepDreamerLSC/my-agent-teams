@@ -1,8 +1,8 @@
 # 任务协作看板 - 任务拆解
 
-> 创建时间：2026-05-03  
-> 对应方案：`design/任务协作看板优化方案.md`  
-> 目标：把看板优化方案拆成可直接派发给 `dev-1 / dev-2 / arch-1 / qa-1` 的执行任务列表。  
+> 创建时间：2026-05-03
+> 对应方案：`design/task-board/optimization-plan.md`
+> 目标：把看板优化方案拆成可直接派发给 `dev-1 / dev-2 / arch-1 / qa-1` 的执行任务列表。
 > 原则：**第一期拆得最细，第二期与第三期先保持粗粒度。**
 
 ---
@@ -37,7 +37,7 @@
 - **指派角色**：`arch-1`
 - **前置依赖**：无
 - **具体要做的事**：
-  1. 细化 `design/任务协作看板优化方案.md` 中的 `communication_events` 字段定义
+  1. 细化 `design/task-board/optimization-plan.md` 中的 `communication_events` 字段定义
   2. 明确以下来源如何映射为统一事件：
      - `chat/general/*.jsonl`
      - `chat/tasks/*.jsonl`
@@ -47,8 +47,8 @@
   3. 明确 event_type / source_type / severity / priority 的枚举与口径
   4. 明确哪些字段属于事实源，哪些字段属于派生字段
 - **涉及文件**：
-  - `design/任务协作看板优化方案.md`
-  - 如需新增补充文档：`design/任务协作看板-事件模型补充.md`
+  - `design/task-board/optimization-plan.md`
+  - 如需新增补充文档：`design/task-board/optimization-plan.md#事件模型`
 - **验收标准**：
   - 对每一种消息来源，都能映射到统一事件模型
   - dev-2 可以据此直接建表和写 ingest 代码
@@ -65,8 +65,8 @@
   2. 明确老库增表 / 加索引 / 回填 / rebuild-all 语义
   3. 给 dev-2 输出可执行迁移边界
 - **涉及文件**：
-  - `design/任务协作看板优化方案.md`
-  - `design/任务协作看板-迁移策略.md`
+  - `design/task-board/optimization-plan.md`
+  - `design/task-board/migration-strategy.md`
 - **验收标准**：
   - 明确 `SCHEMA_VERSION` 的代码版本 / 库版本语义
   - 明确哪些变更允许自动 migrate，哪些场景默认 rebuild
@@ -82,11 +82,11 @@
 - **前置依赖**：`PH1-01`
 - **具体要做的事**：
   1. 明确 `event_type / event_class / source_type / severity / priority`
-  2. 对齐 `design/Chat-Hub-协议补充.md` 与看板 ingest 口径
+  2. 对齐 `design/chat-hub/protocol.md` 与看板 ingest 口径
   3. 明确 general/task/system 事件的 timeline 排序与归属规则
 - **涉及文件**：
-  - `design/Chat-Hub-协议补充.md`
-  - `design/任务协作看板优化方案.md`
+  - `design/chat-hub/protocol.md`
+  - `design/task-board/optimization-plan.md`
 - **验收标准**：
   - dev-2 写 ingest 时无需自行猜测 watcher / dispatch / nudge 的字段格式
 
@@ -147,7 +147,7 @@
 ---
 
 ## PH1-04 扩展同步脚本：支持 sync-chat / rebuild-all
-- **架构前提**：`rebuild-all` 仅在 `design/任务协作看板-迁移策略.md` 定义为允许的环境下开放；共享库默认不得把它当普通同步命令。
+- **架构前提**：`rebuild-all` 仅在 `design/task-board/migration-strategy.md` 定义为允许的环境下开放；共享库默认不得把它当普通同步命令。
 - **任务标题**：扩展 task-board-sync 脚本支持 chat 同步与统一重建入口
 - **指派角色**：`dev-2`
 - **前置依赖**：`PH1-03`
@@ -234,8 +234,8 @@
   3. 定义字段命名，避免前后端口径分裂
   4. 对阶段耗时字段先预留接口位置，允许在 `PH1-06` 完成后补齐
 - **涉及文件**：
-  - `design/任务协作看板优化方案.md`
-  - 如需新增补充：`design/任务协作看板-接口草案.md`
+  - `design/task-board/optimization-plan.md`
+  - 如需新增补充：`design/task-board/optimization-plan.md#接口草案`
 - **验收标准**：
   - dev-1 / dev-2 能直接按此协议对接
   - 一个 payload 足够支撑任务详情抽屉页面
@@ -295,8 +295,8 @@
      - 沟通时间线
   3. 明确时间线卡片字段和视觉层级
 - **涉及文件**：
-  - `design/任务协作看板优化方案.md`
-  - 可补充 `design/任务协作看板-交互草图.md`
+  - `design/task-board/optimization-plan.md`
+  - 可补充 `design/task-board/optimization-plan.md#交互草图`
 - **验收标准**：
   - dev-1 可直接按说明编码，不需要再自行猜 UI 结构
 

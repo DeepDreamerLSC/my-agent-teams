@@ -24,7 +24,7 @@
 也就是说：
 - **任务状态仍看 `tasks/`**
 - **任务讨论开始用 `chat/`**
-- **若后续要把 watcher / dispatch / direct nudge 接到 timeline，请先遵循 `design/Chat-Hub-协议补充.md`，不要在 A-Lite 文档里自行扩字段**
+- **若后续要把 watcher / dispatch / direct nudge 接到 timeline，请先遵循 `design/chat-hub/protocol.md`，不要在 A-Lite 文档里自行扩字段**
 
 ---
 
@@ -33,7 +33,7 @@
 ## 二点五、协议补充阅读要求
 
 - 若任务涉及 chat 协议、看板 ingest、system 通知、severity / priority 口径，必须同时阅读：
-  - `design/Chat-Hub-协议补充.md`
+  - `design/chat-hub/protocol.md`
 - 当前验证期主验证对象仍是 **human message thread**；system 事件已可写入 `chat/system/...`，但主要用于时间线、审计和指标补强。
 
 ### 1. PM（pm-chief）
@@ -47,7 +47,7 @@
    - 生产故障 / critical 任务
    - 多人讨论后仍无法收敛
 4. 每天更新一次：
-   - `design/Chat-Hub-验证记录模板.md`
+   - `design/chat-hub/validation-record-template.md`
 
 #### PM 示例
 ```bash
@@ -189,7 +189,7 @@ PM 每天至少记录一次：
 - 有没有“chat 明明有，但大家还是回来找 PM”的情况
 
 统一模板：
-- `design/Chat-Hub-验证记录模板.md`
+- `design/chat-hub/validation-record-template.md`
 
 ### 6.5 指标采集建议
 可结合脚本：

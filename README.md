@@ -35,7 +35,7 @@ PM（pm-chief）— 需求分析、任务拆解、进度跟踪、决策通知
 - Codex agent 目录读取当前工作目录下的 `AGENT.md`
 - 根目录 `CLAUDE.md` / `AGENTS.md` 只保留**通用规则**
 - `instruction.md` 回归纯任务描述：只写做什么、改哪些文件、验收标准，不再注入角色身份
-- `tasks/`、`scripts/`、`config.json`、`prompts/` 等共享资源统一通过**绝对路径**访问
+- `tasks/`、`scripts/`、`config.json`、`design/agent-templates/` 等共享资源统一通过**绝对路径**访问
 - 新任务 ID 必须使用中文标题式名称，例如：`修复Word生成质量问题`、`Agent目录隔离方案`
 - `T-001` 这类旧编号和纯英文 slug 不允许用于新建任务
 
@@ -89,7 +89,7 @@ SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh >
 ### 3. 创建任务
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh 实现用户登录页 "实现用户登录页" fe-1 frontend chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
+/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh 实现用户登录页 "实现用户登录页" dev-1 development chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
 ```
 
 这会创建 `tasks/实现用户登录页/` 目录，包含：
@@ -443,17 +443,13 @@ my-agent-teams/
 │   ├── task-watcher-watchdog.sh     # task-watcher 守护进程
 │   ├── task-board-sync.py           # 看板数据同步
 │   └── build-agent-files.sh         # 从模板生成所有 agent 角色文件
-├── prompts/                         # 角色 Prompt
-│   ├── pm-base.md                   # PM
-│   ├── architect-base.md            # 架构师
-│   ├── frontend-dev-base.md         # 前端开发
-│   ├── backend-dev-base.md          # 后端开发
-│   ├── qa-base.md                   # 测试
-│   └── reviewer-base.md             # 审查
+├── prompts/                         # 旧角色 Prompt 兼容目录；当前内容已归档到 design/archive/prompts/
 └── design/                          # 设计文档
-    ├── OpenClaw-tmux协作方案优化.md   # 主方案（v12）
-    ├── 分层PM演进方案.md             # 分层 PM 演进
-    ├── 任务看板系统方案.md           # 看板系统设计
+    ├── README.md                    # 文档索引
+    ├── collaboration/               # 协作架构、任务池、共享上下文
+    ├── chat-hub/                    # Chat Hub 协议、使用说明、验证模板
+    ├── task-board/                  # 任务看板设计、迁移、部署
+    ├── archive/                     # 历史方案、审查记录、旧 prompt
     └── agent-templates/             # ⭐ 角色行为准则模板（唯一真相源）
         ├── base.md                  # 通用行为准则（所有 agent 共享）
         ├── pm.md                    # PM 特化规则
@@ -493,8 +489,7 @@ my-agent-teams/
     "hierarchy_ready": true,
     "root_pm": "pm-chief",
     "domains": {
-      "frontend": ["fe-1"],
-      "backend": ["be-1"],
+      "development": ["dev-1", "dev-2", "arch-1"],
       "quality": ["qa-1", "review-1"]
     }
   },
@@ -516,9 +511,9 @@ my-agent-teams/
   "title": "实现用户登录页",
   "status": "pending",
   "task_level": "execution",
-  "domain": "frontend",
+  "domain": "development",
   "owner_pm": "pm-chief",
-  "assigned_agent": "fe-1",
+  "assigned_agent": "dev-1",
   "review_required": true,
   "reviewer": "review-1",
   "test_required": false,
@@ -574,7 +569,7 @@ bash scripts/build-agent-files.sh --dry-run
 - **{role}.md**：角色特化规则（PM 的任务拆解、开发的工作方式等）
 - agent 文件 = 启动信息 + base.md + {role}.md，由构建脚本自动合并
 
-- **保护路径**：agent 不能修改 `tasks/`、`scripts/`、`prompts/`、`config.json`
+- **保护路径**：agent 不能修改 `tasks/`、`scripts/`、`prompts/`、`config.json`；角色规则请改 `design/agent-templates/` 后重新生成
 - **write_scope**：agent 只能修改 task.json 中声明的文件范围
 - **verify 硬检查**：watcher 校验 agent 的实际 diff 是否越界
 - **角色不交叉**：审查者不改代码，开发不做架构决策
@@ -582,9 +577,11 @@ bash scripts/build-agent-files.sh --dry-run
 
 ## 设计参考
 
-- [OpenClaw-tmux协作方案优化.md](design/OpenClaw-tmux协作方案优化.md) — 完整方案文档（v12，2500+ 行）
-- [分层PM演进方案.md](design/分层PM演进方案.md) — 3-5 / 8-10 / 12-15 agent 的组织演进
-- [任务看板系统方案.md](design/任务看板系统方案.md) — 看板系统设计与数据模型
+- [设计文档索引](design/README.md) — 当前入口与归档说明
+- [协作控制面与任务池优化](design/collaboration/control-plane-and-task-pool.md) — 当前最新综合方案
+- [Chat Hub 协议](design/chat-hub/protocol.md) — A-Lite 通信协议与看板桥接契约
+- [任务看板系统方案](design/task-board/system-design.md) — 看板系统设计与数据模型
+- [OpenClaw + tmux 历史方案](design/archive/collaboration/openclaw-tmux-optimization-v15.md) — 历史总方案，作为背景参考
 - [Claude Code 源码分析](https://github.com/dadiaomengmeimei/claude-code-sourcemap-learning-notebook) — 权限模型、Query Loop、Prompt 工程等设计参考
 
 ## 演进路线

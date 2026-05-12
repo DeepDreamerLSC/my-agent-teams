@@ -1,6 +1,6 @@
 # Chat Hub 落地清单
 
-> 基于 `design/OpenClaw-tmux协作方案优化.md` 第 15.5 章的 **A-Lite → 验证期 → B → C** 路线整理。
+> 基于 `design/archive/collaboration/openclaw-tmux-optimization-v15.md` 第 15.5 章的 **A-Lite → 验证期 → B → C** 路线整理。
 > 目标：先验证共享消息区是否能降低 PM 中转负担，再决定是否把 chat 接入任务认领与状态机。
 > 更新时间：2026-05-03
 
@@ -32,7 +32,7 @@
    - 不能把“仍在补 instruction 的任务”直接推进 chat 扩散讨论
 
 6. **协议先于扩展**
-   - 在 A-Lite 继续运行的同时，后续若要把 watcher / dispatch / direct nudge 接入看板，必须先对齐 `design/Chat-Hub-协议补充.md`
+   - 在 A-Lite 继续运行的同时，后续若要把 watcher / dispatch / direct nudge 接入看板，必须先对齐 `design/chat-hub/protocol.md`
    - 不允许由具体脚本各自发明 system event 格式
 
 ---
@@ -61,7 +61,7 @@
 - **涉及文件**：
   - `chat/general/`
   - `chat/tasks/`
-  - `design/OpenClaw-tmux协作方案优化.md`
+  - `design/archive/collaboration/openclaw-tmux-optimization-v15.md`
   - （可选）`README.md`
 - **预估复杂度**：低
 - **依赖关系**：无
@@ -115,7 +115,7 @@
     - `task_claim` / `task_claim_confirmed` 暂不启用
   - 提供 Lite 版示例 JSONL
 - **涉及文件**：
-  - `design/OpenClaw-tmux协作方案优化.md`
+  - `design/archive/collaboration/openclaw-tmux-optimization-v15.md`
   - （可选）`chat/README.md`
 - **预估复杂度**：低
 - **依赖关系**：A-Lite-2
@@ -190,8 +190,8 @@
     - 生产 / critical 任务是否仍正确走“双通道”（chat + 强制唤醒）
   - 先以手工记录或轻量表格方式收集数据
 - **涉及文件**：
-  - `design/OpenClaw-tmux协作方案优化.md`
-  - （可选）`design/Chat-Hub-验证记录模板.md`
+  - `design/archive/collaboration/openclaw-tmux-optimization-v15.md`
+  - （可选）`design/chat-hub/validation-record-template.md`
 - **预估复杂度**：低
 - **依赖关系**：A-Lite 全部完成后启动
 - **验收标准**：
@@ -231,8 +231,8 @@
     - 派发前定义质量是否提升（例如 instruction 是否更少二次补写、超时是否减少）
   - 输出 go / no-go 结论
 - **涉及文件**：
-  - `design/OpenClaw-tmux协作方案优化.md`
-  - （可选）`design/Chat-Hub-验证复盘.md`
+  - `design/archive/collaboration/openclaw-tmux-optimization-v15.md`
+  - （可选）`design/chat-hub/validation-retro-template.md`
 - **预估复杂度**：中
 - **依赖关系**：V-2
 - **验收标准**：
@@ -585,7 +585,7 @@
 - **标题**：补充 Chat Hub 协议补充文档（schema_version / system event / severity）
 - **状态**：已完成（2026-05-03）
 - **描述**：
-  - 新增 `design/Chat-Hub-协议补充.md`
+  - 新增 `design/chat-hub/protocol.md`
   - 明确：
     - `schema_version`
     - `event_class`
@@ -593,9 +593,9 @@
     - `priority` 与 `severity` 的分工
     - 与看板 `communication_events` 的映射
 - **涉及文件**：
-  - `design/Chat-Hub-协议补充.md`
-  - `design/Chat-Hub-A-Lite-验证使用说明.md`
-  - `design/Chat-Hub-落地清单.md`
+  - `design/chat-hub/protocol.md`
+  - `design/chat-hub/a-lite-usage.md`
+  - `design/chat-hub/implementation-checklist.md`
 - **预估复杂度**：低
 - **依赖关系**：A-Lite-3
 - **验收标准**：

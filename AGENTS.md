@@ -47,7 +47,7 @@
 - **绝对路径**：访问 `tasks/`、`scripts/`、`config.json`、`prompts/` 等共享资源时，一律使用绝对路径，不依赖当前 cwd。
 - **保护路径**：禁止修改 `/Users/lin/Desktop/work/my-agent-teams/tasks`、`/Users/lin/Desktop/work/my-agent-teams/scripts`、`/Users/lin/Desktop/work/my-agent-teams/prompts`、`/Users/lin/Desktop/work/my-agent-teams/config.json`、根目录 `CLAUDE.md` / `AGENTS.md`，除非上级明确下达此类任务。
 - **write_scope**：只能修改 `task.json.write_scope` 中声明的文件范围。
-- **不互相私聊**：所有 agent 通过 PM 中转，不直接给其他 agent 发消息。
+- **A-Lite 阶段不互相私聊**：不启用 agent 私聊；允许所有 agent 在 `chat/general/` 和 `chat/tasks/{task-id}.jsonl` 中公开沟通，关键结论必须回写任务上下文。
 
 ## 任务管理流程
 
@@ -89,7 +89,7 @@ tasks/{task-id}/
 - `id`：任务 ID
 - `title`：任务标题
 - `status`：当前状态
-- `domain`：frontend / backend / quality
+- `domain`：development / quality
 - `assigned_agent`：唯一执行者
 - `review_required`：是否需要审查
 - `review_authority`：reviewer（审查者闭环）或 owner（林总工决策）

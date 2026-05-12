@@ -140,7 +140,7 @@
 在开始实现前，补充以下收敛原则：
 
 1. **事件协议先对齐，再写 ingest**
-   - `communication_events` 必须直接复用 `design/Chat-Hub-协议补充.md` 中的：
+   - `communication_events` 必须直接复用 `../chat-hub/protocol.md` 中的：
      - `schema_version`
      - `event_class`
      - `source_type`
@@ -697,7 +697,7 @@ task_stage_durations (
 2. 对线上/共享环境保留 schema version 检查与失败退出
 3. 将 migration 视为第一阶段的显式工作项，而不是藏在 `db.py` 的顺手修改里
 
-> 详见：`design/任务协作看板-迁移策略.md`。该文档定义了 schema version、migrate / backfill / rebuild-all 的边界，以及哪些变更可自动迁移、哪些场景应优先重建。
+> 详见：`design/task-board/migration-strategy.md`。该文档定义了 schema version、migrate / backfill / rebuild-all 的边界，以及哪些变更可自动迁移、哪些场景应优先重建。
 
 ### 现有文件建议扩展
 - `dashboard/db.py`

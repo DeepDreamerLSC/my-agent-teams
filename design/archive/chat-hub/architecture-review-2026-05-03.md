@@ -2,10 +2,10 @@
 
 > 审查时间：2026-05-03  
 > 审查对象：
-> 1. `design/Chat-Hub-A-Lite-验证使用说明.md`
-> 2. `design/Chat-Hub-落地清单.md`
-> 3. `design/Chat-Hub-验证复盘模板.md`
-> 4. `design/Chat-Hub-验证记录模板.md`
+> 1. `design/chat-hub/a-lite-usage.md`
+> 2. `design/chat-hub/implementation-checklist.md`
+> 3. `design/chat-hub/validation-retro-template.md`
+> 4. `design/chat-hub/validation-record-template.md`
 >
 > 对照现有实现：`chat/`、`chat/README.md`、`scripts/send-chat.sh`、`scripts/lint-chat.sh`、`scripts/read-chat.sh`、`scripts/pm-chat-check.sh`、`scripts/task-watcher.sh`、`scripts/dispatch-task.sh`、`scripts/send-to-agent.sh`
 
@@ -169,7 +169,7 @@ Chat Hub 文档也多次强调：
 
 ### 2.2.3 当前最大缺口：没有“桥接契约”
 建议新增一份桥接文档，例如：
-- `design/Chat-Hub-事件协议补充.md`
+- `design/chat-hub/protocol.md`
 
 至少定义：
 
@@ -442,7 +442,7 @@ A-Lite 可以先不做，但文档应说明：
 
 ## 2.6.1 建议新增一份《Chat Hub 协议补充》文档
 建议新增：
-- `design/Chat-Hub-协议补充.md`
+- `design/chat-hub/protocol.md`
 
 至少定义：
 1. `schema_version`
@@ -533,7 +533,7 @@ A-Lite 可以先不做，但文档应说明：
 ## 三、建议的优先级
 
 ### P0（建议立即补）
-1. 新增 `design/Chat-Hub-协议补充.md`
+1. 新增 `design/chat-hub/protocol.md`
 2. 文档明确：A-Lite 当前只有 human 生产路径，system 仅为预留
 3. 文档明确：双通道目前是操作规范，不是自动闭环
 4. 验证模板增加协议质量指标

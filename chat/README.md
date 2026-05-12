@@ -138,7 +138,7 @@ chat/
 - `priority` = 任务/消息的重要程度
 - `severity` = 事件严重度（`info/degraded/critical`）
 
-更多约束见：`design/Chat-Hub-协议补充.md`。
+更多约束见：`../design/chat-hub/protocol.md`。
 
 ### system 事件生产路径
 - `send-chat.sh` 现已支持：
