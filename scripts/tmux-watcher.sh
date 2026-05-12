@@ -19,10 +19,8 @@ KEYWORDS=(
     "Allow the omx_memory"
 )
 DANGEROUS_KEYWORDS=(
-    "don't ask again"
     "make the following edits"
     "Would you like to make the following edits?"
-    "Yes, and don't ask again"
 )
 INTERVAL=3
 STATE_DIR="/Users/lin/.openclaw/workspace/.tmux-watcher"
@@ -124,6 +122,32 @@ while true; do
         done
 
         [ "$matched" -eq 0 ] && continue
+
+        # 判断确认弹窗是否还是活跃状态：只有当 approved 行出现在 confirm 行之后才算已处理
+        # 找最后一个 "Press enter to confirm" 的行号
+        confirm_line=0
+        line_num=0
+        while IFS= read -r aline; do
+            line_num=$((line_num + 1))
+            case "$aline" in
+                *"Press enter to confirm"*|*"enter to confirm"*)
+                    confirm_line=$line_num
+                    ;;
+            esac
+        done <<< "$bottom_lines"
+
+        # 找 confirm 行之后有没有 approved 行
+        already_approved=0
+        if [ "$confirm_line" -gt 0 ]; then
+            tail_after=$(printf '%s\n' "$bottom_lines" | tail -n +$((confirm_line + 1)))
+            if printf '%s\n' "$tail_after" | grep -Eq '✔.*(approved)'; then
+                already_approved=1
+            fi
+        fi
+
+        if [ "$already_approved" -eq 1 ]; then
+            continue
+        fi
 
         dangerous_match=0
         dangerous_kw=""

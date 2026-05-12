@@ -87,6 +87,16 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
 - 如果发现新文件，读取内容并判断是否需要响应
 - 主动检查不算"被通知"，不需要写入 scratchpad-notified.json
 
+### tmux 会话识别注意事项
+
+- 通过 tmux 判断其他 agent 是否在线/是否存在会话时，**不能把一次 `tmux has-session` / `tmux ls` 失败直接等同于会话不存在**。
+- 在 Codex/Claude 的沙箱或受限环境中，访问 tmux socket 可能因权限或 socket 可见性问题失败，即使目标 session 实际存在。
+- 若会话存在性会影响任务状态判断（例如是否转 blocked、是否重派、是否超时催办），必须先做至少一种复核：
+  1. 使用提权方式读取真实 tmux server；
+  2. 检查当前 `TMUX` 环境变量与 socket 路径；
+  3. 通过其他可信迹象确认（pane capture、task ack/result 进展、watcher 队列状态）。
+- 只有在完成复核后，才能把“会话离线”作为正式事实写入 `task.json` 或用于 PM 仲裁。
+
 ### Chat Hub（A-Lite）
 
 - 当前启用的是 **A-Lite**：只使用
