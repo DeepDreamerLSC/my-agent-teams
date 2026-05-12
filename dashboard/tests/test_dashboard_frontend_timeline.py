@@ -248,7 +248,8 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
               endDay: range.end.getDate(),
               startHour: range.start.getHours(),
               endHour: range.end.getHours(),
-              colors: mod.GANTT_PHASES.map(phase => phase.color)
+              colors: mod.GANTT_PHASES.map(phase => phase.color),
+              labels: mod.GANTT_PHASES.map(phase => phase.label)
             }}));
             """
         )
@@ -259,3 +260,21 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertEqual(result["startHour"], 0)
         self.assertEqual(result["endHour"], 23)
         self.assertEqual(result["colors"], ["#1677ff", "#13c2c2", "#722ed1", "#faad14", "#52c41a", "#ff4d4f"])
+        self.assertEqual(result["labels"][3], "等待审查/验收")
+
+    def test_gantt_default_mode_is_near_7_days(self):
+        script = textwrap.dedent(
+            f"""
+            const mod = require({json.dumps(str(DASHBOARD_JS))});
+            const range = mod.getGanttDateRange({{ mode: '7d' }}, new Date(2026, 4, 7, 12, 0, 0));
+            console.log(JSON.stringify({{
+              label: range.label,
+              startDay: range.start.getDate(),
+              endDay: range.end.getDate()
+            }}));
+            """
+        )
+        result = _run_node(script)
+        self.assertEqual(result["label"], "近七天")
+        self.assertEqual(result["startDay"], 1)
+        self.assertEqual(result["endDay"], 7)

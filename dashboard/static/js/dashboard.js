@@ -39,7 +39,7 @@ const GANTT_PHASES = [
   { key: 'created', label: '创建', color: '#1677ff' },
   { key: 'dispatched', label: '派发', color: '#13c2c2' },
   { key: 'ack', label: '接单', color: '#722ed1' },
-  { key: 'completed', label: '交付', color: '#faad14' },
+  { key: 'completed', label: '等待审查/验收', color: '#faad14' },
   { key: 'review_completed', label: '审查通过', color: '#52c41a' },
   { key: 'verify_completed', label: '验证通过', color: '#ff4d4f' },
 ]
@@ -67,7 +67,13 @@ const ganttFilterHint = docRef ? docRef.getElementById('gantt-filter-hint') : nu
 let currentDetailTaskId = null
 let latestBoardPayload = null
 let latestGanttPayload = null
-let ganttFilterState = { mode: 'all', customStart: '', customEnd: '' }
+
+function initDashboardChart(el) {
+  if (!el || typeof echarts === 'undefined') return null
+  const existing = echarts.getInstanceByDom ? echarts.getInstanceByDom(el) : null
+  return existing || echarts.init(el, 'dark')
+}
+let ganttFilterState = { mode: '7d', customStart: '', customEnd: '' }
 
 // --- Tab switching ---
 if (docRef) {
@@ -279,6 +285,15 @@ function getGanttDateRange(state = ganttFilterState, now = new Date()) {
 }
 
 function getTaskGanttIntervals(task) {
+  const segments = Array.isArray(task?.phase_segments) ? task.phase_segments.filter(Boolean) : []
+  if (segments.length) {
+    return segments.map(segment => {
+      const start = new Date(segment.start_at)
+      const end = new Date(segment.end_at)
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null
+      return { start, end }
+    }).filter(Boolean)
+  }
   const milestones = (task && task.milestones) || {}
   return GANTT_PHASES.map((phase, index) => {
     const start = milestones[phase.key]
@@ -359,11 +374,15 @@ function renderGantt(ganttPayload) {
 
   const existingChart = echarts.getInstanceByDom ? echarts.getInstanceByDom(el) : null
   if (!existingChart) el.innerHTML = ''
-  const chart = existingChart || echarts.init(el)
+  const chart = existingChart || initDashboardChart(el)
   const sorted = [...items].sort((a, b) => new Date(a.display_start_at || a.milestones.created) - new Date(b.display_start_at || b.milestones.created))
 
   const categories = sorted.map(t => t.title.length > 16 ? t.title.slice(0, 16) + '…' : t.title)
-  const baseTime = Math.min(...sorted.map(t => new Date(t.milestones.created).getTime()))
+  const baseTime = Math.min(...sorted.map(t => {
+    const segments = Array.isArray(t.phase_segments) ? t.phase_segments : []
+    const firstStart = segments[0]?.start_at || t.display_start_at || t.milestones.created
+    return new Date(firstStart).getTime()
+  }))
 
   const phases = GANTT_PHASES
 
@@ -372,19 +391,22 @@ function renderGantt(ganttPayload) {
     type: 'custom',
     renderItem: renderGanttBar,
     data: sorted.map((t, i) => {
-      const start = t.milestones[phase.key]
-      const nextPhase = phases.slice(phases.indexOf(phase) + 1).find(p => t.milestones[p.key])
-      const end = nextPhase ? t.milestones[nextPhase.key] : (start ? new Date(new Date(start).getTime() + 1800000).toISOString() : null)
+      const segment = (Array.isArray(t.phase_segments) ? t.phase_segments : []).find(item => item.key === phase.key)
+      const start = segment?.start_at || null
+      const end = segment?.end_at || null
       const startOffset = start ? (new Date(start).getTime() - baseTime) / 3600000 : null
       const endOffset = end ? (new Date(end).getTime() - baseTime) / 3600000 : null
+      const durationHours = Number(segment?.duration_hours || 0)
+      const isLongReviewWait = phase.key === 'completed' && durationHours > 24
       return {
         value: [i, startOffset, endOffset, start, end],
-        itemStyle: { color: phase.color },
+        itemStyle: { color: isLongReviewWait ? '#ff4d4f' : (segment?.color || phase.color) },
       }
     }),
   }))
 
   chart.setOption({
+    backgroundColor: 'transparent',
     tooltip: {
       formatter(params) {
         const t = sorted[params.value[0]]
@@ -442,8 +464,9 @@ function renderAgentStats(agentsPayload) {
   const readyCounts = agents.map(s => s.ready_for_merge_count || 0)
   const workHours = agents.map(s => (s.total_tracked_work_seconds || 0) / 3600)
 
-  const taskChart = echarts.init(document.getElementById('agent-tasks-chart'))
+  const taskChart = initDashboardChart(document.getElementById('agent-tasks-chart'))
   taskChart.setOption({
+    backgroundColor: 'transparent',
     title: { text: 'Agent 任务统计', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     legend: { data: ['已完成', '当前负载', '待合入'], top: 30 },
@@ -457,8 +480,9 @@ function renderAgentStats(agentsPayload) {
     ],
   })
 
-  const loadChart = echarts.init(document.getElementById('agent-load-chart'))
+  const loadChart = initDashboardChart(document.getElementById('agent-load-chart'))
   loadChart.setOption({
+    backgroundColor: 'transparent',
     title: { text: 'Agent 工作时长 (小时)', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis', formatter: p => `${p[0].name}: ${p[0].value.toFixed(1)}h` },
     grid: { left: 60, right: 20, top: 50, bottom: 30 },
@@ -772,7 +796,7 @@ function renderTrendChart(daily) {
     return
   }
 
-  const chart = echarts.init(el)
+  const chart = initDashboardChart(el)
   const dates = metrics.map(m => m.metric_date || '')
   const completionRates = metrics.map(m => m.completion_rate != null ? (m.completion_rate * 100).toFixed(1) : null)
   const blockedRates = metrics.map(m => m.blocked_rate != null ? (m.blocked_rate * 100).toFixed(1) : null)
@@ -780,6 +804,7 @@ function renderTrendChart(daily) {
   const completedCounts = metrics.map(m => m.completed_task_count || 0)
 
   chart.setOption({
+    backgroundColor: 'transparent',
     title: { text: '日指标趋势', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     legend: { data: ['完成率(%)', '阻塞率(%)', '创建数', '完成数'], top: 30 },
@@ -817,11 +842,12 @@ function renderDimensionChart(el, title, data) {
     el.innerHTML = `<div class="empty-state">${title}：暂无数据</div>`
     return
   }
-  const chart = echarts.init(el)
+  const chart = initDashboardChart(el)
   const values = keys.map(k => data[k])
   const colors = ['#1677ff', '#52c41a', '#faad14', '#722ed1', '#ff4d4f', '#13c2c2', '#eb2f96']
 
   chart.setOption({
+    backgroundColor: 'transparent',
     title: { text: title, left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     legend: { orient: 'vertical', left: 'left', top: 40, type: 'scroll' },
@@ -844,13 +870,14 @@ function renderRoleEfficiencyChart(agentEff) {
     return
   }
 
-  const chart = echarts.init(el)
+  const chart = initDashboardChart(el)
   const names = agentEff.map(a => a.agentId)
   const completed = agentEff.map(a => a.completed)
   const workHours = agentEff.map(a => Math.round(a.workHours * 10) / 10)
   const comms = agentEff.map(a => a.communications)
 
   chart.setOption({
+    backgroundColor: 'transparent',
     title: { text: '角色效率对比', left: 'center', textStyle: { fontSize: 14 } },
     tooltip: { trigger: 'axis' },
     legend: { data: ['已完成任务', '工作时长(h)', '沟通记录'], top: 30 },

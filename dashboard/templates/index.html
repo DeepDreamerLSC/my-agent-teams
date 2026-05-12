@@ -44,10 +44,10 @@
     <section id="gantt" class="view">
       <div class="filters-bar gantt-filters" id="gantt-filters" aria-label="甘特图时间筛选">
         <div class="gantt-range-buttons" role="group" aria-label="快捷时间范围">
-          <button type="button" class="gantt-range-btn active" data-gantt-range="all">全部</button>
+          <button type="button" class="gantt-range-btn" data-gantt-range="all">全部</button>
           <button type="button" class="gantt-range-btn" data-gantt-range="today">今天</button>
           <button type="button" class="gantt-range-btn" data-gantt-range="3d">近三天</button>
-          <button type="button" class="gantt-range-btn" data-gantt-range="7d">近七天</button>
+          <button type="button" class="gantt-range-btn active" data-gantt-range="7d">近七天</button>
           <button type="button" class="gantt-range-btn" data-gantt-range="30d">近一个月</button>
           <button type="button" class="gantt-range-btn" data-gantt-range="custom">自定义</button>
         </div>
@@ -56,7 +56,7 @@
           <span class="gantt-date-separator">至</span>
           <input id="gantt-end-date" type="date" aria-label="甘特图结束日期">
         </div>
-        <span id="gantt-filter-hint" class="gantt-filter-hint">显示全部时间</span>
+        <span id="gantt-filter-hint" class="gantt-filter-hint">近七天</span>
       </div>
       <div id="gantt-chart" class="chart-container"></div>
     </section>

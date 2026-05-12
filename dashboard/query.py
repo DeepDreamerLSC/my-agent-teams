@@ -9,6 +9,7 @@ from typing import Any
 
 ACTIVE_LOAD_STATUSES = {'pending', 'dispatched', 'working', 'blocked'}
 BLOCKED_AGGREGATE_STATUSES = {'blocked', 'failed', 'cancelled', 'timeout'}
+TERMINAL_GANTT_STATUSES = {'done', 'merged', 'archived', 'cancelled', 'failed', 'timeout'}
 READ_ONLY_AGGREGATE_DIMENSIONS = (
     'owner_pm',
     'domain',
@@ -43,6 +44,102 @@ def _duration_hours(seconds: float | None) -> float | None:
     if seconds is None:
         return None
     return round(seconds / 3600, 3)
+
+
+def _is_skip_review_task(task: dict[str, Any]) -> bool:
+    review_level = str(task.get('review_level') or '').strip().lower()
+    return not bool(task.get('review_required')) or review_level == 'skip'
+
+
+def _gantt_end_reference(task: dict[str, Any], generated_at: str) -> str | None:
+    if task.get('current_status') in TERMINAL_GANTT_STATUSES or task.get('board_status') == 'done':
+        return (
+            task.get('current_status_at')
+            or task.get('verify_completed_at')
+            or task.get('review_completed_at')
+            or task.get('completed_at')
+            or task.get('ack_at')
+            or task.get('dispatched_at')
+            or task.get('created_at')
+        )
+    return generated_at
+
+
+def _append_phase_segment(segments: list[dict[str, Any]], *, key: str, label: str, color: str, start: str | None, end: str | None) -> None:
+    if not start or not end:
+        return
+    duration_seconds = _seconds_between(start, end)
+    if duration_seconds is None or duration_seconds <= 0:
+        return
+    segments.append({
+        'key': key,
+        'label': label,
+        'color': color,
+        'start_at': start,
+        'end_at': end,
+        'duration_seconds': duration_seconds,
+        'duration_hours': _duration_hours(duration_seconds),
+    })
+
+
+def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list[dict[str, Any]]:
+    end_reference = _gantt_end_reference(task, generated_at)
+    skip_review = _is_skip_review_task(task)
+    segments: list[dict[str, Any]] = []
+
+    _append_phase_segment(
+        segments,
+        key='created',
+        label='创建',
+        color='#1677ff',
+        start=task.get('created_at'),
+        end=task.get('dispatched_at'),
+    )
+    _append_phase_segment(
+        segments,
+        key='dispatched',
+        label='派发',
+        color='#13c2c2',
+        start=task.get('dispatched_at'),
+        end=task.get('ack_at'),
+    )
+    _append_phase_segment(
+        segments,
+        key='ack',
+        label='接单',
+        color='#722ed1',
+        start=task.get('ack_at'),
+        end=task.get('completed_at') or end_reference,
+    )
+
+    if not skip_review:
+        review_wait_end = task.get('review_completed_at') or task.get('verify_completed_at') or end_reference
+        _append_phase_segment(
+            segments,
+            key='completed',
+            label='等待审查/验收',
+            color='#faad14',
+            start=task.get('completed_at'),
+            end=review_wait_end,
+        )
+
+    _append_phase_segment(
+        segments,
+        key='review_completed',
+        label='审查通过',
+        color='#52c41a',
+        start=task.get('review_completed_at'),
+        end=task.get('verify_completed_at') or end_reference,
+    )
+    _append_phase_segment(
+        segments,
+        key='verify_completed',
+        label='验证通过',
+        color='#ff4d4f',
+        start=task.get('verify_completed_at'),
+        end=end_reference,
+    )
+    return segments
 
 
 def _persisted_stage_durations_from_row(row: sqlite3.Row) -> dict[str, float | None]:
@@ -417,10 +514,31 @@ def build_gantt_payload(
         milestone_completed = task['completed_at']
         milestone_review = task['review_completed_at']
         milestone_verify = task['verify_completed_at']
-        span_start = milestone_ack or milestone_dispatched or milestone_created
-        span_end = milestone_review or milestone_verify or milestone_completed or (
-            generated_at if task['board_status'] in {'pending', 'working', 'blocked'} else task['current_status_at']
-        )
+        phase_segments = _build_gantt_phase_segments(task, generated_at)
+        end_reference = _gantt_end_reference(task, generated_at)
+        if (
+            not _is_skip_review_task(task)
+            and task.get('completed_at')
+            and end_reference
+            and not any(segment['key'] == 'completed' for segment in phase_segments)
+            and _seconds_between(task.get('completed_at'), end_reference)
+        ):
+            _append_phase_segment(
+                phase_segments,
+                key='completed',
+                label='等待审查/验收',
+                color='#faad14',
+                start=task.get('completed_at'),
+                end=end_reference,
+            )
+        if phase_segments and end_reference:
+            trailing_gap_seconds = _seconds_between(phase_segments[-1]['end_at'], end_reference)
+            if trailing_gap_seconds:
+                phase_segments[-1]['end_at'] = end_reference
+                phase_segments[-1]['duration_seconds'] = _seconds_between(phase_segments[-1]['start_at'], end_reference)
+                phase_segments[-1]['duration_hours'] = _duration_hours(phase_segments[-1]['duration_seconds'])
+        span_start = phase_segments[0]['start_at'] if phase_segments else (milestone_ack or milestone_dispatched or milestone_created)
+        span_end = phase_segments[-1]['end_at'] if phase_segments else end_reference
         items.append({
             'task_id': task['task_id'],
             'title': task['title'],
@@ -428,10 +546,13 @@ def build_gantt_payload(
             'assigned_agent': task['assigned_agent'],
             'current_status': task['current_status'],
             'board_status': task['board_status'],
+            'review_required': bool(task.get('review_required')),
+            'review_level': task.get('review_level'),
             'display_start_at': span_start,
             'display_end_at': span_end,
             'duration_seconds': _seconds_between(span_start, span_end),
             'communication_count': task.get('communication_count', 0),
+            'phase_segments': phase_segments,
             'milestones': {
                 'created': milestone_created,
                 'dispatched': milestone_dispatched,

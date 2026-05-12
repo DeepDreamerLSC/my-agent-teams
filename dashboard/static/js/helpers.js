@@ -31,7 +31,7 @@ const GANTT_PHASES = [
   { key: 'created', label: '创建', color: '#1677ff' },
   { key: 'dispatched', label: '派发', color: '#13c2c2' },
   { key: 'ack', label: '接单', color: '#722ed1' },
-  { key: 'completed', label: '交付', color: '#faad14' },
+  { key: 'completed', label: '等待审查/验收', color: '#faad14' },
   { key: 'review_completed', label: '审查通过', color: '#52c41a' },
   { key: 'verify_completed', label: '验证通过', color: '#ff4d4f' },
 ]
@@ -124,6 +124,32 @@ function formatDurationHours(value) {
   return `${days.toFixed(1)}d`
 }
 
+function getTaskGanttPhaseSegments(task, generatedAt = new Date().toISOString()) {
+  const provided = Array.isArray(task?.phase_segments) ? task.phase_segments.filter(Boolean) : []
+  if (provided.length) return provided
+  const milestones = (task && task.milestones) || {}
+  const segments = []
+  GANTT_PHASES.forEach((phase, index) => {
+    const start = milestones[phase.key]
+    if (!start) return
+    const nextPhase = GANTT_PHASES.slice(index + 1).find(p => milestones[p.key])
+    const end = nextPhase ? milestones[nextPhase.key] : generatedAt
+    const startDate = new Date(start)
+    const endDate = end ? new Date(end) : null
+    if (Number.isNaN(startDate.getTime()) || !endDate || Number.isNaN(endDate.getTime()) || endDate <= startDate) return
+    segments.push({
+      key: phase.key,
+      label: phase.label,
+      color: phase.color,
+      start_at: start,
+      end_at: end,
+      duration_seconds: (endDate.getTime() - startDate.getTime()) / 1000,
+      duration_hours: (endDate.getTime() - startDate.getTime()) / 3600000,
+    })
+  })
+  return segments
+}
+
 function buildFilterOptions(tasks, key) {
   const values = [...new Set((tasks || []).map(task => String(task?.[key] || '').trim()).filter(Boolean))]
   values.sort((a, b) => a.localeCompare(b, 'zh-CN'))
@@ -198,7 +224,7 @@ if (typeof module !== 'undefined' && module.exports) {
     transformBoardPayload, transformAgentPayload,
     hoursBetween, formatDurationHours, buildFilterOptions, applyTaskFilters,
     BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, STATUS_TO_BOARD,
-    GANTT_PHASES,
+    GANTT_PHASES, getTaskGanttPhaseSegments,
     formatSecondsCompact, transformAggregateForAnalytics, transformDailyMetrics, computeAgentEfficiency,
   }
 }
