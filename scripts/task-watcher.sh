@@ -41,15 +41,36 @@ RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.
 MIGRATION_SENTINEL_FILE="${MIGRATION_SENTINEL_FILE:-$STATE_DIR/migration-complete.json}"
 LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/task-watcher.log}"
+WATCHER_STDOUT_LOG="${WATCHER_STDOUT_LOG:-$LOG_FILE}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 DISPATCH_RESEND_AFTER_SECONDS="${DISPATCH_RESEND_AFTER_SECONDS:-300}"
 RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
 WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
+TASK_WATCHER_TEST_MODE="${TASK_WATCHER_TEST_MODE:-0}"
+NOTIFY_RETRY_COOLDOWN_SECONDS="${NOTIFY_RETRY_COOLDOWN_SECONDS:-$RESEND_COOLDOWN_SECONDS}"
 
 LAST_LOG_ROTATE_DAY=""
 WATCHER_STARTED_AT_EPOCH="$(date +%s)"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+ensure_stdout_log_compat() {
+    local compat_stdout_log="$STATE_DIR/task-watcher.stdout.log"
+    [ "$WATCHER_STDOUT_LOG" = "$compat_stdout_log" ] && return 0
+    mkdir -p "$(dirname "$compat_stdout_log")" "$(dirname "$WATCHER_STDOUT_LOG")"
+    rm -f "$compat_stdout_log" 2>/dev/null || true
+    ln -s "$WATCHER_STDOUT_LOG" "$compat_stdout_log" 2>/dev/null || printf 'redirected to %s\n' "$WATCHER_STDOUT_LOG" > "$compat_stdout_log"
+}
+
+redirect_stdout_log_if_needed() {
+    [ "$TASK_WATCHER_TEST_MODE" = "1" ] && return 0
+    [ "${TASK_WATCHER_STDOUT_REDIRECTED:-0}" = "1" ] && return 0
+    export TASK_WATCHER_STDOUT_REDIRECTED=1
+    exec >> "$WATCHER_STDOUT_LOG" 2>&1
+}
+
+ensure_stdout_log_compat
+redirect_stdout_log_if_needed
 
 resolve_notifications_config() {
     python3 - "$CONFIG_PATH" <<'PY'
@@ -234,7 +255,9 @@ PY
 log() {
     local line
     line="$(date '+%Y-%m-%d %H:%M:%S') $*"
-    echo "$line"
+    if [ "${TASK_WATCHER_STDOUT_REDIRECTED:-0}" != "1" ]; then
+        echo "$line"
+    fi
     rotate_watcher_log_if_needed
     printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
 }
@@ -292,11 +315,13 @@ stop_task_watcher() {
     exit 0
 }
 
-trap cleanup_task_watcher_runtime EXIT
-trap stop_task_watcher INT TERM
+if [ "$TASK_WATCHER_TEST_MODE" != "1" ]; then
+    trap cleanup_task_watcher_runtime EXIT
+    trap stop_task_watcher INT TERM
 
-ensure_single_instance
-write_pid_file
+    ensure_single_instance
+    write_pid_file
+fi
 
 # 安全截断 UTF-8 字符串（按字符数，避免截断多字节字符）
 truncate_utf8() {
@@ -1301,6 +1326,86 @@ is_file_newer_than_notified() {
     [ "$file_ts" -gt "$notified_ts" ]
 }
 
+notification_retry_flag() {
+    local key="$1"
+    printf '%s/%s.retry\n' "$STATE_DIR" "$key"
+}
+
+mark_notification_retry_pending() {
+    local key="$1"
+    echo "$(date +%s)" > "$(notification_retry_flag "$key")"
+}
+
+clear_notification_retry_pending() {
+    local key="$1"
+    rm -f "$(notification_retry_flag "$key")"
+}
+
+notification_retry_due() {
+    local key="$1"
+    local cooldown="${2:-$NOTIFY_RETRY_COOLDOWN_SECONDS}"
+    local retry_flag
+    retry_flag="$(notification_retry_flag "$key")"
+    [ -f "$retry_flag" ] || return 0
+    local last_failed now
+    last_failed=$(cat "$retry_flag" 2>/dev/null || echo 0)
+    [ -n "$last_failed" ] || return 0
+    now=$(date +%s)
+    [ $(( now - last_failed )) -ge "$cooldown" ]
+}
+
+push_task_event_with_retry() {
+    local push_key="$1"
+    local artifact_path="$2"
+    local title="$3"
+    local task_id="$4"
+    local summary="${5:-}"
+    local next_action="${6:-}"
+
+    if is_notified "$push_key" && { [ -z "$artifact_path" ] || ! is_file_newer_than_notified "$push_key" "$artifact_path"; }; then
+        return 0
+    fi
+
+    if ! notification_retry_due "$push_key"; then
+        return 1
+    fi
+
+    if push_task_event "$title" "$task_id" "$summary" "$next_action"; then
+        mark_notified "$push_key"
+        clear_notification_retry_pending "$push_key"
+        return 0
+    fi
+
+    mark_notification_retry_pending "$push_key"
+    return 1
+}
+
+push_task_event_with_signature_retry() {
+    local push_key="$1"
+    local signature="$2"
+    local title="$3"
+    local task_id="$4"
+    local summary="${5:-}"
+    local next_action="${6:-}"
+
+    if is_notified "$push_key" && ! is_signature_newer_than_notified "$push_key" "$signature"; then
+        return 0
+    fi
+
+    if ! notification_retry_due "$push_key"; then
+        return 1
+    fi
+
+    if push_task_event "$title" "$task_id" "$summary" "$next_action"; then
+        mark_signature_notified "$push_key" "$signature"
+        clear_notification_retry_pending "$push_key"
+        return 0
+    fi
+
+    mark_notification_retry_pending "$push_key"
+    return 1
+}
+
 review_signature() {
     local task_dir="$1"
     local review_mtime="0"
@@ -1913,11 +2018,14 @@ PY
     now=$(date +%s)
     [ $(( now - entered_epoch )) -gt $(( timeout_minutes * 60 )) ] || return 1
     timeout_key="${task_id}_pool_timeout_notice"
-    if ! is_notified "$timeout_key"; then
-        notify_pm "[task-watcher] $task_id 在任务池中等待已超 ${timeout_minutes} 分钟，请判断转派、拆分或提优先级。"
-        emit_system_chat_event watcher "$task_id" "pooled 超时，建议 PM 转派/拆小/提高优先级。" "$PM_SESSION" degraded notify
-        push_task_event "【任务池超时】" "$task_id" "任务在 pooled 中等待超过 ${timeout_minutes} 分钟" "请 PM 判断转派、拆小或提高优先级" || true
-        mark_notified "$timeout_key"
+    timeout_push_key="${task_id}_pool_timeout_push"
+    if ! is_notified "$timeout_key" || ! is_notified "$timeout_push_key"; then
+        if ! is_notified "$timeout_key"; then
+            notify_pm "[task-watcher] $task_id 在任务池中等待已超 ${timeout_minutes} 分钟，请判断转派、拆分或提优先级。"
+            emit_system_chat_event watcher "$task_id" "pooled 超时，建议 PM 转派/拆小/提高优先级。" "$PM_SESSION" degraded notify
+            mark_notified "$timeout_key"
+        fi
+        push_task_event_with_retry "$timeout_push_key" "$task_dir/task.json" "【任务池超时】" "$task_id" "任务在 pooled 中等待超过 ${timeout_minutes} 分钟" "请 PM 判断转派、拆小或提高优先级" || true
     fi
     return 0
 }
@@ -1979,9 +2087,7 @@ notify_final_done_if_needed() {
     local task_dir="$1"
     local task_id="$2"
     local done_key="${task_id}_done_notice"
-    if is_notified "$done_key"; then
-        return 0
-    fi
+    local done_push_key="${task_id}_done_push"
 
     local done_transition_epoch
     done_transition_epoch=$(final_done_transition_epoch "$task_dir" 2>/dev/null || echo 0)
@@ -2006,9 +2112,15 @@ notify_final_done_if_needed() {
     downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
     if [ "$task_type" = "deployment" ] || [ "$execution_mode" = "deploy" ] || [ "$target_environment" = "prod" ]; then
-        push_task_event "【部署完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "请关注生产验证结果与后续用户反馈"
+        push_task_event_with_retry "$done_push_key" "$task_dir/task.json" "【部署完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "请关注生产验证结果与后续用户反馈" || {
+            log "$task_id: 最终完成飞书推送失败，等待 cooldown 后自动补推"
+            return 1
+        }
     else
-        push_task_event "【任务完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "${downstream_action:-生命周期已结束}"
+        push_task_event_with_retry "$done_push_key" "$task_dir/task.json" "【任务完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "${downstream_action:-生命周期已结束}" || {
+            log "$task_id: 最终完成飞书推送失败，等待 cooldown 后自动补推"
+            return 1
+        }
     fi
     emit_system_chat_event watcher "$task_id" "任务已进入 done 终态，已发送最终完成通知。" "$PM_SESSION" info notify
     mark_notified "$done_key"
@@ -2038,16 +2150,18 @@ auto_close_task() {
     return 1
 }
 
-restart_cause=$(cat "$RESTART_CAUSE_FILE" 2>/dev/null || true)
-if [ -n "$restart_cause" ]; then
-    log "检测到 watchdog 重启原因: $restart_cause"
-fi
+run_task_watcher_loop() {
+    local restart_cause
+    restart_cause=$(cat "$RESTART_CAUSE_FILE" 2>/dev/null || true)
+    if [ -n "$restart_cause" ]; then
+        log "检测到 watchdog 重启原因: $restart_cause"
+    fi
 
-write_heartbeat "startup"
-log "task-watcher 启动，间隔 ${INTERVAL}s"
+    write_heartbeat "startup"
+    log "task-watcher 启动，间隔 ${INTERVAL}s"
 
-loop_count=0
-while true; do
+    loop_count=0
+    while true; do
     loop_count=$((loop_count + 1))
     write_heartbeat "running"
     [ -d "$TASKS_ROOT" ] || { sleep "$INTERVAL"; continue; }
@@ -2197,10 +2311,18 @@ while true; do
         # 检测 result.json → 自动流转到 PM / reviewer
         if [ -f "$task_dir/result.json" ]; then
             result_key="${task_id}_result_route"
+            result_push_key="${task_id}_result_push"
             result_invalid_key="${task_id}_artifact_invalid_result"
             result_stale_key="${task_id}_reopen_with_stale_state_result"
+            result_route_pending=0
+            result_push_pending=0
             if ! is_notified "$result_key" || is_file_newer_than_notified "$result_key" "$task_dir/result.json" || { [ "$current_status" != "ready_for_merge" ] && [ "$current_status" != "blocked" ] && [ "$current_status" != "done" ] && [ "$current_status" != "cancelled" ] && [ "$current_status" != "archived" ]; }; then
-                route_event_ok=1
+                result_route_pending=1
+            fi
+            if ! is_notified "$result_push_key" || is_file_newer_than_notified "$result_push_key" "$task_dir/result.json"; then
+                result_push_pending=1
+            fi
+            if [ "$result_route_pending" -eq 1 ] || [ "$result_push_pending" -eq 1 ]; then
                 agent=$(artifact_pick result "$task_dir" agent)
                 result_status=$(artifact_pick result "$task_dir" normalized_status)
                 result_current_round=$(artifact_pick result "$task_dir" is_current_round)
@@ -2211,10 +2333,6 @@ while true; do
                 review_level=$(task_json_pick "$task_dir" review_level)
                 review_required=$(task_json_pick "$task_dir" review_required)
                 test_required=$(task_json_pick "$task_dir" test_required)
-                task_type=$(task_json_pick "$task_dir" task_type)
-                execution_mode=$(task_json_pick "$task_dir" execution_mode)
-                target_environment=$(task_json_pick "$task_dir" target_environment)
-                downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
                 if [ "$result_status" = "invalid" ]; then
                     if ! is_notified "$result_invalid_key"; then
@@ -2229,52 +2347,77 @@ while true; do
                         mark_notified "$result_stale_key"
                     fi
                 elif [ "$result_status" = "success" ]; then
-                    gate_decision_at=$(now_iso)
-                    gate_state="pm_acceptance_pending"
-                    next_status="ready_for_merge"
-                    if [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; then
-                        gate_state="review_pending"
-                    elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
-                        gate_state="qa_pending"
+                    if [ "$result_route_pending" -eq 1 ]; then
+                        gate_decision_at=$(now_iso)
+                        gate_state="pm_acceptance_pending"
+                        next_status="ready_for_merge"
+                        if [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; then
+                            gate_state="review_pending"
+                        elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
+                            gate_state="qa_pending"
+                        fi
+                        set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at"
+                        current_status="$next_status"
+                        if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
+                            notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
+                            emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
+                        elif [ "$gate_state" = "review_pending" ]; then
+                            auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
+                            log "$task_id: 已进入 review 队列，review_level=$review_level"
+                            auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                        elif [ "$gate_state" = "qa_pending" ]; then
+                            auto_dispatch_qa "$task_id"
+                            log "$task_id: 已进入 QA 队列"
+                            auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                        else
+                            notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
+                            emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
+                        fi
                     fi
-                    set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at"
-                    current_status="$next_status"
+
+                    gate_state=$(task_json_pick "$task_dir" merge_gate_state)
+                    result_push_title="【实现完成待验收】"
+                    result_push_next="请 PM 决定是否最终收口"
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
-                        notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
-                        emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
-                        push_task_event "【技术方案完成】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 汇总并确认后续动作" || route_event_ok=0
+                        result_push_title="【技术方案完成】"
+                        result_push_next="请 PM 汇总并确认后续动作"
                     elif [ "$gate_state" = "review_pending" ]; then
-                        auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
-                        log "$task_id: 已进入 review 队列，review_level=$review_level"
-                        push_task_event "【进入审查】" "$task_id" "$(truncate_utf8 "$summary" 300)" "已通知 reviewer 开始审查" || route_event_ok=0
-                        auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                        result_push_title="【进入审查】"
+                        result_push_next="已通知 reviewer 开始审查"
                     elif [ "$gate_state" = "qa_pending" ]; then
-                        auto_dispatch_qa "$task_id"
-                        log "$task_id: 已进入 QA 队列"
-                        push_task_event "【进入QA】" "$task_id" "$(truncate_utf8 "$summary" 300)" "已通知 QA 开始验证" || route_event_ok=0
-                        auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
-                    else
-                        notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
-                        emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
-                        push_task_event "【实现完成待验收】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 决定是否最终收口" || route_event_ok=0
+                        result_push_title="【进入QA】"
+                        result_push_next="已通知 QA 开始验证"
+                    fi
+                    if [ "$result_push_pending" -eq 1 ]; then
+                        push_task_event_with_retry "$result_push_key" "$task_dir/result.json" "$result_push_title" "$task_id" "$(truncate_utf8 "$summary" 300)" "$result_push_next" || log "$task_id: result 事件飞书补推待重试"
                     fi
                 elif [ "$result_status" = "blocked" ]; then
-                    gate_decision_at=$(now_iso)
-                    set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=blocked" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
-                    current_status="blocked"
-                    notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
-                    emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
-                    push_task_event "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因" || route_event_ok=0
+                    if [ "$result_route_pending" -eq 1 ]; then
+                        gate_decision_at=$(now_iso)
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=blocked" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
+                        current_status="blocked"
+                        notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
+                        emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
+                    fi
+                    if [ "$result_push_pending" -eq 1 ]; then
+                        push_task_event_with_retry "$result_push_key" "$task_dir/result.json" "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因" || log "$task_id: blocked 事件飞书补推待重试"
+                    fi
                 elif [ "$result_status" = "failed" ]; then
-                    gate_decision_at=$(now_iso)
-                    set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=failed" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
-                    current_status="blocked"
-                    notify_pm "[task-watcher] $task_id 执行失败，请查看 result.json 处理。"
-                    emit_system_chat_event watcher "$task_id" "任务执行失败，需 PM 判断补修、重试或关闭。" "$PM_SESSION" degraded notify
-                    push_task_event "【任务失败】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 判断补修、重试或关闭" || route_event_ok=0
+                    if [ "$result_route_pending" -eq 1 ]; then
+                        gate_decision_at=$(now_iso)
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=failed" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
+                        current_status="blocked"
+                        notify_pm "[task-watcher] $task_id 执行失败，请查看 result.json 处理。"
+                        emit_system_chat_event watcher "$task_id" "任务执行失败，需 PM 判断补修、重试或关闭。" "$PM_SESSION" degraded notify
+                    fi
+                    if [ "$result_push_pending" -eq 1 ]; then
+                        push_task_event_with_retry "$result_push_key" "$task_dir/result.json" "【任务失败】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 判断补修、重试或关闭" || log "$task_id: failed 事件飞书补推待重试"
+                    fi
                 else
-                    notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
-                    emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
+                    if [ "$result_route_pending" -eq 1 ]; then
+                        notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
+                        emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
+                    fi
                 fi
 
                 sync_task_board "$task_dir" "result-detected"
@@ -2289,13 +2432,15 @@ while true; do
             now=$(date +%s)
             if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
                 working_timeout_key="${task_id}_working_timeout_notice"
-                if ! is_notified "$working_timeout_key" || is_file_newer_than_notified "$working_timeout_key" "$task_dir/task.json"; then
-                    agent_session=$(task_json_pick "$task_dir" assigned_agent)
-                    notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
-                    emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
-                    push_task_event "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查"
-                    log "$task_id: working 超时已通知 PM 介入，未触发重发"
-                    mark_notified "$working_timeout_key"
+                working_timeout_push_key="${task_id}_working_timeout_push"
+                if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key" || is_file_newer_than_notified "$working_timeout_push_key" "$task_dir/task.json"; then
+                    if ! is_notified "$working_timeout_key"; then
+                        notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
+                        emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
+                        log "$task_id: working 超时已通知 PM 介入，等待飞书送达"
+                        mark_notified "$working_timeout_key"
+                    fi
+                    push_task_event_with_retry "$working_timeout_push_key" "$task_dir/task.json" "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查" || true
                 fi
             fi
         fi
@@ -2305,8 +2450,16 @@ while true; do
             review_level=$(task_json_pick "$task_dir" review_level)
             review_sig=$(review_signature "$task_dir")
             review_key="${task_id}_review_route"
+            review_push_key="${task_id}_review_push"
+            review_route_pending=0
+            review_push_pending=0
             if ! is_notified "$review_key" || is_signature_newer_than_notified "$review_key" "$review_sig"; then
-                review_event_ok=1
+                review_route_pending=1
+            fi
+            if ! is_notified "$review_push_key" || is_signature_newer_than_notified "$review_push_key" "$review_sig"; then
+                review_push_pending=1
+            fi
+            if [ "$review_route_pending" -eq 1 ] || [ "$review_push_pending" -eq 1 ]; then
                 state=$(review_state "$task_dir" "$review_level")
                 clear_review_queue_state_for_task "$task_dir"
                 if [ "$state" = "invalid" ]; then
@@ -2319,45 +2472,67 @@ while true; do
                 elif [ "$state" = "pass" ]; then
                     test_required=$(task_json_pick "$task_dir" test_required)
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
-                        gate_decision_at=$(now_iso)
-                        set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed review pass and queued qa" "qa_pending" "" "review" "$gate_decision_at"
-                        current_status="ready_for_merge"
-                        auto_dispatch_qa "$task_id"
-                        log "$task_id: review 通过，已进入 QA 队列"
-                        push_task_event "【审查通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "已通知 QA 开始验证" || review_event_ok=0
+                        if [ "$review_route_pending" -eq 1 ]; then
+                            gate_decision_at=$(now_iso)
+                            set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed review pass and queued qa" "qa_pending" "" "review" "$gate_decision_at"
+                            current_status="ready_for_merge"
+                            auto_dispatch_qa "$task_id"
+                            log "$task_id: review 通过，已进入 QA 队列"
+                        fi
+                        if [ "$review_push_pending" -eq 1 ]; then
+                            push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "已通知 QA 开始验证" || log "$task_id: review pass 事件飞书补推待重试"
+                        fi
                     else
                         auto_close_policy=$(task_json_pick "$task_dir" auto_close_policy)
-                        gate_decision_at=$(now_iso)
-                        set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at"
-                        if [ "$auto_close_policy" = "review_pass_only" ]; then
-                            if ! auto_close_review_only_task "$task_dir" "$task_id"; then
-                                notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
-                                emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
+                        if [ "$review_route_pending" -eq 1 ]; then
+                            gate_decision_at=$(now_iso)
+                            set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at"
+                            if [ "$auto_close_policy" = "review_pass_only" ]; then
+                                if ! auto_close_review_only_task "$task_dir" "$task_id"; then
+                                    notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
+                                    emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
+                                fi
+                            else
+                                notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
+                                emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
                             fi
-                        else
-                            notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
-                            emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
-                            push_task_event "【审查通过待收口】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "无需 QA，等待 PM 最终验收" || review_event_ok=0
+                        fi
+                        if [ "$auto_close_policy" != "review_pass_only" ] && [ "$review_push_pending" -eq 1 ]; then
+                            push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过待收口】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "无需 QA，等待 PM 最终验收" || log "$task_id: review close-wait 事件飞书补推待重试"
                         fi
                     fi
                 elif [ "$state" = "fail" ]; then
-                    gate_decision_at=$(now_iso)
-                    set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
-                    current_status="blocked"
-                    notify_pm "[task-watcher] $task_id 审查未通过，请查看 review 产物并仲裁。"
-                    emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
-                    push_task_event "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修" || review_event_ok=0
+                    if [ "$review_route_pending" -eq 1 ]; then
+                        gate_decision_at=$(now_iso)
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
+                        current_status="blocked"
+                        notify_pm "[task-watcher] $task_id 审查未通过，请查看 review 产物并仲裁。"
+                        emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
+                    fi
+                    if [ "$review_push_pending" -eq 1 ]; then
+                        push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修" || log "$task_id: review fail 事件飞书补推待重试"
+                    fi
                 fi
                 sync_task_board "$task_dir" "review-detected"
-                mark_signature_notified "$review_key" "$review_sig"
+                if [ "$state" != "invalid" ]; then
+                    mark_signature_notified "$review_key" "$review_sig"
+                fi
             fi
         fi
 
         # 检测 verify.json → QA 通过自动收口；QA 失败通知 PM 仲裁
         if [ -f "$task_dir/verify.json" ]; then
             verify_key="${task_id}_verify_route"
+            verify_push_key="${task_id}_verify_push"
+            verify_route_pending=0
+            verify_push_pending=0
             if ! is_notified "$verify_key" || is_file_newer_than_notified "$verify_key" "$task_dir/verify.json"; then
-                verify_event_ok=1
+                verify_route_pending=1
+            fi
+            if ! is_notified "$verify_push_key" || is_file_newer_than_notified "$verify_push_key" "$task_dir/verify.json"; then
+                verify_push_pending=1
+            fi
+            if [ "$verify_route_pending" -eq 1 ] || [ "$verify_push_pending" -eq 1 ]; then
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
                 clear_qa_queue_state
@@ -2369,45 +2544,53 @@ while true; do
                         mark_notified "$verify_invalid_key"
                     fi
                 elif [ "$vstate" = "pass" ]; then
-                    current_status=$(get_task_status "$task_dir")
-                    if [ "$current_status" = "ready_for_merge" ]; then
-                        _auto_close_retry_key="${task_id}_auto_close_retry"
-                        _retry_count=0
-                        if [ -f "$STATE_DIR/$_auto_close_retry_key" ]; then
-                            _retry_count=$(cat "$STATE_DIR/$_auto_close_retry_key" 2>/dev/null || echo 0)
-                        fi
-                        if [ "$_retry_count" -ge 3 ]; then
-                            _gate_decision_at=$(now_iso)
-                            set_task_gate_state "$task_dir" "blocked" "auto_close failed 3 times" "blocked" "auto_close_failure" "watcher" "$_gate_decision_at"
-                            notify_pm "[task-watcher] $task_id 自动收口连续失败 3 次，已标记 blocked，请检查 close-task.sh 与任务状态。"
-                            emit_system_chat_event watcher "$task_id" "自动收口连续失败 3 次，已标记 blocked。" "$PM_SESSION" degraded notify
+                    if [ "$verify_route_pending" -eq 1 ]; then
+                        current_status=$(get_task_status "$task_dir")
+                        if [ "$current_status" = "ready_for_merge" ]; then
+                            _auto_close_retry_key="${task_id}_auto_close_retry"
+                            _retry_count=0
+                            if [ -f "$STATE_DIR/$_auto_close_retry_key" ]; then
+                                _retry_count=$(cat "$STATE_DIR/$_auto_close_retry_key" 2>/dev/null || echo 0)
+                            fi
+                            if [ "$_retry_count" -ge 3 ]; then
+                                _gate_decision_at=$(now_iso)
+                                set_task_gate_state "$task_dir" "blocked" "auto_close failed 3 times" "blocked" "auto_close_failure" "watcher" "$_gate_decision_at"
+                                notify_pm "[task-watcher] $task_id 自动收口连续失败 3 次，已标记 blocked，请检查 close-task.sh 与任务状态。"
+                                emit_system_chat_event watcher "$task_id" "自动收口连续失败 3 次，已标记 blocked。" "$PM_SESSION" degraded notify
+                                rm -f "$STATE_DIR/$_auto_close_retry_key"
+                                current_status="blocked"
+                                continue
+                            fi
+                            if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
+                                _retry_count=$(( _retry_count + 1 ))
+                                echo "$_retry_count" > "$STATE_DIR/$_auto_close_retry_key"
+                                notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败（第 ${_retry_count}/3 次），请检查 close-task.sh 与任务状态。"
+                                emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败（${_retry_count}/3）。" "$PM_SESSION" degraded notify
+                                continue
+                            fi
                             rm -f "$STATE_DIR/$_auto_close_retry_key"
-                            current_status="blocked"
+                        else
+                            notify_pm "[task-watcher] $task_id QA 已通过但未自动收口，请检查任务状态。"
+                            emit_system_chat_event watcher "$task_id" "QA 已通过但未自动收口。" "$PM_SESSION" degraded notify
                             continue
                         fi
-                        if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
-                            _retry_count=$(( _retry_count + 1 ))
-                            echo "$_retry_count" > "$STATE_DIR/$_auto_close_retry_key"
-                            notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败（第 ${_retry_count}/3 次），请检查 close-task.sh 与任务状态。"
-                            emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败（${_retry_count}/3）。" "$PM_SESSION" degraded notify
-                            continue
-                        fi
-                        rm -f "$STATE_DIR/$_auto_close_retry_key"
-                    else
-                        notify_pm "[task-watcher] $task_id QA 已通过但未自动收口，请检查任务状态。"
-                        emit_system_chat_event watcher "$task_id" "QA 已通过但未自动收口。" "$PM_SESSION" degraded notify
-                        continue
                     fi
                 elif [ "$vstate" = "fail" ]; then
-                    gate_decision_at=$(now_iso)
-                    set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at"
-                    current_status="blocked"
-                    notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
-                    emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
-                    push_task_event "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证" || verify_event_ok=0
+                    if [ "$verify_route_pending" -eq 1 ]; then
+                        gate_decision_at=$(now_iso)
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at"
+                        current_status="blocked"
+                        notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
+                        emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
+                    fi
+                    if [ "$verify_push_pending" -eq 1 ]; then
+                        push_task_event_with_retry "$verify_push_key" "$task_dir/verify.json" "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证" || log "$task_id: QA fail 事件飞书补推待重试"
+                    fi
                 fi
                 sync_task_board "$task_dir" "verify-detected"
-                mark_notified "$verify_key"
+                if [ "$vstate" != "invalid" ]; then
+                    mark_notified "$verify_key"
+                fi
             fi
         fi
 
@@ -2434,4 +2617,9 @@ while true; do
 
     write_heartbeat "sleeping"
     sleep "$INTERVAL"
-done
+    done
+}
+
+if [ "$TASK_WATCHER_TEST_MODE" != "1" ]; then
+    run_task_watcher_loop
+fi

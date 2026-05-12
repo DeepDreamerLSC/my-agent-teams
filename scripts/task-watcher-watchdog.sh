@@ -17,15 +17,25 @@ WATCHDOG_RUN_ONCE="${WATCHDOG_RUN_ONCE:-0}"
 PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
 RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.txt}"
-WATCHER_STDOUT_LOG="${WATCHER_STDOUT_LOG:-$STATE_DIR/task-watcher.stdout.log}"
 MIGRATION_SENTINEL_FILE="${MIGRATION_SENTINEL_FILE:-$STATE_DIR/migration-complete.json}"
 LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/task-watcher.log}"
+WATCHER_STDOUT_LOG="${WATCHER_STDOUT_LOG:-$LOG_FILE}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 
 LAST_LOG_ROTATE_DAY=""
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+ensure_stdout_log_compat() {
+  local compat_stdout_log="$STATE_DIR/task-watcher.stdout.log"
+  [ "$WATCHER_STDOUT_LOG" = "$compat_stdout_log" ] && return 0
+  mkdir -p "$(dirname "$compat_stdout_log")" "$(dirname "$WATCHER_STDOUT_LOG")"
+  rm -f "$compat_stdout_log" 2>/dev/null || true
+  ln -s "$WATCHER_STDOUT_LOG" "$compat_stdout_log" 2>/dev/null || printf 'redirected to %s\n' "$WATCHER_STDOUT_LOG" > "$compat_stdout_log"
+}
+
+ensure_stdout_log_compat
 
 migrate_legacy_task_watcher_runtime() {
     [ -f "$MIGRATION_SENTINEL_FILE" ] && return 0
@@ -224,7 +234,7 @@ start_watcher() {
         return 1
     fi
     record_restart_cause "$reason"
-    nohup "$TASK_WATCHER_SCRIPT" >> "$WATCHER_STDOUT_LOG" 2>&1 &
+  TASK_WATCHER_STDOUT_REDIRECTED=1 WATCHER_STDOUT_LOG="$WATCHER_STDOUT_LOG" nohup "$TASK_WATCHER_SCRIPT" >> "$WATCHER_STDOUT_LOG" 2>&1 &
     local child_pid=$!
     sleep 1
     log "watchdog 已启动 task-watcher（child pid=$child_pid，reason=$reason）"
