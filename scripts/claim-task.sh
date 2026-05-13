@@ -3,7 +3,8 @@ set -euo pipefail
 
 TASK_ID="${1:-}"
 REASON="${2:-}"
-WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 TASK_DIR="$TASKS_ROOT/$TASK_ID"

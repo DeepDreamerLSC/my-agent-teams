@@ -32,3 +32,10 @@ chat/tasks/*.jsonl
 chat/tasks/*.lock
 chat/system/**/*.jsonl
 chat/system/**/*.lock
+# Local/generated migration/runtime artifacts
+config.generated.json
+.env
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+agents/be-1/

@@ -37,7 +37,7 @@
 - 推荐命令：
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "当前空闲，可承接该开发任务"
+$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> "当前空闲，可承接该开发任务"
 ```
 
 - 认领成功后，等待任务进入 `dispatched`，再按正常流程写 `ack.json`

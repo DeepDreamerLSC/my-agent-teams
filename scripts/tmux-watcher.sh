@@ -23,10 +23,12 @@ DANGEROUS_KEYWORDS=(
     "Would you like to make the following edits?"
 )
 INTERVAL=3
-STATE_DIR="/Users/lin/.openclaw/workspace/.tmux-watcher"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/tmux-watcher}"
 PID_FILE="${PID_FILE:-$STATE_DIR/tmux-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/tmux-watcher-heartbeat.json}"
-LOG_DIR="${LOG_DIR:-/Users/lin/.openclaw/workspace/logs}"
+LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
 LOG_FILE="${LOG_FILE:-$LOG_DIR/tmux-watcher.log}"
 MATCH_LINES="${MATCH_LINES:-40}"
 mkdir -p "$STATE_DIR" "$LOG_DIR"

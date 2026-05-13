@@ -39,6 +39,41 @@ PM（pm-chief）— 需求分析、任务拆解、进度跟踪、决策通知
 - 新任务 ID 必须使用中文标题式名称，例如：`修复Word生成质量问题`、`Agent目录隔离方案`
 - `T-001` 这类旧编号和纯英文 slug 不允许用于新建任务
 
+
+## 新电脑迁移 / 顶层控制脚本
+
+推荐优先使用顶层控制脚本 `scripts/teamctl.sh`，避免手工改路径。
+
+```bash
+cd /path/to/my-agent-teams
+
+# 1) 初始化本机目录、config.local、agent 文件、tasks symlink、看板库
+scripts/teamctl.sh bootstrap --render-config
+
+# 2) 检查依赖、路径、agent 文件、tmux session、项目根目录
+scripts/teamctl.sh doctor
+
+# 3) 启动 agent 团队（按 config 中 runtime 选择 codex / claude）
+scripts/teamctl.sh start-agents
+
+# 4) 启动 watcher / dashboard
+scripts/teamctl.sh start-watcher
+scripts/teamctl.sh start-dashboard
+
+# 5) 查看状态
+scripts/teamctl.sh status
+```
+
+说明：
+- `--render-config` 会按当前 checkout 路径重写 `config.json` 中的本机路径；如只想检查不重写，先运行 `scripts/teamctl.sh doctor`。
+- 飞书密钥仍放在被 git 忽略的 `config.local.json`。
+- 如开罗尔项目不在默认相邻目录，可在 bootstrap 前设置：
+  ```bash
+  export CHIRALIUM_DEV_ROOT=/path/to/chiralium
+  export CHIRALIUM_PROD_ROOT=/path/to/prod/chiralium
+  ```
+- `CODEX_CMD` / `CLAUDE_CMD` 可覆盖 agent 启动命令。
+
 ## 快速开始
 
 ### 前置条件

@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CHAT_ROOT="${CHAT_ROOT:-$WORKSPACE_ROOT/chat}"
 DAYS="1"
 LIMIT="20"

@@ -1,17 +1,29 @@
 #!/bin/bash
 # build-agent-files.sh - 从 design/agent-templates/ 构建各 agent 的 AGENT.md / CLAUDE.md
-# 用法: ./scripts/build-agent-files.sh [--dry-run]
+# 用法: ./scripts/build-agent-files.sh [--dry-run] [--agent <agent-id>]
 
 set -eo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-WORKSPACE="/Users/lin/Desktop/work/my-agent-teams"
-TEMPLATES="$WORKSPACE/design/agent-templates"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE/config.json}"
+TEMPLATES="${AGENT_TEMPLATES_DIR:-$WORKSPACE/design/agent-templates}"
 BASE_MD="$TEMPLATES/base.md"
-AGENTS_DIR="$WORKSPACE/agents"
+AGENTS_DIR="${AGENTS_DIR:-$WORKSPACE/agents}"
 
 DRY_RUN=""
-[[ "${1:-}" == "--dry-run" ]] && DRY_RUN="1"
+AGENT_FILTER="${AGENT_FILTER:-}"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN="1"; shift ;;
+    --agent) AGENT_FILTER="${2:-}"; shift 2 ;;
+    --help|-h)
+      echo "usage: build-agent-files.sh [--dry-run] [--agent <agent-id>]" >&2
+      exit 0
+      ;;
+    *) echo "unknown option: $1" >&2; exit 2 ;;
+  esac
+done
 
 if [[ ! -f "$BASE_MD" ]]; then
   echo "❌ base.md not found: $BASE_MD"
@@ -40,7 +52,7 @@ build_agent() {
     return
   fi
 
-  # 生成文件内容
+  mkdir -p "$target_dir"
   {
     echo "# ${agent_id} - ${agent_file}"
     echo "> ⚠️ 本文件由 build-agent-files.sh 自动生成，请勿手动编辑。"
@@ -74,17 +86,54 @@ build_agent() {
 build_agent_pair() {
   local agent_id="$1"
   local role_template="$2"
+  if [ -n "$AGENT_FILTER" ] && [ "$AGENT_FILTER" != "$agent_id" ]; then
+    return
+  fi
   build_agent "$agent_id" "$role_template" "AGENT.md"
   build_agent "$agent_id" "$role_template" "CLAUDE.md"
 }
 
-# agent_id, role_template. 每个 agent 同时生成 Codex/Claude 两个入口。
-build_agent_pair "pm-chief" "pm"
-build_agent_pair "arch-1" "architect"
-build_agent_pair "dev-1" "developer"
-build_agent_pair "dev-2" "developer"
-build_agent_pair "qa-1" "qa"
-build_agent_pair "review-1" "reviewer"
+load_agents_from_config() {
+  python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+role_map = {
+    "pm": "pm",
+    "architect": "architect",
+    "fullstack_dev": "developer",
+    "developer": "developer",
+    "qa": "qa",
+    "reviewer": "reviewer",
+}
+config_path = Path(sys.argv[1]).expanduser()
+if not config_path.exists():
+    raise SystemExit(1)
+config = json.loads(config_path.read_text(encoding="utf-8"))
+for agent_id, payload in (config.get("agents") or {}).items():
+    role = str((payload or {}).get("role") or "").strip()
+    template = role_map.get(role)
+    if template:
+        print(f"{agent_id}\t{template}")
+PY
+}
+
+AGENT_LINES="$(load_agents_from_config || true)"
+if [ -n "$AGENT_LINES" ]; then
+  while IFS=$'\t' read -r agent_id role_template; do
+    [ -n "$agent_id" ] || continue
+    build_agent_pair "$agent_id" "$role_template"
+  done <<< "$AGENT_LINES"
+else
+  echo "⚠️  Could not load agents from $CONFIG_PATH; using built-in fallback" >&2
+  build_agent_pair "pm-chief" "pm"
+  build_agent_pair "arch-1" "architect"
+  build_agent_pair "dev-1" "developer"
+  build_agent_pair "dev-2" "developer"
+  build_agent_pair "qa-1" "qa"
+  build_agent_pair "review-1" "reviewer"
+fi
 
 echo ""
 echo "Done. $count agent file(s) generated."

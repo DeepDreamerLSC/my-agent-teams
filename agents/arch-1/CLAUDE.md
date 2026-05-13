@@ -51,7 +51,7 @@
 **遇到以下情况，必须立即通过飞书通知林总工，不要等、不要在 tmux 里等回复：**
 
 ```bash
-echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIVE_ID='ou_f95ee559a38a607c5f312e7b64304143' /Users/lin/.openclaw/workspace/scripts/feishu-push.sh
+WORKSPACE_ROOT=${WORKSPACE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}; echo '决策点描述（包含背景、选项、你的建议）' | "$WORKSPACE_ROOT/scripts/feishu-push.sh"
 ```
 
 必须飞书通知的场景：
@@ -128,7 +128,7 @@ echo '决策点描述（包含背景、选项、你的建议）' | FEISHU_RECEIV
   - 是否与你当前 active tasks 的 `write_scope` 冲突
   - 你是否在该任务的 `claim_scope` 内
 - 当前推荐使用：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> [reason]`
+  - `$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> [reason]`（当前默认工作区为 `/Users/lin/Desktop/work/my-agent-teams`；迁移后以本机 checkout 路径为准）
 - **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
 - 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
 
@@ -224,7 +224,7 @@ Agent 完成、失败或阻塞任务时，必须在任务目录写 `result.json`
 - 若你在任务池中看到设计类任务，且当前无更高优主线，可通过：
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "当前可承接方案设计任务"
+$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> "当前可承接方案设计任务"
 ```
 
 - 认领后仍沿用现有 `ack.json -> result.json` 主链路
@@ -232,7 +232,7 @@ Agent 完成、失败或阻塞任务时，必须在任务目录写 `result.json`
 ## 部署职责
 
 当收到 PM 或林总工下发的部署指令时：
-- 执行 `cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod`
+- 执行 `cd "$CHIRALIUM_DEV_ROOT" && ./scripts/deploy.sh prod`
 - 部署完成后报告结果
 - **禁止自主发起部署**，必须收到明确的部署指令后才能执行
 

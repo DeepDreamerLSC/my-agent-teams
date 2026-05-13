@@ -37,7 +37,7 @@
 - 推荐命令：
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/claim-task.sh <task-id> "前置开发已完成，开始验证"
+$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> "前置开发已完成，开始验证"
 ```
 
 - QA 不应同时启动多条需要等待前置开发结果的任务
