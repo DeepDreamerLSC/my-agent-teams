@@ -8,6 +8,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TASK_WATCHER = REPO_ROOT / "scripts" / "task-watcher.sh"
 WATCHDOG = REPO_ROOT / "scripts" / "task-watcher-watchdog.sh"
+TEAMCTL = REPO_ROOT / "scripts" / "teamctl.sh"
 
 
 def _base_env(tmp_path: Path) -> dict[str, str]:
@@ -36,6 +37,7 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
 def test_task_watcher_scripts_pass_shell_syntax_check():
     subprocess.run(["bash", "-n", str(TASK_WATCHER)], check=True)
     subprocess.run(["bash", "-n", str(WATCHDOG)], check=True)
+    subprocess.run(["bash", "-n", str(TEAMCTL)], check=True)
 
 
 def test_push_failure_keeps_event_retryable(tmp_path: Path):
@@ -161,5 +163,42 @@ import os
 content = Path(os.environ["LOG_FILE"]).read_text(encoding="utf-8")
 assert content.count("dedupe-check-line") == 1, content
 PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_review_queue_clear_only_removes_matching_task(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    tasks_root = workspace_root / "tasks"
+    task_a = tasks_root / "task-a"
+    task_a.mkdir(parents=True)
+    (task_a / "task.json").write_text(
+        '{\n'
+        '  "id": "task-a",\n'
+        '  "status": "ready_for_merge",\n'
+        '  "merge_gate_state": "review_pending",\n'
+        '  "reviewer": "review-1",\n'
+        '  "reviewers": ["review-1"]\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+queue_state_set review review-1 task-b
+clear_review_queue_state_for_task '{task_a}'
+python3 - <<'PY'
+import json
+from pathlib import Path
+import os
+state = Path(os.environ["STATE_DIR"]) / "review-queue-review-1.json"
+assert json.loads(state.read_text(encoding="utf-8"))["task_id"] == "task-b"
+PY
+
+queue_state_set review review-1 task-a
+clear_review_queue_state_for_task '{task_a}'
+test ! -f "$STATE_DIR/review-queue-review-1.json"
 """
     subprocess.run(["bash", "-lc", script], check=True, env=env)

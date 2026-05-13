@@ -71,6 +71,36 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         self.assertEqual(review.stdout.strip(), 'review-task')
         self.assertEqual(qa.stdout.strip(), 'qa-task')
 
+    def test_queue_router_skips_review_task_with_terminal_review_artifact(self):
+        review_dir = self.tasks_root / 'review-task'
+        (review_dir / 'review.json').write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'reviewer': 'review-1',
+                'status': 'request_changes',
+                'summary': 'needs rework',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertIsNone(payload['next_task_id'])
+        self.assertEqual(payload['rows'], [])
+
+    def test_queue_router_skips_review_task_with_terminal_markdown_artifact(self):
+        review_dir = self.tasks_root / 'review-task'
+        (review_dir / 'review.md').write_text('# 审查结论\n\nREQUEST CHANGES\n', encoding='utf-8')
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertIsNone(payload['next_task_id'])
+        self.assertEqual(payload['rows'], [])
+
     def test_pool_view_counts_timed_out_tasks(self):
         self._write_task('pooled-timeout', {
             'id': 'pooled-timeout', 'title': '池任务超时', 'status': 'pooled', 'priority': 'medium',

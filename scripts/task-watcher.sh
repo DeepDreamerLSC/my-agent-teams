@@ -553,33 +553,52 @@ artifact_pick() {
     local artifact="$1"
     local task_dir="$2"
     shift 2
-    artifact_parse_json "$artifact" "$task_dir" | python3 - "$@" <<'PY'
+    local _ap_tmpfile
+    _ap_tmpfile=$(mktemp "${STATE_DIR:-/tmp}/ap_pick.XXXXXX" 2>/dev/null || mktemp)
+    artifact_parse_json "$artifact" "$task_dir" > "$_ap_tmpfile" 2>/dev/null
+    _AP_JSON_FILE="$_ap_tmpfile" python3 - "$@" <<'PY'
 import json
+import os
 import sys
+from pathlib import Path
 
 keys = sys.argv[1:]
+json_file = os.environ.get("_AP_JSON_FILE", "")
 try:
-    payload = json.load(sys.stdin)
+    payload = json.loads(Path(json_file).read_text(encoding="utf-8")) if json_file else {}
 except Exception:
-    raise SystemExit(0)
+    payload = {}
 
 for key in keys:
     value = payload
     missing = False
-    for part in key.split('.'):
+    for part in key.split("."):
         if isinstance(value, dict) and part in value:
             value = value[part]
         else:
             missing = True
             break
-    if missing or value in (None, ''):
+    if missing or value in (None, ""):
         continue
     if isinstance(value, bool):
-        print('true' if value else 'false')
+        print("true" if value else "false")
     else:
         print(value)
     raise SystemExit(0)
 PY
+    local _ap_rc=$?
+    rm -f "$_ap_tmpfile"
+    return "$_ap_rc"
+}
+
+review_artifact_is_terminal() {
+    local task_dir="$1"
+    local existing_review_status
+    existing_review_status=$(artifact_pick review "$task_dir" normalized_status 2>/dev/null || true)
+    case "$existing_review_status" in
+        approve|request_changes|blocked) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 task_json_pick() {
@@ -930,6 +949,13 @@ auto_push_next_review_for_agent() {
     next_task=$(python3 "$TASK_QUEUE_ROUTER" --tasks-root "$TASKS_ROOT" --queue review --agent "$agent_id" --next 2>/dev/null || true)
     [ -n "$next_task" ] || return 1
 
+    # 防止对已有审查结论的任务重复续推：如果 review 已有明确结论，等待主循环流转 gate。
+    local next_task_dir="$TASKS_ROOT/$next_task"
+    if review_artifact_is_terminal "$next_task_dir"; then
+        log "${next_task}: 跳过续推，已有审查结论 ($(artifact_pick review "$next_task_dir" normalized_status 2>/dev/null || true))"
+        return 1
+    fi
+
     queue_state_set "review" "$agent_id" "$next_task"
     notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md 与 result.json，并输出 review.json（必需）与 review.md（人读说明，可选但推荐）。"
     emit_system_chat_event nudge "$next_task" "review 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
@@ -1191,7 +1217,15 @@ set_task_gate_state() {
     local last_gate_actor="${6:-}"
     local last_gate_decision_at="${7:-}"
     local output=""
-    output=$(python3 - "$task_dir" "$new_status" "$reason" "$merge_gate_state" "$rework_reason" "$last_gate_actor" "$last_gate_decision_at" <<'PY'
+    local effective_last_gate_decision_at="$last_gate_decision_at"
+    if [ "$effective_last_gate_decision_at" != "__KEEP__" ]; then
+        local current_task_value
+        current_task_value=$(task_json_pick "$task_dir" merge_gate_state)
+        if [ "$merge_gate_state" != "__KEEP__" ] && [ "$current_task_value" = "$merge_gate_state" ]; then
+            effective_last_gate_decision_at="__KEEP__"
+        fi
+    fi
+    output=$(python3 - "$task_dir" "$new_status" "$reason" "$merge_gate_state" "$rework_reason" "$last_gate_actor" "$effective_last_gate_decision_at" <<'PY'
 import json
 import os
 import sys
@@ -1698,11 +1732,34 @@ queue_state_clear() {
     rm -f "$(queue_state_file "$queue_kind" "$agent_id")"
 }
 
+queue_state_clear_for_task() {
+    local queue_kind="$1"
+    local agent_id="$2"
+    local task_id="$3"
+    python3 - "$(queue_state_file "$queue_kind" "$agent_id")" "$task_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+expected_task_id = sys.argv[2]
+if not state_path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(state_path.read_text(encoding='utf-8'))
+except Exception:
+    state_path.unlink(missing_ok=True)
+    raise SystemExit(0)
+if str(payload.get('task_id') or '').strip() == expected_task_id:
+    state_path.unlink(missing_ok=True)
+PY
+}
+
 clear_review_queue_state_for_task() {
     local task_dir="$1"
     while IFS= read -r reviewer; do
         [ -n "$reviewer" ] || continue
-        queue_state_clear "review" "$reviewer"
+        queue_state_clear_for_task "review" "$reviewer" "$(basename "$task_dir")"
     done <<< "$(task_reviewers "$task_dir")"
 }
 

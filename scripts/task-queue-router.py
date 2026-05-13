@@ -3,10 +3,19 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
 PRIORITY_RANK = {"critical": 4, "urgent": 4, "high": 3, "medium": 2, "low": 1}
+TERMINAL_REVIEW_STATUSES = {"approve", "request_changes", "blocked"}
+LIB_DIR = Path(__file__).resolve().parent / "lib"
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+try:
+    from task_artifacts import parse_review
+except Exception:  # pragma: no cover - fallback keeps the queue router usable standalone.
+    parse_review = None
 
 
 def load_json(path: Path) -> dict:
@@ -22,6 +31,28 @@ def parse_iso(value: str | None) -> datetime:
         return datetime.max
 
 
+def review_artifact_terminal(task_dir: Path) -> bool:
+    if parse_review is not None:
+        try:
+            status = str(parse_review(task_dir).get("normalized_status") or "").strip().lower()
+        except Exception:
+            status = ""
+        if status in TERMINAL_REVIEW_STATUSES:
+            return True
+    for artifact_name in ("review.json", "design-review.json"):
+        artifact_path = task_dir / artifact_name
+        if not artifact_path.exists():
+            continue
+        try:
+            payload = load_json(artifact_path)
+        except Exception:
+            continue
+        status = str(payload.get("status") or "").strip().lower()
+        if status in TERMINAL_REVIEW_STATUSES:
+            return True
+    return False
+
+
 def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
     rows = []
     for task_path in tasks_root.glob("*/task.json"):
@@ -34,6 +65,8 @@ def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
         gate = str(task.get("merge_gate_state") or "")
         if queue_kind == "review":
             if gate != "review_pending":
+                continue
+            if review_artifact_terminal(task_path.parent):
                 continue
             reviewers = task.get("reviewers") if isinstance(task.get("reviewers"), list) else []
             reviewers = [str(item).strip() for item in reviewers if str(item).strip()]

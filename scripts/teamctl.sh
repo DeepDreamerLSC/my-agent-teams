@@ -322,9 +322,23 @@ stop_pid_file() {
   pid="$(cat "$pid_file" 2>/dev/null || true)"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
     kill "$pid" 2>/dev/null || true
+    for _ in {1..20}; do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.25
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      warn "$label still running after TERM pid=$pid"
+      return 1
+    fi
+    if [ "$(cat "$pid_file" 2>/dev/null || true)" = "$pid" ]; then
+      rm -f "$pid_file"
+    fi
     log "stopped $label pid=$pid"
   else
     warn "$label not running"
+    if [ -f "$pid_file" ] && [ -n "$pid" ]; then
+      rm -f "$pid_file"
+    fi
   fi
 }
 
