@@ -90,25 +90,23 @@ log "tmux-watcher 启动，间隔 ${INTERVAL}s"
 
 while true; do
     write_heartbeat
-    # 获取所有 session 的 id 和 name
-    my_session_name="$(tmux display-message -p '#{session_name}' 2>/dev/null)"
-
+    # 获取所有 session 的 id 和 name。不要按“当前 session”跳过：
+    # tmux-watcher 可能从 pm-chief 等 agent session 后台启动，按当前 session
+    # 跳过会导致启动来源 session 永远无法被自动确认。
     SESSIONS_FILE=$(mktemp)
     tmux list-sessions -F '#{session_id}|#{session_name}' 2>/dev/null > "$SESSIONS_FILE"
     while IFS='|' read -r sid sname; do
         # 跳过空行
         [ -z "$sname" ] && continue
-        # 跳过自己
-        [ "$sname" = "$my_session_name" ] && continue
-        # 跳过 omx-detached 残留
+        # 只跳过明确的 watcher/残留 session；不要跳过启动 tmux-watcher 的 agent session。
         case "$sname" in
-            omx-lin-detached*|tmux-watcher|task-watcher)
+            omx-lin-detached*|tmux-watcher|tmux-watcher-*|task-watcher|task-watcher-*)
                 continue
                 ;;
         esac
 
         # 用 session ID 操作（避免中文名 ____ 问题）
-        content=$(tmux capture-pane -t "$sname" -p -S -80 2>/dev/null)
+        content=$(tmux capture-pane -t "$sid" -p -S -80 2>/dev/null)
         [ -z "$content" ] && continue
 
         # 检查底部若干行是否包含确认关键字（提示可能不总在最后 15 行）
@@ -176,7 +174,7 @@ while true; do
         echo "$now" > "$cooldown_file"
 
         log "自动确认 $sname（sid=$sid，keyword=$matched_kw）"
-        tmux send-keys -t "$sname" Enter
+        tmux send-keys -t "$sid" Enter
     done < "$SESSIONS_FILE"
     rm -f "$SESSIONS_FILE"
 
