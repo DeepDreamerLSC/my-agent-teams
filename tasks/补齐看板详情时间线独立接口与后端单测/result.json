@@ -6,17 +6,17 @@
   "summary": "已在现有 `/api/tasks/<id>/detail` 基础上补齐独立的 timeline / communications 只读接口，并新增后端自动化测试，确保时间线与沟通口径可单独拉取且与 detail 保持一致。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py",
       "action": "modified",
       "description": "新增 `build_task_timeline_payload()` 与 `build_task_communications_payload()`，直接复用现有 detail 查询结果与 communication 查询逻辑，保证新旧口径一致。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py",
       "action": "modified",
       "description": "新增 `/api/tasks/<task_id>/timeline` 与 `/api/tasks/<task_id>/communications` 两个只读接口；缺失任务时统一返回 404。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py",
       "action": "added",
       "description": "新增 query/app 自动化测试，覆盖 timeline / communications 独立拉取、空 communication、排序稳定性、缺失 review/verify 的 durations 容错，以及不存在任务的 404。"
     }
@@ -57,11 +57,11 @@
   ],
   "validation": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/app.py /Users/lin/Desktop/work/my-agent-teams/dashboard/query.py /Users/lin/Desktop/work/my-agent-teams/dashboard/db.py /Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py",
       "result": "passed"
     },
     {
-      "command": "python3 -m unittest discover -s /Users/lin/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
+      "command": "python3 -m unittest discover -s /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
       "result": "passed (4 tests)"
     }
   ],

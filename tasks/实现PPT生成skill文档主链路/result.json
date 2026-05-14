@@ -7,22 +7,22 @@
   "skill_name": "ppt_generator",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
       "action": "added",
       "description": "新增 PPT 生成 skill manifest，声明 document/PDF 输入能力、PPTX 输出格式与 subprocess 执行方式。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
       "action": "added",
       "description": "新增 PPT 生成 skill 主链路：复用现有文本模型、recent_messages 与 parsed_files，上下文整理后请求模型返回结构化 JSON，并导出 PPTX。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/office_export_service.py",
       "action": "modified",
       "description": "新增 `PPTX_MIME` 与 `build_pptx_bytes()`，使用现有 zip/XML 方式手工构造最小可下载 PPTX 包，不引入额外第三方依赖。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
       "action": "added",
       "description": "新增后端测试，验证 skill 可发现、可基于解析文本生成 `.pptx`，且返回 `display_type=file` 契约。"
     }
@@ -59,11 +59,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py -q",
       "result": "passed (4 passed, 4 warnings)"
     }
   ],

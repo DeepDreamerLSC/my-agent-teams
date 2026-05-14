@@ -14,19 +14,19 @@
 
 ## 输入事实
 - 当前改动集中在以下 13 个文件：
-  - /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh
-  - /Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh
-  - /Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh
-  - /Users/lin/Desktop/work/my-agent-teams/tasks/task.schema.json
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/db.py
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/query.py
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css
-  - /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py
+  - /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh
+  - /Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh
+  - /Users/linsuchang/Desktop/work/my-agent-teams/scripts/create-task.sh
+  - /Users/linsuchang/Desktop/work/my-agent-teams/tasks/task.schema.json
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates/index.html
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/css/style.css
+  - /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py
 - 本轮目标包括：
   1. review fail 自动回退为 blocked + review_rejected；
   2. QA fail 自动回退为 blocked + qa_failed；

@@ -6,12 +6,12 @@
   "summary": "已在现有 shell watcher 架构上补上持久化日志与 7 天轮转：watcher 与 watchdog 都会把关键事件写入 ~/.openclaw/workspace/logs/task-watcher.log，跨天自动归档为 task-watcher.YYYY-MM-DD.log，并清理 7 天前归档；日志写入失败不会阻塞主流转。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
       "action": "modified",
       "description": "新增日志目录/文件/保留期配置、按天轮转与 7 天归档清理、stdout+文件双写且失败容忍；set_task_status 改为记录状态流转日志；close-task 失败也会明确落日志。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
       "action": "modified",
       "description": "复用同一 task-watcher.log，补上 watchdog 事件文件日志与相同的按天轮转/保留策略，确保自动重启原因能持久化。"
     }
@@ -38,7 +38,7 @@
   ],
   "test_commands": [
     {
-      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "command": "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
       "result": "passed"
     },
     {

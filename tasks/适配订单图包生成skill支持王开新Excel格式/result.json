@@ -37,15 +37,15 @@
   },
   "current_skill_mismatch_before_fix": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:754-787（修复前）",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:754-787（修复前）",
       "problem": "`_read_sheet_rows()` 只读取 `workbook.find('a:sheets/a:sheet')` 找到的第一张 sheet，因此王开新样本后续 6 张业务 sheet 完全不会进入 skill。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:783-785（修复前）",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:783-785（修复前）",
       "problem": "`row_data = {header: ... for ... if header}` 会把空表头列直接丢掉；而新格式恰好把 `DISPIMG(...)` 放在空表头第 2 列，导致 `客户货号` / 商品图引用信息丢失。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:893-897",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:893-897",
       "problem": "图片提取逻辑依赖 `row.get('客户货号')`；空表头列被丢掉后，这里拿不到 DISPIMG id，只会退化成‘未找到对应的商品图’。"
     }
   ],
@@ -60,12 +60,12 @@
   },
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
       "action": "modified",
       "description": "适配多 sheet Excel 读取、跳过 WpsReserved sheet、空表头第 2 列映射为 `客户货号`、日期别名归一。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
       "action": "modified",
       "description": "新增 synthetic 新格式多 sheet 回归测试，并保留/跑通旧格式与同模块既有测试。"
     }
@@ -83,16 +83,16 @@
   },
   "validation": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q",
       "result": "passed (12 passed, 4 warnings)"
     }
   ],
   "new_test_added": {
-    "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+    "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
     "name": "test_skill_supports_wangkai_new_multisheet_excel_format",
     "covers": [
       "多业务 sheet 遍历",

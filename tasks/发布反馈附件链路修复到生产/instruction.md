@@ -8,17 +8,17 @@
 
 当前相关链路：
 - 已完成并通过：
-  - `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
-  - `/Users/lin/Desktop/work/my-agent-teams/tasks/收束反馈附件详情为可靠下载入口`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收束反馈附件详情为可靠下载入口`
 - 仍需先补齐 review / QA：
-  - `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈AI链路附件元数据传递`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈AI链路附件元数据传递`
 
 ## 你的任务
 在上游任务全部通过后，统一完成：
 
 ### A. 更新 Release Note
 在：
-- `/Users/lin/Desktop/work/chiralium/design/product/release-note.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md`
 
 补充反馈管理附件链路相关更新，要求简洁、一行一条。
 
@@ -28,7 +28,7 @@
 ### C. 部署生产
 执行：
 ```bash
-cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
 ```
 
 ## 说明
@@ -37,7 +37,7 @@ cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/发布反馈附件链路修复到生产/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/发布反馈附件链路修复到生产/result.json`
 
 result.json 至少包含：
 - release_note_path

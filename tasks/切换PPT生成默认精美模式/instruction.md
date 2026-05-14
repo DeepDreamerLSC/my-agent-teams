@@ -38,8 +38,8 @@
 - `skills/custom/ppt_generator/1.0.0/skill.py` 默认模式切换
 - `skills/custom/ppt_generator/1.0.0/manifest.json` 如有必要补充默认行为说明
 - `backend/tests/test_ppt_generator_skill.py` 回归测试
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/切换PPT生成默认精美模式/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/切换PPT生成默认精美模式/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/切换PPT生成默认精美模式/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/切换PPT生成默认精美模式/result.json`
 
 `result.json` 必须写明：
 - 默认模式切换前后的判定逻辑

@@ -7,11 +7,11 @@
 3. **确保其他供应商模型（智谱/GLM 等）的联网搜索不受影响，能正常使用**
 
 相关事实来源：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`
 
 ## 你的任务
 请按最小范围完成前端调整：
@@ -42,4 +42,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/前端置灰DeepSeek联网搜索并保持其他模型正常/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/前端置灰DeepSeek联网搜索并保持其他模型正常/result.json`

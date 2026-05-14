@@ -53,7 +53,7 @@
 ## 输出位置
 
 请在以下路径输出方案文档：
-- `/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
 
 ## 约束
 
@@ -64,7 +64,7 @@
 ## 交付物
 
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案/result.json`
 
 结果中请包含：
 - 方案文档路径

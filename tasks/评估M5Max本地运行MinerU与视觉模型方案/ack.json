@@ -1,0 +1,9 @@
+{
+  "task_id": "评估M5Max本地运行MinerU与视觉模型方案",
+  "agent": "arch-1",
+  "agent_id": "arch-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-13T23:40:25+08:00",
+  "acked_at": "2026-05-13T23:40:25+08:00",
+  "notes": "已读取 instruction.md 与原 PDF 转 Word 设计/拆解结果；本任务为只读架构评估，仅写 ack.json/result.json，不修改 chiralium 代码或设计文档。"
+}

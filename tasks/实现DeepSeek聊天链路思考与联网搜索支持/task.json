@@ -22,11 +22,11 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests"
   ],
   "depends_on": [
     "实现DeepSeek固定供应商注册表与能力输出"

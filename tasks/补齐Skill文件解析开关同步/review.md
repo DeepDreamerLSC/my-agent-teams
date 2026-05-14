@@ -8,9 +8,9 @@
 - 说明：任务目录当前 **无 `verify.json`**；本审查已复跑本任务要求的目标测试，后续如需独立 QA 门禁仍应由 QA 写入 `verify.json`。
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐Skill文件解析开关同步/result.json`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/admin_skill_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_admin_skills.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐Skill文件解析开关同步/result.json`
 
 ## 通过项
 
@@ -47,9 +47,9 @@
 已复跑：
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend \
-  /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider \
-  /Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend \
+  /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider \
+  /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_admin_skills.py
 ```
 
 结果：`13 passed, 4 warnings`。warnings 为 FastAPI `on_event` 弃用提示，与本次改动无关。

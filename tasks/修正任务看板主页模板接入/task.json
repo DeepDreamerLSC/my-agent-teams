@@ -16,8 +16,8 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/__init__.py"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/__init__.py"
   ],
   "depends_on": [
     "任务看板系统架构设计"

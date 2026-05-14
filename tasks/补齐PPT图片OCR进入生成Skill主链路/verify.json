@@ -7,7 +7,7 @@
   "pass": true,
   "summary": "QA PASS。14 个目标测试全部通过。图片 OCR -> parsed_files -> PPT prompt 消费链路闭环：ContextAssembler 统一产出含 attachment_kind/image 元信息的 parsed_files、UploadedFileSchema 暴露 extracted_text/parse_status/parser_source、ppt_generator 优先消费 parsed_files 并按图片标签纳入 prompt、manifest 允许 png/jpg/jpeg/webp。review-1 APPROVE。",
   "test_commands": [
-    "cd /Users/lin/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py"
+    "cd /Users/linsuchang/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py"
   ],
   "test_results": {
     "target_tests": "14 passed, 4 deprecation warnings (FastAPI lifecycle)",

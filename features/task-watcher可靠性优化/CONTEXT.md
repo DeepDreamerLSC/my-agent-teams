@@ -33,7 +33,7 @@
   - agents/runtime/session/role 映射
   - project / domain policy / reviewer 规则
 - watcher 运行时状态目录：
-  - `STATE_DIR=/Users/lin/.openclaw/workspace/.task-watcher`
+  - `STATE_DIR=/Users/linsuchang/.openclaw/workspace/.task-watcher`
   - 当前主要保存“是否已通知”“上次时间戳”“签名”等去重状态
 - watcher 锁目录：
   - `agents/arch-1/.watcher-lock`（当前仓库里可见）

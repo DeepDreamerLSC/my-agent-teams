@@ -14,16 +14,16 @@
   - 第 2 列空表头映射为 `客户货号`
   - 日期别名归一为 `船期`
 - 相关实现：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:759-823`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:759-823`
 - 这与任务要求“先对比新旧格式差异，再做最小兼容改动”一致。
 
 ### 2. 新格式当前关键断点已被补齐
 - `_list_order_sheet_infos()` 不再只吃第一张 sheet，而是遍历所有业务 sheet：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:788-807`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:788-807`
 - `_normalize_headers()` 能把“第 2 列空表头但实际承载 `DISPIMG(...)`”标准化为 `客户货号`：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:809-823`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:809-823`
 - 这样后续商品图引用恢复可用：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:929-932`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:929-932`
 
 ### 3. 新样本自动化测试已补上，且旧路径未明显回归
 - 新增测试已覆盖：
@@ -32,7 +32,7 @@
   - 空表头第 2 列映射为 `客户货号`
   - 新格式 workbook 能走通主流程
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py:107-164`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py:107-164`
 - 同文件里既有单 sheet / 导出 / 排版等用例继续存在并通过，说明旧成功路径没有被顺手打坏。
 
 ## 非阻塞备注

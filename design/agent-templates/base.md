@@ -111,7 +111,7 @@ WORKSPACE_ROOT=${WORKSPACE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || 
   - 是否与你当前 active tasks 的 `write_scope` 冲突
   - 你是否在该任务的 `claim_scope` 内
 - 当前推荐使用：
-  - `$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> [reason]`（当前默认工作区为 `/Users/lin/Desktop/work/my-agent-teams`；迁移后以本机 checkout 路径为准）
+  - `$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> [reason]`（当前默认工作区为 `/Users/linsuchang/Desktop/work/my-agent-teams`；迁移后以本机 checkout 路径为准）
 - **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
 - 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
 

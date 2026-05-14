@@ -2,7 +2,7 @@
 
 ## 背景
 上轮补修任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正反馈附件详情下载链路与契约接线`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正反馈附件详情下载链路与契约接线`
 
 审查驳回点明确：
 - 受保护下载链路已经修好
@@ -33,7 +33,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/收束反馈附件详情为可靠下载入口/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收束反馈附件详情为可靠下载入口/result.json`
 
 请在结果中写明：
 - 最终是否保留“打开”入口

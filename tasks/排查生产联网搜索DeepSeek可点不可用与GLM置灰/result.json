@@ -25,8 +25,8 @@
         "dev-2"
       ],
       "suggested_minimal_fix_scope": [
-        "生产配置：补齐 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 中的 CHAT_WEB_SEARCH_BASE_URL，并确认对应外部搜索接口可达。",
-        "如仍需避免“可点但必失败”的体验，再评估是否让前端也对 DeepSeek 的 web_search_runtime_status=unavailable 做显式禁用或更明确提示。相关代码范围：/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts、/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx、/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py。"
+        "生产配置：补齐 /Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod 中的 CHAT_WEB_SEARCH_BASE_URL，并确认对应外部搜索接口可达。",
+        "如仍需避免“可点但必失败”的体验，再评估是否让前端也对 DeepSeek 的 web_search_runtime_status=unavailable 做显式禁用或更明确提示。相关代码范围：/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts、/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx、/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py。"
       ]
     },
     "glm_button_greyed_out": {
@@ -49,7 +49,7 @@
       ],
       "suggested_minimal_fix_scope": [
         "先由 arch-1 确认是否接受继续按 provider 级 unavailable 直接置灰所有 GLM；如果接受，则无需前端修复，重点转为排查 zhipu 上游可用性。",
-        "如果需要更细粒度，dev-2 可把 provider-native 探针从 provider 级进一步细化到 model 级（例如区分 GLM-5.0 与 GLM-4.7-Flash），再由 dev-1/前端按更细状态展示。当前最小相关范围：/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py、/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py、/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts。"
+        "如果需要更细粒度，dev-2 可把 provider-native 探针从 provider 级进一步细化到 model 级（例如区分 GLM-5.0 与 GLM-4.7-Flash），再由 dev-1/前端按更细状态展示。当前最小相关范围：/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py、/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py、/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts。"
       ]
     }
   },
@@ -59,11 +59,11 @@
   },
   "minimal_verification": [
     {
-      "command": "读取生产部署代码 /Users/lin/Desktop/prod/chiralium/backend/app/core/model_providers.py、backend/app/api/meta.py、frontend/src/hooks/useChatOptions.ts、frontend/src/components/ChatToolbar.tsx",
+      "command": "读取生产部署代码 /Users/linsuchang/Desktop/prod/chiralium/backend/app/core/model_providers.py、backend/app/api/meta.py、frontend/src/hooks/useChatOptions.ts、frontend/src/components/ChatToolbar.tsx",
       "result": "confirmed: 生产已部署 DeepSeek tool_call 修复，以及 GLM provider-native runtime 状态输出与前端置灰逻辑"
     },
     {
-      "command": "读取 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 相关项，并在已 source 环境下执行 describe_web_search_runtime()",
+      "command": "读取 /Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod 相关项，并在已 source 环境下执行 describe_web_search_runtime()",
       "result": "confirmed: DeepSeek runtime 当前 unavailable，直接原因是 missing_base_url"
     },
     {

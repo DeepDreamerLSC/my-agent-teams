@@ -61,7 +61,7 @@ SQLite（/opt/task-board/task-board.sqlite3）
 
 ```yaml
 tunnel: 575873d2-b13d-40cf-8ed6-a1da627d0a51
-credentials-file: /Users/lin/.cloudflared/575873d2-b13d-40cf-8ed6-a1da627d0a51.json
+credentials-file: /Users/linsuchang/.cloudflared/575873d2-b13d-40cf-8ed6-a1da627d0a51.json
 ingress:
   - hostname: chiraliumai.cn
     service: http://127.0.0.1:8088
@@ -234,7 +234,7 @@ launchctl load ~/Library/LaunchAgents/com.chiralium.task-board.plist
 #!/bin/bash
 set -euo pipefail
 
-SRC="/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3"
+SRC="/Users/linsuchang/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3"
 DST="/opt/task-board/task-board.sqlite3"
 
 if [ ! -f "$SRC" ]; then

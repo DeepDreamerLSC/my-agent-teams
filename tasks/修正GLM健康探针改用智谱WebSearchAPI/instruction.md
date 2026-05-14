@@ -2,7 +2,7 @@
 
 ## 背景
 生产排查结论：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
 
 林总工要求先看智谱网络搜索官方文档，再对比我们实现哪里有问题并修复。参考官方文档：
 - Chat Completions 文档：`https://docs.bigmodel.cn/api-reference/模型-api/对话补全`
@@ -38,7 +38,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
 
 结果中请明确写：
 1. 官方文档与我们原实现的差异点

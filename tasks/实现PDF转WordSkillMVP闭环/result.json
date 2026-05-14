@@ -20,8 +20,8 @@
     "backend/tests/test_pdf_to_word_service.py"
   ],
   "tests": [
-    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_pdf_to_word_skill.py tests/test_pdf_to_word_service.py -v → 9 passed",
-    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_admin_skills.py tests/test_order_print_image_skill.py tests/test_ppt_generator_skill.py tests/test_ppt_generator_image_input.py -v → 35 passed (回归验证)"
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_pdf_to_word_skill.py tests/test_pdf_to_word_service.py -v → 9 passed",
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_admin_skills.py tests/test_order_print_image_skill.py tests/test_ppt_generator_skill.py tests/test_ppt_generator_image_input.py -v → 35 passed (回归验证)"
   ],
   "risks": [
     "DOCX 使用 office_export_service.build_docx_bytes 最小 OOXML 方式生成，不含 python-docx 依赖，格式能力有限但满足 MVP 闭环",

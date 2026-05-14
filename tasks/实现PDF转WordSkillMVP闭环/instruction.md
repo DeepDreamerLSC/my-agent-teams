@@ -14,28 +14,28 @@ development
 - 只修改 task.json.write_scope 中列出的文件。
 
 ## 输入事实
-- 架构评审任务：`/Users/lin/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json`。
-- 设计文档：`/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md`。
+- 架构评审任务：`/Users/linsuchang/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json`。
+- 设计文档：`/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md`。
 - 前置任务 `补齐Skill文件解析开关同步` 已 done：manifest 顶层 `supports_file_parse=true` 可同步到 DB。
 - 现有 custom skill 输出文件可通过 `display_type=file` + `file` payload 进入 generated file 链路。
 - 当前 `backend/requirements.txt` 没有 `python-docx`，本 MVP 应用最小 OOXML/zip 方式或项目现有模式生成合法 docx。
 
 ## 约束
 - write_scope 仅限：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/manifest.json`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/core/config.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/.env.example`
-  - `/Users/lin/Desktop/work/chiralium/.env.example`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/__init__.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/workspace.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/manifest.json`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/core/config.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/.env.example`
+  - `/Users/linsuchang/Desktop/work/chiralium/.env.example`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/__init__.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/workspace.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py`
 - `result.json.status` 只能使用 `done` / `failed` / `blocked`。
 - 保持现有 docx_generator / ppt_generator / order-print-image-pack skill 不回归。
 

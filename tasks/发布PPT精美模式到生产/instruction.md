@@ -48,7 +48,7 @@
 ## 验收标准
 1. 生产部署命令已执行：
    ```bash
-   cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+   cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
    ```
 2. Release Note 已更新，至少说明：
    - PPT 精美模式 polished demo 闭环上线

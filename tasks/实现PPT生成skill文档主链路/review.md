@@ -9,32 +9,32 @@
 
 ### 1. `ppt_generator` 主链路已按现有 skill 体系落地
 - 新 skill 目录结构与现有 custom skill 保持一致：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py`
 - manifest 已声明文档/PDF 输入与 `pptx` 输出：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:1-47`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:1-47`
 - 测试已验证 SkillManager 可发现该 skill：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:41-47`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:41-47`
 
 ### 2. 文档主链路与现有 parsed_files 契约对齐
 - skill 会读取 `recent_messages + parsed_files + 当前 query` 组织计划提示词：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:126-173`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:126-173`
 - 这与当前聊天链路对文档/PDF 解析后再供 skill 消费的方式一致，没有引入割裂的新结构。
 - 测试已覆盖 `parsed_files` 内容会进入最终计划消息：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:94-111`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:94-111`
 
 ### 3. `.pptx` 导出能力已落地，且不新增依赖
 - `office_export_service.py` 已新增 `PPTX_MIME` 与 `build_pptx_bytes()`：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py:10-14,232-384`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/office_export_service.py:10-14,232-384`
 - 实现沿用现有 zip/XML 导出风格，没有引入额外第三方依赖，符合任务边界。
 
 ### 4. 返回契约与现有 `display_type=file` 主链路一致
 - skill 返回：`status=success` + `display_type=file` + `file{file_name,file_path,file_size,mime_type}`：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:57-69`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:57-69`
 - 聊天链路本身已经复用该文件回传契约注册生成文件，无需为本任务额外改造：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py:1493-1511`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py:1493-1511`
 - 测试已明确断言 `display_type=file`：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:51-91`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:51-91`
 
 ### 5. 测试覆盖与本任务目标匹配
 - 已覆盖：
@@ -43,7 +43,7 @@
   - 基于 parsed text 生成真实 `.pptx`
   - 计划消息会带入 `recent_messages + parsed_files`
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:29-111`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:29-111`
 
 ## 非阻塞备注
 - 任务目录缺少 `verify.json`，但不影响本次代码审查结论。

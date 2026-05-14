@@ -2,7 +2,7 @@
 
 ## 背景
 上轮补修任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正boxcalculator数量兜底解析回归`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正boxcalculator数量兜底解析回归`
 
 审查驳回点已明确：
 - 你修掉了“本轮文本”和“上游 params”误传
@@ -31,7 +31,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正boxcalculator历史总数回填回归/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正boxcalculator历史总数回填回归/result.json`
 
 请在结果中写明：
 - 如何阻断历史错误 total_quantity 回填

@@ -4,7 +4,7 @@
   "status": "done",
   "completed_at": "2026-04-26T11:47:34+08:00",
   "summary": "已更新 2026-04-23 至 2026-04-25 的 release note，整理并提交当前工作树中的有效 DeepSeek/GLM 相关改动并推送到 origin/master，随后完成生产部署。",
-  "release_note_path": "/Users/lin/Desktop/work/chiralium/design/product/release-note.md",
+  "release_note_path": "/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md",
   "release_note_entries_summary": {
     "2026-04-25": [
       "DeepSeek 联网搜索异常已修复，联网搜索链路恢复到正确可用状态",
@@ -22,14 +22,14 @@
   "commit_hash": "4f37d637a274e3a860753e997939d2eaee80fdb4",
   "pushed": true,
   "deployed_commit": "4f37d637a274e3a860753e997939d2eaee80fdb4",
-  "deploy_command": "cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod",
+  "deploy_command": "cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod",
   "health_check_result": {
     "backend_health": "http://127.0.0.1:18000/health ready",
     "hotpick_backend_health": "http://127.0.0.1:18100/health ready",
     "public_site": "https://chiraliumai.cn ready"
   },
   "verification": {
-    "backend_tests": "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q -> 41 passed, 5 warnings",
+    "backend_tests": "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q -> 41 passed, 5 warnings",
     "frontend_tests": "npx vitest run src/test/chatOptions.test.tsx src/test/deepseekModelsRuntimeWiring.test.tsx src/test/deepseekWebSearchVisibility.test.tsx -> 37 passed",
     "frontend_typecheck": "npx tsc --noEmit -> passed",
     "git_match": "local HEAD == prod HEAD == 4f37d637a274e3a860753e997939d2eaee80fdb4"

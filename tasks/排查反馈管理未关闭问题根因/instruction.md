@@ -47,5 +47,5 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/result.json`

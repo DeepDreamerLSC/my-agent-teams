@@ -1,15 +1,15 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx`
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
-  - `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
+  - `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx`
 
 ## 结论摘要
 本任务按“最小提示与前端接线”目标完成得比较到位：

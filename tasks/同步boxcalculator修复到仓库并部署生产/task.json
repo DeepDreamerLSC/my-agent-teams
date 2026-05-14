@@ -19,9 +19,9 @@
   "owner_pm": "pm-chief",
   "domain": "quality",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/.git",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
-    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+    "/Users/linsuchang/Desktop/work/chiralium/.git",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md"
   ],
   "depends_on": [
     "修改boxcalculator支持混装两列优化"

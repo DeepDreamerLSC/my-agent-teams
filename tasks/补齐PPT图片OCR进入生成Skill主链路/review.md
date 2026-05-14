@@ -20,7 +20,7 @@
 
 ## 验证证据
 - 复跑目标测试：
-  - `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py`
+  - `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py`
   - 结果：`14 passed`。
 - 复跑扩展相关回归：
   - `... pytest -q -p no:cacheprovider backend/tests/contracts/test_chat_response_contract.py backend/tests/test_files.py backend/tests/integration/test_file_flow.py`

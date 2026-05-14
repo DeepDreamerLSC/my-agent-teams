@@ -19,11 +19,11 @@
   "owner_pm": "pm-chief",
   "domain": "quality",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/.git",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
-    "/Users/lin/Desktop/work/chiralium/design/product/release-note.md"
+    "/Users/linsuchang/Desktop/work/chiralium/.git",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md"
   ],
   "depends_on": [
     "增强boxcalculator支持直接输入鞋盒尺寸",

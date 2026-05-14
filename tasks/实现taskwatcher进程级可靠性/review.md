@@ -1,14 +1,14 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现taskwatcher进程级可靠性/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现taskwatcher进程级可靠性/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现taskwatcher进程级可靠性/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现taskwatcher进程级可靠性/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
-  - `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
-  - `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/qa.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/qa.md`
 
 ## 结论摘要
 本次实现满足“在现有 shell watcher 架构上做最小进程级可靠性增强”的目标：

@@ -2,7 +2,7 @@
   "status": "done",
   "completed_at": "2026-05-06T07:32:16.937212+08:00",
   "summary": "设计总体可实施，且与 chiralium 当前 custom skill、subprocess runtime、chat file result 注册链路匹配；但需先补齐 manifest -> DB 的 supports_file_parse 同步，否则 PDF 转 Word skill 启用后仍会被 chat 通用 PDF 预解析链路拦截/拖慢。MinerU 与 MiniCPM-V 不应放进 skill.py 或默认 docker runtime，MVP 先用 mock/fixture 跑通 skill + service + DOCX 闭环，真实接入优先使用长期运行的 HTTP sidecar/service，CLI 仅作为开发兜底。",
-  "design_doc": "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
+  "design_doc": "/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
   "review_conclusion": {
     "implementable": true,
     "blocking_level": "non_blocking_with_required_pre_mvp_fix",
@@ -23,8 +23,8 @@
       "agent_or_pool": "be-1 或 auto-dev/backend",
       "task_type": "development",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
       ],
       "dependencies": [],
       "acceptance": [
@@ -40,20 +40,20 @@
       "agent_or_pool": "be-1 或 auto-dev/backend",
       "task_type": "development",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/manifest.json",
-        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
-        "/Users/lin/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md",
-        "/Users/lin/Desktop/work/chiralium/backend/app/core/config.py",
-        "/Users/lin/Desktop/work/chiralium/backend/.env.example",
-        "/Users/lin/Desktop/work/chiralium/.env.example",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/__init__.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/workspace.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py"
+        "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/manifest.json",
+        "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
+        "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/core/config.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/__init__.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/workspace.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py"
       ],
       "dependencies": [
         "补齐 Skill 文件解析开关同步"
@@ -73,10 +73,10 @@
       "agent_or_pool": "be-1 或 auto-dev/backend",
       "task_type": "development",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_content_list.json",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_middle.json"
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_content_list.json",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_middle.json"
       ],
       "dependencies": [
         "PDF 转 Word Skill MVP（mock/fixture 闭环）"
@@ -94,10 +94,10 @@
       "agent_or_pool": "be-1 或 auto-dev/backend",
       "task_type": "development",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/minicpmv_client.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/enhancement.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_enhancement.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/minicpmv_enhancement.json"
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/minicpmv_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/enhancement.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_enhancement.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/minicpmv_enhancement.json"
       ],
       "dependencies": [
         "MinerU HTTP sidecar Adapter 接入"
@@ -115,14 +115,14 @@
       "agent_or_pool": "be-1 或 auto-dev/backend；接口契约由 arch-1 复核",
       "task_type": "development",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/schemas/pdf_to_word.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/pdf_to_word/job_service.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/db/models/pdf_to_word_job.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/db/models/__init__.py",
-        "/Users/lin/Desktop/work/chiralium/backend/alembic/versions/016_pdf_to_word_jobs.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/main.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/pdf_to_word.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/job_service.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/db/models/pdf_to_word_job.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/db/models/__init__.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/alembic/versions/016_pdf_to_word_jobs.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/main.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
       ],
       "dependencies": [
         "PDF 转 Word Skill MVP（mock/fixture 闭环）",
@@ -142,7 +142,7 @@
       "agent_or_pool": "qa-1",
       "task_type": "verification",
       "write_scope": [
-        "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-qa-report.md"
+        "/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-qa-report.md"
       ],
       "dependencies": [
         "PDF 转 Word Skill MVP（mock/fixture 闭环）",
@@ -162,8 +162,8 @@
     "title": "补齐 Skill 文件解析开关同步",
     "reason": "这是最小、低风险且会阻塞 PDF 转 Word skill 正常启用的前置项；不先修，MVP 即使 skill.py 可用，也可能在 chat.py 执行 skill 前被通用 PDF parser 拦截或拖慢。",
     "write_scope": [
-      "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
-      "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+      "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+      "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
     ]
   },
   "risks": [
@@ -241,16 +241,16 @@
     "设计文档本身目前是 chiralium 工作树未跟踪文件；PM 若要纳入版本管理，应单独创建文档提交/合入任务。"
   ],
   "evidence": [
-    "/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/skill_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/skill_runner.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/docx_generator/1.0.0/manifest.json",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
-    "/Users/lin/Desktop/work/chiralium/backend/requirements.txt",
-    "/Users/lin/Desktop/work/my-agent-teams/tasks/*/task.json active chiralium task scan"
+    "/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/skill_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/file_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/skill_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/docx_generator/1.0.0/manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/requirements.txt",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/*/task.json active chiralium task scan"
   ],
   "verification": {
     "result_json_validated": true,
@@ -262,8 +262,8 @@
   "agent": "arch-1",
   "files_modified": [],
   "tests": [
-    "python3 -m json.tool /Users/lin/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json",
-    "python3 -m json.tool /Users/lin/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/ack.json",
+    "python3 -m json.tool /Users/linsuchang/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json",
+    "python3 -m json.tool /Users/linsuchang/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/ack.json",
     "未运行业务测试；本任务为只读架构评审，仅写任务 ack/result。"
   ]
 }

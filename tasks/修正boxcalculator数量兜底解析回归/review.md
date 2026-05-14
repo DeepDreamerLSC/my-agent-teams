@@ -7,17 +7,17 @@
 
 ## 通过项
 - 已把总数解析拆成“显式总数”与“兜底总数”两层，`10个/10双` 的 direct_dimension 兼容仍在：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30,117-123,457-465`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30,117-123,457-465`
 - 已补 plain query 与上游错误 `params.total_quantity` 的回归测试：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:78-108`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:78-108`
 
 ## 阻塞问题
 
 ### 1. `recent_messages` 合并路径仍会把历史 `total_quantity` 回填回来，forward 混装回归在多轮对话下没有真正修掉
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:117-123`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:139-159`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:161-181`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:117-123`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:139-159`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:161-181`
 - 当前修复会在“文本里已解析出 `style_quantities`、但没有显式总数语义”时先把 `request['total_quantity']` 置空，这是对的。
 - 但紧接着又调用 `_merge_recent_request()`；而 `_merge_recent_request()` 在 `merged['mode']` 还没被判成 `forward` 之前，不会提前 `break`，仍会执行：
   - `if merged['total_quantity'] is None: merged['total_quantity'] = historical['total_quantity']`
@@ -31,7 +31,7 @@
 
 ### 2. 没有覆盖 `recent_messages` 场景，因此上面的剩余回归没有被测出来
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:49-181`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:49-181`
 - 当前新增测试全部使用 `context={}`，只覆盖了：
   - 本轮文本直输
   - 上游 params 误传

@@ -7,18 +7,18 @@
 
 ## 通过项
 - `ppt_generator` 已新增 `simple / polished` 两种模式入口：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:69-125`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:69-125`
 - 页图渲染逻辑已抽成独立 `ppt_page_render_service`，没有把 provider 调用散落回 skill：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py:53-112,115-176`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py:53-112,115-176`
 - `cover / content / closing` 三类页型的最小 demo 主链路与测试已补出：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py:13-52`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:98-158`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py:13-52`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:98-158`
 
 ## 阻塞问题
 
 ### 1. `presentation_plan.json` 会被按字节硬截断，可能生成无效 JSON / 无效 UTF-8，破坏 polished demo 包契约
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:30,317-323`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:30,317-323`
 - 当前实现会：
   - 先把 `plan` 序列化成 `plan_bytes`
   - 再直接写入 `plan_bytes[:_MAX_DEMO_ARCHIVE_PLAN_BYTES]`
@@ -30,8 +30,8 @@
 
 ### 2. 显式 `image_model_id` 会绕过 CogView 限制，和任务要求“先用 CogView-3-Flash，不直接接 GLM-Image”不一致
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:78-83`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py:82-94`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:78-83`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py:82-94`
 - 当前 `ppt_generator` 会把 `params.image_model_id` / `context.selected_image_model_id` 直接传给 `render_presentation_demo()`。
 - 但 `_resolve_demo_image_model()` 的实现是：
   - 只要传入的 `image_model_id` 对应的是**任意活跃的 image_generation 模型**，就直接返回；
@@ -44,8 +44,8 @@
 
 ## 测试问题
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:98-158`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py:13-100`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:98-158`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py:13-100`
 - 当前测试已覆盖：
   - polished 模式会返回 zip demo 包
   - 页图渲染 service 会调用 CogView 接口

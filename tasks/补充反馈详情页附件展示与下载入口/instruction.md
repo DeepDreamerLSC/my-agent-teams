@@ -2,7 +2,7 @@
 
 ## 背景
 依赖上游后端契约任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
 
 生产排查已确认：反馈详情页当前没有附件展示区，导致后续处理人员无法查看已上传附件。
 

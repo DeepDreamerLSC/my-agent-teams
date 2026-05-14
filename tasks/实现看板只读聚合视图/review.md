@@ -9,11 +9,11 @@
 
 ### 1. 只读聚合视图主链路已补齐
 - 新增聚合 payload 构造：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:575-651`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:575-651`
 - 新增 API：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py:131-144`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py:131-144`
 - 新增 CLI：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-aggregate.py:1-78`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-aggregate.py:1-78`
 - 三者共同构成了“query → API → 脚本”的只读聚合闭环。
 
 ### 2. 聚合维度符合任务要求
@@ -24,15 +24,15 @@
   - `parent_task_id`
   - `root_request_id`
 - 相关实现：
-  - 维度常量：`/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:11-18`
-  - 分组构造：`/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:518-547`
-  - request tree drill-down：`/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:550-651`
+  - 维度常量：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:11-18`
+  - 分组构造：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:518-547`
+  - request tree drill-down：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:550-651`
 
 ### 3. `task_level` 的 task.json 回退策略合理，能兼容当前 SQLite 快照缺口
 - 聚合前会按 `task_json_path` 回退读取 task.json 元数据：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:449-468`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:449-468`
 - `task_level` / `parent_task_id` / `root_request_id` 等字段都通过 `_coalesce_task_field()` 做补齐：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:471-500`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:471-500`
 - 这与 `result.json` 的说明一致，也避免了当前 read model 未持久化 `task_level` 时的聚合失真。
 
 ### 4. 明确声明“只读派生视图”，没有把聚合结果当事实源
@@ -40,7 +40,7 @@
   - `read_only: true`
   - `source.note: derived for inspection only`
 - 位置：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py:630-642`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py:630-642`
 - 这符合任务“不要把聚合视图误当状态事实源”的边界要求。
 
 ## 非阻塞备注

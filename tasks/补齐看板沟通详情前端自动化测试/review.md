@@ -9,28 +9,28 @@
 
 ### 1. 详情抽屉与时间线渲染已抽成可直接回归的纯函数
 - 已把详情抽屉主体 HTML 提炼为 `renderTaskDetailHtml()`：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:351-394`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:351-394`
 - 已把时间线主体提炼为 `renderTimelineHtml()`：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:397-433`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:397-433`
 - 同时新增 `sortTimelineItems()`，把排序逻辑独立出来：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:401-408`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:401-408`
 - 这满足了任务要求中的“时间线排序与展示逻辑有测试兜底”。
 
 ### 2. Node 环境保护已补齐，测试不依赖真实浏览器 DOM 启动
 - `dashboard.js` 现在先探测 `document/window`，并且只在浏览器环境下自动执行 `init()`：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:29-39,496-503`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:29-39,496-503`
 - Node 环境下通过 `module.exports` 暴露纯渲染函数与排序函数，便于 unittest 稳定调用：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:505-513`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:505-513`
 
 ### 3. 自动化测试已覆盖核心场景
 - 时间线排序：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:21-37`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:21-37`
 - 状态时间线渲染与空态 fallback：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:39-61`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:39-61`
 - 沟通时间线字段渲染（from_actor / to_actor / priority / message_text）：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:63-82`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:63-82`
 - 详情抽屉在缺失阶段耗时、空 communication 下的展示：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:84-117`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py:84-117`
 - 这些用例与 instruction 里列出的目标场景一致。
 
 ### 4. 既有详情抽屉与三大视图没有被顺手改坏

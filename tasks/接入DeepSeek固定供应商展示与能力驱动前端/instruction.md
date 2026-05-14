@@ -3,8 +3,8 @@
 ## 背景
 
 上游方案任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案`
-- 方案文档：`/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案`
+- 方案文档：`/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
 
 本任务对应方案中的 execution 子任务 C。
 
@@ -18,11 +18,11 @@
 2. 聊天页“深度思考 / 联网搜索”按钮不再写死为 zhipu，而是基于后端 capability 驱动
 
 ## 建议实现范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test`
 
 ## 验收标准
 1. 管理后台 provider 列表能出现 DeepSeek
@@ -38,4 +38,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/接入DeepSeek固定供应商展示与能力驱动前端/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/接入DeepSeek固定供应商展示与能力驱动前端/result.json`

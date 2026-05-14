@@ -6,12 +6,12 @@
   "completed_at": "2026-04-26T11:14:30+08:00",
   "summary": "已按最小范围完成 GLM 联网搜索不可用前端提示接线：前端优先消费 zhipu provider-native runtime，GLM 联网搜索确认 unavailable 时给出明确提示并禁用搜索开关；DeepSeek 与其他 provider 继续沿用原有状态语义，不被 zhipu 状态误伤。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
   ],
   "implementation": {
     "comparison_basis": [

@@ -46,12 +46,12 @@ chat/
 统一使用：
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh general "消息内容"
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task <task-id> "消息内容"
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh announce <task-id> "任务公告内容"
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "系统通知" --to pm-chief --severity degraded
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发" --to dev-1 --severity info
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "已强制唤醒" --to dev-2 --severity critical
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh general "消息内容"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh task <task-id> "消息内容"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh announce <task-id> "任务公告内容"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "系统通知" --to pm-chief --severity degraded
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发" --to dev-1 --severity info
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "已强制唤醒" --to dev-2 --severity critical
 ```
 
 ### `task_announce` 前置条件
@@ -92,16 +92,16 @@ chat/
 
 ### 1. 查看消息
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh general --limit 20
-/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh task <task-id> --limit 50
-/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh watcher --limit 20
-/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh dispatch --limit 20
-/Users/lin/Desktop/work/my-agent-teams/scripts/read-chat.sh nudge --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/read-chat.sh general --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/read-chat.sh task <task-id> --limit 50
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/read-chat.sh watcher --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/read-chat.sh dispatch --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/read-chat.sh nudge --limit 20
 ```
 
 ### 2. PM 巡检
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/pm-chat-check.sh --days 1 --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/pm-chat-check.sh --days 1 --limit 20
 ```
 
 默认会聚焦：
@@ -113,8 +113,8 @@ chat/
 
 ### 3. 协议校验
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/lint-chat.sh
-/Users/lin/Desktop/work/my-agent-teams/scripts/lint-chat.sh /Users/lin/Desktop/work/my-agent-teams/chat/tasks
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/lint-chat.sh
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/lint-chat.sh /Users/linsuchang/Desktop/work/my-agent-teams/chat/tasks
 ```
 
 会校验：
@@ -149,16 +149,16 @@ chat/
 
 ### 常用 system 示例
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发并完成定向唤醒" --to dev-1 --severity info
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "QA 未通过，需 PM 仲裁" --to pm-chief --severity degraded
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "critical 任务已强制唤醒" --to dev-2 --severity critical
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh dispatch <task-id> "任务已派发并完成定向唤醒" --to dev-1 --severity info
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh watcher <task-id> "QA 未通过，需 PM 仲裁" --to pm-chief --severity degraded
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh nudge <task-id> "critical 任务已强制唤醒" --to dev-2 --severity critical
 ```
 
 
 ### 4. 指标采集
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
-/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 7 --json
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 7 --json
 ```
 
 用于采集：

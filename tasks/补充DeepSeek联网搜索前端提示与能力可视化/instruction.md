@@ -2,7 +2,7 @@
 
 ## 背景
 已批准的架构方案见：
-- `/Users/lin/Desktop/work/chiralium/design/product/deepseek-web-search-production-incident-plan.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-web-search-production-incident-plan.md`
 
 当前生产事故已确认：
 - flash 禁用是因为生产模型 provider 漂移，前端只是如实反映 capability
@@ -41,7 +41,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/result.json`
 
 请在 `result.json` 中包含：
 - 修改文件列表

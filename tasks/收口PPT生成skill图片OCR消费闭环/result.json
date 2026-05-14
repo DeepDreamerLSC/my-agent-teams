@@ -6,27 +6,27 @@
   "summary": "已补齐 PPT 生成 skill 的图片 OCR 消费闭环：图片附件现在会在现有文件解析主链路中进入 `parsed_files`，`ppt_generator` 可直接消费 OCR 文本生成 PPT；同时把 manifest / skill 输入能力与实际实现对齐，并补了证明闭环的测试。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
       "action": "modified",
       "description": "把 `ppt_generator` 的输入能力从仅文档扩展为文档 + 图片，允许 `.png/.jpg/.jpeg/.webp`，并声明 `attachment_kinds=[document,image]`，与实际 OCR 消费能力保持一致。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
       "action": "modified",
       "description": "更新 skill 描述，明确支持消费文档/PDF/图片 OCR 解析结果；生成逻辑继续统一消费 `parsed_files`，不额外分叉新的页面/UI 链路。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py",
       "action": "modified",
       "description": "让 `ensure_parsed_files()` 在现有文档解析之外，也会把图片扩展名（IMAGE_OCR_EXTENSIONS）送入 ParserService，从而让图片 OCR 文本进入 skill 可消费的 `parsed_files`。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
       "action": "modified",
       "description": "新增 manifest 输入能力对齐断言，以及图片 OCR 解析内容会进入 PPT 计划消息的测试。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
       "action": "modified",
       "description": "新增图片文件在 `ensure_parsed_files()` 中会产出 OCR 解析结果的测试，证明图片 -> parsed_files 主链路闭环。"
     }
@@ -47,11 +47,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py /Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/office_export_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py -q",
       "result": "passed (9 passed, 4 warnings)"
     }
   ],

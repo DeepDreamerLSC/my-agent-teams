@@ -6,7 +6,7 @@
   "summary": "已在现有 shell watcher 架构上完成超时检测优化：dispatched 任务改为“3 分钟无 ack 且无 Working/无后续工件才重发”，working 超过 30 分钟只通知 PM 介入、不再重发，并保留重发冷却避免短时间重复重发。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
       "action": "modified",
       "description": "新增超时阈值配置、任务时间戳/显式工件/Working 信号辅助函数；重写 dispatched 与 working 两类超时判断逻辑，优先依据 task.json / ack.json / result.json / review / verify 等显式工件，减少仅靠 tmux pane 文本造成的误报。"
     }
@@ -30,7 +30,7 @@
   ],
   "test_commands": [
     {
-      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/send-to-agent.sh",
+      "command": "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh && bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-to-agent.sh",
       "result": "passed"
     },
     {

@@ -1,11 +1,11 @@
 # 审查结论：驳回（REQUEST CHANGES）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx`
 
 ## 结论摘要
 本次改动只完成了**一半**：

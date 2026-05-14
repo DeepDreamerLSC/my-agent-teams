@@ -6,9 +6,9 @@
   "completed_at": "2026-04-25T19:12:30+08:00",
   "summary": "按 review 驳回意见完成前端最小范围补修：Models 能力标签改为以后端返回 capabilities 为准，保留 provider anomaly 仅作辅助提示；补充真实 Models 页面接线测试，以及 useChatOptions 对 degraded/unknown/非法 runtime status 的前向兼容测试。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
   ],
   "implementation": {
     "backend_capabilities_wiring": [

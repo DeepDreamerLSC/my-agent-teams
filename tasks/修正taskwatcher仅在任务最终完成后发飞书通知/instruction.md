@@ -16,16 +16,16 @@
 - 当前 watcher 在 `result.json` 进入 `ready_for_merge` 时会发 `【任务完成】` 类 push_task_event，语义上容易误导为“任务已经最终完成”。
 - 林总工明确要求：**必须等 review/QA/最终 done 后才能说任务完成。**
 - 当前关键脚本：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
 - 相关文档：
-  - `/Users/lin/Desktop/work/my-agent-teams/README.md`
-  - `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/README.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
 
 ## 约束
 - write_scope:
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/README.md`
-  - `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/README.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
 - read_only: false
 - target_environment: dev
 - execution_mode: dev

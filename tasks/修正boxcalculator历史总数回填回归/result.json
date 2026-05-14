@@ -6,12 +6,12 @@
   "summary": "已做最小补修，阻断 recent_messages 路径把历史错误 total_quantity 回填到当前混装 forward 的问题；同时补了多轮上下文下的 forward / direct_dimension / reverse 回归测试，确保历史内容不再污染当前轮意图。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
       "action": "modified",
       "description": "在 _build_request 的 recent_messages 合并前后增加‘当前轮意图保护’：当前文本已有 style_quantities 且无显式总数时，合并后强制清空 total_quantity；当前轮若是纯 direct_dimension 或纯 reverse，也会在 recent_messages 合并后清空历史 style_quantities / total_quantity 污染。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
       "action": "modified",
       "description": "新增 recent_messages 场景回归测试，覆盖历史错误总数回填、direct_dimension 多轮不回归、reverse 多轮不回归。"
     }
@@ -29,11 +29,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
       "result": "passed (15 passed, 4 warnings)"
     }
   ],

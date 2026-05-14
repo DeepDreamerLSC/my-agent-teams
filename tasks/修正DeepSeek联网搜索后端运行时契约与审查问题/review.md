@@ -1,15 +1,15 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_web_search_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_web_search_service.py`
 - 回归复核：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_models.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py`
 
 ## 结论摘要
 本次补修已经解决了上一轮 complex review 的核心阻塞点：

@@ -6,7 +6,7 @@
   "completed_at": "2026-05-06T09:20:00+08:00",
   "summary": "已按 review 驳回意见收束完成：最终完成类飞书通知不再只绑定 QA 自动收口路径，而是统一挂在 watcher 对 task.json.status=done 的观察分支上，通过 notify_final_done_if_needed 覆盖 auto_close、PM/integrator 手工 close-task.sh 等所有合法 done 路径；ready_for_merge 阶段继续只通知 PM/reviewer/QA 进入下游，不误报最终完成。README 说明已同步更新。",
   "modified_files": [
-    "/Users/lin/Desktop/work/my-agent-teams/README.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/README.md"
   ],
   "implementation": {
     "final_done_notification_strategy": [
@@ -23,15 +23,15 @@
   "verification": {
     "commands": [
       {
-        "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+        "command": "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
         "result": "passed"
       },
       {
-        "command": "grep -n 'notify_final_done_if_needed\\|done\\|【任务完成】\\|【部署完成】' /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+        "command": "grep -n 'notify_final_done_if_needed\\|done\\|【任务完成】\\|【部署完成】' /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
         "result": "passed（脚本存在统一 done 终态通知钩子，并在 done 分支调用）"
       },
       {
-        "command": "grep -n 'ready_for_merge' /Users/lin/Desktop/work/my-agent-teams/README.md",
+        "command": "grep -n 'ready_for_merge' /Users/linsuchang/Desktop/work/my-agent-teams/README.md",
         "result": "passed（README 已改为“检测到 result.json，进入待审 / 待验阶段”）"
       }
     ]

@@ -8,7 +8,7 @@
   "summary": "QA 验证通过。详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试已补齐。dashboard.js 已抽取纯渲染函数 (renderTaskDetailHtml / renderTimelineHtml / sortTimelineItems) 并增加 Node 环境保护，4 个 unittest 全部通过。",
   "review_verdict": "APPROVE",
   "test_commands": [
-    "cd /Users/lin/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest dashboard.tests.test_dashboard_frontend_timeline -v"
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest dashboard.tests.test_dashboard_frontend_timeline -v"
   ],
   "test_results": {
     "test_dashboard_frontend_timeline.py": "4 passed"

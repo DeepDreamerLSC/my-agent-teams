@@ -4,7 +4,7 @@
 design
 
 ## 目标
-对 `/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md` 做架构评审，并输出可执行实施拆分，帮助 PM 进入实施派发。重点确认：MinerU 主解析 + MiniCPM-V 增强 + custom skill + 后续 API 化这条路线是否与当前 chiralium skill/runtime/API 体系匹配。
+对 `/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md` 做架构评审，并输出可执行实施拆分，帮助 PM 进入实施派发。重点确认：MinerU 主解析 + MiniCPM-V 增强 + custom skill + 后续 API 化这条路线是否与当前 chiralium skill/runtime/API 体系匹配。
 
 ## 任务边界
 - 这是只读设计/实施拆解任务，不修改 chiralium 业务代码。
@@ -14,13 +14,13 @@ design
 
 ## 输入事实
 - 新需求：设计 PDF 转 Word skill，用于开罗尔平台；核心架构为 MinerU 主解析 + MiniCPM-V 增强；需要封装 API，后续可能对外提供。
-- 已产出设计文档：`/Users/lin/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md`。
+- 已产出设计文档：`/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md`。
 - 当前 custom skill 采用 `skills/custom/<skill-name>/<version>/manifest.json`，多数可执行 skill 还包含 `skill.py`。
 - 当前 custom skill 文件输出通过 `display_type=file` + `file` payload 进入 chat 链路注册 generated file。
 - 当前 `supports_file_parse` 是 DB 字段，默认同步为 false；PDF 转 Word 是否应从 manifest 同步该字段需要你评审。
 
 ## 约束
-- 遵守 `/Users/lin/Desktop/work/my-agent-teams/AGENTS.md` 与 chiralium 现有代码约定。
+- 遵守 `/Users/linsuchang/Desktop/work/my-agent-teams/AGENTS.md` 与 chiralium 现有代码约定。
 - 所有共享资源使用绝对路径。
 - 不假设 MinerU/MiniCPM-V 已在生产可用；需要区分 MVP mock、内网服务接入、生产部署前置条件。
 - 不安排生产部署，不修改生产目录。

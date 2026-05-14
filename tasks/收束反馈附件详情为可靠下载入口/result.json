@@ -6,10 +6,10 @@
   "completed_at": "2026-04-28T12:59:30+08:00",
   "summary": "已按 PM 裁决完成收束：反馈问题/需求详情页本轮不再保留误导性的‘打开’入口，只保留可靠的‘下载’入口；受保护下载链路继续沿用签名链接优先、blob fallback 兜底的实现。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
   ],
   "final_decision": {
     "keep_open_entry": false,

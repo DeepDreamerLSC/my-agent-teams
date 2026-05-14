@@ -26,15 +26,15 @@
 - 在结果中给出修复前后口径
 
 ## write_scope
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py`
-- `/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py`
-- `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
 
 ## 交付物
-请写 `/Users/lin/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/result.json`，说明：
+请写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/result.json`，说明：
 - 根因
 - 修改文件
 - 修复后后端口径

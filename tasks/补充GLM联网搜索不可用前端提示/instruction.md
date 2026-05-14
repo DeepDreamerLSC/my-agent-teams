@@ -6,7 +6,7 @@
 2. 如果探测确认联网不可用，前端直接报出正确的错误提示
 
 上游依赖任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/增加GLM联网搜索健康探针与状态输出`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增加GLM联网搜索健康探针与状态输出`
 
 ## 你的任务
 请在后端状态契约稳定后，完成前端最小提示：
@@ -27,4 +27,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充GLM联网搜索不可用前端提示/result.json`

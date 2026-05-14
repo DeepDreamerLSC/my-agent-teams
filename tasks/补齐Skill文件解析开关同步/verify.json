@@ -7,7 +7,7 @@
   "pass": true,
   "summary": "QA PASS。13 个测试全部通过。manifest -> SkillRecord.supports_file_parse 三条同步路径均已验证：文件系统同步新建记录 (L660)、已有记录 false->true 漂移修复 (L692-695)、zip upload 审批流 (L443)。解析 helper 只接受真实 bool，顶层优先、parameters 兜底、缺省 false。review-1 APPROVE，0 个阻塞问题。",
   "test_commands": [
-    "cd /Users/lin/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_admin_skills.py"
+    "cd /Users/linsuchang/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_admin_skills.py"
   ],
   "test_results": {
     "pytest": "13 passed, 4 deprecation warnings (FastAPI lifecycle, non-blocking)",

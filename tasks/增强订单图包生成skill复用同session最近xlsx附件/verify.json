@@ -8,8 +8,8 @@
   "summary": "QA 验证通过。平台层同 session 最近匹配附件复用能力已补齐，order-print-image-pack 接入正常，当前请求附件优先级正确，跨 session / 无历史时不误复用。全部 56 个测试通过（test_chat.py 45 + test_order_print_image_skill.py 11）。",
   "review_verdict": "APPROVE",
   "test_commands": [
-    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
-    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q"
+    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+    "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q"
   ],
   "test_results": {
     "test_chat.py": "45 passed, 4 warnings",

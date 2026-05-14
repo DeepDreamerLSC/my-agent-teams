@@ -1,8 +1,8 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/__init__.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/__init__.py`
 
 ## 结论摘要
 该任务已经把 Flask 根路由真正接到了 dashboard 模板上，同时保留了 `/api/health /api/board /api/gantt /api/agents`，联调验证也确认 `GET /` 返回 HTML 页面且三视图可访问。因此本任务可以通过 review。

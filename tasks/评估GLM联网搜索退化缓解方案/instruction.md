@@ -2,7 +2,7 @@
 
 ## 背景
 只读排查任务结论：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`
 
 当前 GLM 问题没有发现本地 capability / UI / 链路回退证据。
 更像是：
@@ -23,7 +23,7 @@
 
 ## 输出要求
 请在以下路径输出方案文档：
-- `/Users/lin/Desktop/work/chiralium/design/product/glm-web-search-degradation-mitigation-plan.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/glm-web-search-degradation-mitigation-plan.md`
 
 并在 result.json 中写明：
 - 根因判断

@@ -6,7 +6,7 @@
   "summary": "已为 box-calculator skill 增加‘用户直接输入鞋盒实际尺寸 + 数量’模式，并明确 exact-match / mismatch 提示：匹配成功才继续按 A-G 规则计算外箱，不匹配则列出 A-G 标准尺寸并停止计算。",
   "modified_files": [
     {
-      "path": "/Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "path": "/Users/linsuchang/.agents/skills/box-calculator/SKILL.md",
       "action": "modified",
       "description": "新增鞋盒实际尺寸输入模式、尺寸匹配规则、不匹配提示、输出格式与正反例示例。"
     }
@@ -43,11 +43,11 @@
   ],
   "verification": [
     {
-      "command": "grep -n '鞋盒实际尺寸输入模式\\|鞋盒尺寸匹配规则\\|不符合标准鞋盒数据库\\|输入鞋盒尺寸' /Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "command": "grep -n '鞋盒实际尺寸输入模式\\|鞋盒尺寸匹配规则\\|不符合标准鞋盒数据库\\|输入鞋盒尺寸' /Users/linsuchang/.agents/skills/box-calculator/SKILL.md",
       "result": "passed"
     },
     {
-      "command": "人工复核 /Users/lin/.agents/skills/box-calculator/SKILL.md 中‘工作方式 / 鞋盒尺寸匹配规则 / 输出格式 / 示例 5-6’段落",
+      "command": "人工复核 /Users/linsuchang/.agents/skills/box-calculator/SKILL.md 中‘工作方式 / 鞋盒尺寸匹配规则 / 输出格式 / 示例 5-6’段落",
       "result": "passed"
     }
   ],

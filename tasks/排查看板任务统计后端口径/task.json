@@ -21,12 +21,12 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh"
   ],
   "depends_on": [],
   "blocks": [],

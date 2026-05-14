@@ -2,10 +2,10 @@
 
 ## 背景
 原任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充反馈详情页附件展示与下载入口`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充反馈详情页附件展示与下载入口`
 
 审查意见：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充反馈详情页附件展示与下载入口/review.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充反馈详情页附件展示与下载入口/review.md`
 
 当前阻塞点不是“有没有附件区”，而是：
 1. 当前直接把受保护的 `/api/files/{id}` 裸链接塞给 `<a href>`，真实环境大概率 401
@@ -39,7 +39,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正反馈附件详情下载链路与契约接线/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正反馈附件详情下载链路与契约接线/result.json`
 
 请在 result.json 中说明：
 - 参考了哪条现有受保护下载实现

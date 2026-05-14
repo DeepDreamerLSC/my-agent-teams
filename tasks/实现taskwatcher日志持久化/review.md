@@ -1,13 +1,13 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现taskwatcher日志持久化/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现taskwatcher日志持久化/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现taskwatcher日志持久化/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现taskwatcher日志持久化/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
-  - `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
 
 ## 结论摘要
 本次实现满足“在现有 shell watcher 架构上补上持久化日志与 7 天轮转”的目标：

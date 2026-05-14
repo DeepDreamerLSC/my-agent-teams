@@ -5,15 +5,15 @@
   "status": "done",
   "summary": "已在授权范围内补齐图片 OCR 进入 PPT 生成 Skill 主链路：ContextAssembler 的 parsed_files 为图片/文档补充稳定元信息，UploadedFileSummary schema 暴露 extracted_text/parse_status/parser_source，ppt_generator 在 prompt 构建时优先消费 parsed_files，并可兜底消费 uploaded_files 中的图片 OCR 文本；manifest 已复核包含 .png/.jpg/.jpeg/.webp 与 image MIME。",
   "files_modified": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/schemas/file.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/file.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py"
   ],
   "files_reviewed": [
-    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json"
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json"
   ],
   "implementation": {
     "context_assembler": [
@@ -34,10 +34,10 @@
     ]
   },
   "tests": [
-    "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py：passed，14 passed",
-    "PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/context_assembler.py backend/app/schemas/file.py skills/custom/ppt_generator/1.0.0/skill.py：passed",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q backend/tests/test_context_assembler.py backend/tests/test_ppt_generator_image_input.py backend/tests/test_ppt_generator_skill.py：passed，14 passed",
+    "PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/context_assembler.py backend/app/schemas/file.py skills/custom/ppt_generator/1.0.0/skill.py：passed",
     "git diff --check -- scoped files：passed",
-    "/Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q backend/tests/contracts/test_chat_response_contract.py backend/tests/test_files.py backend/tests/integration/test_file_flow.py：非目标扩展回归命令中 11 passed / 1 failed；失败为 backend/tests/test_files.py 仍期望 preview.webp 上传 parse_status=skipped，但当前图片 OCR 链路已将 webp 标记为 pending。该断言不在本任务 write_scope，且与本任务“图片 OCR 进入主链路”目标相冲突，未越权修改。"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q backend/tests/contracts/test_chat_response_contract.py backend/tests/test_files.py backend/tests/integration/test_file_flow.py：非目标扩展回归命令中 11 passed / 1 failed；失败为 backend/tests/test_files.py 仍期望 preview.webp 上传 parse_status=skipped，但当前图片 OCR 链路已将 webp 标记为 pending。该断言不在本任务 write_scope，且与本任务“图片 OCR 进入主链路”目标相冲突，未越权修改。"
   ],
   "risks": [
     "未修改生产配置，未做生产部署。",

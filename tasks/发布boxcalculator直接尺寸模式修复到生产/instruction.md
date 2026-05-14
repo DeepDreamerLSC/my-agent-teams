@@ -4,8 +4,8 @@
 林总工已明确要求：直接安排架构师把已完成的 box-calculator 增强发布到生产。
 
 当前应吸收的**有效任务结果**：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/增强boxcalculator支持直接输入鞋盒尺寸`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正boxcalculator历史总数回填回归`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强boxcalculator支持直接输入鞋盒尺寸`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正boxcalculator历史总数回填回归`
 
 说明：
 - 较早的“紧急修复生产外箱尺寸计算直接尺寸输入模式”与“修正boxcalculator数量兜底解析回归”已被后续补修吸收，不应再单独作为发布内容。
@@ -20,7 +20,7 @@
 
 ### B. 更新 Release Note
 在：
-- `/Users/lin/Desktop/work/chiralium/design/product/release-note.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md`
 
 补充 2026-04-28（或当前最新日期）一条简洁更新，说明：
 - 外箱尺寸计算已支持“直接输入鞋盒实际尺寸 + 数量”模式
@@ -34,7 +34,7 @@
 ### D. 部署生产
 执行：
 ```bash
-cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
 ```
 
 ## 发布边界
@@ -43,7 +43,7 @@ cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/发布boxcalculator直接尺寸模式修复到生产/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/发布boxcalculator直接尺寸模式修复到生产/result.json`
 
 请在 result.json 中包含：
 - release_note_path

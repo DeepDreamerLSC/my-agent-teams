@@ -7,16 +7,16 @@
 
 ## 通过项
 - 已补出 `direct_dimension` 运行时模式，并在明显属于“鞋盒实际尺寸 + 数量”的输入下优先纠偏，不再直接落入 reverse：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:136-154,178-206`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:136-154,178-206`
 - 已补 `10个 / 10双` 识别、尺寸不匹配提示与 A-G 参考尺寸：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30,455-459,510-518`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30,455-459,510-518`
 
 ## 阻塞问题
 
 ### 1. 新增的总数兜底正则会把混装明细里的第一个“X双/个”误当总数，回归破坏原有 forward 混装输入
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:120-121,208-215,455-459`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:27-30`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py:120-121,208-215,455-459`
 - 当前新增了：
   - `re.compile(r'(?<![0-9.])([0-9]+)\s*(?:双|个)(?![0-9.])', re.I)`
 - `_parse_total_quantity()` 会按顺序取**第一个**匹配值直接返回；而 `_run_forward()` 又会把它当 `declared_total` 强校验总双数一致。
@@ -32,7 +32,7 @@
 
 ### 2. 缺少“混装但未显式声明总双数”的回归测试，导致上述回归未被捕获
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:62-120`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py:62-120`
 - 当前新增测试覆盖了：
   - direct dimension 成功
   - `10个` 误落 reverse 的纠偏

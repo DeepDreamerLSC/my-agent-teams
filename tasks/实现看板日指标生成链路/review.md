@@ -34,12 +34,12 @@
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile \
-  /Users/lin/Desktop/work/my-agent-teams/dashboard/metrics.py \
-  /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py
+  /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/metrics.py \
+  /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py
 
-python3 -m unittest /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py -v
+python3 -m unittest /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py -v
 
-python3 -m unittest discover -s /Users/lin/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v
+python3 -m unittest discover -s /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v
 ```
 
 结果：

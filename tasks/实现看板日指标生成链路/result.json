@@ -10,12 +10,12 @@
   },
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/metrics.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/metrics.py",
       "action": "modified",
       "description": "修正 `rebuild_daily_metrics()` 的 project / `__all__` 生成逻辑：project 定向重建时不再把 `__all__` 插回 `projects`。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
       "action": "added",
       "description": "新增回归测试，覆盖 project 范围重建不污染 `__all__`，以及 `/api/metrics/daily` 默认查询继续返回真实全局口径。"
     }
@@ -36,15 +36,15 @@
   ],
   "validation": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/metrics.py /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/metrics.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py",
       "result": "passed"
     },
     {
-      "command": "python3 -m unittest /Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py -v",
+      "command": "python3 -m unittest /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_metrics.py -v",
       "result": "passed (2 tests)"
     },
     {
-      "command": "python3 -m unittest discover -s /Users/lin/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
+      "command": "python3 -m unittest discover -s /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests -p 'test_*.py' -v",
       "result": "passed (10 tests)"
     }
   ],

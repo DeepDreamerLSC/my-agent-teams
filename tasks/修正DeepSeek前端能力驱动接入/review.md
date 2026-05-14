@@ -1,9 +1,9 @@
 # 审查结论：驳回（REQUEST CHANGES）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx`
 
 ## 结论摘要
 这次修正把上轮两个代码层阻塞点都修掉了：

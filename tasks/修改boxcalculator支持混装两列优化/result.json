@@ -6,7 +6,7 @@
   "summary": "已按生产 feedback 的 selected_plan 原文更新 box-calculator skill 文档：两列混装时强制启用左右列优化，宽度改为左右列最大宽度求和，并新增外箱长宽交换规则；其余固定鞋盒库、摆放方向、各边 +2.0 cm、1 位小数等原有正确规则继续保留。",
   "modified_files": [
     {
-      "path": "/Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "path": "/Users/linsuchang/.agents/skills/box-calculator/SKILL.md",
       "action": "modified",
       "description": "按 selected_plan 更新混装两列优化规则、长宽交换规则、计算公式、输出格式与示例。"
     }
@@ -37,7 +37,7 @@
   },
   "verification": [
     {
-      "command": "读取生产 feedback_requests.id=8b69238d-50ab-4340-936b-cfcb778108f2 的 selected_plan 原文，并逐条对照 /Users/lin/.agents/skills/box-calculator/SKILL.md",
+      "command": "读取生产 feedback_requests.id=8b69238d-50ab-4340-936b-cfcb778108f2 的 selected_plan 原文，并逐条对照 /Users/linsuchang/.agents/skills/box-calculator/SKILL.md",
       "result": "passed"
     },
     {

@@ -6,17 +6,17 @@
   "summary": "已在平台层为 skill 文件输入增加‘同 session 最近一次匹配附件复用’能力：当当前请求没有带符合 skill manifest 的文件时，聊天 skill 执行路径会回看同一 session 最近消息中的附件，找到最近一次匹配 `allowed_extensions / allowed_mime_types` 的文件并复用。对 `order-print-image-pack` 来说，这意味着当前轮没重新上传 `.xlsx` 时，会自动复用同 session 最近一次上传的订单汇总 xlsx；如果当前轮自己已经带了 xlsx，则仍优先使用当前附件。",
   "changed_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py",
       "action": "modified",
       "description": "新增 `_resolve_skill_uploaded_files()` / `_skill_file_matches_manifest()` 等平台层帮助函数；在 `_execute_skill_path()` 中改为先解析‘当前请求附件或同 session 最近匹配附件’，再做 skill 文件校验与执行。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "action": "modified",
       "description": "新增同 session 最近 xlsx 复用测试，以及‘当前请求已有 xlsx 时不读历史’的优先级测试。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py",
       "action": "modified",
       "description": "保留并跑通同模块回归测试；同时让既有非整数分配错误用例兼容 SkillManager 的 error/result 返回形态。"
     }
@@ -40,8 +40,8 @@
   "why_chat_layer_only": {
     "reason": "`order-print-image-pack` 缺文件报错的直接原因不是业务计算，而是平台给 skill 传的 `uploaded_files` 只包含当前请求文件；把回填逻辑放在 `_execute_skill_path()` 能让其他依赖最近上传文件的 skill 也复用同一能力。",
     "not_changed": [
-      "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
-      "/Users/lin/Desktop/work/chiralium/backend/app/services/skill_service.py"
+      "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+      "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/skill_service.py"
     ]
   },
   "acceptance_mapping": {
@@ -52,15 +52,15 @@
   },
   "validation": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py /Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py /Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q",
       "result": "passed (45 passed, 4 warnings)"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py -q",
       "result": "passed (11 passed, 4 warnings)"
     }
   ],

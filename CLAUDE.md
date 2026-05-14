@@ -4,7 +4,7 @@
 
 ## 工作目录隔离
 
-- 每个 agent 的当前工作目录必须是：`/Users/lin/Desktop/work/my-agent-teams/agents/<agent-id>`。
+- 每个 agent 的当前工作目录必须是：`/Users/linsuchang/Desktop/work/my-agent-teams/agents/<agent-id>`。
 - Claude Code 只自动读取当前工作目录下的 `CLAUDE.md`。
 - Codex agent 目录使用当前工作目录下的 `AGENT.md`。
 - 每个 agent 目录必须同时保留 `AGENT.md` 和 `CLAUDE.md`，两者由同一套 `design/agent-templates/` 模板生成；林总工可按当前规划决定某个 agent 用 Claude Code 还是 Codex 启动。
@@ -16,14 +16,14 @@
 
 ## 共享资源（必须使用绝对路径）
 
-- 工作区根目录：`/Users/lin/Desktop/work/my-agent-teams`
-- agent 工作目录根：`/Users/lin/Desktop/work/my-agent-teams/agents`
-- 任务目录：`/Users/lin/Desktop/work/my-agent-teams/tasks`
-- 脚本目录：`/Users/lin/Desktop/work/my-agent-teams/scripts`
-- 配置文件：`/Users/lin/Desktop/work/my-agent-teams/config.json`
-- 角色 prompt 目录：`/Users/lin/Desktop/work/my-agent-teams/prompts`
-- 根共享规则（Claude）：`/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md`
-- 根共享规则（Codex）：`/Users/lin/Desktop/work/my-agent-teams/AGENTS.md`
+- 工作区根目录：`/Users/linsuchang/Desktop/work/my-agent-teams`
+- agent 工作目录根：`/Users/linsuchang/Desktop/work/my-agent-teams/agents`
+- 任务目录：`/Users/linsuchang/Desktop/work/my-agent-teams/tasks`
+- 脚本目录：`/Users/linsuchang/Desktop/work/my-agent-teams/scripts`
+- 配置文件：`/Users/linsuchang/Desktop/work/my-agent-teams/config.json`
+- 角色 prompt 目录：`/Users/linsuchang/Desktop/work/my-agent-teams/prompts`
+- 根共享规则（Claude）：`/Users/linsuchang/Desktop/work/my-agent-teams/CLAUDE.md`
+- 根共享规则（Codex）：`/Users/linsuchang/Desktop/work/my-agent-teams/AGENTS.md`
 
 ## 向其他会话发送消息的注意事项
 
@@ -45,7 +45,7 @@
 
 - **任务管理**：所有任务通过 `tasks/` 目录下的 `task.json` 管理，不凭记忆做派发。
 - **绝对路径**：访问 `tasks/`、`scripts/`、`config.json`、`prompts/` 等共享资源时，一律使用绝对路径，不依赖当前 cwd。
-- **保护路径**：禁止修改 `/Users/lin/Desktop/work/my-agent-teams/tasks`、`/Users/lin/Desktop/work/my-agent-teams/scripts`、`/Users/lin/Desktop/work/my-agent-teams/prompts`、`/Users/lin/Desktop/work/my-agent-teams/config.json`、根目录 `CLAUDE.md` / `AGENTS.md`，除非上级明确下达此类任务。
+- **保护路径**：禁止修改 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks`、`/Users/linsuchang/Desktop/work/my-agent-teams/scripts`、`/Users/linsuchang/Desktop/work/my-agent-teams/prompts`、`/Users/linsuchang/Desktop/work/my-agent-teams/config.json`、根目录 `CLAUDE.md` / `AGENTS.md`，除非上级明确下达此类任务。
 - **write_scope**：只能修改 `task.json.write_scope` 中声明的文件范围。
 - **A-Lite 阶段不互相私聊**：不启用 agent 私聊；允许所有 agent 在 `chat/general/` 和 `chat/tasks/{task-id}.jsonl` 中公开沟通，关键结论必须回写任务上下文。
 
@@ -53,13 +53,13 @@
 
 ### 创建任务（PM）
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh <task-id-title> "<title>" <assigned-agent> <domain> <project>
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/create-task.sh <task-id-title> "<title>" <assigned-agent> <domain> <project>
 ```
-这会在 `/Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/` 下创建 `task.json`、`instruction.md`、`transitions.jsonl`。
+这会在 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id>/` 下创建 `task.json`、`instruction.md`、`transitions.jsonl`。
 
 ### 派发任务（PM）
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/dispatch-task.sh /Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/task.json
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/dispatch-task.sh /Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id>/task.json
 ```
 - 将 `task.json.status` 改为 `dispatched`
 - 通过 tmux send-keys 将任务发送给 `assigned_agent`
@@ -101,10 +101,10 @@ tasks/{task-id}/
 - `blocks`：阻塞的任务 ID
 
 ### Agent 收到任务后
-1. 读 `/Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/instruction.md` 了解任务详情。
-2. 写 `/Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/ack.json` 确认收到。
+1. 读 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id>/instruction.md` 了解任务详情。
+2. 写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id>/ack.json` 确认收到。
 3. 执行任务（只在 `write_scope` 范围内修改文件）。
-4. 完成后写 `/Users/lin/Desktop/work/my-agent-teams/tasks/<task-id>/result.json`。
+4. 完成后写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id>/result.json`。
 5. 如需审查，等待 reviewer 反馈。
 
 ## 环境隔离
@@ -117,7 +117,7 @@ tasks/{task-id}/
 
 ## 配置
 
-全局配置在 `/Users/lin/Desktop/work/my-agent-teams/config.json`，包含：
+全局配置在 `/Users/linsuchang/Desktop/work/my-agent-teams/config.json`，包含：
 - `agents`：所有 agent 的角色、权限、tmux session、独立 workdir
 - `projects`：项目注册表（`dev_root` / `prod_root`）
 - `tasks_root` / `scripts_root` / `prompts_root` / `agents_root`：共享资源绝对路径

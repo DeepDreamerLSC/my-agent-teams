@@ -38,7 +38,7 @@
      - error_message: `标签导出失败：invalid literal for int() with base 10: '0.5'`
 - 相关 session：`57c57394-1cb4-4035-ae82-20e444fbbe5d`
 - 当前重点代码路径：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
 - 需要重点核对：
   1. xlsx 输入识别与文件类型判断
   2. xlsx 内容解析时是否错误把 `0.5` 当整型字段处理
@@ -55,8 +55,8 @@
 - 若只能定位到模块层，也必须说明还差哪一步证据。
 
 ## 交付物
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查王开订单图包生成skill失败/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查王开订单图包生成skill失败/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查王开订单图包生成skill失败/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查王开订单图包生成skill失败/result.json`
 
 `result.json` 必须至少包含：
 - 三次失败记录的结构化整理（时间、错误、session、query）

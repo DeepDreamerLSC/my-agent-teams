@@ -36,8 +36,8 @@
   "title": "实现 task-watcher 持久化日志与 7 天轮转",
   "status": "done",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh"
   ],
   "depends_on": [
     "实现taskwatcher进程级可靠性"

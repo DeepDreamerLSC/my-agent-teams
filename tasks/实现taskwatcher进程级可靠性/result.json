@@ -6,12 +6,12 @@
   "summary": "已在现有 shell watcher 架构上完成最小进程级可靠性增强：task-watcher 主循环会持续写 heartbeat 与 pid，新增 watchdog 脚本可检测 watcher 退出或 heartbeat 超时并自动重启，同时不把 heartbeat/pid/restart-cause 文件纳入任务看板同步链。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
       "action": "modified",
       "description": "新增 PID/heartbeat/restart-cause 运行时文件约定；启动时写 pid 和 startup heartbeat，主循环每轮写 running heartbeat；增加单实例保护；补充 TERM/INT 的优雅退出清理，确保 watchdog 能正确停止并重启 watcher。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
       "action": "created",
       "description": "新增 watchdog 监控脚本：检测 watcher 进程退出、heartbeat 缺失、heartbeat 非法或 heartbeat 超时后自动重启；支持循环守护和 WATCHDOG_RUN_ONCE=1 单次检查模式。"
     }
@@ -55,11 +55,11 @@
   ],
   "test_commands": [
     {
-      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "command": "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh && bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
       "result": "passed"
     },
     {
-      "command": "chmod 755 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
+      "command": "chmod 755 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh",
       "result": "passed"
     },
     {

@@ -1,13 +1,13 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正GLM健康探针改用智谱WebSearchAPI/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
 
 ## 结论摘要
 本次修复方向正确，且实现与任务边界一致：

@@ -6,19 +6,19 @@
   "summary": "REQUEST CHANGES：13 个目标文件已完成只读审查；review/QA 补推、merge gate 字段链路与 ready_for_merge 通知时机总体正确，但最终完成类飞书通知目前只覆盖 QA 自动收口路径，未覆盖所有进入 done 的合法收口路径。",
   "verdict": "REQUEST CHANGES",
   "reviewed_files": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/tasks/task.schema.json",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/create-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/task.schema.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates/index.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/css/style.css",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_task_detail_endpoints.py"
   ],
   "passed_checks": [
     "result -> ready_for_merge 阶段不再发送最终完成类飞书通知",
@@ -32,8 +32,8 @@
       "severity": "high",
       "title": "最终完成类飞书通知未覆盖所有进入 done 的合法收口路径",
       "files": [
-        "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-        "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh"
+        "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+        "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh"
       ],
       "evidence": [
         "task-watcher.sh 仅在 auto_close_task() 中发送 【任务完成】/【部署完成】 飞书通知",
@@ -44,8 +44,8 @@
     }
   ],
   "artifacts_written": [
-    "/Users/lin/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/review-note.md",
-    "/Users/lin/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/result.json"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/review-note.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/审查taskwatcher空闲补推与收口链路修复/result.json"
   ],
   "verification_context": [
     "已对照任务给定的本地验证命令结果进行代码层复核",

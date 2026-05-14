@@ -6,8 +6,8 @@
   "completed_at": "2026-05-04T15:22:30+08:00",
   "summary": "已补齐看板详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试，并做了最小可测性补修：抽出纯渲染函数、增加前端时间线排序辅助函数与 Node 环境保护，使 dashboard 前端逻辑可在 unittest 中稳定回归验证。",
   "modified_files": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/tests/test_dashboard_frontend_timeline.py"
   ],
   "implementation": {
     "tests_added": [
@@ -30,7 +30,7 @@
   "verification": {
     "commands": [
       {
-        "command": "cd /Users/lin/Desktop/work/my-agent-teams && python3 -m unittest dashboard.tests.test_dashboard_frontend_timeline",
+        "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams && python3 -m unittest dashboard.tests.test_dashboard_frontend_timeline",
         "result": "passed (4 tests)"
       },
       {

@@ -6,9 +6,9 @@
   "completed_at": "2026-04-28T12:08:00+08:00",
   "summary": "已按最小范围为问题详情页与需求详情页补充附件展示区：当后端返回 attachments[] 时显示文件名，并提供打开/下载入口；无附件时页面保持正常，不额外报错。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
   ],
   "implementation": {
     "display_positions": [

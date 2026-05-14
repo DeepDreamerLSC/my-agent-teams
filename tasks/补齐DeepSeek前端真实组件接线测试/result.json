@@ -6,7 +6,7 @@
   "summary": "新增 11 条真实组件级接线测试：render ChatToolbar 验证 capability-driven 按钮状态 + render Ant Design Table 验证 provider 文案展示。不再使用函数模拟。",
   "new_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx",
       "action": "created",
       "description": "11 条真实组件级测试，分两组"
     }

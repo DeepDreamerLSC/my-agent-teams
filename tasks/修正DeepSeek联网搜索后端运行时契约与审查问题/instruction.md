@@ -2,8 +2,8 @@
 
 ## 背景
 原任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修复DeepSeek联网搜索后端守卫与可观测性/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修复DeepSeek联网搜索后端守卫与可观测性/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修复DeepSeek联网搜索后端守卫与可观测性/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修复DeepSeek联网搜索后端守卫与可观测性/result.json`
 
 当前状态：complex review 未通过，本次为 review 驳回后的补修任务。
 
@@ -47,7 +47,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正DeepSeek联网搜索后端运行时契约与审查问题/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正DeepSeek联网搜索后端运行时契约与审查问题/result.json`
 
 请在 `result.json` 中包含：
 - 修改文件列表

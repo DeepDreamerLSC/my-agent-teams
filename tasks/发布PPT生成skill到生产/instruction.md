@@ -50,7 +50,7 @@
    - 图片 OCR 消费闭环
 3. 已执行生产部署：
    ```bash
-   cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+   cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
    ```
 4. 最小验证通过：
    - 主站健康 OK

@@ -9,14 +9,14 @@
 
 ### 1. 默认模式判定已切到 polished
 - `_resolve_render_mode()` 现在在未显式传 `mode/render_mode` 时默认返回 `polished`：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:127-134`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:127-134`
 - 这与本任务“普通请求默认进入精美模式”的目标一致。
 
 ### 2. 显式 simple / 显式 polished 兼容入口保留
 - 显式 `render_mode=simple` / `mode=simple` 仍优先走 simple：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:127-130`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:127-130`
 - 默认 polished 与显式 simple 两条路径都已有测试覆盖：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:164-233`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py:164-233`
 
 ### 3. 输出契约未被破坏
 - `simple` 仍输出 `.pptx`
@@ -27,7 +27,7 @@
 - `default_render_mode` 已改为 `polished`
 - 描述文案也已补充“默认走 polished、显式 simple 才回落”
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:1-17`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:1-17`
 
 ## 非阻塞备注
 - 这是一次“默认行为切换”任务，本身依赖 polished 主链路可用；按 instruction 与 downstream_action 说明，应与上游 CogView 可用性修复一起合入，不建议单独抢先发布。

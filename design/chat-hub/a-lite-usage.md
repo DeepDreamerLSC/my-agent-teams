@@ -51,7 +51,7 @@
 
 #### PM 示例
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh announce 修复登录页样式 "新建任务：修复登录页样式。功能目录：features/登录体验优化/，请相关同学在此 thread 讨论。"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh announce 修复登录页样式 "新建任务：修复登录页样式。功能目录：features/登录体验优化/，请相关同学在此 thread 讨论。"
 ```
 
 ---
@@ -69,11 +69,11 @@
 
 #### dev 示例
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "@arch-1 登录页按钮颜色是否继续用 primary-blue？" --type question
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "@arch-1 登录页按钮颜色是否继续用 primary-blue？" --type question
 ```
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "完成，已写 result.json。" --type task_done
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "完成，已写 result.json。" --type task_done
 ```
 
 ---
@@ -89,7 +89,7 @@
 
 #### arch 示例
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "按钮颜色继续用 primary-blue，保持与导航栏一致。" --type answer --reply-to <question-msg-id>
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh task 修复登录页样式 "按钮颜色继续用 primary-blue，保持与导航栏一致。" --type answer --reply-to <question-msg-id>
 ```
 
 ---
@@ -194,8 +194,8 @@ PM 每天至少记录一次：
 ### 6.5 指标采集建议
 可结合脚本：
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
-/Users/lin/Desktop/work/my-agent-teams/scripts/pm-chat-check.sh --days 1 --limit 20
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/chat-metrics.py --days 1
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/pm-chat-check.sh --days 1 --limit 20
 ```
 用于自动采集：task_announce、question/answer、PM @、critical 双通道、未答复问题等核心验证指标。
 

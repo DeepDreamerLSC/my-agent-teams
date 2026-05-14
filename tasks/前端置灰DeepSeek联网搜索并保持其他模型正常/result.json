@@ -6,9 +6,9 @@
   "completed_at": "2026-04-27T13:31:30+08:00",
   "summary": "已按林总工最新方向完成前端最小调整：当前模型为 DeepSeek 时，联网搜索按钮直接置灰并提示用户改为普通对话；DeepSeek 普通对话与深度思考能力不受误伤；GLM/Zhipu 继续沿用现有 provider-native unavailable 提示逻辑，其他 provider 的联网搜索也不受影响。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/chatOptions.test.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx"
   ],
   "implementation": {
     "comparison_basis": [

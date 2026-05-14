@@ -34,12 +34,12 @@
   2. 需要继续从“王开的最近对话 / message feedback / 会话上下文 / 相关附件 / 近期订单图包/PPT 任务链”反查真实失败链路。
 - 当前已知重点链路：
   - 订单图包相关 skill：
-    - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
+    - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
   - PPT 精美模式 / 图片生成：
-    - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0`
-    - `/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py`
+    - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0`
+    - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py`
   - PPTX 装配相关：
-    - `/Users/lin/Desktop/work/chiralium/backend/app/services/office_export_service.py`
+    - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/office_export_service.py`
 - 当前重点排查环节：
   1. **生产环境 CogView / 智谱图片模型可用性与密钥来源**
   2. **图片生成请求链路是否在生产中正确选中模型与 base_url**
@@ -56,8 +56,8 @@
 - 若没找到直接命中的反馈记录，必须在结论里明确说明“数据库关键词检索未命中”，并给出你采用的替代证据链。
 
 ## 交付物
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查王开生产skill失败根因/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查王开生产skill失败根因/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查王开生产skill失败根因/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查王开生产skill失败根因/result.json`
 
 `result.json` 必须至少包含：
 - 是否找到与“王开”本次失败最相关的具体记录 / 证据链

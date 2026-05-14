@@ -6,22 +6,22 @@
   "summary": "已按 review 驳回意见完成最小补修：1) polished demo zip 包中的 `presentation_plan.json` 不再做按字节硬截断，现始终完整写入、可合法 UTF-8 解码并可被 JSON 解析；2) polished demo 的 `image_model_id` 不再允许绕过 CogView 约束，若显式传入非 CogView-3-Flash / cogview-3 的图片模型会直接拒绝。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
       "action": "modified",
       "description": "删除 polished demo 归档时对 `presentation_plan.json` 的字节硬截断逻辑，改为完整 UTF-8 JSON 写入。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
       "action": "modified",
       "description": "新增 `_is_allowed_demo_image_model()`，并在显式 `image_model_id` 路径下强制校验 demo 只允许 `CogView-3-Flash / cogview-3`；非 CogView 模型直接抛错，不再静默绕过。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
       "action": "modified",
       "description": "补充 polished demo 归档测试，验证 `presentation_plan.json` 可被完整 UTF-8 解码并 JSON 解析，且长视觉描述字段未被截断损坏。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
       "action": "modified",
       "description": "新增显式非 CogView `image_model_id` 被拒绝的测试，确保 demo 模型边界不会被绕过。"
     }
@@ -45,11 +45,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
       "result": "passed (9 passed, 4 warnings)"
     }
   ],

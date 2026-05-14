@@ -11,7 +11,7 @@
 
 ## PM 已做的快速定位
 我已快速查看当前仓库里的生产 skill 运行时代码：
-- `/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py`
+- `/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py`
 
 初步判断：
 1. 当前 `skill.py` 实际运行逻辑仍然只支持：
@@ -69,8 +69,8 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式/result.json`
 
 result.json 请包含：
 - 根因判断

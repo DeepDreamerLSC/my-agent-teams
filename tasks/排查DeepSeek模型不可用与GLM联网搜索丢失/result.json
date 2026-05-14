@@ -29,18 +29,18 @@
         "backend/tests/test_models.py:517-611 和 backend/tests/test_chat_capabilities.py:152-163 已把“DeepSeek= native_provider_tool”固化进回归测试。",
         "git log / git show 2425c845（2026-04-26）明确把 DeepSeek web_search 从 tool_call 改成 native_provider_tool，并同步改测。",
         "生产 chat_logs 只读查询：2026-04-26 00:37:05 UTC（deepseek-v4-flash）与 00:37:40 UTC（deepseek-v4-pro）error_message 都是 HTTP 400: tools[0].type unknown variant `web_search`, expected `function`。",
-        "读取 /Users/lin/Desktop/prod/chiralium/backend/.env.prod 并执行 describe_web_search_runtime()：provider=deepseek, status=unavailable, internal_status=misconfigured, error=missing_base_url。"
+        "读取 /Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod 并执行 describe_web_search_runtime()：provider=deepseek, status=unavailable, internal_status=misconfigured, error=missing_base_url。"
       ],
       "suggested_fix_owner": {
         "primary": "dev-2",
         "secondary": "arch-1"
       },
       "suggested_change_scope": [
-        "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
-        "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
-        "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py"
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/core/model_providers.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py"
       ],
       "notes": "DeepSeek 模型本身不是全量不可用：生产 chat_logs 中同一批模型在 web_search_enabled=false 时有成功对话记录，因此“模型不可用”实质是 DeepSeek + 联网搜索路径失配。"
     },
@@ -70,15 +70,15 @@
       "suggested_change_scope": {
         "arch_decision_first": "先由 arch-1 确认产品策略：继续依赖智谱原生 web_search，还是增加 provider-side 健康探针/模型降级策略（例如在 GLM-5.0 不稳定时明确切回可验证可用的模型或给用户显式提示）。",
         "if_backend_mitigation_needed": [
-          "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
-          "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
-          "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
-          "/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py"
+          "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
+          "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py",
+          "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
+          "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py"
         ],
         "if_ui_copy_needed": [
-          "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
-          "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
-          "/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
+          "/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+          "/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+          "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx"
         ]
       },
       "notes": "当前证据不支持把 GLM 问题归因为这次 DeepSeek 后端修复链路；更像上游 provider-native search 的模型/配额/行为变化。"
@@ -90,11 +90,11 @@
   },
   "minimal_verification": [
     {
-      "command": "git -C /Users/lin/Desktop/work/chiralium show 2425c845 -- backend/app/core/model_providers.py backend/tests/test_models.py",
+      "command": "git -C /Users/linsuchang/Desktop/work/chiralium show 2425c845 -- backend/app/core/model_providers.py backend/tests/test_models.py",
       "result": "confirmed: 2026-04-26 commit 2425c845 explicitly changed DeepSeek web_search from tool_call to native_provider_tool and updated tests accordingly"
     },
     {
-      "command": "source /Users/lin/Desktop/prod/chiralium/backend/.env.prod && describe_web_search_runtime()",
+      "command": "source /Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod && describe_web_search_runtime()",
       "result": "confirmed: provider=deepseek, status=unavailable, internal_status=misconfigured, error=missing_base_url"
     },
     {

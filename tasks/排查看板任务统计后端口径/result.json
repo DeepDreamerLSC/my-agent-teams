@@ -10,7 +10,7 @@
   },
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
       "action": "modified",
       "description": "终态任务在 watcher 跳过通知前，先执行 task.json / transitions / result / review / verify 的 mtime 驱动同步，避免 ready_for_merge -> done 收口后 SQLite 残留旧状态；同时允许通过环境变量覆盖 TASKS_ROOT / STATE_DIR / BOARD_SYNC_SCRIPT / INTERVAL 以便受控验证。"
     }
@@ -90,7 +90,7 @@
       "result": "passed；/api/board /api/health /api/agents 后端统计口径一致"
     },
     {
-      "command": "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+      "command": "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
       "result": "passed"
     },
     {

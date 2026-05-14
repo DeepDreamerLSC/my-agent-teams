@@ -6,12 +6,12 @@
   "summary": "已为反馈 AI 链路补齐最小附件元数据透传：issue/request 的 AI input_json 现在都会带 attachments[]，至少包含 file_id、file_name、mime_type；若 uploaded_files 上已有 extracted_text，则再附带最小 extracted_text_summary。无附件场景保持兼容，attachments 会稳定为 []。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py",
       "action": "modified",
       "description": "新增反馈附件元数据装配与摘要截断逻辑，并将 attachments[] 接入 issue/request 的 AI input_json、start_* 持久化 input_json、finish_* 实际模型调用三处链路。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
       "action": "modified",
       "description": "补充附件元数据/摘要装配测试、start_issue_analysis input_json 持久化测试，以及无附件场景下模型请求 attachments=[] 兼容性断言。"
     }
@@ -44,11 +44,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_ai_service.py -q",
       "result": "passed (17 passed, 4 warnings)"
     }
   ],

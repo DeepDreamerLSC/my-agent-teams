@@ -6,22 +6,22 @@
   "summary": "已补齐看板阶段耗时持久化与回填链路：SQLite 新增 `task_stage_durations` 持久化表，`dashboard.ingest` 在同步任务时会落库各阶段耗时，`task-board-sync.py backfill` 可对现有任务做全量回填，`dashboard.query` 现优先读取持久化阶段耗时而不是只做临时计算。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/db.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py",
       "action": "modified",
       "description": "新增 `task_stage_durations` 表与 upsert 入口，供阶段耗时持久化使用。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py",
       "action": "modified",
       "description": "新增阶段耗时计算与 `task_stage_durations` 落库逻辑；在 `sync_task_dir` / `backfill_tasks` 路径中自动回填。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py",
       "action": "modified",
       "description": "任务查询改为 LEFT JOIN `task_stage_durations`，并在详情 payload 中优先返回持久化阶段耗时；缺失阶段时仍回落为 null/临时计算。"
     },
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
       "action": "verified",
       "description": "复用现有 `backfill` / `sync-task` 入口完成阶段耗时回填，无需新增独立命令。"
     }
@@ -51,11 +51,11 @@
   },
   "validation": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/db.py /Users/lin/Desktop/work/my-agent-teams/dashboard/ingest.py /Users/lin/Desktop/work/my-agent-teams/dashboard/query.py /Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/taskboard-pyc python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/db.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/ingest.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py",
       "result": "passed"
     },
     {
-      "command": "python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py backfill --tasks-root /Users/lin/Desktop/work/my-agent-teams/tasks --db /tmp/task-board-stage.sqlite3",
+      "command": "python3 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py backfill --tasks-root /Users/linsuchang/Desktop/work/my-agent-teams/tasks --db /tmp/task-board-stage.sqlite3",
       "result": "passed；对现有任务完成全量回填"
     },
     {

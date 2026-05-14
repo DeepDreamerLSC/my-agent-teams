@@ -1,0 +1,327 @@
+{
+  "status": "done",
+  "completed_at": "2026-05-13T23:51:23+08:00",
+  "summary": "结论：在目标环境 Apple M5 Max / 128GB 统一内存 / macOS 下，PDF 转 Word 的真实接入应从原“HTTP sidecar 优先”调整为“本机进程/本机 worker 优先，保留 HTTP sidecar 作为可选扩展形态”。MinerU 本地 CLI/Python adapter 可行，且比 Docker sidecar 更贴合当前 SKILL_DOCKER_NETWORK=none 的约束；视觉增强也可本地运行，但不建议把 MiniCPM-V 或任一 VLM 内嵌到 skill.py 或 FastAPI 请求线程中，而应通过本机常驻 worker/本地 OpenAI-compatible endpoint 复用模型进程。首选落地顺序为 MinerU-only 本地接入 -> Apple Vision/PaddleOCR 低成本 OCR fallback -> 本地 VLM 局部增强（优先 mlx-vlm 或 Ollama/llama.cpp 形态，MiniCPM-V 视 macOS 推理成熟度作为候选）。",
+  "read_only": true,
+  "decision": {
+    "local_feasible": true,
+    "recommended_topology": "local_worker_first_with_optional_local_http_endpoint",
+    "answer": "本地方案更优，前提是把重型解析/模型推理放到 backend worker 或本机常驻模型进程中，而不是每次 skill 执行时冷启动模型；HTTP sidecar 不再作为本机 Mac Studio dev/单机部署的首选，但保留为将来多机、GPU 服务器、容器化生产扩展接口。",
+    "why_not_original_http_sidecar_first": [
+      "当前默认 docker skill runtime network=none，不适合从容器内访问 MinerU/MiniCPM-V sidecar；若强行改 Docker 网络，会增加部署面和安全面。",
+      "目标机器是单台高内存 Apple Silicon；把文件在本机路径内交给本地 CLI/worker 能减少 HTTP 上传、临时文件复制、端口管理和健康检查复杂度。",
+      "MinerU 主解析是批处理型工具，适合由 subprocess/worker 按 job 调 CLI 或 Python API，并通过结构化输出映射为 DocumentIR。",
+      "VLM 增强只应处理少量高风险 block，本地模型常驻后调用成本可控；若不可用，可自动降级 MinerU-only。"
+    ],
+    "where_sidecar_still_wins": [
+      "需要多后端实例共享同一模型服务或跨机器扩容时。",
+      "需要隔离 MinerU/VLM 依赖、崩溃、内存泄漏或不同 Python/系统库版本时。",
+      "需要统一监控、限流、队列、GPU 资源池或未来迁移到 Linux/CUDA 时。",
+      "对外 API 规模化后，建议保持 adapter 抽象，底层可切换为 HTTP service。"
+    ]
+  },
+  "evidence_and_validation": {
+    "local_project_docs_checked": [
+      {
+        "path": "/Users/linsuchang/Desktop/work/chiralium/design/product/pdf-to-word-skill-mineru-minicpmv-design.md",
+        "finding": "原设计已明确 runtime_backend=subprocess 适合调用本机/内网 MinerU 与 MiniCPM-V；docker runtime 默认 network=none；MinerU/MiniCPM-V 不应塞进 skill.py，而应经 PDFConversionService adapter 调用。"
+      },
+      {
+        "path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/评审PDF转WordSkill方案并拆解实施/result.json",
+        "finding": "早前拆解建议 HTTP sidecar 优先是基于资源与部署假设；本任务的新硬件事实改变了取舍，但 DocumentIR、降级、严格 JSON、只增强高风险 block 等原则仍保留。"
+      },
+      {
+        "path": "/Users/linsuchang/Desktop/work/chiralium/backend/requirements.txt",
+        "finding": "当前已有 paddleocr、paddlepaddle、pypdfium2、Pillow、numpy/scipy；未见 MinerU、mlx-vlm、ollama/llama.cpp Python binding、python-docx 等依赖。"
+      },
+      {
+        "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/SKILL.md",
+        "finding": "当前 pdf_to_word skill 仍是 mock/fixture 阶段，真实 MinerU/MiniCPM-V 尚未接入，适合按本结论重定后续切片。"
+      }
+    ],
+    "external_docs_checked": [
+      {
+        "source": "MinerU official GitHub / docs",
+        "url": "https://github.com/opendatalab/MinerU",
+        "finding": "MinerU 定位为文档解析/转换工具，输出 markdown、content list、middle json、layout/images 等结构化产物；适合作为主解析器而不是直接生成最终 Word。"
+      },
+      {
+        "source": "MinerU output files docs",
+        "url": "https://opendatalab.github.io/MinerU/reference/output_files/",
+        "finding": "MinerU 输出文件可作为 DocumentIR adapter 的输入边界。"
+      },
+      {
+        "source": "MiniCPM-o / MiniCPM-V official docs",
+        "url": "https://github.com/OpenBMB/MiniCPM-o",
+        "finding": "MiniCPM-V 适合 OCR、文档图像理解、表格/图表增强；在本方案中只作为局部增强器，失败时保留 MinerU 结果。"
+      },
+      {
+        "source": "Apple Vision VNRecognizeTextRequest docs",
+        "url": "https://developer.apple.com/documentation/vision/vnrecognizetextrequest",
+        "finding": "Vision.framework 可做本机 OCR/text recognition，适合作扫描件或局部 crop 的低成本 OCR fallback；但它不提供 MinerU 级别的 PDF 版面结构、表格语义和阅读顺序。"
+      },
+      {
+        "source": "MLX-VLM README",
+        "url": "https://github.com/Blaizzy/mlx-vlm/blob/main/README.md",
+        "finding": "mlx-vlm 提供 Mac/MLX 上 VLM 推理、CLI 和 server 能力，适合作为 Apple Silicon 本机视觉增强候选。"
+      },
+      {
+        "source": "Ollama Vision docs",
+        "url": "https://docs.ollama.com/capabilities/vision",
+        "finding": "Ollama 支持 vision 模型以 images 数组/API 输入图片，适合作为部署简单的本机模型 endpoint 候选。"
+      }
+    ],
+    "note": "无法在本任务内实际安装/压测 MinerU 或模型权重；性能结论为架构级可行性判断。后续实施任务必须加入基准测试验收。"
+  },
+  "evaluation": {
+    "mineru_local_process_mode": {
+      "feasible": true,
+      "recommendation": "优先实现本地 MinerU CLI/Python adapter，由 PDFConversionService 在 backend worker/subprocess 中按 job 调用；不要在 skill.py 内直接承载重逻辑。",
+      "expected_resource_profile": "MinerU 主解析通常是 CPU/内存/局部模型推理混合型批处理；M5 Max 128GB 对单并发和低并发足够宽裕。实际页耗时、峰值内存、模型缓存目录大小需在实施切片中用 5 类样本基准测量。",
+      "implementation_notes": [
+        "以 per-job 临时目录调用 MinerU，产出 content_list/middle_json/markdown/images。",
+        "adapter 只消费结构化产物并映射到 DocumentIR，避免 DOCX 生成器依赖 MinerU 原始 schema。",
+        "使用 timeout、页数/文件大小限制、进程退出码、stderr 摘要和输出完整性校验。",
+        "先支持 local_cli；如 MinerU Python API 稳定，再增加 local_python backend；保留 http backend 配置位。"
+      ],
+      "not_recommended": [
+        "每次 skill 执行时安装、下载或冷启动大型模型。",
+        "把 MinerU 输出 markdown 直接当最终 Word 内容。",
+        "在 FastAPI request handler 内同步长时间阻塞；大 PDF 应进 job/worker。"
+      ]
+    },
+    "local_vision_model": {
+      "feasible": true,
+      "memory_assessment": "128GB 统一内存足以尝试 7B/8B 级量化 VLM，甚至可评估更大模型；但可用速度取决于 MLX/Metal/llama.cpp/Ollama 后端、量化格式和图像 token 长度。建议默认只增强有限 block，避免整页全量 VLM。",
+      "recommended_order": [
+        {
+          "rank": 1,
+          "option": "mlx-vlm 或 MLX 兼容 VLM 常驻进程",
+          "reason": "最贴合 Apple Silicon/统一内存，便于在本机避免 Docker/GPU 驱动问题；适合做局部 OCR/表格/图注增强。",
+          "caveat": "需验证目标模型是否稳定支持图像输入、中文 OCR、严格 JSON 输出和批量 crop。"
+        },
+        {
+          "rank": 2,
+          "option": "Ollama + vision model 本机 HTTP endpoint",
+          "reason": "部署/进程管理简单，天然提供本机 HTTP；对开发和运维友好。",
+          "caveat": "模型 JSON 可控性和文档 OCR 精度需实测；Ollama endpoint 虽是 HTTP，但它是本机模型 runtime，不等同于原双 sidecar 服务体系。"
+        },
+        {
+          "rank": 3,
+          "option": "MiniCPM-V 本地推理",
+          "reason": "与原设计语义一致，文档理解/OCR 方向匹配。",
+          "caveat": "是否作为首选取决于 macOS/Apple Silicon 下官方或社区推理链路成熟度、量化权重可得性和速度；建议作为候选而非硬编码唯一模型。"
+        },
+        {
+          "rank": 4,
+          "option": "外部/云 VLM",
+          "reason": "兜底质量或临时验证可用。",
+          "caveat": "默认不推荐，因 PDF 隐私与成本；必须显式开关、审计和用户告知。"
+        }
+      ],
+      "integration_rule": "VLM 只增强高风险 block；fast 模式完全不调 VLM；balanced/quality 按最大 block 数、超时和失败降级控制。"
+    },
+    "apple_ml_frameworks": {
+      "vision_framework": {
+        "use": "可作为 OCR fallback 或局部 crop 文字识别器，特别适合扫描件、图片区域、MinerU 低置信文本复核。",
+        "limits": "不能替代 MinerU 主解析：缺少 PDF 全文结构化版面、表格语义、阅读顺序、公式/图片上下文等完整 DocumentIR 所需信息。"
+      },
+      "core_ml": {
+        "use": "可用于未来固化某些 OCR/layout 小模型，但当前不建议作为首轮实施主路线。",
+        "limits": "模型转换、算子兼容、版本管理和质量验证成本高；不如先用 MinerU + MLX/Ollama adapter 快速闭环。"
+      },
+      "mlx": {
+        "use": "推荐作为 Apple Silicon 本地 VLM 推理优先方向，尤其是局部增强 worker。",
+        "limits": "需要锁定模型、权重、量化、prompt 与 JSON schema；必须做实际样本基准。"
+      },
+      "replacement_conclusion": "Apple Vision/MLX 能补充但不能完整替代 MinerU + VLM 组合。主解析仍应保留 MinerU；Apple Vision 可降级 OCR；MLX/Ollama/VLM 做增强。"
+    },
+    "deployment_complexity_comparison": [
+      {
+        "dimension": "部署",
+        "local_worker": "安装本机 Python/env、MinerU、模型权重和本机 worker/launchd；少端口、少容器网络问题。",
+        "http_sidecar": "需要启动/监控 MinerU service + VLM service，配置端口、健康检查、日志、跨容器/宿主访问。",
+        "winner": "local_worker for single Mac Studio"
+      },
+      {
+        "dimension": "调试",
+        "local_worker": "可直接查看 job 临时目录、stdout/stderr、输出文件；路径传递简单。",
+        "http_sidecar": "协议边界清晰，但多一层 HTTP 序列化/上传/错误映射。",
+        "winner": "local_worker 初期更快；sidecar 长期边界更清晰"
+      },
+      {
+        "dimension": "监控与隔离",
+        "local_worker": "需自行记录进程耗时、峰值内存、模型版本；崩溃隔离弱于独立服务。",
+        "http_sidecar": "天然适合健康检查、限流、服务级指标和独立重启。",
+        "winner": "http_sidecar"
+      },
+      {
+        "dimension": "性能",
+        "local_worker": "少一次 HTTP 文件传输，适合同机路径；模型常驻后延迟较低。",
+        "http_sidecar": "长期服务也能常驻模型，但同机 HTTP 增加少量复杂度；跨机时更灵活。",
+        "winner": "local_worker for same host"
+      },
+      {
+        "dimension": "扩展性",
+        "local_worker": "单机队列和并发受限；多实例共享困难。",
+        "http_sidecar": "更容易接入多 worker/GPU pool/独立机器。",
+        "winner": "http_sidecar"
+      }
+    ]
+  },
+  "revised_implementation_slices": [
+    {
+      "title": "MinerU 本地 Adapter 接入（替代原 MinerU HTTP sidecar 优先）",
+      "agent_or_pool": "be-1 或 auto-dev/backend",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/core/config.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_content_list.json",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/mineru_middle.json"
+      ],
+      "dependencies": [
+        "PDF 转 Word Skill MVP（mock/fixture 闭环）"
+      ],
+      "config_keys": [
+        "PDF_TO_WORD_PARSE_BACKEND=mock|local_mineru_cli|local_mineru_python|http_mineru",
+        "MINERU_CLI_PATH",
+        "MINERU_PYTHON_BIN",
+        "MINERU_MODEL_DIR",
+        "MINERU_WORKDIR",
+        "MINERU_TIMEOUT_SECONDS",
+        "MINERU_PARSE_MODE",
+        "MINERU_OUTPUT_FORMAT"
+      ],
+      "acceptance": [
+        "默认 dev backend 可配置为 local_mineru_cli；测试环境默认仍可使用 mock，避免 CI 依赖真实 MinerU。",
+        "MinerU adapter 以 per-job 临时目录调用本机 CLI/Python，读取 content_list/middle_json/markdown/images，并映射为 DocumentIR。",
+        "保留 http_mineru backend 作为未来 sidecar 兼容分支，但本切片不要求启动 HTTP service。",
+        "进程 timeout、非零退出码、缺少输出文件、JSON schema 缺字段都转为结构化错误或 warning；临时目录按策略清理。",
+        "新增 fixtures 固定 MinerU 样例输出，单测覆盖 paragraph/table/image/formula/unknown block 映射。",
+        "基准脚本或测试记录至少 5 类样本的页数、耗时、峰值内存观察方法；真实压测可在本机手动执行，不阻塞单元测试。",
+        "不修改 skill.py 为重逻辑入口；skill 仍只调用 PDFConversionService。"
+      ]
+    },
+    {
+      "title": "本机视觉增强 Adapter 接入（MLX/Ollama 优先，MiniCPM-V 作为候选模型）",
+      "agent_or_pool": "be-1 或 auto-dev/backend；模型选型由 arch/PM 复核",
+      "task_type": "development",
+      "write_scope": [
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/core/config.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/.env.example",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/vision_client.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/enhancement.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_enhancement.py",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/vision_enhancement.json"
+      ],
+      "dependencies": [
+        "MinerU 本地 Adapter 接入（替代原 MinerU HTTP sidecar 优先）"
+      ],
+      "config_keys": [
+        "PDF_TO_WORD_VISION_ENABLED=true|false",
+        "PDF_TO_WORD_VISION_BACKEND=disabled|apple_vision|mlx_vlm|ollama|openai_compatible",
+        "VISION_MODEL_NAME",
+        "VISION_ENDPOINT_URL",
+        "VISION_TIMEOUT_SECONDS",
+        "VISION_MAX_BLOCKS_BALANCED",
+        "VISION_MAX_BLOCKS_QUALITY",
+        "VISION_JSON_SCHEMA_VERSION"
+      ],
+      "acceptance": [
+        "fast 模式不调用视觉模型；balanced/quality 只选择高风险 block，且有最大 block 数、最大图片尺寸、超时限制。",
+        "vision_client 支持至少一个 mocked openai_compatible/ollama 风格接口；如接 Apple Vision，则封装为 OCR-only backend，只返回文本复核结果。",
+        "模型输出必须解析为严格 JSON schema；非法 JSON、超时、单 block 失败时保留 MinerU 原始 block 并追加 warning。",
+        "合并策略禁止新增 PDF 不存在内容；修正文本文字时保留 original_text、source、enhancement_reason。",
+        "meta 输出 enhanced_block_count、vision_backend、model_name、warnings、per_block_latency_ms 汇总。",
+        "单测覆盖表格修正、caption 补充、OCR-only fallback、失败降级、禁幻觉策略。",
+        "实现不要求在 CI 安装真实 VLM；真实 mlx-vlm/Ollama/MiniCPM-V 只作为本机验收手册/可选集成测试。"
+      ]
+    }
+  ],
+  "environment_dependencies": {
+    "system": [
+      "macOS on Apple Silicon（目标为 M5 Max 128GB；开发验证可先用同类 M 系列机器，但性能结论以目标机为准）",
+      "Python 版本与 chiralium backend .venv 对齐；建议为 MinerU/VLM 单独建本机 virtualenv，避免污染 backend runtime",
+      "Homebrew（用于 poppler/tesseract/辅助库如后续需要；首轮不强制）",
+      "足够磁盘空间：MinerU 模型、VLM 权重、临时 PDF 图片和 DOCX 输出建议预留 100GB+"
+    ],
+    "python_backend_existing": [
+      "pypdfium2、Pillow、numpy/scipy、paddleocr、paddlepaddle 已在 backend requirements.txt 中存在，可作为 PDF 渲染/OCR fallback 的基础"
+    ],
+    "mineru_local": [
+      "MinerU 官方 Python 包/CLI 及其模型权重缓存",
+      "MINERU_CLI_PATH 或 MINERU_PYTHON_BIN",
+      "MINERU_MODEL_DIR / cache dir",
+      "验证样本 PDF 与 fixtures：content_list.json、middle.json、markdown、images"
+    ],
+    "vision_local_options": [
+      "Option A: mlx-vlm/MLX 运行环境 + 选定 VLM 权重（推荐优先评估 Apple Silicon 原生路径）",
+      "Option B: Ollama + 支持 vision 的本机模型权重（运维简单，作为第一可运行 endpoint 候选）",
+      "Option C: MiniCPM-V 可在 macOS/Apple Silicon 上稳定运行的量化/推理链路（若验证通过再设为默认增强模型）",
+      "Option D: Apple Vision.framework bridge（pyobjc 或独立 Swift helper）作为 OCR-only fallback；也可先不做，继续使用 PaddleOCR fallback"
+    ],
+    "not_required_for_first_local_mineru_slice": [
+      "Docker sidecar network 调整",
+      "公网 VLM API key",
+      "生产级多机模型服务"
+    ]
+  },
+  "risk_assessment": [
+    {
+      "severity": "high",
+      "risk": "真实 MinerU 在 macOS/Apple Silicon 的依赖安装或模型下载不稳定",
+      "impact": "本地接入任务被环境问题阻塞",
+      "mitigation": "MinerU adapter 支持 mock/local_cli/http 三后端；CI 保持 fixture；实施前先由 PM/owner 在目标机完成一次手工安装与样本解析。"
+    },
+    {
+      "severity": "high",
+      "risk": "本地 VLM 输出 JSON 不稳定或 OCR/表格质量不达标",
+      "impact": "增强结果污染 DOCX 或体验不如 MinerU-only",
+      "mitigation": "VLM 只做可关闭增强；严格 JSON schema；合并默认保留 MinerU；先用 Apple Vision/PaddleOCR 或 MinerU-only 上线。"
+    },
+    {
+      "severity": "medium",
+      "risk": "同步执行长 PDF 阻塞 FastAPI/聊天链路",
+      "impact": "用户等待过久或 WebSocket 超时",
+      "mitigation": "MVP 限制页数/大小/timeout；真实 MinerU 接入后尽快推进内部异步 job；worker 并发默认 1-2。"
+    },
+    {
+      "severity": "medium",
+      "risk": "本地进程隔离弱于 sidecar",
+      "impact": "MinerU/VLM 崩溃、内存泄漏或依赖冲突影响 backend 主机",
+      "mitigation": "单独 virtualenv、subprocess timeout、资源监控、launchd/worker supervisor；保留 HTTP adapter 便于以后隔离。"
+    },
+    {
+      "severity": "medium",
+      "risk": "Apple Vision/Core ML 不能替代完整版面解析",
+      "impact": "若误用 Vision 取代 MinerU，会导致表格/阅读顺序/图片语义质量不足",
+      "mitigation": "明确 Vision 仅 OCR fallback；DocumentIR 主来源仍为 MinerU。"
+    },
+    {
+      "severity": "low",
+      "risk": "模型权重占用大量磁盘与下载时间",
+      "impact": "部署慢、磁盘告警",
+      "mitigation": "固定模型清单和缓存目录；部署脚本预检磁盘；不要在请求路径下载权重。"
+    }
+  ],
+  "recommended_next_actions_for_pm": [
+    "先派发“MinerU 本地 Adapter 接入”任务，要求 dev 在 M5 Max 目标机完成一次真实 CLI smoke test，并把真实输出固化为 fixtures。",
+    "视觉模型不要马上绑定 MiniCPM-V；先派发小型 spike：mlx-vlm vs Ollama vision vs MiniCPM-V 本机推理三选一，使用同一批 crop 测 JSON 稳定性、中文 OCR、表格修复、延迟/内存。",
+    "保持原 PDFConversionService / DocumentIR / DOCX assembler 架构不变，只替换 adapter 后端。",
+    "在真实 MinerU 接入后立即规划内部异步 job，避免大 PDF 同步阻塞聊天。"
+  ],
+  "final_acceptance_mapping": {
+    "明确回答本地可行还是 sidecar 更优": "本地可行，且在单台 M5 Max 128GB / macOS / docker network=none 约束下，本地 worker/本机模型 runtime 优于原 HTTP sidecar-first。",
+    "修订后的实施切片": "已给出 MinerU 本地 Adapter 与本机视觉增强 Adapter 两个修订切片，含 write_scope、dependencies、acceptance。",
+    "环境依赖清单": "已列出 system、backend existing、MinerU、本机视觉模型选项与首轮不需要项。",
+    "经过代码/文档验证": "已读取原设计文档、历史拆解 result、当前 backend requirements、现有 pdf_to_word skill 状态，并结合官方技术方向做架构判断；实际性能需后续实施切片实测。"
+  }
+}

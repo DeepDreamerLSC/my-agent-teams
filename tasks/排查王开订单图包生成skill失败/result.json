@@ -80,13 +80,13 @@
       {
         "file_id": "a3fec5f6-63b6-4138-9ddc-c9599219079c",
         "original_name": "佳佳丽订单汇总5.5.xlsx",
-        "stored_path": "/Users/lin/Desktop/prod/chiralium/uploads/original/a3fec5f6-63b6-4138-9ddc-c9599219079c.xlsx",
+        "stored_path": "/Users/linsuchang/Desktop/prod/chiralium/uploads/original/a3fec5f6-63b6-4138-9ddc-c9599219079c.xlsx",
         "sha256": "79b5114a431462f70a4676781e1ffea35832b082b6caa68d0a7cfd09364919ef"
       },
       {
         "file_id": "28404380-e2ac-47e8-91cb-b44e64879d7f",
         "original_name": "佳佳丽订单汇总5.5.xlsx",
-        "stored_path": "/Users/lin/Desktop/prod/chiralium/uploads/original/28404380-e2ac-47e8-91cb-b44e64879d7f.xlsx",
+        "stored_path": "/Users/linsuchang/Desktop/prod/chiralium/uploads/original/28404380-e2ac-47e8-91cb-b44e64879d7f.xlsx",
         "sha256": "79b5114a431462f70a4676781e1ffea35832b082b6caa68d0a7cfd09364919ef"
       }
     ],
@@ -116,27 +116,27 @@
   ],
   "suspicious_code_paths": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:934-965",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:934-965",
       "why": "`_compute_per_box_sizes()` 会把非整数每箱数量格式化成字符串 `0.5/1.5`，同时仅追加 warning，不阻断后续流程。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:867-908",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:867-908",
       "why": "`_build_order_rows()` 即使拿到 warning 行，也仍然 append 到最终 `result`，没有 skip / fail-fast。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:506-528",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:506-528",
       "why": "`_write_label_block()` 在 `pairs_total = sum(int(q) for _, q in per_box_sizes)` 处是本次生产异常的直接抛出点。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:686-699",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:686-699",
       "why": "即使修掉 `pairs_total` 这处，`_write_quantity_row()` 仍会对 `qty_str` 执行 `int(qty_str)`，同样会被 `0.5` / `1.5` 重新击穿。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:716-723",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:716-723",
       "why": "`_select_xlsx_source_file()` 只看当前 `context.uploaded_files`；没有当前附件时，必然返回“请先上传一个 .xlsx 订单汇总文件”。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py:380-389,1788-1829",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py:380-389,1788-1829",
       "why": "聊天执行链只把本次请求的 `file_ids` 转成 `skill_uploaded_files` 传给 skill，不会自动回填同 session 上一次的附件，因此第二次空附件重发会命中 xlsx 缺失错误。"
     }
   ],

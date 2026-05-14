@@ -6,22 +6,22 @@
   "summary": "已按林总工简化方向实现 GLM/Zhipu provider-native 联网搜索的最小健康探针与状态输出：后端会对 zhipu/native_provider_tool 做轻量 probe，输出 healthy/degraded/unavailable/unknown，并通过 meta 接口稳定暴露给前端消费。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py",
       "action": "modified",
       "description": "chat-capabilities 新增 provider_web_search_runtime 与 zhipu_web_search_runtime_status，并新增 /api/meta/provider-web-search-runtime 接口输出 provider 级状态。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
       "action": "modified",
       "description": "新增 zhipu/native_provider_tool 轻量健康探针、60 秒缓存、状态归类与统一 payload 构造；不复用 DeepSeek tool_call runtime 语义。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
       "action": "modified",
       "description": "补充 chat-capabilities 与 provider-web-search-runtime 暴露测试，验证 zhipu provider 级状态字段可被前端稳定消费。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "action": "modified",
       "description": "新增 provider-native health probe 单测，覆盖 healthy 与“模型文本明确表示联网搜索不可用”两种 probe 结果。"
     }
@@ -71,11 +71,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q",
       "result": "passed (49 passed, 4 warnings)"
     },
     {
-      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py /Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "result": "passed"
     }
   ],

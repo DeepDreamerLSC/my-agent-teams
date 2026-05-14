@@ -20,8 +20,8 @@
         "生产库同用户同日真实重复行：3ffc8586-973e-4d28-a8d4-3febdd474b8f（2026-04-24 05:00:17+00）与 1cb7ed13-3136-417d-bfa1-4ca167b2843b（2026-04-24 05:00:18+00），title/description/repro_steps/impact_scope/page_url/client_meta_json 全部一致。",
         "生产库 feedback_events：1cb7ed13 于 2026-04-24 06:34:24+00 被写入 closed，并注明“重复提交记录，已归并到 3ffc8586”；3ffc8586 同时记录 merged_duplicate_id=1cb7ed13。",
         "代码提交记录：git log 显示幂等修复 commit 6cbc0177《Block duplicate feedback submissions before they create extra records》提交时间为 2026-04-24 14:03:37 +08:00，晚于真实事故发生时间。",
-        "后端修复内容：/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_service.py 中新增 5 秒窗口指纹去重 + pg_advisory_xact_lock；/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py 在 deduplicated 命中时不再重复入队 AI。",
-        "前端修复内容：/Users/lin/Desktop/work/chiralium/frontend/src/components/MainLayout.tsx:617-642 已有 feedbackSubmitting 重入保护；git blame 显示该保护来自 6cbc0177。"
+        "后端修复内容：/Users/linsuchang/Desktop/work/chiralium/backend/app/services/feedback_service.py 中新增 5 秒窗口指纹去重 + pg_advisory_xact_lock；/Users/linsuchang/Desktop/work/chiralium/backend/app/api/feedback.py 在 deduplicated 命中时不再重复入队 AI。",
+        "前端修复内容：/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/MainLayout.tsx:617-642 已有 feedbackSubmitting 重入保护；git blame 显示该保护来自 6cbc0177。"
       ],
       "recommended_owner": "dev-2",
       "minimal_fix_scope_suggestion": [
@@ -45,9 +45,9 @@
         "生产库 feedback_issues：14ce5122 的 attachment_ids=[]，submitted_at=2026-04-27 12:57:12+00。",
         "生产库 uploaded_files：同一用户 f5c65698-4919-458a-ac95-2daffd4cc8f2 在 2026-04-27 全天没有任何上传记录；因此这张工单没有证据表明附件曾成功写入服务器。",
         "健康对照样本：feedback_issues.db640906 在 2026-04-27 12:17:46+00 保存了 attachment_ids=[\"e8c8be38-977c-42f1-a064-34932202632c\"]，uploaded_files 表中存在对应文件行，说明生产上传/存储链路并非整体不可用。",
-        "API 现状：/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py:95-115 与 /Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py:118-160 仅把 attachment_ids 原样塞进 detail response，没有展开 file_name/download_url/mime_type。",
-        "前端现状：/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx:183-270 与 FeedbackRequestsPage.tsx:211-300 的详情页只渲染标题、正文、AI 结果、管理操作、时间线，没有任何附件列表或下载入口。",
-        "AI 现状：/Users/lin/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py:566-584 的 _issue_input_json/_request_input_json 只传 title/description/background 等文本字段，完全不包含 attachment_ids、文件元数据或解析文本。",
+        "API 现状：/Users/linsuchang/Desktop/work/chiralium/backend/app/api/feedback.py:95-115 与 /Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_feedback.py:118-160 仅把 attachment_ids 原样塞进 detail response，没有展开 file_name/download_url/mime_type。",
+        "前端现状：/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx:183-270 与 FeedbackRequestsPage.tsx:211-300 的详情页只渲染标题、正文、AI 结果、管理操作、时间线，没有任何附件列表或下载入口。",
+        "AI 现状：/Users/linsuchang/Desktop/work/chiralium/backend/app/services/feedback_ai_service.py:566-584 的 _issue_input_json/_request_input_json 只传 title/description/background 等文本字段，完全不包含 attachment_ids、文件元数据或解析文本。",
         "测试现状：现有测试只验证 feedback form 能把 attachment_ids 带到 create payload（如 frontend/src/test/feedbackFormSimplified.test.ts），没有覆盖“详情页可见附件 / AI 可消费附件”的回归测试。"
       ],
       "recommended_owner": "arch-1",
@@ -62,8 +62,8 @@
   ],
   "commands_run": [
     "docker exec chiralium_prod_postgres psql -U chiralium -d chiralium_prod_db -c '... feedback_issues / feedback_events / feedback_ai_analyses / uploaded_files ...'",
-    "git -C /Users/lin/Desktop/work/chiralium log --oneline -- backend/app/services/feedback_service.py backend/app/api/feedback.py backend/tests/test_feedback_api.py",
-    "git -C /Users/lin/Desktop/work/chiralium blame ... frontend/src/components/MainLayout.tsx backend/app/api/feedback.py backend/app/services/feedback_ai_service.py",
+    "git -C /Users/linsuchang/Desktop/work/chiralium log --oneline -- backend/app/services/feedback_service.py backend/app/api/feedback.py backend/tests/test_feedback_api.py",
+    "git -C /Users/linsuchang/Desktop/work/chiralium blame ... frontend/src/components/MainLayout.tsx backend/app/api/feedback.py backend/app/services/feedback_ai_service.py",
     "rg / nl -ba on frontend/backend feedback-related files for attachment and dedup code-path inspection"
   ],
   "notes": [

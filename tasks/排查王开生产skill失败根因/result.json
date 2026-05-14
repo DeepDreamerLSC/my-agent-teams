@@ -57,7 +57,7 @@
       "evidence": [
         "生产库 `model_configs` 中存在可用智谱图片模型记录，但它的 `model_name` 是 `GLM-Image`，不是显式 `cogview-3-flash`。",
         "当前修复后的 `backend/app/services/ppt_page_render_service.py:103-135` 已新增 fallback：默认路径先找显式 CogView；找不到时回退到任意可用 zhipu 图片模型记录，并把实际请求模型名固定为 `cogview-3-flash`。",
-        "修复任务结果 `/Users/lin/Desktop/work/my-agent-teams/tasks/修复PPT精美模式CogView生产密钥取用异常/result.json:6-23` 与 QA `/Users/lin/Desktop/work/my-agent-teams/tasks/修复PPT精美模式CogView生产密钥取用异常/verify.json:8-34` 一致确认：旧代码的问题不是‘没有密钥’，而是‘模型记录形态与请求模型名耦合错误’。"
+        "修复任务结果 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修复PPT精美模式CogView生产密钥取用异常/result.json:6-23` 与 QA `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修复PPT精美模式CogView生产密钥取用异常/verify.json:8-34` 一致确认：旧代码的问题不是‘没有密钥’，而是‘模型记录形态与请求模型名耦合错误’。"
       ],
       "base_url_check": {
         "observed_base_url": "https://open.bigmodel.cn/api/paas/v4/",
@@ -81,7 +81,7 @@
       "pptx_side": [
         "`skills/custom/ppt_generator/1.0.0/skill.py:77-105,318-330` 当前 polished 路径会把渲染页图映射为 `image slides`，再交给 `build_pptx_bytes()` 输出最终 `.pptx`。",
         "`backend/app/services/office_export_service.py:239-360` 已支持 `image_path -> ppt/media/image*.png + slide rels` 的图片页装配。",
-        "发布任务 `/Users/lin/Desktop/work/my-agent-teams/tasks/发布PPT精美模式到生产/result.json:5-35` 证明 polished 最终 `.pptx` 闭环已在 2026-05-01 13:40 +08 发布，且 smoke test passed。"
+        "发布任务 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/发布PPT精美模式到生产/result.json:5-35` 证明 polished 最终 `.pptx` 闭环已在 2026-05-01 13:40 +08 发布，且 smoke test passed。"
       ],
       "order_pack_side": [
         "`skills/custom/order-print-image-pack/1.0.0/skill.py:129-177` 是本地 xlsx 解析与 zip 导出链路，不涉及 CogView、图片模型、base_url、PPTX。",

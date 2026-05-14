@@ -5,14 +5,14 @@
   "completed_at": "2026-05-04T01:14:30+08:00",
   "summary": "已补齐任务协作看板的 schema version、migrate/backfill/rebuild-all 边界设计：新增独立迁移策略文档，并同步更新主方案与任务拆解，使后续 dev-2 可以按统一规则实现版本检查、有限保守迁移、幂等重建与全量回填逻辑。",
   "changed_files": [
-    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
-    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
-    "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
   ],
   "deliverables": {
-    "migration_strategy_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
-    "updated_solution_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
-    "updated_breakdown_doc": "/Users/lin/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
+    "migration_strategy_doc": "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板-迁移策略.md",
+    "updated_solution_doc": "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板优化方案.md",
+    "updated_breakdown_doc": "/Users/linsuchang/Desktop/work/my-agent-teams/design/任务协作看板-任务拆解.md"
   },
   "key_points": [
     "明确 SCHEMA_VERSION 分为代码期望版本与数据库实际版本，并定义数据库不存在、版本相等、低于代码版本、高于代码版本四种处理语义。",

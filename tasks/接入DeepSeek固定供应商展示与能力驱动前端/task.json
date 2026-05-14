@@ -21,11 +21,11 @@
   "owner_pm": "pm-chief",
   "domain": "frontend",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test"
   ],
   "depends_on": [
     "实现DeepSeek固定供应商注册表与能力输出"

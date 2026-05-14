@@ -16,7 +16,7 @@
 
 ## 输入事实
 - 上游任务：`实现PPT精美模式入口与CogView页图渲染Demo`
-- review 结论：`/Users/lin/Desktop/work/my-agent-teams/tasks/实现PPT精美模式入口与CogView页图渲染Demo/review.md`
+- review 结论：`/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PPT精美模式入口与CogView页图渲染Demo/review.md`
 - review 明确的两个阻塞点：
   1. `presentation_plan.json` 可能被字节截断，导致 JSON / UTF-8 损坏。
   2. 显式 `image_model_id` 会绕过 CogView 限制，与 demo 约束不一致。

@@ -30,7 +30,7 @@
       "title": "watcher 重启会对 92 个历史 done 任务批量补发完成通知",
       "evidence": "notify_final_done_if_needed() (L1633-1657) 使用 is_notified/mark_notified 做去重，key 为 ${task_id}_done_notice。当前 STATE_DIR 下 0 个 *_done_notice 文件，任务池 92 个 status=done。watcher 重启后主循环 L1695-1716 扫描每个 done 任务，L1705-1706 调用 notify_final_done_if_needed，is_notified 返回 false，触发 92 条飞书通知。",
       "reproduction": [
-        "1. ls /Users/lin/.openclaw/workspace/.task-watcher/*_done_notice → 0 matches",
+        "1. ls /Users/linsuchang/.openclaw/workspace/.task-watcher/*_done_notice → 0 matches",
         "2. 统计 done 任务：for d in tasks/*/; do python3 -c \"import json; d=json.load(open('${d}task.json')); print(d.get('status',''))\" 2>/dev/null; done | sort | uniq -c → 92 done",
         "3. 重启 watcher → 主循环逐条调用 notify_final_done_if_needed → 92 条飞书推送"
       ],
@@ -44,9 +44,9 @@
     }
   ],
   "test_commands": [
-    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "grep -n 'notify_final_done_if_needed' /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "ls /Users/lin/.openclaw/workspace/.task-watcher/*_done_notice 2>/dev/null | wc -l"
+    "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "grep -n 'notify_final_done_if_needed' /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "ls /Users/linsuchang/.openclaw/workspace/.task-watcher/*_done_notice 2>/dev/null | wc -l"
   ],
   "test_results": {
     "shell_syntax": "passed",

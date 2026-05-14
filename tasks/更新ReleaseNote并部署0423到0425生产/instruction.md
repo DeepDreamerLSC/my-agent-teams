@@ -5,12 +5,12 @@
 1. 把最近三天（4/23-4/25）的主要更新写到 release note 里，简洁，一行一条
 2. `git add / commit / push`
 3. 执行生产部署：
-   - `cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod`
+   - `cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod`
 
 当前仓库存在待提交变更，请你以**当前工作树中本次计划发布的最终有效改动**为准，统一整理后发布。
 
 当前 release note 文件：
-- `/Users/lin/Desktop/work/chiralium/design/product/release-note.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/release-note.md`
 
 ## 你的任务
 ### A. 更新 release note
@@ -26,7 +26,7 @@
 
 ### C. 生产部署
 - 执行：
-  - `cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod`
+  - `cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod`
 - 脚本执行时间较长，请耐心等待完成
 
 ## 发布边界
@@ -36,8 +36,8 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/更新ReleaseNote并部署0423到0425生产/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/更新ReleaseNote并部署0423到0425生产/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/更新ReleaseNote并部署0423到0425生产/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/更新ReleaseNote并部署0423到0425生产/result.json`
 
 请在 `result.json` 中包含：
 - release_note_path

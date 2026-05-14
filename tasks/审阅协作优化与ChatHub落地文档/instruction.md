@@ -3,8 +3,8 @@
 ## 目标
 请从架构与可执行性角度，审阅以下两份文档的最新修订内容，重点判断它们是否已经与最近实战规则对齐，是否还有明显冲突、遗漏或过重设计：
 
-1. `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
-2. `/Users/lin/Desktop/work/my-agent-teams/design/Chat-Hub-落地清单.md`
+1. `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+2. `/Users/linsuchang/Desktop/work/my-agent-teams/design/Chat-Hub-落地清单.md`
 
 ## 重点关注
 请重点看以下几类问题：

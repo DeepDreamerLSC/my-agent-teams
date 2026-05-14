@@ -1,10 +1,10 @@
 {
   "version": 1,
   "phase": "phase1_minimal_closure",
-  "workspace_root": "/Users/lin/Desktop/work/my-agent-teams",
-  "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
-  "prompts_root": "/Users/lin/Desktop/work/my-agent-teams/prompts",
-  "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts",
+  "workspace_root": "/Users/linsuchang/Desktop/work/my-agent-teams",
+  "tasks_root": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks",
+  "prompts_root": "/Users/linsuchang/Desktop/work/my-agent-teams/prompts",
+  "scripts_root": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts",
   "orchestration": {
     "mode": "single_pm",
     "hierarchy_ready": true,
@@ -43,10 +43,10 @@
         "integration_gate": false,
         "cross_domain_coordination": true
       },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/pm-chief",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/pm-chief",
       "runtime": "claude_code",
       "guidance_file": "CLAUDE.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/pm-chief/CLAUDE.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/pm-chief/CLAUDE.md"
     },
     "qa-1": {
       "name": "QA",
@@ -68,10 +68,10 @@
         "backend"
       ],
       "borrow_policy": "borrowed_by_task",
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/qa-1",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/qa-1",
       "runtime": "claude_code",
       "guidance_file": "CLAUDE.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/qa-1/CLAUDE.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/qa-1/CLAUDE.md"
     },
     "review-1": {
       "name": "Reviewer / Integrator",
@@ -93,10 +93,10 @@
         "backend"
       ],
       "borrow_policy": "borrowed_by_task",
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/review-1",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/review-1",
       "runtime": "codex",
       "guidance_file": "AGENT.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/review-1/AGENT.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/review-1/AGENT.md"
     },
     "arch-1": {
       "name": "Architect / Integrator",
@@ -116,10 +116,10 @@
         "integration_gate": true,
         "cross_domain_coordination": false
       },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/arch-1",
       "runtime": "codex",
       "guidance_file": "AGENT.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/arch-1/AGENT.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/arch-1/AGENT.md"
     },
     "dev-1": {
       "name": "Full-stack Dev 1",
@@ -138,10 +138,10 @@
         "integration_gate": false,
         "cross_domain_coordination": false
       },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-1",
       "runtime": "codex",
       "guidance_file": "AGENT.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-1/AGENT.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-1/AGENT.md"
     },
     "dev-2": {
       "name": "Full-stack Dev 2",
@@ -160,10 +160,10 @@
         "integration_gate": false,
         "cross_domain_coordination": false
       },
-      "workdir": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-2",
+      "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-2",
       "runtime": "codex",
       "guidance_file": "AGENT.md",
-      "guidance_path": "/Users/lin/Desktop/work/my-agent-teams/agents/dev-2/AGENT.md"
+      "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-2/AGENT.md"
     }
   },
   "defaults": {
@@ -220,29 +220,29 @@
   "notifications": {
     "enabled": true,
     "feishu_open_id": "ou_f95ee559a38a607c5f312e7b64304143",
-    "push_script": "/Users/lin/Desktop/work/my-agent-teams/scripts/feishu-push.sh"
+    "push_script": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/feishu-push.sh"
   },
   "projects": {
     "chiralium": {
-      "dev_root": "/Users/lin/Desktop/work/chiralium",
-      "prod_root": "/Users/lin/Desktop/prod/chiralium",
-      "deploy_script": "/Users/lin/Desktop/work/chiralium/scripts/deploy.sh"
+      "dev_root": "/Users/linsuchang/Desktop/work/chiralium",
+      "prod_root": "/Users/linsuchang/Desktop/prod/chiralium",
+      "deploy_script": "/Users/linsuchang/Desktop/work/chiralium/scripts/deploy.sh"
     },
     "my-agent-teams": {
-      "dev_root": "/Users/lin/Desktop/work/my-agent-teams",
-      "prod_root": "/Users/lin/Desktop/prod/my-agent-teams",
+      "dev_root": "/Users/linsuchang/Desktop/work/my-agent-teams",
+      "prod_root": "/Users/linsuchang/Desktop/prod/my-agent-teams",
       "deploy_script": null
     }
   },
-  "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
+  "agents_root": "/Users/linsuchang/Desktop/work/my-agent-teams/agents",
   "shared_paths": {
-    "workspace_root": "/Users/lin/Desktop/work/my-agent-teams",
-    "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
-    "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
-    "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts",
-    "prompts_root": "/Users/lin/Desktop/work/my-agent-teams/prompts",
-    "config_path": "/Users/lin/Desktop/work/my-agent-teams/config.json",
-    "root_claude_path": "/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md",
-    "root_agents_path": "/Users/lin/Desktop/work/my-agent-teams/AGENTS.md"
+    "workspace_root": "/Users/linsuchang/Desktop/work/my-agent-teams",
+    "agents_root": "/Users/linsuchang/Desktop/work/my-agent-teams/agents",
+    "tasks_root": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks",
+    "scripts_root": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts",
+    "prompts_root": "/Users/linsuchang/Desktop/work/my-agent-teams/prompts",
+    "config_path": "/Users/linsuchang/Desktop/work/my-agent-teams/config.json",
+    "root_claude_path": "/Users/linsuchang/Desktop/work/my-agent-teams/CLAUDE.md",
+    "root_agents_path": "/Users/linsuchang/Desktop/work/my-agent-teams/AGENTS.md"
   }
 }

@@ -8,8 +8,8 @@
 你是 `arch-1`（architect 角色）。你的角色身份由本文件确定，不依赖 tmux session 名，也不从 instruction.md 推断。
 
 ## 启动后立即执行
-1. 读取并遵守根共享规则：`/Users/lin/Desktop/work/my-agent-teams/AGENTS.md` 与 `/Users/lin/Desktop/work/my-agent-teams/CLAUDE.md`（按当前运行时读取对应文件）
-2. 当前工作目录固定为：`/Users/lin/Desktop/work/my-agent-teams/agents/arch-1`
+1. 读取并遵守根共享规则：`/Users/linsuchang/Desktop/work/my-agent-teams/AGENTS.md` 与 `/Users/linsuchang/Desktop/work/my-agent-teams/CLAUDE.md`（按当前运行时读取对应文件）
+2. 当前工作目录固定为：`/Users/linsuchang/Desktop/work/my-agent-teams/agents/arch-1`
 3. 所有共享资源都用绝对路径访问
 
 ---
@@ -128,7 +128,7 @@ WORKSPACE_ROOT=${WORKSPACE_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || 
   - 是否与你当前 active tasks 的 `write_scope` 冲突
   - 你是否在该任务的 `claim_scope` 内
 - 当前推荐使用：
-  - `$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> [reason]`（当前默认工作区为 `/Users/lin/Desktop/work/my-agent-teams`；迁移后以本机 checkout 路径为准）
+  - `$WORKSPACE_ROOT/scripts/claim-task.sh <task-id> [reason]`（当前默认工作区为 `/Users/linsuchang/Desktop/work/my-agent-teams`；迁移后以本机 checkout 路径为准）
 - **只有认领成功进入 `dispatched` 后，再写 `ack.json`，任务才会进入真正的 `working`。**
 - 不要把“我看到任务了”当成“我已经开始执行”；`working` 的事实点仍然是 `ack.json`
 

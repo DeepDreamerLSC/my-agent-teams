@@ -6,13 +6,13 @@
   "completed_at": "2026-04-28T12:18:30+08:00",
   "summary": "已按审查意见完成最小补修：反馈详情页不再把受保护的 /api/files/{id} 裸链接直接塞给 <a>，而是复用 MessageBubble.tsx 已工作的受保护下载模式；同时在 feedbackManagement.ts 正式补齐 attachments DTO 契约，并补齐问题详情/需求详情/无附件/下载策略测试。",
   "modified_files": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/services/feedbackManagement.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackIssuesPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/feedback/FeedbackRequestsPage.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/feedbackAttachmentDetails.test.tsx"
   ],
   "implementation": {
-    "reference_impl": "参考 /Users/lin/Desktop/work/chiralium/frontend/src/components/MessageBubble.tsx 的受保护附件下载实现：先请求 /files/{id}/download-link，失败时退回 axios blob 下载。",
+    "reference_impl": "参考 /Users/linsuchang/Desktop/work/chiralium/frontend/src/components/MessageBubble.tsx 的受保护附件下载实现：先请求 /files/{id}/download-link，失败时退回 axios blob 下载。",
     "final_download_strategy": [
       "打开/下载都先调用 /files/{file_id}/download-link 获取签名链接。",
       "获取成功后用隐藏 <a> 触发打开（target=_blank）或下载（download 属性）。",

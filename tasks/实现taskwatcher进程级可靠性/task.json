@@ -36,8 +36,8 @@
   "title": "实现 task-watcher 进程级可靠性（heartbeat + watchdog）",
   "status": "done",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher-watchdog.sh"
   ],
   "depends_on": [],
   "artifacts": [

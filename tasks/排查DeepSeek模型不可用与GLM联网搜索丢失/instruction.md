@@ -36,5 +36,5 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`

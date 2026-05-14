@@ -28,8 +28,8 @@
   "owner_approved_at": null,
   "auto_close_policy": "manual_after_review",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
   ],
   "depends_on": [
     "排查看板任务统计后端口径"

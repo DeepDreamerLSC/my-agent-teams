@@ -88,20 +88,20 @@ scripts/teamctl.sh status
 
 ```bash
 # PM（Claude Code）
-cd /Users/lin/Desktop/work/my-agent-teams/agents/pm-chief
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/pm-chief
 
 # 架构师（Codex）
-cd /Users/lin/Desktop/work/my-agent-teams/agents/arch-1
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/arch-1
 
 # 全栈开发（Codex）
-cd /Users/lin/Desktop/work/my-agent-teams/agents/dev-1
-cd /Users/lin/Desktop/work/my-agent-teams/agents/dev-2
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-1
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-2
 
 # QA（Claude Code）
-cd /Users/lin/Desktop/work/my-agent-teams/agents/qa-1
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/qa-1
 
 # Reviewer（Codex）
-cd /Users/lin/Desktop/work/my-agent-teams/agents/review-1
+cd /Users/linsuchang/Desktop/work/my-agent-teams/agents/review-1
 ```
 
 各 agent 启动后先读取各自目录下与运行时匹配的角色文件再按其中规则工作：
@@ -115,16 +115,16 @@ cd /Users/lin/Desktop/work/my-agent-teams/agents/review-1
 
 ```bash
 # 前台运行（调试用）
-SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh
+SCAN_INTERVAL=3 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh
 
 # 后台运行（生产用）
-SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh >> /tmp/agent-teams-watcher.log 2>&1 &
+SCAN_INTERVAL=3 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh >> /tmp/agent-teams-watcher.log 2>&1 &
 ```
 
 ### 3. 创建任务
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh 实现用户登录页 "实现用户登录页" dev-1 development chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/create-task.sh 实现用户登录页 "实现用户登录页" dev-1 development chiralium "frontend/src/pages/Login.tsx" false false reviewer dev dev
 ```
 
 这会创建 `tasks/实现用户登录页/` 目录，包含：
@@ -135,7 +135,7 @@ SCAN_INTERVAL=3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh >
 ### 4. 派发任务
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/dispatch-task.sh /Users/lin/Desktop/work/my-agent-teams/tasks/实现用户登录页/task.json
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/dispatch-task.sh /Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现用户登录页/task.json
 ```
 
 - 将 `task.json.status` 改为 `dispatched`
@@ -290,7 +290,7 @@ flowchart TD
 默认 SQLite 文件：
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3
+/Users/linsuchang/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3
 ```
 
 如需覆盖，可设置环境变量：
@@ -304,7 +304,7 @@ export TASK_BOARD_DB_PATH=/your/path/task-board.sqlite3
 #### 1. 安装依赖
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 -m pip install -r dashboard/requirements.txt
 ```
 
@@ -313,14 +313,14 @@ python3 -m pip install -r dashboard/requirements.txt
 把 `tasks/` 目录里的历史任务导入 SQLite：
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 scripts/task-board-sync.py backfill --tasks-root ./tasks
 ```
 
 #### 3. 启动看板服务
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 -m dashboard.app
 ```
 
@@ -341,7 +341,7 @@ http://127.0.0.1:5001/
 如需手工同步某个任务目录：
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 scripts/task-board-sync.py sync-task --task-dir ./tasks/<task-id> --source manual
 ```
 
@@ -356,7 +356,7 @@ TASK_BOARD_DB_PATH=/custom/path/task-board.sqlite3
 例如局域网访问：
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 TASK_BOARD_HOST=0.0.0.0 TASK_BOARD_PORT=5001 python3 -m dashboard.app
 ```
 
@@ -386,7 +386,7 @@ http://<你的机器IP>:5001/
 先确认 SQLite 有数据：
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 scripts/task-board-sync.py backfill --tasks-root ./tasks
 curl http://127.0.0.1:5001/api/board
 ```
@@ -396,7 +396,7 @@ curl http://127.0.0.1:5001/api/board
 检查前端脚本是否有语法错误：
 
 ```bash
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 node --check dashboard/static/js/dashboard.js
 ```
 
@@ -405,7 +405,7 @@ node --check dashboard/static/js/dashboard.js
 ```bash
 lsof -nP -iTCP:5001 -sTCP:LISTEN
 kill <PID>
-cd /Users/lin/Desktop/work/my-agent-teams
+cd /Users/linsuchang/Desktop/work/my-agent-teams
 python3 -m dashboard.app
 ```
 
@@ -514,10 +514,10 @@ my-agent-teams/
 {
   "version": 1,
   "phase": "phase1_minimal_closure",
-  "agents_root": "/Users/lin/Desktop/work/my-agent-teams/agents",
+  "agents_root": "/Users/linsuchang/Desktop/work/my-agent-teams/agents",
   "shared_paths": {
-    "tasks_root": "/Users/lin/Desktop/work/my-agent-teams/tasks",
-    "scripts_root": "/Users/lin/Desktop/work/my-agent-teams/scripts"
+    "tasks_root": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks",
+    "scripts_root": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts"
   },
   "orchestration": {
     "mode": "single_pm",

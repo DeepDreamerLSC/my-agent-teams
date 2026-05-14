@@ -8,7 +8,7 @@
   "summary": "QA 验证通过。独立的 /api/tasks/<id>/timeline 与 /api/tasks/<id>/communications 接口已补齐，复用 detail 查询逻辑保证口径一致。缺失任务返回 404。4 个 unittest 全部通过（query 2 + API 2）。",
   "review_verdict": "APPROVE",
   "test_commands": [
-    "PYTHONPATH=/Users/lin/Desktop/work/my-agent-teams python3 -m unittest discover -s dashboard/tests -p 'test_task_detail_endpoints.py' -v"
+    "PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams python3 -m unittest discover -s dashboard/tests -p 'test_task_detail_endpoints.py' -v"
   ],
   "test_results": {
     "test_task_detail_endpoints.py": "4 passed"

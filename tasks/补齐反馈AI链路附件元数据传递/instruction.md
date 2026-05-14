@@ -2,7 +2,7 @@
 
 ## 背景
 依赖上游后端契约任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回`
 
 生产排查已确认：当前 feedback AI 输入完全不包含附件信息，因此即使附件存在，AI 也看不到。
 

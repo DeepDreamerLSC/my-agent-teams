@@ -1,14 +1,14 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
 
 ## 结论摘要
 这次 DeepSeek 聊天链路改动已经达到任务目标：

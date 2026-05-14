@@ -26,7 +26,7 @@
 ## create-task.sh 参数
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/create-task.sh <task-id-title> <title> <assigned-agent> <domain> <project> [write-scope-csv] [review-required] [test-required] [review-authority] [execution-mode] [target-environment]
 ```
 
 - `task-id-title` 必须使用不含空格且包含中文的标题式名称，例如：`修复Word生成质量问题`

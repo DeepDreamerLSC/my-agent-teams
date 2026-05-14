@@ -7,8 +7,8 @@
   "pass": true,
   "summary": "QA PASS。9 个新测试全部通过，23 个现有 skill 测试无回归。manifest 合规（subprocess/.pdf/max_files=1/timeout=900/supports_file_parse=true）。skill.py 输入校验严格，PDFConversionService mock 闭环完整，DOCX 合法 zip。错误边界覆盖无文件/多文件/非PDF/文件不存在/assemble 失败。review-1 APPROVE。",
   "test_commands": [
-    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_pdf_to_word_skill.py tests/test_pdf_to_word_service.py -v",
-    "cd /Users/lin/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_admin_skills.py tests/test_ppt_generator_skill.py tests/test_ppt_generator_image_input.py -q"
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_pdf_to_word_skill.py tests/test_pdf_to_word_service.py -v",
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/pytest tests/test_admin_skills.py tests/test_ppt_generator_skill.py tests/test_ppt_generator_image_input.py -q"
   ],
   "test_results": {
     "new_tests": "9 passed in 1.5s",

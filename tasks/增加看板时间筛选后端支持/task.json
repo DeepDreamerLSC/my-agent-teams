@@ -21,8 +21,8 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py"
   ],
   "depends_on": [],
   "blocks": [

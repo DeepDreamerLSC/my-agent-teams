@@ -1,14 +1,14 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py`
   - 参考：
-    - `/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
-    - `/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py`
+    - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`
+    - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py`
 
 ## 结论摘要
 这次紧急修复符合“最小范围先恢复可感知响应”的目标：

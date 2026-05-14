@@ -23,8 +23,8 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产DeepSeek对话无响应/result.json`
 
 result.json 请写明：
 - 根因判断

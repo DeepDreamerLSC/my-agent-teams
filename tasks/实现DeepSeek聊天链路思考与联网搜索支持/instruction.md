@@ -3,8 +3,8 @@
 ## 背景
 
 上游方案任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案`
-- 方案文档：`/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计DeepSeek供应商与能力支持方案`
+- 方案文档：`/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
 
 本任务对应方案中的 execution 子任务 B。
 
@@ -18,15 +18,15 @@
 2. DeepSeek web_search（通过平台级 tool-call 路径，而不是智谱 native web_search）
 
 ## 依据方案（必须阅读）
-- `/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
 - 重点章节：DeepSeek thinking 支持、DeepSeek 联网搜索、tool-call runtime、风险评估
 
 ## 建议实现范围
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py`（新增）
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`（新增）
-- `/Users/lin/Desktop/work/chiralium/backend/tests`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py`（新增）
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py`（新增）
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests`
 
 ## 验收标准
 1. DeepSeek 开启 thinking 时，后端能正确组装请求体
@@ -48,4 +48,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现DeepSeek聊天链路思考与联网搜索支持/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现DeepSeek聊天链路思考与联网搜索支持/result.json`

@@ -27,9 +27,9 @@
   "owner_approved_by": null,
   "owner_approved_at": null,
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/README.md",
-    "/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/README.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
   ],
   "depends_on": [],
   "blocks": [],

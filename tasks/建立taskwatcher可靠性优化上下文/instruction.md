@@ -1,10 +1,10 @@
 # 任务：建立 task-watcher 可靠性优化共享上下文与拆分方案
 
-功能目录：`/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/`
+功能目录：`/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/`
 开始前必须先读：
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/`
 
 ## 背景
 林总工已确认 task-watcher 第一批优化范围：
@@ -34,7 +34,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/建立taskwatcher可靠性优化上下文/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立taskwatcher可靠性优化上下文/result.json`
 
 结果中请包含：
 - CONTEXT.md 路径

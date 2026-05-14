@@ -4,10 +4,10 @@
 林总工明确要求：把缺失的联网搜索配置补上，并确保每个大模型供应商的联网搜索和深度思考配置都正确对应，不要混用。
 
 相关分析与证据：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
-- `/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/合入DeepSeek联网搜索回退修复到集成/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查生产联网搜索DeepSeek可点不可用与GLM置灰/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/合入DeepSeek联网搜索回退修复到集成/result.json`
 
 当前已知：
 1. DeepSeek 生产代码已恢复为 `tool_call` 正确链路
@@ -20,7 +20,7 @@
 
 ### A. 核对并补齐生产联网搜索配置
 至少检查并修正：
-- `/Users/lin/Desktop/prod/chiralium/backend/.env.prod`
+- `/Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod`
 - `CHAT_WEB_SEARCH_PROVIDER`
 - `CHAT_WEB_SEARCH_BASE_URL`
 - `CHAT_WEB_SEARCH_API_KEY`
@@ -40,7 +40,7 @@
 ### C. 执行部署与验证
 在配置修正后执行生产部署（林总工已明确授权）：
 ```bash
-cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
 ```
 
 部署后至少验证：
@@ -50,8 +50,8 @@ cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
 
 ## 输出要求
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐生产AI对话联网搜索配置并部署验证/ack.json`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐生产AI对话联网搜索配置并部署验证/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐生产AI对话联网搜索配置并部署验证/ack.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐生产AI对话联网搜索配置并部署验证/result.json`
 
 结果中请包含：
 - 修改了哪些生产配置项

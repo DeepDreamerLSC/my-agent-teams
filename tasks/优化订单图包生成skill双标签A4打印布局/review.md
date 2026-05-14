@@ -8,8 +8,8 @@
 - 注意：当前任务目录 **未发现 `verify.json`**；本审查遵守 reviewer 边界，未自行执行功能测试。测试状态以 `result.json` 中 dev-2 报告的 `12 passed` 为证据，合并门禁若强依赖 QA 独立验证，请补生成 `verify.json` 后再推进。
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py`
+- `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py`
 
 说明：当前工作树同文件中仍叠加了依赖任务“王开新 Excel 格式适配”的解析层改动，该依赖任务已有 review/QA 通过记录；本轮重点审查 A4 双标签直打布局改动及其与既有主链路的交互。
 
@@ -57,7 +57,7 @@
 
 ## 非阻塞备注
 - `result.json` 已如实记录“未在真实 Excel/WPS 打印预览中人工核对”；当前自动化验证是基于 xlsx 页设置、行高/列宽和分页结构。若最终交付特别依赖具体打印机/Excel/WPS 渲染差异，建议由 QA 追加一次人工打印预览验证。
-- 当前 `/Users/lin/Desktop/work/chiralium` 工作树还有其他非本任务文件处于 modified/untracked 状态（如 chat 相关文件、设计文档），不在本任务 `write_scope` 内，本审查未覆盖也不应随本任务混入合并。
+- 当前 `/Users/linsuchang/Desktop/work/chiralium` 工作树还有其他非本任务文件处于 modified/untracked 状态（如 chat 相关文件、设计文档），不在本任务 `write_scope` 内，本审查未覆盖也不应随本任务混入合并。
 
 ## 最终意见
 当前实现满足本任务目标：`order-print-image-pack` 的每个订单行双标签块已按 A4 纵向页面缩放行高与打印列宽，打印设置为 A4/零边距/100%，多订单块之间使用手动分页，且短码段与长码段都有对应断言。**代码审查通过。**

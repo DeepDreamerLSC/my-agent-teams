@@ -50,7 +50,7 @@
   3. demo 阶段最小闭环是什么
 
 ## 交付物
-- 一份方案文档：`/Users/lin/Desktop/work/chiralium/design/product/ppt-skill-image-mode-upgrade-plan.md`
+- 一份方案文档：`/Users/linsuchang/Desktop/work/chiralium/design/product/ppt-skill-image-mode-upgrade-plan.md`
 - `result.json`，至少包含：
   1. banana-slides 架构拆解结论
   2. 对 chiralium 的集成建议

@@ -1,12 +1,12 @@
 # 审查结论：驳回（REQUEST CHANGES）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx`
 
 ## 结论摘要
 这次改动在聊天工具栏提示文案和 runtime 状态接线上做了不少正确工作，但**Models 页的 capability 可视化当前会误报**，同时“前向兼容接线”和“Models 页真实渲染”的测试覆盖仍然不够扎实，因此我不能给通过结论。

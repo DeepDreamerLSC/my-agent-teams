@@ -40,6 +40,6 @@
       "regression_update": "deepSeekComponentWiring.test.tsx 更新 tooltip 断言以匹配新文案"
     }
   },
-  "test_command": "cd /Users/lin/Desktop/work/chiralium/frontend && npx vitest run src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx",
+  "test_command": "cd /Users/linsuchang/Desktop/work/chiralium/frontend && npx vitest run src/test/deepseekWebSearchVisibility.test.tsx src/test/deepSeekComponentWiring.test.tsx",
   "test_result": "41/41 passed (30 new + 11 existing)"
 }

@@ -15,13 +15,13 @@
 - 王开最新成功上传样本（新格式）：
   - `file_id = 44960e88-b8cb-49e8-866b-07a2d2f743e5`
   - `original_name = 佳佳丽订单汇总5.5.xlsx`
-  - `stored_path = /Users/lin/Desktop/prod/chiralium/uploads/original/44960e88-b8cb-49e8-866b-07a2d2f743e5.xlsx`
+  - `stored_path = /Users/linsuchang/Desktop/prod/chiralium/uploads/original/44960e88-b8cb-49e8-866b-07a2d2f743e5.xlsx`
 - 王开历史成功样本（旧格式，可作参照物）：
   - `39659b84-6f25-46c8-89a7-9898aa585176` -> `订单汇总总单(1).xlsx`
   - `770c4794-9fae-497b-a451-45865502b0ba` -> `订单汇总总单(1).xlsx`
   - `71b39b50-5270-4e4e-8e27-dc7be6eca71a` -> `短款分品牌订单.xlsx`
 - `order-print-image-pack` 当前代码路径：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0`
 - 需要重点回答：
   1. 新样本与旧成功样本相比，sheet / 表头 / 列顺序 / 合并单元格 / 数值字段有什么变化
   2. 当前 skill 的哪段逻辑导致“格式变化后输出不对”

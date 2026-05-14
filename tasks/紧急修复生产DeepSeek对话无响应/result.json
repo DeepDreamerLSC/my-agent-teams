@@ -17,12 +17,12 @@
   "code_fix_completed": true,
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py",
       "action": "modified",
       "description": "在 _stream_text_model_response() 中为 DeepSeek tool_call 链路增加 runtime preflight：若 web_search runtime 不 ready，则在进入模型流式调用前直接返回固定失败文案并记录日志。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "action": "modified",
       "description": "新增回归测试，验证 DeepSeek tool_call 在 runtime unavailable（missing_base_url）时会直接短路返回固定响应，并且不会继续调用 tool_call runtime。"
     }
@@ -35,11 +35,11 @@
   ],
   "verification_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py -q",
       "result": "passed (72 passed, 4 warnings)"
     },
     {
-      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/chat.py /Users/lin/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/app/services/web_search_service.py /Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py",
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/chat_tool_runtime_service.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/web_search_service.py /Users/linsuchang/Desktop/work/chiralium/backend/app/core/model_providers.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py",
       "result": "passed"
     }
   ],

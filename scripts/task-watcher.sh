@@ -1936,7 +1936,7 @@ auto_dispatch_pending_arch() {
     fi
 
     dispatch_task_to_agent "$task_dir" "arch-1" "watcher auto dispatch domain/epic task to arch-1"
-    notify_agent "arch-1" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。"
+    notify_agent "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。"
     sync_task_board "$task_dir" "auto-dispatch-arch"
     log "$task_id: 自动派发给 arch-1（domain/epic 并行）"
     return 0
@@ -1965,7 +1965,7 @@ auto_claim_pending_dev() {
     [ -n "$target_agent" ] || return 1
 
     dispatch_task_to_agent "$task_dir" "$target_agent" "watcher auto-claimed pending execution task"
-    notify_agent "$target_agent" "请读取 /Users/lin/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。"
+    notify_agent "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。"
     sync_task_board "$task_dir" "auto-claim-dev"
     log "$task_id: 自动认领并派发给 $target_agent"
     return 0

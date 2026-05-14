@@ -335,7 +335,7 @@ echo "【方案确认】任务：{标题}
 1. {子任务1} → {agent}
 2. {子任务2} → {agent}
 风险评估：{风险描述}
-请确认是否同意此方案。" | FEISHU_RECEIVE_ID='ou_f95ee559a38a607c5f312e7b64304143' /Users/lin/.openclaw/workspace/scripts/feishu-push.sh
+请确认是否同意此方案。" | FEISHU_RECEIVE_ID='ou_f95ee559a38a607c5f312e7b64304143' /Users/linsuchang/.openclaw/workspace/scripts/feishu-push.sh
 ```
 
 ### 9.3 不需要确认的场景

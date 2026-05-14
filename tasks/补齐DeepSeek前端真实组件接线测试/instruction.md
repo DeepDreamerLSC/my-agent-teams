@@ -3,7 +3,7 @@
 ## 背景
 
 上游任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正DeepSeek前端能力驱动接入`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正DeepSeek前端能力驱动接入`
 
 review-1 已明确指出：
 - Chat.tsx 真实接线已修好
@@ -31,10 +31,10 @@ review-1 已明确指出：
 - 不再显示裸字符串 `deepseek`
 
 ## write_scope
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test`
 
 ## 注意
 - 这轮优先补测试，不要大改逻辑
@@ -42,4 +42,4 @@ review-1 已明确指出：
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐DeepSeek前端真实组件接线测试/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐DeepSeek前端真实组件接线测试/result.json`

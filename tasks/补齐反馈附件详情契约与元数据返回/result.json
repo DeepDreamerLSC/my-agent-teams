@@ -6,22 +6,22 @@
   "summary": "已完成后端 feedback detail / admin detail 的附件契约补齐：在保留 attachment_ids 兼容的同时，新增可直接消费的 attachments[]，返回 file_id、file_name、file_size、mime_type、download_url；并补了详情接口输出测试。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/feedback.py",
       "action": "modified",
       "description": "为用户侧问题/需求 detail 响应增加 attachments[] 契约，并在 create/get detail 返回中统一带出附件元数据。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_feedback.py",
       "action": "modified",
       "description": "为管理员侧问题/需求 detail 响应增加 attachments[] 契约，并在 get/update/rerun detail 返回中统一带出附件元数据。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/file_service.py",
       "action": "modified",
       "description": "新增 get_uploaded_file_summaries()，按 attachment_ids 顺序把 uploaded_files 记录展开为结构化附件摘要。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
       "action": "modified",
       "description": "新增用户问题详情与管理员需求详情的附件元数据输出测试，验证 attachment_ids 兼容保留且 attachments[] 正确返回。"
     }
@@ -53,11 +53,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py /Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py /Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/api/feedback.py /Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_feedback.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/file_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_api.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py /Users/lin/Desktop/work/chiralium/backend/tests/test_files.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_api.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_files.py -q",
       "result": "passed (25 passed, 4 warnings)"
     }
   ],

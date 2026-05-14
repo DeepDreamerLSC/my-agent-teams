@@ -15,9 +15,9 @@
 ## 输入事实
 - 林总工明确要求：输出的标签图片每两张要刚好撑满一个 A4 纸大小。
 - 当前 skill 代码路径：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py`
 - 当前测试：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py`
 - 你需要先确认当前标签图片是怎样排版/输出的，再决定最小改法。
 
 ## 约束

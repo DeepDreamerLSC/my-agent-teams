@@ -1,7 +1,7 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh`
 
 ## 结论摘要
 该脚本已经满足任务要求：支持单任务收口、只允许 `ready_for_merge -> done`、会更新 `task.json.updated_at`、写回 `result_summary`、追加 `transitions.jsonl`，并且 `--dry-run` 不落盘。我认为该任务可以通过 review。
@@ -43,7 +43,7 @@
 - **判断**：满足 `--dry-run` 不落盘要求。
 
 ## 本次复核证据
-- `bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh` → **通过**
+- `bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh` → **通过**
 - 本地临时夹具验证：
   - dry-run 不落盘 → **通过**
   - `working` 状态拒绝关闭 → **通过**

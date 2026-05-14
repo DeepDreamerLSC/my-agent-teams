@@ -1,10 +1,10 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekWebSearchVisibility.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepseekModelsRuntimeWiring.test.tsx`
 
 ## 结论摘要
 本次补修已经解决了上一轮 review 的核心问题：

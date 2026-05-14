@@ -8,7 +8,7 @@
     "backend/tests/test_order_print_image_skill.py"
   ],
   "tests": [
-    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider /Users/lin/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py （12 passed, 4 deprecation warnings）"
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_order_print_image_skill.py （12 passed, 4 deprecation warnings）"
   ],
   "risks": [
     "未在真实 Excel/WPS 打印预览中人工核对；当前验证基于生成的 xlsx 页设置、行高/列宽和分页结构。"

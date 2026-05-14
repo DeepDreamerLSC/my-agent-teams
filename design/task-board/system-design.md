@@ -2,7 +2,7 @@
 
 ## 0. 结论摘要
 
-- **Decision**：任务看板数据库落在 `/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3`，作为运行时状态，不进入业务代码目录，也不要求纳入任务 `write_scope`。
+- **Decision**：任务看板数据库落在 `/Users/linsuchang/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3`，作为运行时状态，不进入业务代码目录，也不要求纳入任务 `write_scope`。
 - **Decision**：采集链路采用 **`task-watcher.sh` 负责触发、独立 Python ingest 脚本负责规范化与写 SQLite** 的分层方式；不把 SQL/字段清洗逻辑塞进 shell。
 - **Decision**：Phase 1 采用 **`tasks` + `task_events`** 两张核心表；Agent 统计先按查询实时计算，不单独落 `agent_daily_stats`，避免双份真相源。
 - **Decision**：看板只暴露 5 个列状态：`pending / working / ready_for_merge / blocked / done`；`dispatched` 映射到 `pending`，`merged/archived` 映射到 `done`，`failed/cancelled/timeout` 映射到 `blocked`。
@@ -119,7 +119,7 @@ tasks/*/task.json|ack.json|result.json|review.md|verify.json|transitions.jsonl
 
 **Decision**：数据库文件放在：
 
-`/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3`
+`/Users/linsuchang/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3`
 
 理由：
 
@@ -314,8 +314,8 @@ tasks/*/task.json|ack.json|result.json|review.md|verify.json|transitions.jsonl
 **Decision**：新增独立 CLI：
 
 ```bash
-python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py backfill --tasks-root /Users/lin/Desktop/work/my-agent-teams/tasks
-python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py sync-task --task-dir /Users/lin/Desktop/work/my-agent-teams/tasks/<task-id> --source <trigger>
+python3 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py backfill --tasks-root /Users/linsuchang/Desktop/work/my-agent-teams/tasks
+python3 /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-board-sync.py sync-task --task-dir /Users/linsuchang/Desktop/work/my-agent-teams/tasks/<task-id> --source <trigger>
 ```
 
 - `backfill`：首次把所有历史任务导入 SQLite。
@@ -398,7 +398,7 @@ python3 /Users/lin/Desktop/work/my-agent-teams/scripts/task-board-sync.py sync-t
 {
   "status": "ok",
   "generated_at": "2026-04-24T18:30:00+08:00",
-  "db_path": "/Users/lin/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3",
+  "db_path": "/Users/linsuchang/Desktop/work/my-agent-teams/.omx/task-board/task-board.sqlite3",
   "task_count": 20,
   "event_count": 43,
   "last_synced_at": "2026-04-24T18:29:58+08:00",

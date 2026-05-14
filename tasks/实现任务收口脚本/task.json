@@ -21,7 +21,7 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh"
   ],
   "depends_on": [],
   "blocks": [

@@ -5,14 +5,14 @@
   "status": "done",
   "summary": "已完成重派补修：复核现有前端已支持 owner_pm/reviewer/integration_owner、状态停留时长、priority/target_environment 以及 project/domain/assigned_agent/owner_pm/review_level 筛选；修复 helpers.js 与 dashboard.js 同页加载时同名顶层 const 重复声明导致的浏览器加载风险，并在卡片标签区补充 review_level 展示。后端 integration_owner/target_environment/review_level 字段链路经源码与临时 DB smoke 验证可进入 board payload，本任务无需越权修改后端。",
   "files_modified": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/css/style.css"
   ],
   "files_reviewed": [
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
-    "/Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates/index.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/css/style.css"
   ],
   "implementation": {
     "frontend_display": [

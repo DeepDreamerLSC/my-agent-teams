@@ -1,14 +1,14 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/models.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py`
-- `/Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_models.py`
-- `/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/core/model_providers.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/models.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_models.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/model.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py`
+- `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py`
 
 ## 结论摘要
 这次后端契约层实现是完整的：

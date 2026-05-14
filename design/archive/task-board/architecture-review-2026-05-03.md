@@ -2,8 +2,8 @@
 
 > 审查时间：2026-05-03  
 > 审查对象：
-> 1. `/Users/lin/Desktop/work/my-agent-teams/design/task-board/optimization-plan.md`
-> 2. `/Users/lin/Desktop/work/my-agent-teams/design/archive/task-board/task-breakdown-2026-05-03.md`
+> 1. `/Users/linsuchang/Desktop/work/my-agent-teams/design/task-board/optimization-plan.md`
+> 2. `/Users/linsuchang/Desktop/work/my-agent-teams/design/archive/task-board/task-breakdown-2026-05-03.md`
 >
 > 结合现有实现：`dashboard/db.py`、`dashboard/ingest.py`、`dashboard/query.py`、`dashboard/app.py`、`scripts/task-board-sync.py`、`scripts/send-chat.sh`、`scripts/lint-chat.sh`、`scripts/task-watcher.sh`、`scripts/dispatch-task.sh`、`scripts/send-to-agent.sh`
 

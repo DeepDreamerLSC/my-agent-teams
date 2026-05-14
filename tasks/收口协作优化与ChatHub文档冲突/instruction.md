@@ -3,8 +3,8 @@
 ## 目标
 根据架构审阅结论，对以下两份文档做最小范围收口，消除仍然存在的冲突和过重表达：
 
-1. `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
-2. `/Users/lin/Desktop/work/my-agent-teams/design/Chat-Hub-落地清单.md`
+1. `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+2. `/Users/linsuchang/Desktop/work/my-agent-teams/design/Chat-Hub-落地清单.md`
 
 ## 已知问题（来自上游审阅任务）
 ### 1. OpenClaw 主文档头部修订说明仍残留 v13 全量 Chat Hub 描述

@@ -8,7 +8,7 @@
   "summary": "QA 验证通过。API /api/tasks/aggregate 与 CLI task-aggregate.py 已补齐，支持按 owner_pm/domain/task_level/parent_task_id/root_request_id 五维度只读聚合、request_tree drill-down 与拥塞分布。8 个 dashboard 测试全部通过，aggregate CLI JSON 输出可解析、维度完整。",
   "review_verdict": "APPROVE",
   "test_commands": [
-    "PYTHONPATH=/Users/lin/Desktop/work/my-agent-teams python3 -m unittest discover -s dashboard/tests -p 'test_*.py' -v",
+    "PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams python3 -m unittest discover -s dashboard/tests -p 'test_*.py' -v",
     "python3 scripts/task-aggregate.py --json --group-limit 1"
   ],
   "test_results": {

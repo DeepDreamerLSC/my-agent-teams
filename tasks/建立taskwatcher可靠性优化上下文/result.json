@@ -4,7 +4,7 @@
   "status": "done",
   "completed_at": "2026-04-26T13:06:42+08:00",
   "summary": "已完成 task-watcher 可靠性优化第一批的 feature 级共享上下文：补全 CONTEXT.md、记录 arch 约束、追加关键决策，并给出按当前 watcher 脚本结构的 execution 拆分建议。",
-  "context_path": "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md",
+  "context_path": "/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md",
   "execution_task_suggestions": [
     {
       "title": "task-watcher 进程级可靠性（heartbeat + watchdog）",
@@ -38,9 +38,9 @@
     "最后做超时检测优化，因为它依赖更稳定的运行时观测与日志证据"
   ],
   "written_files": [
-    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md",
-    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/decisions.log",
-    "/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/decisions.log",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md"
   ],
   "key_findings": [
     "task-watcher.sh 当前已承载扫描、派发、重发、review/QA 路由、自动收口和看板同步，敏感区集中在 set_task_status/transitions.jsonl 和 close-task 自动链。",

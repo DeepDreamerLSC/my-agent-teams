@@ -32,10 +32,10 @@
   "task_level": "execution",
   "domain": "frontend",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
-    "/Users/lin/Desktop/work/chiralium/frontend/src/test"
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+    "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test"
   ],
   "depends_on": [
     "增加GLM联网搜索健康探针与状态输出"

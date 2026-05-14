@@ -2,7 +2,7 @@
 
 ## 背景
 上轮紧急修复任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/紧急修复生产外箱尺寸计算直接尺寸输入模式`
 
 审查驳回点已经明确：
 - 你新增的总数兜底正则会把混装明细里的第一个“X双/个”误当总数
@@ -36,7 +36,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正boxcalculator数量兜底解析回归/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正boxcalculator数量兜底解析回归/result.json`
 
 请在结果中写明：
 - 你如何避免把混装明细误当总数

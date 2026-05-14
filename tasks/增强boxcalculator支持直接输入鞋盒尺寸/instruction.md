@@ -9,7 +9,7 @@
 3. 如果不匹配任何款号，明确提示用户该尺寸不符合标准，并列出 A-G 的标准尺寸供参考
 
 当前 skill 文件：
-- `/Users/lin/.agents/skills/box-calculator/SKILL.md`
+- `/Users/linsuchang/.agents/skills/box-calculator/SKILL.md`
 
 ## 你的任务
 请在现有 skill 文档基础上，新增“尺寸输入模式”规则，要求：
@@ -49,7 +49,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/增强boxcalculator支持直接输入鞋盒尺寸/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强boxcalculator支持直接输入鞋盒尺寸/result.json`
 
 结果中请包含：
 - 新增了哪些输入模式规则

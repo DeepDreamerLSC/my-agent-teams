@@ -978,7 +978,7 @@ tmux new-session -d -s task-watcher "/bin/bash scripts/task-watcher.sh"
 例如:
 
 ```text
-/Users/lin/Desktop/work/.openclaw-worktrees/chiralium/20260422-001
+/Users/linsuchang/Desktop/work/.openclaw-worktrees/chiralium/20260422-001
 ```
 
 优点:
@@ -1221,7 +1221,7 @@ ready_for_merge
 | ack/result/verify.json | ✅ 通用 | 纯数据文件 |
 | tmux-send.sh | ✅ 通用 | bash 脚本,任何 *nix 可用 |
 | verify 脚本 | ✅ 通用 | 基于 git diff,不依赖具体项目 |
-| worktree 路径 | ❌ 主机相关 | 硬编码了 `/Users/lin/Desktop/work/` |
+| worktree 路径 | ❌ 主机相关 | 硬编码了 `/Users/linsuchang/Desktop/work/` |
 | agent 名称映射 | ❌ 主机相关 | `dcai`/`xcai`/`xke` 写死 |
 | 飞书推送配置 | ❌ 主机相关 | 依赖 open_id / webhook |
 | 项目路径 | ❌ 主机相关 | 绝对路径 |
@@ -1297,10 +1297,10 @@ ready_for_merge
       "fallback_manual_review"
     ]
   },
-  "worktree_root": "/Users/lin/Desktop/work/.openclaw-worktrees",
+  "worktree_root": "/Users/linsuchang/Desktop/work/.openclaw-worktrees",
   "notifications": {
     "feishu_open_id": "ou_xxx",
-    "push_script": "/Users/lin/.openclaw/workspace/system/scripts/feishu-push.sh"
+    "push_script": "/Users/linsuchang/.openclaw/workspace/system/scripts/feishu-push.sh"
   }
 }
 ```
@@ -1422,12 +1422,12 @@ cp config.example.json config.json
 {
   "projects": {
     "chiralium": {
-      "dev_root": "/Users/lin/Desktop/work/chiralium",
-      "prod_root": "/Users/lin/Desktop/prod/chiralium"
+      "dev_root": "/Users/linsuchang/Desktop/work/chiralium",
+      "prod_root": "/Users/linsuchang/Desktop/prod/chiralium"
     },
     "my-agent-teams": {
-      "dev_root": "/Users/lin/Desktop/work/my-agent-teams",
-      "prod_root": "/Users/lin/Desktop/prod/my-agent-teams"
+      "dev_root": "/Users/linsuchang/Desktop/work/my-agent-teams",
+      "prod_root": "/Users/linsuchang/Desktop/prod/my-agent-teams"
     }
   }
 }
@@ -2266,14 +2266,14 @@ agent 在任务间隙或被唤醒时，直接往 chat 文件追加消息：
 
 ```bash
 # dev-1 在公共频道发言
-echo '{"ts":"'$(date -Iseconds)'","from":"dev-1","to":"all","type":"text","msg":"这个接口我改完了，arch-1 帮忙看看"}' >> /Users/lin/Desktop/work/my-agent-teams/chat/general/$(date +%Y-%m-%d).jsonl
+echo '{"ts":"'$(date -Iseconds)'","from":"dev-1","to":"all","type":"text","msg":"这个接口我改完了，arch-1 帮忙看看"}' >> /Users/linsuchang/Desktop/work/my-agent-teams/chat/general/$(date +%Y-%m-%d).jsonl
 ```
 
 **方式二：通过 send-chat.sh 脚本（封装，带格式校验）**
 
 ```bash
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh general "这个接口我改完了，arch-1 帮忙看看"
-/Users/lin/Desktop/work/my-agent-teams/scripts/send-chat.sh task "修复DeepSeek联网搜索配置" "这条任务我先看一下上下文"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh general "这个接口我改完了，arch-1 帮忙看看"
+/Users/linsuchang/Desktop/work/my-agent-teams/scripts/send-chat.sh task "修复DeepSeek联网搜索配置" "这条任务我先看一下上下文"
 ```
 
 > A-Lite 阶段当前只启用 `general` 与 `task` 两类公开消息；`agent` 私聊命令保留为后续阶段预留，不属于当前落地范围。

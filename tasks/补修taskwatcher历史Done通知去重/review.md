@@ -8,9 +8,9 @@
 - 说明：本任务目录当前 **无 `verify.json`**；本结论是代码/文档审查结论。`task.json.test_required=true`，后续仍应由 QA 产出 `verify.json` 后再最终收口。
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-- `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补修taskwatcher历史Done通知去重/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补修taskwatcher历史Done通知去重/result.json`
 
 ## 通过项
 
@@ -46,7 +46,7 @@
 - `result.json` 已包含实现策略、验证命令与剩余风险。
 
 ## 验证证据
-- `bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`：通过。
+- `bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`：通过。
 - 只读历史 done 扫描（以当前时间模拟 watcher 新启动边界）：
   - `done_tasks_scanned=95`
   - `historical_done_that_would_notify_if_started_now=0`

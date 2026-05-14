@@ -1,12 +1,12 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查看板任务统计后端口径/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py`
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py`
 
 ## 结论摘要
 本次排查结论是可信的：当前看板后端统计口径本身没有算错，`SQLite tasks`、`/api/board`、`/api/health`、`/api/agents` 之间口径一致，且与当前 `task.json` 事实源一致。用户给出的 `ready_for_merge=6 / done=25` 与当前 `7 ready_for_merge + 1 working + 25 done` 的差异，来自**排查任务创建后的时间点变化**，而不是同一时刻的后端统计错误。

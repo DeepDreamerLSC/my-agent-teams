@@ -12,8 +12,8 @@
 为后端 API 增加时间筛选能力，供前端界面使用。
 
 ## 范围
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/query.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/query.py`
 
 ## 要求
 - 至少支持 query 参数（如 `range=24h|3d|7d|30d`）
@@ -21,4 +21,4 @@
 - 需说明筛选基于哪个时间字段（建议 `current_status_at` 或等价口径）
 
 ## 交付物
-完成后写 `/Users/lin/Desktop/work/my-agent-teams/tasks/增加看板时间筛选后端支持/result.json`
+完成后写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增加看板时间筛选后端支持/result.json`

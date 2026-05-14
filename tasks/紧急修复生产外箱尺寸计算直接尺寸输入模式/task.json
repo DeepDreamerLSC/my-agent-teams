@@ -21,9 +21,9 @@
   "owner_pm": "pm-chief",
   "domain": "development",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py"
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py"
   ],
   "depends_on": [],
   "blocks": [],

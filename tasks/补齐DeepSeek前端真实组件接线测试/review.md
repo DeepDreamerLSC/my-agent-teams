@@ -1,7 +1,7 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/deepSeekComponentWiring.test.tsx`
 
 ## 结论摘要
 这次补测已经达到了我上轮要求的**真实组件级接线测试**目标：

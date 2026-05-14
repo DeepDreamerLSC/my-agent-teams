@@ -6,8 +6,8 @@
 2. 如果探测确认联网不可用，前端直接报出正确的错误提示
 
 参考依据：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`
-- `/Users/lin/Desktop/work/chiralium/design/product/glm-web-search-degradation-mitigation-plan.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查DeepSeek模型不可用与GLM联网搜索丢失/result.json`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/glm-web-search-degradation-mitigation-plan.md`
 
 ## 你的任务
 请先实现后端侧最小可用能力：
@@ -33,4 +33,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/增加GLM联网搜索健康探针与状态输出/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增加GLM联网搜索健康探针与状态输出/result.json`

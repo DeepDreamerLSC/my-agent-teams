@@ -14,10 +14,10 @@
 - 仍缺关键 gate 的任务不得关闭
 
 ## write_scope
-- `/Users/lin/Desktop/work/my-agent-teams/tasks`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks`
 
 ## 交付物
-完成后写 `/Users/lin/Desktop/work/my-agent-teams/tasks/批量收口待合入任务/result.json`，包括：
+完成后写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/批量收口待合入任务/result.json`，包括：
 - 关闭了哪些任务
 - 每个任务的关闭理由
 - 仍保留 ready_for_merge 的任务及原因

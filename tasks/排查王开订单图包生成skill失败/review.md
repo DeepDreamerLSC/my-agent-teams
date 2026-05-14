@@ -36,10 +36,10 @@
   3. `_compute_per_box_sizes()` 仅记 warning，不阻断
   4. `_write_label_block()` / `_write_quantity_row()` 再对这些字符串执行 `int()`，直接抛异常
 - 对应可疑代码段也已明确列出：
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:934-965`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:867-908`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:506-528`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:686-699`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:934-965`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:867-908`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:506-528`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/order-print-image-pack/1.0.0/skill.py:686-699`
 - 满足任务验收标准 3。
 
 ### 4. 后续修复任务可直接派发

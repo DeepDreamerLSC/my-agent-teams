@@ -3,7 +3,7 @@
 ## 背景
 
 上游任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/接入DeepSeek固定供应商展示与能力驱动前端`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/接入DeepSeek固定供应商展示与能力驱动前端`
 
 review-1 已给出 REQUEST CHANGES，阻塞点有两个：
 1. `Chat.tsx` 真实接线仍只传旧的 `supportsZhipuTools`，没有把 `supportsThinking` / `supportsWebSearch` 传进 `ChatToolbar`
@@ -37,13 +37,13 @@ review-1 已给出 REQUEST CHANGES，阻塞点有两个：
 3. Models 页 provider 展示文案正确
 
 ## write_scope
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
-- `/Users/lin/Desktop/work/chiralium/frontend/src/test`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/hooks/useChatOptions.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/components/ChatToolbar.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/utils/chatThinking.ts`
+- `/Users/linsuchang/Desktop/work/chiralium/frontend/src/test`
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正DeepSeek前端能力驱动接入/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正DeepSeek前端能力驱动接入/result.json`

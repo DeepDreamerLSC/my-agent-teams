@@ -28,8 +28,8 @@
   "owner_approved_at": null,
   "auto_close_policy": "manual_after_review",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/admin_skill_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_admin_skills.py"
   ],
   "depends_on": [],
   "blocks": [],

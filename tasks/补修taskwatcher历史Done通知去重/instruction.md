@@ -12,14 +12,14 @@ development
 - 不做生产部署。
 
 ## 输入事实
-- 原任务 `/Users/lin/Desktop/work/my-agent-teams/tasks/修正taskwatcher仅在任务最终完成后发飞书通知/review.md` 结论 REQUEST CHANGES。
+- 原任务 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正taskwatcher仅在任务最终完成后发飞书通知/review.md` 结论 REQUEST CHANGES。
 - QA 结论：当前 `notify_final_done_if_needed()` 仅依赖 sentinel 去重，watcher 重启可能对约 92 个历史 done 任务补发完成通知。
 - 文档 `design/OpenClaw-tmux协作方案优化.md` 仍把“verify 通过自动收口”与“最终完成通知发送”写在同一阶段，需改为 done 观察分支统一发送。
 
 ## 约束
 - write_scope 仅限：
-  - `/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
-  - `/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md`
 - result.json.status 只能使用 `done` / `failed` / `blocked`。
 - 必须避免历史任务刷屏；宁可少发历史通知，也不能批量补发误报。
 

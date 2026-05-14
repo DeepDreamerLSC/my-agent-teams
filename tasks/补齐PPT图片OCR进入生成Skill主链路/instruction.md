@@ -13,20 +13,20 @@ development
 - 不新增第三方依赖。
 
 ## 输入事实
-- 原任务 `/Users/lin/Desktop/work/my-agent-teams/tasks/实现PPT生成skill图片OCR输入链路/result.json` 已说明当前窄 write_scope 无法闭环。
+- 原任务 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PPT生成skill图片OCR输入链路/result.json` 已说明当前窄 write_scope 无法闭环。
 - review-1 驳回点：`ContextAssembler.ensure_parsed_files()` 未解析图片；`ppt_generator` 当前主要消费 `context.parsed_files`；`ppt_generator` manifest 未允许图片输入；`UploadedFileSummary` schema 未暴露新增字段。
 - 当前已有 ParserService 图片 OCR 能力和 uploaded_files.extracted_text 落库基础。
 - 与 `ppt_generator` 文件有潜在冲突，需等待 `实现PPT精美模式入口与CogView页图渲染Demo` 完成/收口后再认领。
 
 ## 约束
 - write_scope 仅限：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/schemas/file.py`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/file.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py`
 - result.json.status 只能使用 `done` / `failed` / `blocked`。
 - 必须保持现有 PDF/docx/xlsx 解析逻辑不回归。
 

@@ -2,7 +2,7 @@
 
 ## 背景
 来自生产排查结论：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查反馈管理未关闭问题根因/result.json`
 
 B 号问题（反馈附件未保存或传递导致后续环节无法查看）的核心根因不是存储整体失效，而是：
 - feedback detail/admin detail 当前只返回 `attachment_ids`

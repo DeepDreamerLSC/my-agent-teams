@@ -22,13 +22,13 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/core/model_providers.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/models.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/admin_models.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/schemas/model.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/core/model_providers.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/models.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_models.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/model.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests"
   ],
   "depends_on": [],
   "blocks": [],

@@ -11,18 +11,18 @@ PM 在验收 `任务看板前端可视化实现` 时发现两个阻塞问题：
   - `/api/gantt`
   - `/api/agents`
 - 后端当前实现也是这组 API：
-  - `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py:42-79`
+  - `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py:42-79`
 - 但前端当前代码仍在请求：
   - `/api/tasks`
   - `/api/tasks/gantt`
   - `/api/agents/stats`
-  见：`/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:29-57`
+  见：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js:29-57`
 
 ### 阻塞 2：看板列数与方案不一致
 - 架构方案要求只有五列：
   - `pending / working / ready_for_merge / blocked / done`
   - 且 `dispatched -> pending`
-  见：`/Users/lin/Desktop/work/my-agent-teams/design/任务看板系统方案.md` 中 board_status 设计
+  见：`/Users/linsuchang/Desktop/work/my-agent-teams/design/任务看板系统方案.md` 中 board_status 设计
 - 但当前前端使用了 6 列，把 `dispatched` 独立成一列：
   - `dashboard/static/js/dashboard.js:2-14`
 
@@ -67,8 +67,8 @@ PM 在验收 `任务看板前端可视化实现` 时发现两个阻塞问题：
 ## write_scope
 
 仅允许修改：
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/templates`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static`
 
 ## 测试要求
 
@@ -79,4 +79,4 @@ PM 在验收 `任务看板前端可视化实现` 时发现两个阻塞问题：
 ## 交付物
 
 完成后请写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正任务看板前端接口契约/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正任务看板前端接口契约/result.json`

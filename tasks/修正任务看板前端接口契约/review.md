@@ -1,10 +1,10 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static/css/style.css`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/dashboard.js`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/helpers.js`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/js/test/helpers.test.js`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static/css/style.css`
 
 ## 结论摘要
 该修正任务已经把前端从“旧接口 + 6 列状态”纠正到了“对齐后端 `/api/board|gantt|agents` + 五列状态映射”的正确状态。联调验证也已经确认前后端契约完全一致，因此本任务可以通过 review。

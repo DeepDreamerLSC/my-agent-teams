@@ -7,9 +7,9 @@
   "pass": true,
   "summary": "QA PASS。核心修复（终态任务 sync_if_changed）在当前 task-watcher.sh 中仍完整保留（L1758-1763）。10 个后端测试全部通过。SQLite 与 task.json 在非 pooled 状态下完全一致（cancelled=18, dispatched=1, done=95, ready_for_merge=5）；pooled 存在 4 条历史测试残留（磁盘已删除但 SQLite 未清理），属非阻塞 stale data 问题，与本次修复无关。",
   "test_commands": [
-    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "cd /Users/lin/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest dashboard.tests.test_dashboard_metrics dashboard.tests.test_dashboard_frontend_timeline dashboard.tests.test_task_detail_endpoints -v",
-    "cd /Users/lin/Desktop/work/my-agent-teams && python3 -c \"对比 tasks/*/task.json 与 SQLite .omx/task-board/task-board.sqlite3 的 status 统计\""
+    "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest dashboard.tests.test_dashboard_metrics dashboard.tests.test_dashboard_frontend_timeline dashboard.tests.test_task_detail_endpoints -v",
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams && python3 -c \"对比 tasks/*/task.json 与 SQLite .omx/task-board/task-board.sqlite3 的 status 统计\""
   ],
   "test_results": {
     "shell_syntax": "passed",

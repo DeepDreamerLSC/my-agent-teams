@@ -16,17 +16,17 @@
   ],
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/Chat.tsx",
       "action": "modified",
       "description": "解构 supportsThinking/supportsWebSearch，传递给 ChatToolbar"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/frontend/src/pages/admin/Models.tsx",
       "action": "modified",
       "description": "导入 getProviderLabel；table column render 和卡片视图使用 getProviderLabel 展示 provider 文案"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/frontend/src/test/capabilityDrivenToolbar.test.tsx",
       "action": "modified",
       "description": "新增 6 条真实接线测试：only-thinking/only-websearch/both/legacy-fallback/no-caps/granular-override"
     }

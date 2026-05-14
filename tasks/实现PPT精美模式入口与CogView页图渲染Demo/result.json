@@ -14,27 +14,27 @@
   },
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
       "action": "modified",
       "description": "新增 polished/simple 模式元数据入口（`default_render_mode`、`render_modes`），并保持现有 skill 输入输出契约。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
       "action": "modified",
       "description": "新增 `render_mode` 入口判定；simple 模式继续输出 `.pptx`，polished 模式改为输出 zip demo 包；扩展 polished `presentation_plan` schema，并接入独立页图渲染 service。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py",
       "action": "added",
       "description": "新增独立页图渲染 service，封装 CogView-3-Flash 图片模型选择、分页 prompt 构造、逐页图片生成与本地导出，避免 provider 调用散落在 skill 中。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py",
       "action": "modified",
       "description": "补充 polished 模式入口、demo archive 输出、图片 OCR 上下文消费等测试。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
       "action": "added",
       "description": "新增页图渲染 service 测试，验证支持页型过滤/页数限制，以及调用 CogView-3-Flash 图片生成接口。"
     }
@@ -80,11 +80,11 @@
   ],
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/ppt_page_render_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_page_render_service.py -q",
       "result": "passed (8 passed, 4 warnings)"
     }
   ],

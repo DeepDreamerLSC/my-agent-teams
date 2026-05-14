@@ -27,7 +27,7 @@
 
 ### 3. 检查生产环境配置是否与代码逻辑一致
 至少检查：
-- `/Users/lin/Desktop/prod/chiralium/backend/.env.prod`
+- `/Users/linsuchang/Desktop/prod/chiralium/backend/.env.prod`
 - 当前生产代码逻辑
 - 模型管理 / provider registry / meta 接口 / runtime 检测逻辑
 
@@ -39,7 +39,7 @@
 
 ## 输出要求
 请在以下路径输出分析文档：
-- `/Users/lin/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/ai-chat-provider-config-analysis.md`
 
 文档至少包含：
 1. 当前 AI 对话架构简述
@@ -51,7 +51,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/分析AI对话供应商配置与生产一致性/result.json`
 
 结果中请包含：
 - 文档路径

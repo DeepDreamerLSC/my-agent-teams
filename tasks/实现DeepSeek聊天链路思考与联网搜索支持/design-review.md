@@ -1,8 +1,8 @@
 # 设计审查结论：通过（APPROVE, with follow-up notes）
 
 ## 审查范围
-- 任务：`/Users/lin/Desktop/work/my-agent-teams/tasks/实现DeepSeek聊天链路思考与联网搜索支持`
-- 上游方案：`/Users/lin/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
+- 任务：`/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现DeepSeek聊天链路思考与联网搜索支持`
+- 上游方案：`/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-provider-capability-support-plan.md`
 - 本次重点核对：
   - DeepSeek thinking 是否按方案接入
   - DeepSeek web_search 是否走平台级 tool-call 路径，而不是智谱 native `web_search`
@@ -17,7 +17,7 @@
 3. 聊天主链路与 skill-backed model 路径都已改为消费 `resolve_model_capabilities(model)`，与方案要求一致。
 4. 已新增平台级 `web_search_service.py` 与 `chat_tool_runtime_service.py`，架构边界基本符合方案。
 5. 我本地复跑了相关后端测试：
-   - `PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_models.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q`
+   - `PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_models.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_tool_runtime_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q`
    - 结果：`64 passed, 4 warnings`
 
 基于以上，我的**设计审查结论为通过 / APPROVE**。

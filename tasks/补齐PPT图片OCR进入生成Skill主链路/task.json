@@ -28,13 +28,13 @@
   "owner_approved_at": null,
   "auto_close_policy": "manual_after_review",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/schemas/file.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
-    "/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/file.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_context_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_skill.py"
   ],
   "depends_on": [
     "实现PPT精美模式入口与CogView页图渲染Demo"

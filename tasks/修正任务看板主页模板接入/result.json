@@ -6,7 +6,7 @@
   "summary": "已将 Flask 根路由 `/` 改为渲染 dashboard 模板，并保持 `/api/health`、`/api/board`、`/api/gantt`、`/api/agents` 不回归；同时补了当前模板脚本所需的兼容 API 别名。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py",
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py",
       "action": "modified",
       "description": "将 `/` 从 JSON 改为 `render_template(\"index.html\")`，显式配置 template/static 目录，并保留原 `/api/health|board|gantt|agents`。另外新增 `/api/tasks`、`/api/tasks/gantt`、`/api/agents/stats` 兼容别名，匹配现有 dashboard.js 调用。"
     }
@@ -14,7 +14,7 @@
   "template_integration": {
     "root_route": "/",
     "behavior": "returns HTML template",
-    "template": "/Users/lin/Desktop/work/my-agent-teams/dashboard/templates/index.html",
+    "template": "/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates/index.html",
     "static_prefix": "/static"
   },
   "api_status": {
@@ -32,11 +32,11 @@
   },
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/my-agent-teams-pycache python3 -m py_compile /Users/lin/Desktop/work/my-agent-teams/dashboard/app.py /Users/lin/Desktop/work/my-agent-teams/dashboard/__init__.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/my-agent-teams-pycache python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py /Users/linsuchang/Desktop/work/my-agent-teams/dashboard/__init__.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONPATH=/tmp/task-board-pkgs:/Users/lin/Desktop/work/my-agent-teams python3 内联脚本：create_app(test_db) + Flask test_client 校验 GET / 返回 HTML、GET /static/css/style.css 返回 CSS、GET /api/health|board|gantt|agents 及兼容别名全部 200",
+      "command": "PYTHONPATH=/tmp/task-board-pkgs:/Users/linsuchang/Desktop/work/my-agent-teams python3 内联脚本：create_app(test_db) + Flask test_client 校验 GET / 返回 HTML、GET /static/css/style.css 返回 CSS、GET /api/health|board|gantt|agents 及兼容别名全部 200",
       "result": "passed"
     }
   ],

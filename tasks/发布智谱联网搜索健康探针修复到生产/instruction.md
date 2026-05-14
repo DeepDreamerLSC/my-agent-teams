@@ -30,7 +30,7 @@
 4. **部署生产**
    - 执行：
      ```bash
-     cd /Users/lin/Desktop/work/chiralium && ./scripts/deploy.sh prod
+     cd /Users/linsuchang/Desktop/work/chiralium && ./scripts/deploy.sh prod
      ```
    - 脚本执行时间较长，请等待完成
 

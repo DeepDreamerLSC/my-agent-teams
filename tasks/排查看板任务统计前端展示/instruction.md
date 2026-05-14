@@ -29,11 +29,11 @@
 如果排查后确认前端只是如实展示了后端错误数据，也请在 result.json 中明确说明“前端未修改，根因在后端”。
 
 ## write_scope
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/templates`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates`
 
 ## 交付物
-请写 `/Users/lin/Desktop/work/my-agent-teams/tasks/排查看板任务统计前端展示/result.json`，说明：
+请写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查看板任务统计前端展示/result.json`，说明：
 - 根因是否在前端
 - 修改文件（如有）
 - 修复后展示口径

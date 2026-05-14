@@ -19,8 +19,13 @@ KEYWORDS=(
     "Allow the omx_memory"
 )
 DANGEROUS_KEYWORDS=(
-    "make the following edits"
-    "Would you like to make the following edits?"
+    "rm -rf"
+    "rm -r"
+    "DROP TABLE"
+    "DELETE FROM"
+    "format disk"
+    "mkfs."
+    "dd if="
 )
 INTERVAL=3
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

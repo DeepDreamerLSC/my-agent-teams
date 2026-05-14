@@ -1,13 +1,13 @@
 # 审查结论：通过（APPROVE）
 
 ## 审查范围
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回/instruction.md`
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐反馈附件详情契约与元数据返回/result.json`
 - 相关实现：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/feedback.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/admin_feedback.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_feedback_api.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/feedback.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/admin_feedback.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/file_service.py`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_feedback_api.py`
 
 ## 结论摘要
 这次后端补修已经完成了任务要求的“detail 契约补齐”目标：

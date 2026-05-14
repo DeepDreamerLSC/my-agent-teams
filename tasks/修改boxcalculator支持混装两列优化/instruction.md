@@ -8,7 +8,7 @@
 我已确认读取了这条需求的完整 `selected_plan`（处理方案）字段，当前 skill 需要按该字段里的细化规则更新，而不是只按原始摘要需求理解。
 
 现有 skill：
-- `/Users/lin/.agents/skills/box-calculator/SKILL.md`
+- `/Users/linsuchang/.agents/skills/box-calculator/SKILL.md`
 
 ## 你的任务
 请直接修改 `box-calculator` skill 文档，使其符合生产需求单里的最新规则。重点改动：
@@ -53,7 +53,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修改boxcalculator支持混装两列优化/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修改boxcalculator支持混装两列优化/result.json`
 
 请在结果中写明：
 - 改了哪些规则

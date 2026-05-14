@@ -20,8 +20,8 @@
 三视图按所选时间范围刷新。
 
 ## write_scope
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/static`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/templates`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/static`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/templates`
 
 ## 验收标准
 - 4 个时间选项可见且可切换
@@ -30,4 +30,4 @@
 - 不破坏现有 tab 切换
 
 ## 交付物
-完成后写 `/Users/lin/Desktop/work/my-agent-teams/tasks/增加看板时间筛选前端界面/result.json`
+完成后写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增加看板时间筛选前端界面/result.json`

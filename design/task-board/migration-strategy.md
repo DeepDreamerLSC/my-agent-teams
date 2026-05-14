@@ -1,6 +1,6 @@
 # 任务协作看板迁移策略
 
-> 适用范围：`/Users/lin/Desktop/work/my-agent-teams/dashboard/` 及其 SQLite 数据库  
+> 适用范围：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/` 及其 SQLite 数据库  
 > 当前数据库路径：`.omx/task-board/task-board.sqlite3`  
 > 目标：把当前“仅能初始化 schema”的状态，升级为“有明确 schema version、保守迁移、幂等 rebuild、全量 backfill 语义”的可执行设计。
 

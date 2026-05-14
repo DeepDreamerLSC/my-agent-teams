@@ -2,10 +2,10 @@
 
 ## 背景
 原任务：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/instruction.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/instruction.md`
 
 审查意见：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/review.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补充DeepSeek联网搜索前端提示与能力可视化/review.md`
 
 本次是 review 驳回后的补修任务，请只处理审查指出的问题，不要扩散改动范围。
 
@@ -33,7 +33,7 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正DeepSeek联网搜索前端可视化误报与测试补齐/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正DeepSeek联网搜索前端可视化误报与测试补齐/result.json`
 
 请在 `result.json` 中包含：
 - 修改文件列表

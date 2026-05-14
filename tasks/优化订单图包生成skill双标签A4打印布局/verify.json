@@ -7,7 +7,7 @@
   "pass": true,
   "summary": "QA PASS。12 个测试全部通过。双标签 A4 布局实现正确：行高按 A4 高度等比缩放、列宽按 A4 宽度适配、打印设置 A4/纵向/100%/零边距、多订单块间手动分页。短码段(678)与长码段(910)均有断言覆盖。review-1 审查通过，0 个阻塞问题。现有标签生成主链路无回归。",
   "test_commands": [
-    "cd /Users/lin/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/lin/Desktop/work/chiralium/backend /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_order_print_image_skill.py"
+    "cd /Users/linsuchang/Desktop/work/chiralium && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -q -p no:cacheprovider backend/tests/test_order_print_image_skill.py"
   ],
   "test_results": {
     "pytest": "12 passed, 4 deprecation warnings (FastAPI lifecycle, non-blocking)",

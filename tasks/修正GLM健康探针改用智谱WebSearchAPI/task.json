@@ -21,10 +21,10 @@
   "owner_pm": "pm-chief",
   "domain": "backend",
   "write_scope": [
-    "/Users/lin/Desktop/work/chiralium/backend/app/api/meta.py",
-    "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
-    "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py"
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py"
   ],
   "depends_on": [],
   "blocks": [

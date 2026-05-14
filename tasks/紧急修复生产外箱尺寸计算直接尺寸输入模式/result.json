@@ -12,17 +12,17 @@
   ],
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py",
       "action": "modified",
       "description": "新增 direct_dimension 运行时模式；补 10个/10双 数量解析；补尺寸匹配与不匹配提示；在 query 明显属于直接尺寸模式时覆盖误判的 reverse params。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/SKILL.md",
       "action": "modified",
       "description": "把部署中的 skill 文档补齐到与当前运行时一致，加入鞋盒实际尺寸输入模式说明，并保留现有资产测试所需文案。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
       "action": "modified",
       "description": "新增直接尺寸匹配成功、10个 误落 reverse 纠偏、不匹配提示等回归测试。"
     }
@@ -41,11 +41,11 @@
   },
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/skills/custom/box-calculator/1.0.0/skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py",
       "result": "passed"
     },
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_box_calculator_skill.py -q",
       "result": "passed (10 passed, 4 warnings)"
     }
   ],

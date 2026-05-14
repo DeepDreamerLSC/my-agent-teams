@@ -4,7 +4,7 @@
 
 PM 在验收时发现：
 - 当前 `dashboard/app.py` 的 `/` 路由返回的是 API JSON 列表，而不是任务看板页面
-  见：`/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py:34-40`
+  见：`/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py:34-40`
 
 而该需求要求的是：
 - Flask + ECharts 单页 dashboard
@@ -26,8 +26,8 @@ PM 在验收时发现：
 ## write_scope
 
 仅允许修改：
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/app.py`
-- `/Users/lin/Desktop/work/my-agent-teams/dashboard/__init__.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/app.py`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/dashboard/__init__.py`
 
 ## 测试要求
 
@@ -38,4 +38,4 @@ PM 在验收时发现：
 ## 交付物
 
 完成后请写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/修正任务看板主页模板接入/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/修正任务看板主页模板接入/result.json`

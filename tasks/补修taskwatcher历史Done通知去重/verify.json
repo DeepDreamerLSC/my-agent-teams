@@ -7,7 +7,7 @@
   "pass": true,
   "summary": "QA PASS。5 个验收标准全部通过：历史 done 任务重启不触发通知（96 done / 0 would notify）、新近合法收口仍可触发一次通知（done 观察分支完整）、去重逻辑基于 transition 时间 + sentinel 双重判定、bash -n 通过、设计文档已修正。review-1 APPROVE，0 个阻塞问题。",
   "test_commands": [
-    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
     "python3 历史 done 扫描：模拟 watcher 以当前时间启动，统计 would_notify / no_transition / transition_before_start"
   ],
   "test_results": {

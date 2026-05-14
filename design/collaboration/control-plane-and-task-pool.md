@@ -3,8 +3,8 @@
 > 创建日期：2026-05-09  
 > 修订日期：2026-05-09  
 > 状态：实施方案草案（已整合 PM 反馈）  
-> 适用范围：`/Users/lin/Desktop/work/my-agent-teams` 的任务协作、task-watcher、Chat Hub、dashboard 与任务池认领机制  
-> 背景依据：当前 task-watcher / Chat Hub / 任务池实现审查；既有文档 `任务池认领机制方案.md`、`Chat-Hub-协议补充.md`、`任务协作看板优化方案.md`、`/Users/lin/Desktop/work/design/chiralium-ci/Agent团队效率优化待办.md`（原始日期 2026-05-07）  
+> 适用范围：`/Users/linsuchang/Desktop/work/my-agent-teams` 的任务协作、task-watcher、Chat Hub、dashboard 与任务池认领机制  
+> 背景依据：当前 task-watcher / Chat Hub / 任务池实现审查；既有文档 `任务池认领机制方案.md`、`Chat-Hub-协议补充.md`、`任务协作看板优化方案.md`、`/Users/linsuchang/Desktop/work/design/chiralium-ci/Agent团队效率优化待办.md`（原始日期 2026-05-07）  
 > 本次修订重点：补充 `resume-task` 恢复语义、通知三级分流、非法 artifact 一次性告警、PM Inbox / 待 PM 处理总视图、P0 最小契约前置与 5 月 7 日待办文档合并评估。
 
 ---
@@ -671,7 +671,7 @@ for idle_agent in agents:
   "claim_max_concurrency": 1,
   "priority": "high",
   "depends_on": [],
-  "write_scope": ["/Users/lin/Desktop/work/chiralium/frontend"],
+  "write_scope": ["/Users/linsuchang/Desktop/work/chiralium/frontend"],
   "pool_entered_at": "2026-05-09T10:00:00+08:00",
   "pool_timeout_minutes": 120
 }
@@ -1246,12 +1246,12 @@ agent 当前主线满足以下之一，才允许续推下一条 execution 任务
 已找到林总工提到的文档：
 
 ```text
-/Users/lin/Desktop/work/design/chiralium-ci/Agent团队效率优化待办.md
+/Users/linsuchang/Desktop/work/design/chiralium-ci/Agent团队效率优化待办.md
 原始创建时间：2026-05-07 22:43:20
 最近修改时间：2026-05-08 22:19:08
 ```
 
-评估结论：**可以选择性合并控制面与 PM 工作流部分，不建议整篇合并**。原因是本方案的适用范围是 `/Users/lin/Desktop/work/my-agent-teams` 的 agent 协作控制面；该待办文档还包含 Chiralium CI、生产部署入口、prod preflight、自动回滚等应用项目治理内容，若整篇合并会扩大本方案边界，并与“生产部署流程改造另案处理”的非目标冲突。
+评估结论：**可以选择性合并控制面与 PM 工作流部分，不建议整篇合并**。原因是本方案的适用范围是 `/Users/linsuchang/Desktop/work/my-agent-teams` 的 agent 协作控制面；该待办文档还包含 Chiralium CI、生产部署入口、prod preflight、自动回滚等应用项目治理内容，若整篇合并会扩大本方案边界，并与“生产部署流程改造另案处理”的非目标冲突。
 
 已在本方案吸收或对齐的内容：
 

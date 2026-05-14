@@ -1,12 +1,12 @@
 # 任务：实现 task-watcher 超时检测优化
 
-功能目录：`/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/`
+功能目录：`/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/`
 开始前必须先读：
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/dev.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
-- `/Users/lin/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/qa.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/BRIEF.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/CONTEXT.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/dev.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/arch.md`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/features/task-watcher可靠性优化/notes/qa.md`
 
 ## 背景
 这是第三条 execution，依赖：
@@ -27,4 +27,4 @@
 
 ## 交付物
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/实现taskwatcher超时检测优化/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现taskwatcher超时检测优化/result.json`

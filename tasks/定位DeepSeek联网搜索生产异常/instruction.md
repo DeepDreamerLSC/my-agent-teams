@@ -35,7 +35,7 @@
 ## 输出要求
 
 请在以下路径输出方案文档：
-- `/Users/lin/Desktop/work/chiralium/design/product/deepseek-web-search-production-incident-plan.md`
+- `/Users/linsuchang/Desktop/work/chiralium/design/product/deepseek-web-search-production-incident-plan.md`
 
 文档至少包含：
 1. 需求分析 / 现象拆分
@@ -56,7 +56,7 @@
 ## 交付物
 
 完成后写：
-- `/Users/lin/Desktop/work/my-agent-teams/tasks/定位DeepSeek联网搜索生产异常/result.json`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/定位DeepSeek联网搜索生产异常/result.json`
 
 结果中请包含：
 - 方案文档路径

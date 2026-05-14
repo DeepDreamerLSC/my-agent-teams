@@ -4,8 +4,8 @@
   "status": "acknowledged",
   "message": "已读取 AGENT.md 的 result.json 规范及任务 instruction.md，确认 result.json.status 仅使用 done/failed/blocked，并按 write_scope 执行 task-watcher 历史 done 通知去重补修。",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
   ],
   "acknowledged_at": "2026-05-06T11:36:52.838674+08:00"
 }

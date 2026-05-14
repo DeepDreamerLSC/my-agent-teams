@@ -14,7 +14,7 @@
    - 追加 `transitions.jsonl`
 
 ## write_scope
-- `/Users/lin/Desktop/work/my-agent-teams/scripts/close-task.sh`
+- `/Users/linsuchang/Desktop/work/my-agent-teams/scripts/close-task.sh`
 
 ## 要求
 - 先做单任务关闭能力
@@ -36,7 +36,7 @@
 - `--dry-run` 不落盘
 
 ## 交付物
-完成后写 `/Users/lin/Desktop/work/my-agent-teams/tasks/实现任务收口脚本/result.json`，说明：
+完成后写 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现任务收口脚本/result.json`，说明：
 - 脚本参数
 - dry-run 示例
 - 实测命令和结果

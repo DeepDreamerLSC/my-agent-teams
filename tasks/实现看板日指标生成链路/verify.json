@@ -11,7 +11,7 @@
     "resolution": "PM 已将 dashboard/tests/test_dashboard_metrics.py 补入 task.json.write_scope（L35），review-1 复审确认授权范围匹配，APPROVE。"
   },
   "test_commands": [
-    "cd /Users/lin/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest discover -s dashboard/tests -p 'test_*.py' -v"
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams && PYTHONPATH=. python3 -m unittest discover -s dashboard/tests -p 'test_*.py' -v"
   ],
   "test_results": {
     "full_dashboard_suite": "10 passed in 2.9s",

@@ -19,7 +19,7 @@
   "owner_pm": "pm-chief",
   "domain": "quality",
   "write_scope": [
-    "/Users/lin/Desktop/work/my-agent-teams/tasks"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks"
   ],
   "depends_on": [
     "实现任务收口脚本"

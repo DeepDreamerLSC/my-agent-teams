@@ -4,8 +4,8 @@
   "status": "done",
   "summary": "已补修 task-watcher 最终完成通知去重：记录 watcher 本轮启动时间，仅当 transitions.jsonl 中存在本轮启动后 ready_for_merge -> done 迁移时才发送【任务完成/部署完成】；历史 done 或缺少合法收口迁移的 done 任务只补种 *_done_notice sentinel，不补发飞书。已同步设计文档，明确 verify 通过只负责收口到 done，最终完成类通知由 done 观察分支统一发送。",
   "files_modified": [
-    "/Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
-    "/Users/lin/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/OpenClaw-tmux协作方案优化.md"
   ],
   "implementation_strategy": [
     "在 watcher 启动时记录 WATCHER_STARTED_AT_EPOCH，作为本轮实例的历史边界。",
@@ -14,7 +14,7 @@
     "保留原有 done_notice sentinel，确保新近 done 任务最多发送一次最终完成/部署完成通知。"
   ],
   "tests": [
-    "bash -n /Users/lin/Desktop/work/my-agent-teams/scripts/task-watcher.sh 通过",
+    "bash -n /Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh 通过",
     "python3 历史 done 扫描：done_tasks_scanned=95，historical_done_that_would_notify_if_started_now=0，done_without_ready_for_merge_transition=2"
   ],
   "risks": [

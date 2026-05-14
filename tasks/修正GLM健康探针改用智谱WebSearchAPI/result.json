@@ -6,17 +6,17 @@
   "summary": "已按最小范围把 GLM/Zhipu provider-native 健康探针从“chat completion + 模型自然语言回答”改为直接调用智谱 Web Search API 的结构化探测；同时把 429 / request_failed 这类瞬时故障校准为 degraded，避免单次抖动直接把整个 provider 长时间判成 unavailable。",
   "modified_files": [
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py",
       "action": "modified",
       "description": "将 zhipu provider-native 健康探针改为直接调用 /web_search Tool API，按结构化 search_result 结果判定健康状态；同时将 rate_limited/request_failed 等瞬时失败校准为 degraded。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "action": "modified",
       "description": "更新 provider-native 健康探针单测：断言请求命中 /api/paas/v4/web_search，使用结构化请求体，并覆盖 healthy / degraded(rate_limited) / degraded(request_failed)。"
     },
     {
-      "path": "/Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py",
       "action": "modified",
       "description": "补强 chat-capabilities 与 provider-web-search-runtime 的兼容字段测试，确保 provider_web_search_runtime.zhipu 与 zhipu_web_search_runtime_status 对前端保持稳定。"
     }
@@ -67,11 +67,11 @@
   },
   "test_commands": [
     {
-      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/lin/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py -q",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py -q",
       "result": "passed (50 passed, 4 warnings)"
     },
     {
-      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/lin/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/lin/Desktop/work/chiralium/backend/app/api/meta.py /Users/lin/Desktop/work/chiralium/backend/app/services/model_service.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/lin/Desktop/work/chiralium/backend/tests/test_chat.py",
+      "command": "mkdir -p /tmp/chiralium-pyc && PYTHONPYCACHEPREFIX=/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/api/meta.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/model_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat_capabilities.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_chat.py",
       "result": "passed"
     }
   ],

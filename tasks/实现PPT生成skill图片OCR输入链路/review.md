@@ -7,18 +7,18 @@
 
 ## 通过项
 - 图片 OCR 解析本身已接到现有 `ParserService` 主链：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/parser_service.py:65-106,129-201`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/parser_service.py:65-106,129-201`
 - `docx/pdf/xls/xlsx` 既有本地 fallback 逻辑未被直接改坏：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/parser_service.py:107-128,225-260`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/parser_service.py:107-128,225-260`
 
 ## 阻塞问题
 
 ### 1. OCR 结果还没有真正进入 PPT skill 当前可消费的主链路
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/context_assembler.py:84-95`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py:1280-1318`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:126-173`
-  - `/Users/lin/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:18-32`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/context_assembler.py:84-95`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py:1280-1318`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/skill.py:126-173`
+  - `/Users/linsuchang/Desktop/work/chiralium/skills/custom/ppt_generator/1.0.0/manifest.json:18-32`
 - 具体问题：
   1. `ContextAssembler.ensure_parsed_files()` 仍只对 `CHAT_PARSEABLE_EXTENSIONS` 执行解析，而该集合只包含 `doc/docx/pdf/xls/xlsx`，**不包含图片**；因此图片不会进入 `parsed_files`。
   2. `ppt_generator` 当前消费的是 `context.parsed_files`，并不消费 `uploaded_files[].extracted_text`。
@@ -27,9 +27,9 @@
 
 ### 2. `uploaded_file_summary` 新增字段没有进入稳定 schema，外部消费者实际拿不到
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/app/services/file_service.py:247-278`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/schemas/file.py:18-23`
-  - `/Users/lin/Desktop/work/chiralium/backend/app/api/chat.py:356-358`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/services/file_service.py:247-278`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/schemas/file.py:18-23`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/app/api/chat.py:356-358`
 - 当前 `uploaded_file_summary()` 虽然返回了：
   - `extracted_text`
   - `parse_status`
@@ -45,8 +45,8 @@
 
 ## 测试问题
 - 位置：
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_parser_service.py:86-144`
-  - `/Users/lin/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py:1-23`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_parser_service.py:86-144`
+  - `/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_ppt_generator_image_input.py:1-23`
 - 当前测试已覆盖：
   - 图片可被 OCR 模型解析并写回 `extracted_text`
   - `uploaded_file_summary()` 原始 dict 包含新增字段
