@@ -48,6 +48,64 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertEqual(payload['patches']['rework_reason'], 'review')
         self.assertTrue(any(item['reason_type'] == 'blocked' for item in payload['attention_items']))
 
+    def test_new_result_after_rejected_review_reopens_review_pending(self):
+        task_dir = self._copy_fixture('result-after-review-rejection')
+        payload = run_reducer(task_dir)
+        self.assertEqual(payload['artifacts']['review']['normalized_status'], 'missing')
+        self.assertEqual(payload['artifacts']['review']['source'], 'stale_json')
+        self.assertIn('stale_round', payload['artifacts']['review']['warnings'])
+        self.assertEqual(payload['patches']['status'], 'ready_for_merge')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
+        self.assertIsNone(payload['patches']['rework_reason'])
+        self.assertTrue(any(item['type'] == 'dispatch_review' for item in payload['actions']))
+
+    def test_old_invalid_review_json_does_not_block_new_result(self):
+        task_dir = self._copy_fixture('result-after-review-rejection')
+        (task_dir / 'review.json').write_text('{"status": "definitely-not-valid", "round": 1}\n', encoding='utf-8')
+        payload = run_reducer(task_dir)
+        self.assertEqual(payload['artifacts']['review']['normalized_status'], 'missing')
+        self.assertEqual(payload['artifacts']['review']['source'], 'stale_json')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
+        self.assertFalse(any(
+            item['reason_type'] == 'artifact_invalid' and 'review' in item['summary']
+            for item in payload['attention_items']
+        ))
+
+    def test_old_verify_json_does_not_close_new_round_before_fresh_qa(self):
+        task_dir = self._copy_fixture('result-after-review-rejection')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['review_required'] = False
+        task['test_required'] = True
+        task['merge_gate_state'] = 'qa_failed'
+        task['rework_reason'] = 'qa'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').unlink(missing_ok=True)
+        (task_dir / 'verify.json').write_text(json.dumps({
+            'task_id': 'task-result-after-review-rejection',
+            'tester': 'qa-1',
+            'status': 'pass',
+            'round': 1,
+            'summary': '旧 QA 通过结果',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['artifacts']['verify']['normalized_status'], 'missing')
+        self.assertEqual(payload['artifacts']['verify']['source'], 'stale_json')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'qa_pending')
+        self.assertTrue(any(item['type'] == 'dispatch_qa' for item in payload['actions']))
+
+    def test_done_task_with_old_result_does_not_reopen(self):
+        task_dir = self._copy_fixture('result-after-review-rejection')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['status'] = 'done'
+        task['merge_gate_state'] = 'closed'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        payload = run_reducer(task_dir)
+        self.assertEqual(payload['patches'], {})
+        self.assertEqual(payload['actions'], [])
+        self.assertEqual(payload['reason'], 'terminal_status')
+
     def test_resume_stale_result_is_ignored_and_flagged(self):
         task_dir = self._copy_fixture('resume-stale-result')
         stale_epoch = 1

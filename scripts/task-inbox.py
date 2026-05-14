@@ -98,22 +98,23 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     if status in {'done', 'cancelled', 'archived'}:
         return items
 
-    if status == 'blocked' or gate in {'review_rejected', 'qa_failed', 'blocked'}:
-        items.append(make_item(task_dir, 'blocked', 'L3', f'任务处于 {status} / {gate or "无 gate"} 状态，需要 PM 仲裁', now))
-        return items
-
-    if gate == 'pm_acceptance_pending':
-        items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now))
-
     result_info = task_artifacts.parse_result(task_dir)
     review_info = task_artifacts.parse_review(task_dir)
     verify_info = task_artifacts.parse_verify(task_dir)
     ack_info = task_artifacts.parse_ack(task_dir)
 
+    if status == 'blocked' or gate in {'review_rejected', 'qa_failed', 'blocked'}:
+        if not (status == 'ready_for_merge' and gate == 'review_rejected' and result_info.get('normalized_status') == 'success' and review_info.get('source') == 'stale_json'):
+            items.append(make_item(task_dir, 'blocked', 'L3', f'任务处于 {status} / {gate or "无 gate"} 状态，需要 PM 仲裁', now))
+            return items
+
+    if gate == 'pm_acceptance_pending':
+        items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now))
+
     for kind, info in [('result', result_info), ('review', review_info), ('verify', verify_info), ('ack', ack_info)]:
         if info.get('valid') is False and info.get('errors'):
             detail = ','.join(info.get('errors') or ['unknown'])
-            items.append(make_item(task_dir, 'artifact_invalid', 'L2', f'{kind} 产物非法：{detail}', now))
+            items.append(make_item(task_dir, 'artifact_invalid', 'L3', f'{kind} 产物非法：{detail}', now))
 
     if status in {'dispatched', 'working'}:
         if ack_info.get('exists') and not ack_info.get('is_current_round', True):
@@ -141,12 +142,13 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         review_deadline = parse_iso(str(task_payload.get('review_deadline') or ''))
         review_timeout_minutes = 120
         qa_timeout_minutes = 120
-        if gate == 'review_pending':
+        has_artifact_invalid = any(item['reason_type'] == 'artifact_invalid' for item in items)
+        if gate == 'review_pending' and not has_artifact_invalid:
             if review_deadline and now > review_deadline:
                 items.append(make_item(task_dir, 'timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', now))
             elif gate_wait_minutes > review_timeout_minutes:
                 items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now))
-        if gate == 'qa_pending' and gate_wait_minutes > qa_timeout_minutes:
+        if gate == 'qa_pending' and not has_artifact_invalid and gate_wait_minutes > qa_timeout_minutes:
             items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now))
 
     return items
@@ -196,7 +198,11 @@ def main() -> int:
     parser.add_argument('--dispatch-timeout-seconds', type=int, default=300)
     parser.add_argument('--working-timeout-seconds', type=int, default=1800)
     parser.add_argument('--governance-file', default=str(DEFAULT_GOVERNANCE_FILE))
+    parser.add_argument('--control-config', default='')
     args = parser.parse_args()
+    if args.control_config:
+        import os
+        os.environ['TASK_CONTROL_CONFIG_PATH'] = str(Path(args.control_config).expanduser().resolve())
 
     tasks_root = Path(args.tasks_root).expanduser().resolve()
     now = datetime.now().astimezone()

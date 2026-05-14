@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
+import unittest
 from pathlib import Path
 
 
@@ -202,3 +204,101 @@ clear_review_queue_state_for_task '{task_a}'
 test ! -f "$STATE_DIR/review-queue-review-1.json"
 """
     subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+class TaskWatcherStaleArtifactTests(unittest.TestCase):
+    def test_pending_stale_review_does_not_clear_review_queue_assignment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            env = _base_env(tmp_path)
+            task_dir = tmp_path / "task-stale-review"
+            task_dir.mkdir(parents=True)
+            (task_dir / "task.json").write_text(
+                '{\n'
+                '  "id": "task-stale-review",\n'
+                '  "status": "ready_for_merge",\n'
+                '  "merge_gate_state": "review_pending",\n'
+                '  "reviewer": "review-1",\n'
+                '  "review_required": true,\n'
+                '  "execution_round": 2\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            (task_dir / "result.json").write_text(
+                '{\n'
+                '  "task_id": "task-stale-review",\n'
+                '  "agent": "dev-1",\n'
+                '  "status": "success",\n'
+                '  "round": 2,\n'
+                '  "summary": "new result"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            (task_dir / "review.json").write_text(
+                '{\n'
+                '  "task_id": "task-stale-review",\n'
+                '  "reviewer": "review-1",\n'
+                '  "status": "request_changes",\n'
+                '  "round": 1,\n'
+                '  "summary": "old review"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+
+            script = f"""
+set -e
+source '{TASK_WATCHER}'
+queue_state_set review review-1 task-stale-review
+state="$(review_state '{task_dir}' '')"
+test "$state" = "pending"
+case "$state" in
+  invalid|pass|fail) clear_review_queue_state_for_task '{task_dir}' ;;
+esac
+test -f "$STATE_DIR/review-queue-review-1.json"
+"""
+            subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+    def test_stale_verify_is_missing_for_watcher_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            env = _base_env(tmp_path)
+            task_dir = tmp_path / "task-stale-verify"
+            task_dir.mkdir(parents=True)
+            (task_dir / "task.json").write_text(
+                '{\n'
+                '  "id": "task-stale-verify",\n'
+                '  "status": "ready_for_merge",\n'
+                '  "merge_gate_state": "qa_pending",\n'
+                '  "test_required": true,\n'
+                '  "execution_round": 2\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            (task_dir / "result.json").write_text(
+                '{\n'
+                '  "task_id": "task-stale-verify",\n'
+                '  "agent": "dev-1",\n'
+                '  "status": "success",\n'
+                '  "round": 2,\n'
+                '  "summary": "new result"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            (task_dir / "verify.json").write_text(
+                '{\n'
+                '  "task_id": "task-stale-verify",\n'
+                '  "tester": "qa-1",\n'
+                '  "status": "pass",\n'
+                '  "round": 1,\n'
+                '  "summary": "old qa pass"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+
+            script = f"""
+set -e
+source '{TASK_WATCHER}'
+test "$(verify_state '{task_dir}/verify.json')" = "missing"
+test "$(resolve_merge_gate_state '{task_dir}')" = "qa_pending"
+"""
+            subprocess.run(["bash", "-lc", script], check=True, env=env)

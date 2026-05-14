@@ -1,0 +1,8 @@
+{
+  "task_id": "task-result-after-review-rejection",
+  "agent": "dev-1",
+  "status": "success",
+  "round": 2,
+  "summary": "补修后重新提交",
+  "finished_at": "2026-05-09T10:30:00+08:00"
+}

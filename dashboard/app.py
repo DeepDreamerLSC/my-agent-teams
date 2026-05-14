@@ -152,6 +152,8 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
             '--json',
             '--tasks-root',
             app.config['TASKS_ROOT'],
+            '--control-config',
+            app.config['TASK_CONTROL_CONFIG_PATH'],
         )
         return jsonify({
             'generated_at': utcnow_iso(),

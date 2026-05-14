@@ -155,6 +155,82 @@ def _base_result(path: Path, kind: str, ctx: TaskContext) -> dict[str, Any]:
     }
 
 
+def _artifact_round(payload: dict[str, Any]) -> int | None:
+    for key in ("round", "execution_round", "review_round", "verify_round", "resume_round"):
+        value = payload.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed >= 0:
+            return parsed
+    return None
+
+
+def _task_execution_round(task: dict[str, Any]) -> int | None:
+    for key in ("execution_round", "current_round", "resume_round"):
+        value = task.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed >= 0:
+            return parsed
+    return None
+
+
+def _result_mtime_epoch(task_dir: Path) -> int:
+    return mtime_epoch(task_dir / "result.json")
+
+
+def _mtime_ns(path: Path) -> int:
+    try:
+        return int(path.stat().st_mtime_ns)
+    except Exception:
+        return 0
+
+
+def _current_result_round(task_dir: Path) -> int | None:
+    payload, error = load_json(task_dir / "result.json")
+    if error or not payload:
+        return None
+    return _artifact_round(payload)
+
+
+def _mark_round_status(result: dict[str, Any], payload: dict[str, Any], ctx: TaskContext, *, compare_to_result: bool = False) -> None:
+    artifact_round = _artifact_round(payload)
+    task_round = _task_execution_round(ctx.task)
+    if artifact_round is not None:
+        result["artifact_round"] = artifact_round
+    if task_round is not None:
+        result["task_round"] = task_round
+    if artifact_round is not None and task_round is not None and artifact_round < task_round:
+        result["is_current_round"] = False
+        if "stale_round" not in result["warnings"]:
+            result["warnings"].append("stale_round")
+    if compare_to_result:
+        result_round = _current_result_round(ctx.task_dir)
+        if result_round is not None:
+            result["result_round"] = result_round
+        if artifact_round is not None and result_round is not None and artifact_round < result_round:
+            result["is_current_round"] = False
+            if "stale_round" not in result["warnings"]:
+                result["warnings"].append("stale_round")
+        result_mtime = _result_mtime_epoch(ctx.task_dir)
+        result_mtime_ns = _mtime_ns(ctx.task_dir / "result.json")
+        own_mtime = int(result.get("mtime_epoch") or 0)
+        own_mtime_ns = _mtime_ns(Path(str(result.get("path") or "")))
+        if result_mtime and own_mtime and own_mtime_ns and result_mtime_ns and own_mtime_ns < result_mtime_ns and artifact_round is None:
+            result["is_current_round"] = False
+            result["superseded_by_result_mtime_epoch"] = result_mtime
+            if "stale_after_new_result" not in result["warnings"]:
+                result["warnings"].append("stale_after_new_result")
+
+
 def parse_ack(task_dir: Path) -> dict[str, Any]:
     ctx = task_context(task_dir)
     path = task_dir / "ack.json"
@@ -236,6 +312,7 @@ def parse_result(task_dir: Path) -> dict[str, Any]:
         result["errors"].append(error)
         return result
     norm_status, legacy_mapped = _normalize_result_status(payload.get("status"))
+    _mark_round_status(result, payload, ctx)
     result.update({
         "task_id": payload.get("task_id"),
         "agent": payload.get("agent") or payload.get("agent_id"),
@@ -297,6 +374,7 @@ def parse_verify(task_dir: Path) -> dict[str, Any]:
         result["errors"].append(error)
         return result
     status = _normalize_verify_status(payload)
+    _mark_round_status(result, payload, ctx, compare_to_result=True)
     result.update({
         "task_id": payload.get("task_id"),
         "agent": payload.get("tester") or payload.get("agent") or payload.get("agent_id") or payload.get("tested_by"),
@@ -309,9 +387,16 @@ def parse_verify(task_dir: Path) -> dict[str, Any]:
         result["errors"].append("unknown_or_missing_status")
     if not result["is_current_round"]:
         result["warnings"].append("stale_round")
+        result.update({
+            "valid": False,
+            "normalized_status": "missing",
+            "source": "stale_json",
+        })
+        return result
     result.update({
         "valid": not result["errors"],
         "normalized_status": status if not result["errors"] else "invalid",
+        "source": "json",
     })
     return result
 
@@ -354,6 +439,16 @@ def _parse_review_markdown(path: Path) -> str:
     return _classify_review_snippet("\n".join(line.strip() for line in lines[:20] if line.strip()))
 
 
+def _markdown_stale_after_current_result(path: Path, ctx: TaskContext) -> bool:
+    if not path.exists():
+        return False
+    result_mtime = _result_mtime_epoch(ctx.task_dir)
+    result_mtime_ns = _mtime_ns(ctx.task_dir / "result.json")
+    own_mtime = mtime_epoch(path)
+    own_mtime_ns = _mtime_ns(path)
+    return bool(result_mtime and own_mtime and result_mtime_ns and own_mtime_ns and own_mtime_ns < result_mtime_ns)
+
+
 def _parse_review_json(path: Path, ctx: TaskContext) -> dict[str, Any]:
     result = _base_result(path, path.name, ctx)
     payload, error = load_json(path)
@@ -365,6 +460,7 @@ def _parse_review_json(path: Path, ctx: TaskContext) -> dict[str, Any]:
         result["errors"].append(error)
         return result
     status = str(payload.get("status") or "").strip().lower()
+    _mark_round_status(result, payload, ctx, compare_to_result=True)
     if status not in {"approve", "request_changes", "blocked"}:
         result["errors"].append("unknown_or_missing_status")
     result.update({
@@ -391,6 +487,12 @@ def parse_review(task_dir: Path) -> dict[str, Any]:
     design_json = _parse_review_json(task_dir / "design-review.json", ctx)
     review_md = _parse_review_markdown(task_dir / "review.md")
     design_md = _parse_review_markdown(task_dir / "design-review.md")
+    review_md_stale = _markdown_stale_after_current_result(task_dir / "review.md", ctx)
+    design_md_stale = _markdown_stale_after_current_result(task_dir / "design-review.md", ctx)
+    if review_md_stale and review_md != "missing":
+        review_md = "missing"
+    if design_md_stale and design_md != "missing":
+        design_md = "missing"
 
     result = {
         "kind": "review",
@@ -405,27 +507,41 @@ def parse_review(task_dir: Path) -> dict[str, Any]:
         "errors": [],
         "warnings": [],
     }
+    stale_markdown_sources = []
+    if review_md_stale:
+        stale_markdown_sources.append("review.md")
+    if design_md_stale:
+        stale_markdown_sources.append("design-review.md")
+    if stale_markdown_sources:
+        result["warnings"].append("stale_markdown")
+        result["stale_markdown_sources"] = stale_markdown_sources
 
     json_sources = [review_json]
     if review_level == "complex":
         json_sources.append(design_json)
 
-    if any(src["normalized_status"] == "invalid" for src in json_sources if src["exists"]):
+    stale_json_sources = [src for src in json_sources if src["exists"] and not src.get("is_current_round", True)]
+    current_json_sources = [src for src in json_sources if src["exists"] and src.get("is_current_round", True)]
+    if stale_json_sources:
+        result["warnings"].append("stale_round")
+        result["stale_sources"] = [Path(str(src.get("path") or "")).name for src in stale_json_sources]
+
+    if any(src["normalized_status"] == "invalid" for src in current_json_sources if src["exists"]):
         result["errors"].append("invalid_review_json")
         result.update({"valid": False, "normalized_status": "invalid", "source": "json"})
         return result
 
-    existing_json_sources = [src for src in json_sources if src["exists"]]
+    existing_json_sources = current_json_sources
     if existing_json_sources:
         statuses = [src["normalized_status"] for src in existing_json_sources]
         if "blocked" in statuses:
             status = "blocked"
         elif "request_changes" in statuses:
             status = "request_changes"
-        elif review_level == "complex" and (not review_json["exists"] or not design_json["exists"]):
-            if not review_json["exists"]:
+        elif review_level == "complex" and (review_json not in current_json_sources or design_json not in current_json_sources):
+            if review_json not in current_json_sources:
                 result["errors"].append("review_json_missing_for_complex")
-            if not design_json["exists"]:
+            if design_json not in current_json_sources:
                 result["errors"].append("design_review_json_missing_for_complex")
             result.update({"valid": False, "normalized_status": "missing", "source": "json_incomplete"})
             return result
@@ -436,6 +552,10 @@ def parse_review(task_dir: Path) -> dict[str, Any]:
         result.update({"valid": True, "normalized_status": status, "source": "json"})
         if any(not src["is_current_round"] for src in existing_json_sources):
             result["warnings"].append("stale_round")
+        return result
+
+    if stale_json_sources:
+        result.update({"valid": False, "normalized_status": "missing", "source": "stale_json"})
         return result
 
     if review_json_required_for_task(ctx.task):

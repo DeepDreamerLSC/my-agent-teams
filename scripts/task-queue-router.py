@@ -34,10 +34,13 @@ def parse_iso(value: str | None) -> datetime:
 def review_artifact_terminal(task_dir: Path) -> bool:
     if parse_review is not None:
         try:
-            status = str(parse_review(task_dir).get("normalized_status") or "").strip().lower()
+            parsed = parse_review(task_dir)
+            status = str(parsed.get("normalized_status") or "").strip().lower()
+            source = str(parsed.get("source") or "").strip().lower()
         except Exception:
             status = ""
-        if status in TERMINAL_REVIEW_STATUSES:
+            source = ""
+        if status in TERMINAL_REVIEW_STATUSES and source != "stale_json":
             return True
     for artifact_name in ("review.json", "design-review.json"):
         artifact_path = task_dir / artifact_name
@@ -48,8 +51,65 @@ def review_artifact_terminal(task_dir: Path) -> bool:
         except Exception:
             continue
         status = str(payload.get("status") or "").strip().lower()
-        if status in TERMINAL_REVIEW_STATUSES:
+        if status in TERMINAL_REVIEW_STATUSES and not _artifact_stale_after_current_result(task_dir, artifact_path, payload):
             return True
+    return False
+
+
+def _artifact_round(payload: dict) -> int | None:
+    for key in ("round", "execution_round", "review_round", "resume_round"):
+        value = payload.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed >= 0:
+            return parsed
+    return None
+
+
+def _task_round(task: dict) -> int | None:
+    for key in ("execution_round", "current_round", "resume_round"):
+        value = task.get(key)
+        if value is None or value == "":
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed >= 0:
+            return parsed
+    return None
+
+
+def _artifact_stale_after_current_result(task_dir: Path, artifact_path: Path, payload: dict) -> bool:
+    try:
+        task = load_json(task_dir / "task.json")
+    except Exception:
+        task = {}
+    artifact_round = _artifact_round(payload)
+    task_round = _task_round(task)
+    if artifact_round is not None and task_round is not None:
+        return artifact_round < task_round
+
+    result_path = task_dir / "result.json"
+    if not result_path.exists():
+        return False
+    if artifact_round is not None:
+        try:
+            result_payload = load_json(result_path)
+        except Exception:
+            result_payload = {}
+        result_round = _artifact_round(result_payload)
+        if result_round is not None:
+            return artifact_round < result_round
+    if artifact_round is None:
+        try:
+            return artifact_path.stat().st_mtime < result_path.stat().st_mtime
+        except OSError:
+            return False
     return False
 
 

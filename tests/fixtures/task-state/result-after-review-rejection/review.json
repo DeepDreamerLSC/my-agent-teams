@@ -1,0 +1,8 @@
+{
+  "task_id": "task-result-after-review-rejection",
+  "reviewer": "review-1",
+  "status": "request_changes",
+  "round": 1,
+  "summary": "上一轮审查要求修改",
+  "reviewed_at": "2026-05-09T10:20:00+08:00"
+}

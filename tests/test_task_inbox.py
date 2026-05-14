@@ -82,6 +82,47 @@ class TaskInboxTests(unittest.TestCase):
         self.assertEqual(items[0]['reason_type'], 'invalid_timeline')
         self.assertEqual(items[0]['summary'], '阶段时间倒挂')
 
+class TaskInboxStaleReviewTests(unittest.TestCase):
+    def test_ready_for_merge_with_stale_rejected_review_is_not_pm_blocked(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp) / 'stale-review-task'
+            task_dir.mkdir()
+            task = {
+                'id': 'stale-review-task',
+                'title': '旧审查后新提交',
+                'status': 'ready_for_merge',
+                'priority': 'medium',
+                'owner_pm': 'pm-chief',
+                'merge_gate_state': 'review_rejected',
+                'rework_reason': 'review',
+                'review_required': True,
+                'reviewer': 'review-1',
+                'execution_round': 2,
+                'created_at': '2026-05-09T10:00:00+08:00',
+                'updated_at': '2026-05-09T10:30:00+08:00',
+            }
+            (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            (task_dir / 'result.json').write_text(json.dumps({
+                'task_id': 'stale-review-task',
+                'agent': 'dev-1',
+                'status': 'success',
+                'round': 2,
+                'summary': '补修后提交',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            (task_dir / 'review.json').write_text(json.dumps({
+                'task_id': 'stale-review-task',
+                'reviewer': 'review-1',
+                'status': 'request_changes',
+                'round': 1,
+                'summary': '旧审查',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            now = datetime.fromisoformat('2026-05-09T11:00:00+08:00')
+            items = task_inbox.task_items(task_dir, now, dispatch_timeout_s=300, working_timeout_s=7200)
+
+        self.assertFalse([item for item in items if item['reason_type'] == 'blocked'])
+
 
 if __name__ == '__main__':
     unittest.main()

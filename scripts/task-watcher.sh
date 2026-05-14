@@ -1259,11 +1259,48 @@ now = datetime.now().astimezone().isoformat(timespec='seconds')
 status_changed = bool(new_status) and old_status != new_status
 fields_changed = False
 
+def artifact_round(payload):
+    for key in ('round', 'execution_round', 'review_round', 'verify_round', 'resume_round'):
+        value = payload.get(key)
+        if value in (None, ''):
+            continue
+        try:
+            parsed = int(value)
+        except (TypeError, ValueError):
+            continue
+        if parsed >= 0:
+            return parsed
+    return None
+
+
+def next_execution_round():
+    current = task.get('execution_round', task.get('resume_round', 0))
+    try:
+        current_round = int(current or 0)
+    except (TypeError, ValueError):
+        current_round = 0
+    result_path = task_dir / 'result.json'
+    if result_path.exists():
+        try:
+            result_payload = json.loads(result_path.read_text(encoding='utf-8'))
+        except Exception:
+            result_payload = {}
+        result_round = artifact_round(result_payload)
+        if result_round is not None:
+            return max(current_round, result_round)
+    return current_round
+
+
 if new_status:
     task['status'] = new_status
 if merge_gate_state != "__KEEP__" and task.get('merge_gate_state') != merge_gate_state:
     task['merge_gate_state'] = merge_gate_state
     fields_changed = True
+    if merge_gate_state in {'review_pending', 'qa_pending', 'pm_acceptance_pending'}:
+        execution_round = next_execution_round()
+        if task.get('execution_round') != execution_round:
+            task['execution_round'] = execution_round
+            fields_changed = True
 if rework_reason != "__KEEP__":
     value = None if rework_reason in {"", "null", "None"} else rework_reason
     if task.get('rework_reason') != value:
@@ -2550,8 +2587,8 @@ run_task_watcher_loop() {
             fi
             if [ "$review_route_pending" -eq 1 ] || [ "$review_push_pending" -eq 1 ]; then
                 state=$(review_state "$task_dir" "$review_level")
-                clear_review_queue_state_for_task "$task_dir"
                 if [ "$state" = "invalid" ]; then
+                    clear_review_queue_state_for_task "$task_dir"
                     review_invalid_key="${task_id}_artifact_invalid_review"
                     if ! is_notified "$review_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 review 机器产物非法，请修正 review.json 后重试。"
@@ -2559,6 +2596,7 @@ run_task_watcher_loop() {
                         mark_notified "$review_invalid_key"
                     fi
                 elif [ "$state" = "pass" ]; then
+                    clear_review_queue_state_for_task "$task_dir"
                     test_required=$(task_json_pick "$task_dir" test_required)
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         if [ "$review_route_pending" -eq 1 ]; then
@@ -2591,6 +2629,7 @@ run_task_watcher_loop() {
                         fi
                     fi
                 elif [ "$state" = "fail" ]; then
+                    clear_review_queue_state_for_task "$task_dir"
                     if [ "$review_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
                         set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
@@ -2624,8 +2663,8 @@ run_task_watcher_loop() {
             if [ "$verify_route_pending" -eq 1 ] || [ "$verify_push_pending" -eq 1 ]; then
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
-                clear_qa_queue_state
                 if [ "$vstate" = "invalid" ]; then
+                    clear_qa_queue_state
                     verify_invalid_key="${task_id}_artifact_invalid_verify"
                     if ! is_notified "$verify_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 verify.json 非法，请修正后重试。"
@@ -2633,6 +2672,7 @@ run_task_watcher_loop() {
                         mark_notified "$verify_invalid_key"
                     fi
                 elif [ "$vstate" = "pass" ]; then
+                    clear_qa_queue_state
                     if [ "$verify_route_pending" -eq 1 ]; then
                         current_status=$(get_task_status "$task_dir")
                         if [ "$current_status" = "ready_for_merge" ]; then
@@ -2665,6 +2705,7 @@ run_task_watcher_loop() {
                         fi
                     fi
                 elif [ "$vstate" = "fail" ]; then
+                    clear_qa_queue_state
                     if [ "$verify_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
                         set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at"

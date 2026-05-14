@@ -53,6 +53,21 @@ def reduce_task_state(task_dir: Path) -> dict:
     for kind, parsed in [('ack', ack), ('result', result), ('review', review), ('verify', verify)]:
         if parsed.get('normalized_status') == 'invalid':
             attention_items.append(attention_item(task_id, 'artifact_invalid', f'{kind} 产物非法：{(parsed.get("errors") or ["unknown"])[0]}', 'L2'))
+    if status in {'done', 'cancelled', 'archived', 'failed', 'timeout'}:
+        return {
+            'task_id': task_id,
+            'current': {'status': status, 'merge_gate_state': gate},
+            'artifacts': {
+                'ack': ack,
+                'result': result,
+                'review': review,
+                'verify': verify,
+            },
+            'patches': {},
+            'actions': [],
+            'attention_items': attention_items,
+            'reason': 'terminal_status',
+        }
     if status in {'dispatched', 'working'}:
         if ack.get('exists') and not ack.get('is_current_round', True):
             attention_items.append(attention_item(task_id, 'stale_resume', '恢复后检测到旧 ack.json，需重新 ack', 'L2'))
@@ -66,14 +81,17 @@ def reduce_task_state(task_dir: Path) -> dict:
         patches['status'] = 'ready_for_merge'
         if review_required:
             patches['merge_gate_state'] = 'review_pending'
+            patches['rework_reason'] = None
             actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
             reason = 'result.success + review_required'
         elif test_required:
             patches['merge_gate_state'] = 'qa_pending'
+            patches['rework_reason'] = None
             actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
             reason = 'result.success + qa_required'
         else:
             patches['merge_gate_state'] = 'pm_acceptance_pending'
+            patches['rework_reason'] = None
             actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
             reason = 'result.success + pm_acceptance'
         if assigned_agent:

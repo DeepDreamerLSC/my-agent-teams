@@ -90,6 +90,93 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         self.assertIsNone(payload['next_task_id'])
         self.assertEqual(payload['rows'], [])
 
+    def test_queue_router_keeps_review_task_when_terminal_review_is_stale_after_new_result(self):
+        review_dir = self.tasks_root / 'review-task'
+        review_json = review_dir / 'review.json'
+        result_json = review_dir / 'result.json'
+        review_json.write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'reviewer': 'review-1',
+                'status': 'request_changes',
+                'summary': 'old review',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        result_json.write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'agent': 'dev-1',
+                'status': 'success',
+                'summary': 'new result after review',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        old_time = 1_700_000_000
+        new_time = old_time + 60
+        import os
+        os.utime(review_json, (old_time, old_time))
+        os.utime(result_json, (new_time, new_time))
+
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload['next_task_id'], 'review-task')
+        self.assertEqual([row['task_id'] for row in payload['rows']], ['review-task'])
+
+    def test_queue_router_keeps_review_task_when_terminal_review_round_is_stale(self):
+        review_dir = self.tasks_root / 'review-task'
+        task = json.loads((review_dir / 'task.json').read_text(encoding='utf-8'))
+        task['execution_round'] = 2
+        (review_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (review_dir / 'review.json').write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'reviewer': 'review-1',
+                'status': 'request_changes',
+                'round': 1,
+                'summary': 'old review',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload['next_task_id'], 'review-task')
+
+    def test_queue_router_keeps_review_task_when_review_round_is_stale_against_result_round(self):
+        review_dir = self.tasks_root / 'review-task'
+        (review_dir / 'result.json').write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'agent': 'dev-1',
+                'status': 'success',
+                'round': 3,
+                'summary': 'newer result',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        (review_dir / 'review.json').write_text(
+            json.dumps({
+                'task_id': 'review-task',
+                'reviewer': 'review-1',
+                'status': 'request_changes',
+                'round': 2,
+                'summary': 'old review',
+            }, ensure_ascii=False, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload['next_task_id'], 'review-task')
+
     def test_queue_router_skips_review_task_with_terminal_markdown_artifact(self):
         review_dir = self.tasks_root / 'review-task'
         (review_dir / 'review.md').write_text('# 审查结论\n\nREQUEST CHANGES\n', encoding='utf-8')
