@@ -219,7 +219,6 @@
   },
   "notifications": {
     "enabled": true,
-    "feishu_open_id": "ou_f95ee559a38a607c5f312e7b64304143",
     "push_script": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/feishu-push.sh"
   },
   "projects": {

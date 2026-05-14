@@ -79,15 +79,24 @@ import sys
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
-if not config_path.exists():
+local_path = config_path.parent / 'config.local.json'
+
+# 优先从 config.local.json 读取，其次从 config.json 读取
+payload = {}
+for p in [local_path, config_path]:
+    if p.exists():
+        try:
+            payload = json.loads(p.read_text(encoding='utf-8'))
+            break
+        except Exception:
+            continue
+
+if not payload:
     raise SystemExit(0)
-try:
-    payload = json.loads(config_path.read_text(encoding='utf-8'))
-except Exception:
-    raise SystemExit(0)
+
 notifications = payload.get('notifications') or {}
 push_script = str(notifications.get('push_script') or '').strip()
-open_id = str(notifications.get('feishu_open_id') or '').strip()
+open_id = str(notifications.get('feishu_receive_id') or notifications.get('feishu_open_id') or '').strip()
 print(f"{push_script}\n{open_id}")
 PY
 }
@@ -104,7 +113,7 @@ if [ -z "$PUSH_SCRIPT" ] || [ -z "$USER_ID" ]; then
     fi
 fi
 PUSH_SCRIPT="${PUSH_SCRIPT:-$LEGACY_OPENCLAW_ROOT/scripts/feishu-push.sh}"
-USER_ID="${USER_ID:-ou_f95ee559a38a607c5f312e7b64304143}"
+USER_ID="${USER_ID:-}"
 
 migrate_legacy_task_watcher_runtime() {
     [ -f "$MIGRATION_SENTINEL_FILE" ] && return 0
