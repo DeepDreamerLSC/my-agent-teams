@@ -1704,6 +1704,29 @@ allowed_gate = 'review_pending' if queue_kind == 'review' else 'qa_pending'
 if status != 'ready_for_merge' or gate != allowed_gate:
     state_path.unlink(missing_ok=True)
     raise SystemExit(1)
+# 如果队列任务已有终态审查/QA结论，说明主循环还没流转 gate，先清理 queue state 避免卡住
+if queue_kind == 'review':
+    review_json = tasks_root / task_id / 'review.json'
+    if review_json.exists():
+        try:
+            r = json.loads(review_json.read_text(encoding='utf-8'))
+            verdict = str(r.get('verdict') or r.get('status') or '').strip().lower()
+            if verdict in ('approve', 'approved', 'request_changes', 'reject', 'rejected', 'pass', 'fail', 'blocked'):
+                state_path.unlink(missing_ok=True)
+                raise SystemExit(1)
+        except (json.JSONDecodeError, KeyError):
+            pass
+elif queue_kind == 'qa':
+    verify_json = tasks_root / task_id / 'verify.json'
+    if verify_json.exists():
+        try:
+            v = json.loads(verify_json.read_text(encoding='utf-8'))
+            verdict = str(v.get('verdict') or v.get('status') or '').strip().lower()
+            if verdict in ('pass', 'fail', 'blocked'):
+                state_path.unlink(missing_ok=True)
+                raise SystemExit(1)
+        except (json.JSONDecodeError, KeyError):
+            pass
 print(task_id)
 PY
 }
