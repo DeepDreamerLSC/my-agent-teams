@@ -53,26 +53,73 @@ scripts/teamctl.sh bootstrap --render-config
 # 2) 检查依赖、路径、agent 文件、tmux session、项目根目录
 scripts/teamctl.sh doctor
 
-# 3) 启动 agent 团队（按 config 中 runtime 选择 codex / claude）
+# 3) 可选：启用 Codex Responses Gateway（用于统一接 Codex 自定义 provider）
+scripts/teamctl.sh init-codex-gateway-config
+# 编辑 config/codex-responses-gateway.json，确认上游与模型映射；设置 OPENAI_API_KEY / CODEX_GATEWAY_API_KEY
+scripts/teamctl.sh start-codex-gateway
+scripts/teamctl.sh install-codex-profile
+export CODEX_CMD='codex -p dev-team'
+
+# 4) 启动 agent 团队（按 config 中 runtime 选择 codex / claude）
 scripts/teamctl.sh start-agents
 
-# 4) 启动 watcher / dashboard
+# 5) 启动 watcher / dashboard
 scripts/teamctl.sh start-watcher
 scripts/teamctl.sh start-dashboard
 
-# 5) 查看状态
+# 6) 查看状态
 scripts/teamctl.sh status
 ```
 
 说明：
 - `--render-config` 会按当前 checkout 路径重写 `config.json` 中的本机路径；如只想检查不重写，先运行 `scripts/teamctl.sh doctor`。
 - 飞书密钥仍放在被 git 忽略的 `config.local.json`。
+- Codex Gateway 本机配置默认写入被 git 忽略的 `config/codex-responses-gateway.json`；示例见 `config/codex-responses-gateway.example.json`。
 - 如开罗尔项目不在默认相邻目录，可在 bootstrap 前设置：
   ```bash
   export CHIRALIUM_DEV_ROOT=/path/to/chiralium
   export CHIRALIUM_PROD_ROOT=/path/to/prod/chiralium
   ```
 - `CODEX_CMD` / `CLAUDE_CMD` 可覆盖 agent 启动命令。
+
+
+## Codex Responses Gateway / One API 落地闭环
+
+`design/one-api-plan.md` 的结论是：Codex 不应直接把标准 `base_url=https://one-api.example.com/v1` 指到经典 One API，因为标准 relay 缺少 `/v1/responses`。本仓库落地的是独立 **Codex Responses Gateway**：
+
+```text
+Codex agent -> ~/.codex profile (wire_api=responses) -> local gateway -> Responses-compatible upstream
+```
+
+最小本机流程：
+
+```bash
+cd /path/to/my-agent-teams
+
+# 1) 生成本机网关配置（不会提交真实密钥）
+scripts/teamctl.sh init-codex-gateway-config
+
+# 2) 配置密钥
+export OPENAI_API_KEY='sk-...'
+export CODEX_GATEWAY_API_KEY='local-random-token'
+
+# 3) 启动网关并安装 Codex profile
+scripts/teamctl.sh start-codex-gateway
+scripts/teamctl.sh install-codex-profile
+
+# 4) 用网关 profile 启动 Codex agent
+export CODEX_CMD='codex -p dev-team'
+scripts/teamctl.sh start-agents
+```
+
+关键文件：
+
+- `scripts/codex-responses-gateway.py`：仅处理 `POST /v1/responses`，streaming 原样透传；只在响应尚未开始前做故障切换。
+- `scripts/install-codex-gateway-profile.py`：向 `~/.codex/config.toml` 写入托管 profile，并设置 `requires_openai_auth = false`。
+- `config/codex-responses-gateway.example.json`：网关配置示例；复制出的 `config/codex-responses-gateway.json` 被 `.gitignore` 忽略。
+- `config/codex-profile.example.toml`：Codex profile 示例。
+
+One API 经典版仍可在后续作为 POC 目标验证 `/v1/oneapi/proxy/:channelid/*target` 是否能透明代理 Responses，但在路径、鉴权、streaming、计费和模型映射全部验证前，不进入默认生产链路。
 
 ## 快速开始
 

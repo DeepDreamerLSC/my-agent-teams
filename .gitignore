@@ -39,3 +39,6 @@ config.generated.json
 *.sqlite3-shm
 *.sqlite3-wal
 agents/be-1/
+
+# Local Codex Responses Gateway config (contains endpoint and secret env names)
+config/codex-responses-gateway.json

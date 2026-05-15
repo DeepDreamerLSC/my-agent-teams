@@ -19,6 +19,12 @@ RENDER_CONFIG="${RENDER_CONFIG:-0}"
 WATCHER_INTERVAL="${WATCHER_INTERVAL:-5}"
 DASHBOARD_HOST="${TASK_BOARD_HOST:-127.0.0.1}"
 DASHBOARD_PORT="${TASK_BOARD_PORT:-5001}"
+CODEX_GATEWAY_CONFIG="${CODEX_GATEWAY_CONFIG:-$WORKSPACE_ROOT/config/codex-responses-gateway.json}"
+CODEX_GATEWAY_HOST="${CODEX_GATEWAY_HOST:-127.0.0.1}"
+CODEX_GATEWAY_PORT="${CODEX_GATEWAY_PORT:-8787}"
+CODEX_GATEWAY_LOG="${CODEX_GATEWAY_LOG:-$LOG_DIR/codex-responses-gateway.log}"
+CODEX_GATEWAY_PROFILE_BASE_URL="${CODEX_GATEWAY_PROFILE_BASE_URL:-http://$CODEX_GATEWAY_HOST:$CODEX_GATEWAY_PORT/v1}"
+CODEX_GATEWAY_API_KEY_ENV="${CODEX_GATEWAY_API_KEY_ENV:-CODEX_GATEWAY_API_KEY}"
 
 usage() {
   cat <<EOF_USAGE
@@ -33,6 +39,10 @@ Commands:
   stop-watcher    停止 task-watcher
   start-dashboard 后台启动任务看板
   stop-dashboard  停止任务看板
+  init-codex-gateway-config  从示例生成本机 Codex Responses Gateway 配置
+  start-codex-gateway        后台启动 Codex Responses Gateway
+  stop-codex-gateway         停止 Codex Responses Gateway
+  install-codex-profile      写入/更新 ~/.codex/config.toml 托管 profile
   smoke           做轻量 smoke：脚本语法、Python 编译、agent 文件 dry-run
   status          输出关键运行状态
 
@@ -44,7 +54,8 @@ Options:
 
 Environment overrides:
   WORKSPACE_ROOT, CONFIG_PATH, CONFIG_LOCAL_PATH, TASKS_ROOT, AGENTS_ROOT,
-  DEFAULT_WORK_PARENT, CODEX_CMD, CLAUDE_CMD, START_ATTACH=1, START_FORCE=1
+  DEFAULT_WORK_PARENT, CODEX_CMD, CLAUDE_CMD, START_ATTACH=1, START_FORCE=1,
+  CODEX_GATEWAY_CONFIG, CODEX_GATEWAY_HOST, CODEX_GATEWAY_PORT, CODEX_GATEWAY_API_KEY_ENV
 EOF_USAGE
 }
 
@@ -233,6 +244,7 @@ doctor() {
   check_cmd node optional || true
   check_cmd codex optional || true
   check_cmd claude optional || true
+  check_file codex-gateway-example "$WORKSPACE_ROOT/config/codex-responses-gateway.example.json" || rc=1
   check_file repo "$WORKSPACE_ROOT/README.md" || rc=1
   check_file config "$CONFIG_PATH" || rc=1
   check_file config.local "$CONFIG_LOCAL_PATH" || true
@@ -365,11 +377,61 @@ stop_dashboard() {
   stop_pid_file "$STATE_DIR/task-board.pid" dashboard
 }
 
+init_codex_gateway_config() {
+  local example="$WORKSPACE_ROOT/config/codex-responses-gateway.example.json"
+  if [ -f "$CODEX_GATEWAY_CONFIG" ]; then
+    log "Codex gateway config exists: $CODEX_GATEWAY_CONFIG"
+    return 0
+  fi
+  if [ ! -f "$example" ]; then
+    err "missing example config: $example"
+    return 1
+  fi
+  mkdir -p "$(dirname "$CODEX_GATEWAY_CONFIG")"
+  cp "$example" "$CODEX_GATEWAY_CONFIG"
+  chmod 600 "$CODEX_GATEWAY_CONFIG" 2>/dev/null || true
+  log "created Codex gateway config: $CODEX_GATEWAY_CONFIG"
+  warn "set OPENAI_API_KEY and CODEX_GATEWAY_API_KEY before starting the gateway"
+}
+
+start_codex_gateway() {
+  ensure_runtime_dirs
+  if [ ! -f "$CODEX_GATEWAY_CONFIG" ]; then
+    init_codex_gateway_config
+  fi
+  python3 "$SCRIPT_DIR/codex-responses-gateway.py" check-config --config "$CODEX_GATEWAY_CONFIG" >/dev/null
+  local pid_file="$STATE_DIR/codex-responses-gateway.pid"
+  local pid="$(cat "$pid_file" 2>/dev/null || true)"
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    log "Codex Responses Gateway already running pid=$pid"
+    return 0
+  fi
+  nohup python3 "$SCRIPT_DIR/codex-responses-gateway.py" serve \
+    --config "$CODEX_GATEWAY_CONFIG" \
+    --host "$CODEX_GATEWAY_HOST" \
+    --port "$CODEX_GATEWAY_PORT" \
+    >> "$CODEX_GATEWAY_LOG" 2>&1 &
+  echo $! > "$pid_file"
+  log "Codex Responses Gateway started pid=$(cat "$pid_file") url=http://$CODEX_GATEWAY_HOST:$CODEX_GATEWAY_PORT/v1"
+}
+
+stop_codex_gateway() {
+  stop_pid_file "$STATE_DIR/codex-responses-gateway.pid" codex-responses-gateway
+}
+
+install_codex_profile() {
+  python3 "$SCRIPT_DIR/install-codex-gateway-profile.py" \
+    --gateway-base-url "$CODEX_GATEWAY_PROFILE_BASE_URL" \
+    --api-key-env "$CODEX_GATEWAY_API_KEY_ENV"
+}
+
 smoke() {
   local rc=0
   for f in "$SCRIPT_DIR"/*.sh; do
     bash -n "$f" || rc=1
   done
+  python3 "$SCRIPT_DIR/codex-responses-gateway.py" check-config --config "$WORKSPACE_ROOT/config/codex-responses-gateway.example.json" >/dev/null || rc=1
+  python3 "$SCRIPT_DIR/install-codex-gateway-profile.py" --dry-run >/dev/null || rc=1
   PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/my-agent-teams-pycache}" \
     python3 -m compileall -q "$SCRIPT_DIR" "$WORKSPACE_ROOT/dashboard" "$WORKSPACE_ROOT/tests" || rc=1
   WORKSPACE_ROOT="$WORKSPACE_ROOT" CONFIG_PATH="$CONFIG_PATH" "$SCRIPT_DIR/build-agent-files.sh" --dry-run >/dev/null || rc=1
@@ -386,6 +448,7 @@ status_cmd() {
   echo "config:    $CONFIG_PATH"
   echo "tasks:     $TASKS_ROOT"
   echo "runtime:   $RUNTIME_ROOT"
+  echo "gateway:   http://$CODEX_GATEWAY_HOST:$CODEX_GATEWAY_PORT/v1 config=$CODEX_GATEWAY_CONFIG"
   echo "agents:"
   agent_rows | while IFS=$'\t' read -r agent_id session runtime workdir guidance; do
     [ -n "$agent_id" ] || continue
@@ -419,6 +482,10 @@ case "$COMMAND" in
   stop-watcher) stop_watcher ;;
   start-dashboard) start_dashboard ;;
   stop-dashboard) stop_dashboard ;;
+  init-codex-gateway-config) init_codex_gateway_config ;;
+  start-codex-gateway) start_codex_gateway ;;
+  stop-codex-gateway) stop_codex_gateway ;;
+  install-codex-profile) install_codex_profile ;;
   smoke) smoke ;;
   status) status_cmd ;;
   -h|--help|help) usage ;;

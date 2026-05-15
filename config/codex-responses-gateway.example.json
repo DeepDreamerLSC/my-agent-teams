@@ -1,0 +1,22 @@
+{
+  "auth": {
+    "bearer_token_env": "CODEX_GATEWAY_API_KEY"
+  },
+  "routing": {
+    "strategy": "ordered_failover",
+    "max_failovers": 1,
+    "retry_statuses": [429, 500, 502, 503, 504]
+  },
+  "upstreams": [
+    {
+      "id": "openai-primary",
+      "base_url": "https://api.openai.com/v1",
+      "api_key_env": "OPENAI_API_KEY",
+      "model_map": {
+        "gpt-5.4": "gpt-5.4",
+        "gpt-5.4-mini": "gpt-5.4-mini"
+      },
+      "timeout_seconds": 600
+    }
+  ]
+}

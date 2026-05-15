@@ -1,0 +1,17 @@
+# Copy or install via: scripts/teamctl.sh install-codex-profile
+[model_providers.codex-gateway]
+name = "Codex Responses Gateway"
+base_url = "http://127.0.0.1:8787/v1"
+wire_api = "responses"
+env_key = "CODEX_GATEWAY_API_KEY"
+requires_openai_auth = false
+
+[profiles.pm-team]
+model_provider = "codex-gateway"
+model = "gpt-5.4"
+model_reasoning_effort = "high"
+
+[profiles.dev-team]
+model_provider = "codex-gateway"
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
