@@ -88,6 +88,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .kanban-card .card-review-level { background: #f9f0ff; color: #531dab; }
 .gate-review_rejected, .gate-qa_failed { background: #fff1f0 !important; color: #cf1322 !important; }
 .gate-review_pending, .gate-qa_pending { background: #fff7e6 !important; color: #d46b08 !important; }
+.gate-quality_pending { background: #f9f0ff !important; color: #531dab !important; }
 .gate-pm_acceptance_pending { background: #e6f4ff !important; color: #0958d9 !important; }
 .priority-high { background: #fff1f0; color: #cf1322; }
 .priority-medium { background: #fff7e6; color: #d46b08; }
@@ -454,6 +455,7 @@ body::before {
 .priority-medium,
 .gate-review_pending,
 .gate-qa_pending { background: rgba(251,191,36,0.14) !important; color: var(--ops-amber) !important; }
+.gate-quality_pending { background: rgba(167,139,250,0.16) !important; color: var(--ops-violet) !important; }
 .priority-low,
 .badge-merged,
 .badge-archived { background: rgba(52,211,153,0.14) !important; color: var(--ops-green) !important; }
@@ -533,4 +535,3 @@ body::before {
   .tabs { margin-left: 10px; margin-right: 10px; overflow-x: auto; }
   .tab { white-space: nowrap; }
 }
-

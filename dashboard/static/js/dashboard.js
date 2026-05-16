@@ -13,11 +13,31 @@ const CURRENT_STATUS_LABELS = {
 const MERGE_GATE_LABELS = {
   review_pending: '待审查',
   review_rejected: '审查驳回',
+  quality_pending: '并行质控中',
   qa_pending: '待QA',
   qa_failed: 'QA未通过',
   pm_acceptance_pending: '待PM收口',
   closed: '已收口',
   blocked: '阻塞',
+}
+const QUALITY_GATE_MODE_LABELS = {
+  single: '单门禁',
+  serial: '串行',
+  parallel: '并行',
+}
+const REVIEW_GATE_STATE_LABELS = {
+  pending: '待审查',
+  approved: '已通过',
+  rejected: '已驳回',
+  blocked: '阻塞',
+  skipped: '跳过',
+}
+const QA_GATE_STATE_LABELS = {
+  pending: '待QA',
+  passed: '已通过',
+  failed: '未通过',
+  blocked: '阻塞',
+  skipped: '跳过',
 }
 const EVENT_TYPE_LABELS = {
   created: '创建',
@@ -543,6 +563,9 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
         ${detailItem('当前状态', task.current_status)}
         ${detailItem('看板列', task.board_status)}
         ${detailItem('收口阶段', MERGE_GATE_LABELS[task.merge_gate_state] || task.merge_gate_state)}
+        ${detailItem('质量门禁模式', QUALITY_GATE_MODE_LABELS[task.quality_gate_mode] || task.quality_gate_mode)}
+        ${detailItem('审查子门禁', REVIEW_GATE_STATE_LABELS[task.review_gate_state] || task.review_gate_state)}
+        ${detailItem('QA子门禁', QA_GATE_STATE_LABELS[task.qa_gate_state] || task.qa_gate_state)}
         ${detailItem('负责人', task.assigned_agent)}
         ${detailItem('Owner PM', task.owner_pm)}
         ${detailItem('Reviewer', task.reviewer)}
@@ -566,7 +589,9 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
         ${detailItem('派发→ACK', formatHours(durations.dispatch_to_ack_hours))}
         ${detailItem('ACK→结果', formatHours(durations.ack_to_result_hours))}
         ${detailItem('结果→审查', formatHours(durations.result_to_review_hours))}
+        ${detailItem('结果→QA', formatHours(durations.result_to_qa_hours))}
         ${detailItem('审查→验证', formatHours(durations.review_to_verify_hours))}
+        ${detailItem('质控完成→当前', formatHours(durations.quality_to_acceptance_hours))}
         ${detailItem('验证→当前', formatHours(durations.verify_to_close_hours))}
         ${detailItem('总周期', formatHours(durations.total_cycle_hours))}
       </div>

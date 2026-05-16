@@ -157,6 +157,21 @@ def _review_state(review_text: str | None) -> str | None:
     return 'present'
 
 
+def _normalize_review_state(value: str | None) -> str | None:
+    if not value:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized in {'approve', 'approved', 'pass'}:
+        return 'approved'
+    if normalized in {'request_changes', 'changes_requested', 'reject', 'rejected', 'fail'}:
+        return 'changes_requested'
+    if normalized == 'blocked':
+        return 'blocked'
+    if normalized in {'pending', 'missing', 'present'}:
+        return 'pending'
+    return normalized
+
+
 def _bool_value(mapping: dict[str, Any] | None, *keys: str) -> int | None:
     if not mapping:
         return None
@@ -187,6 +202,8 @@ def _derive_merge_gate_state(
     explicit = _get_first(task, 'merge_gate_state')
     review_required = bool(task.get('review_required'))
     test_required = bool(task.get('test_required'))
+    quality_gate_mode = str(task.get('quality_gate_mode') or '').strip().lower()
+    review_state = _normalize_review_state(review_state)
 
     if current_status == 'done':
         return 'closed'
@@ -205,6 +222,10 @@ def _derive_merge_gate_state(
         return 'qa_failed'
     if review_state == 'changes_requested':
         return 'review_rejected'
+    if review_required and test_required and quality_gate_mode == 'parallel':
+        if review_state == 'approved' and verify_ok == 1:
+            return 'pm_acceptance_pending'
+        return 'quality_pending'
     if test_required and (not review_required or review_state == 'approved'):
         return 'qa_pending'
     if review_required and review_state != 'approved':
@@ -416,9 +437,21 @@ def _build_task_record(
         _file_mtime(task_dir / 'verify.json') if verify is not None else None,
     )
     current_status = str(task.get('status') or 'pending')
-    review_state = (parsed_review or {}).get('normalized_status') or _review_state(review_text)
+    review_state = _normalize_review_state((parsed_review or {}).get('normalized_status') or _review_state(review_text))
     verify_state = (parsed_verify or {}).get('normalized_status')
     verify_ok = 1 if verify_state == 'pass' else 0 if verify_state in {'fail', 'blocked'} else _bool_value(verify, 'ok', 'pass')
+    review_gate_state = 'skipped' if not task.get('review_required') else (
+        'approved' if review_state == 'approved'
+        else 'rejected' if review_state == 'changes_requested'
+        else 'blocked' if review_state == 'blocked'
+        else 'pending'
+    )
+    qa_gate_state = 'skipped' if not task.get('test_required') else (
+        'passed' if verify_state == 'pass'
+        else 'failed' if verify_state == 'fail'
+        else 'blocked' if verify_state == 'blocked'
+        else 'pending'
+    )
     current_status_at = _coalesce(
         _last_transition_at(transitions, to_status=current_status),
         _normalize_time(task.get('updated_at')),
@@ -457,6 +490,7 @@ def _build_task_record(
         'last_gate_actor': task.get('last_gate_actor'),
         'last_gate_decision_at': _normalize_time(task.get('last_gate_decision_at')),
         'auto_close_policy': task.get('auto_close_policy'),
+        'quality_gate_mode': task.get('quality_gate_mode'),
         'created_at': created_at,
         'dispatched_at': dispatched_at,
         'ack_at': ack_at,
@@ -471,6 +505,8 @@ def _build_task_record(
         'summary': _coalesce(_get_first(result, 'summary'), task.get('result_summary')),
         'review_state': review_state,
         'verify_ok': verify_ok,
+        'review_gate_state': task.get('review_gate_state') or review_gate_state,
+        'qa_gate_state': task.get('qa_gate_state') or qa_gate_state,
         'task_dir': str(task_dir),
         'task_json_path': str(task_dir / 'task.json'),
         'write_scope_json': _json_dumps(task.get('write_scope') or []),
@@ -501,13 +537,18 @@ def _seconds_between(start: Any, end: Any) -> float | None:
 
 
 def _build_task_stage_duration_record(task_record: dict[str, Any]) -> dict[str, Any]:
+    is_parallel_quality_gate = (
+        bool(task_record.get('review_required'))
+        and bool(task_record.get('test_required'))
+        and str(task_record.get('quality_gate_mode') or '').strip().lower() == 'parallel'
+    )
     return {
         'task_id': task_record['task_id'],
         'create_to_dispatch_seconds': _seconds_between(task_record.get('created_at'), task_record.get('dispatched_at')),
         'dispatch_to_ack_seconds': _seconds_between(task_record.get('dispatched_at'), task_record.get('ack_at')),
         'ack_to_result_seconds': _seconds_between(task_record.get('ack_at'), task_record.get('completed_at')),
         'result_to_review_seconds': _seconds_between(task_record.get('completed_at'), task_record.get('review_completed_at')),
-        'review_to_verify_seconds': _seconds_between(task_record.get('review_completed_at'), task_record.get('verify_completed_at')),
+        'review_to_verify_seconds': None if is_parallel_quality_gate else _seconds_between(task_record.get('review_completed_at'), task_record.get('verify_completed_at')),
         'verify_to_close_seconds': _seconds_between(task_record.get('verify_completed_at'), task_record.get('current_status_at')),
         'total_cycle_seconds': _seconds_between(task_record.get('created_at'), task_record.get('current_status_at')),
         'updated_at': utcnow_iso(),

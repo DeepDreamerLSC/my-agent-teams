@@ -1,7 +1,7 @@
 # 并行度、任务池与甘特图真实性优化方案
 
 > 创建日期：2026-05-16  
-> 状态：方案草案（Phase 1/2 已落地，Phase 3/4 待实现）  
+> 状态：增量实施中（Phase 1/2/3 已落地，Phase 4 待实现）  
 > 适用范围：`my-agent-teams` 的 PM 拆分、任务池认领、watcher 续推、dashboard/Gantt 数据口径  
 > 相关文档：`control-plane-and-task-pool.md`、`task-pool-claiming.md`、`task-board/optimization-plan.md`
 >
@@ -601,11 +601,11 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - 空闲 agent + pool_ready > 0 时，1 个 scan interval 内出现 reserved/dispatched；
 - 同一 agent 仍最多 1 条 working。
 
-### Phase 3：分层并行 review/QA gate（必须实现）
+### Phase 3：分层并行 review/QA gate（已实现）
 
 目标：减少后置流水线串行等待。
 
-改动：
+已落地改动：
 
 - `merge_gate_state` 支持并行子 gate，例如：
 
@@ -621,7 +621,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - complex 任务支持 review-1 + arch-1 双审；
 - PM acceptance 等所有必需 gate 满足后出现。
 
-验收：
+当前验收口径：
 
 - review 与 smoke / 自动校验 可以并行等待；
 - 完整 QA 是否并行触发由任务类型/风险级别决定，不一刀切；

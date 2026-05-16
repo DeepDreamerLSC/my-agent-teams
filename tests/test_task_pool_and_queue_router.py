@@ -43,6 +43,12 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
             'id': 'qa-task', 'title': '待QA', 'status': 'ready_for_merge', 'priority': 'medium',
             'test_required': True, 'merge_gate_state': 'qa_pending', 'last_gate_decision_at': '2026-05-09T10:05:00+08:00',
         })
+        self._write_task('quality-task', {
+            'id': 'quality-task', 'title': '并行质控', 'status': 'ready_for_merge', 'priority': 'low',
+            'reviewer': 'review-1', 'review_required': True, 'test_required': True,
+            'quality_gate_mode': 'parallel', 'merge_gate_state': 'quality_pending',
+            'updated_at': '2026-05-09T10:06:00+08:00',
+        })
 
     def tearDown(self):
         self.tmpdir.cleanup()
@@ -85,6 +91,20 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         self.assertEqual(review.stdout.strip(), 'review-task')
         self.assertEqual(qa.stdout.strip(), 'qa-task')
 
+    def test_queue_router_quality_pending_is_visible_to_both_review_and_qa(self):
+        review = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        qa = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'qa', '--agent', 'qa-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        review_payload = json.loads(review.stdout)
+        qa_payload = json.loads(qa.stdout)
+        self.assertIn('quality-task', [row['task_id'] for row in review_payload['rows']])
+        self.assertIn('quality-task', [row['task_id'] for row in qa_payload['rows']])
+
     def test_queue_router_skips_review_task_with_terminal_review_artifact(self):
         review_dir = self.tasks_root / 'review-task'
         (review_dir / 'review.json').write_text(
@@ -101,8 +121,8 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
             cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
         )
         payload = json.loads(completed.stdout)
-        self.assertIsNone(payload['next_task_id'])
-        self.assertEqual(payload['rows'], [])
+        self.assertEqual(payload['next_task_id'], 'quality-task')
+        self.assertNotIn('review-task', [row['task_id'] for row in payload['rows']])
 
     def test_queue_router_keeps_review_task_when_terminal_review_is_stale_after_new_result(self):
         review_dir = self.tasks_root / 'review-task'
@@ -138,7 +158,8 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         )
         payload = json.loads(completed.stdout)
         self.assertEqual(payload['next_task_id'], 'review-task')
-        self.assertEqual([row['task_id'] for row in payload['rows']], ['review-task'])
+        self.assertEqual(payload['rows'][0]['task_id'], 'review-task')
+        self.assertIn('quality-task', [row['task_id'] for row in payload['rows']])
 
     def test_queue_router_keeps_review_task_when_terminal_review_round_is_stale(self):
         review_dir = self.tasks_root / 'review-task'
@@ -199,8 +220,8 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
             cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
         )
         payload = json.loads(completed.stdout)
-        self.assertIsNone(payload['next_task_id'])
-        self.assertEqual(payload['rows'], [])
+        self.assertEqual(payload['next_task_id'], 'quality-task')
+        self.assertNotIn('review-task', [row['task_id'] for row in payload['rows']])
 
     def test_pool_view_counts_timed_out_tasks(self):
         self._write_task('pooled-timeout', {

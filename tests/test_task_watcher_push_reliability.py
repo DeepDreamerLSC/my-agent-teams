@@ -382,3 +382,106 @@ test "$(verify_state '{task_dir}/verify.json')" = "missing"
 test "$(resolve_merge_gate_state '{task_dir}')" = "qa_pending"
 """
             subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+class TaskWatcherParallelQualityGateTests(unittest.TestCase):
+    def test_resolve_merge_gate_state_supports_quality_pending(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            env = _base_env(tmp_path)
+            task_dir = tmp_path / "task-quality-pending"
+            task_dir.mkdir(parents=True)
+            (task_dir / "task.json").write_text(
+                '{\n'
+                '  "id": "task-quality-pending",\n'
+                '  "status": "ready_for_merge",\n'
+                '  "review_required": true,\n'
+                '  "test_required": true,\n'
+                '  "quality_gate_mode": "parallel",\n'
+                '  "merge_gate_state": "quality_pending"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            script = f"""
+set -e
+source '{TASK_WATCHER}'
+test "$(resolve_merge_gate_state '{task_dir}')" = "quality_pending"
+"""
+            subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+    def test_parallel_qa_pass_does_not_auto_close_before_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            env = _base_env(tmp_path)
+            task_dir = tmp_path / "task-parallel-gate"
+            task_dir.mkdir(parents=True)
+            (task_dir / "task.json").write_text(
+                '{\n'
+                '  "id": "task-parallel-gate",\n'
+                '  "status": "ready_for_merge",\n'
+                '  "review_required": true,\n'
+                '  "test_required": true,\n'
+                '  "quality_gate_mode": "parallel",\n'
+                '  "merge_gate_state": "quality_pending"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            (task_dir / "verify.json").write_text(
+                '{\n'
+                '  "task_id": "task-parallel-gate",\n'
+                '  "tester": "qa-1",\n'
+                '  "status": "pass",\n'
+                '  "summary": "qa pass"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            script = f"""
+set -e
+source '{TASK_WATCHER}'
+set_task_gate_state '{task_dir}' 'ready_for_merge' 'test qa pass only' 'quality_pending' '' 'qa' '2026-05-16T10:00:00+08:00' '__KEEP__' 'passed'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task = json.loads(Path('{task_dir}/task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'ready_for_merge', task
+assert task['merge_gate_state'] == 'quality_pending', task
+assert task['qa_gate_state'] == 'passed', task
+assert task.get('review_gate_state') in (None, 'pending'), task
+PY
+"""
+            subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+    def test_parallel_quality_gate_both_complete_promotes_pm_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            env = _base_env(tmp_path)
+            task_dir = tmp_path / "task-parallel-complete"
+            task_dir.mkdir(parents=True)
+            (task_dir / "task.json").write_text(
+                '{\n'
+                '  "id": "task-parallel-complete",\n'
+                '  "status": "ready_for_merge",\n'
+                '  "review_required": true,\n'
+                '  "test_required": true,\n'
+                '  "quality_gate_mode": "parallel",\n'
+                '  "merge_gate_state": "quality_pending",\n'
+                '  "review_gate_state": "approved",\n'
+                '  "qa_gate_state": "pending"\n'
+                '}\n',
+                encoding="utf-8",
+            )
+            script = f"""
+set -e
+source '{TASK_WATCHER}'
+set_task_gate_state '{task_dir}' 'ready_for_merge' 'test all quality gates done' 'pm_acceptance_pending' '' 'qa' '2026-05-16T10:05:00+08:00' '__KEEP__' 'passed'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task = json.loads(Path('{task_dir}/task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'ready_for_merge', task
+assert task['merge_gate_state'] == 'pm_acceptance_pending', task
+assert task['review_gate_state'] == 'approved', task
+assert task['qa_gate_state'] == 'passed', task
+PY
+"""
+            subprocess.run(["bash", "-lc", script], check=True, env=env)

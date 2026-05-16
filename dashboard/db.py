@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = WORKSPACE_ROOT / '.omx' / 'task-board' / 'task-board.sqlite3'
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 TASK_COLUMNS = [
     'task_id',
@@ -33,6 +33,7 @@ TASK_COLUMNS = [
     'last_gate_actor',
     'last_gate_decision_at',
     'auto_close_policy',
+    'quality_gate_mode',
     'created_at',
     'dispatched_at',
     'ack_at',
@@ -47,6 +48,8 @@ TASK_COLUMNS = [
     'summary',
     'review_state',
     'verify_ok',
+    'review_gate_state',
+    'qa_gate_state',
     'task_dir',
     'task_json_path',
     'write_scope_json',
@@ -149,6 +152,9 @@ TASK_ADDITIONAL_COLUMN_DEFINITIONS = {
     'last_gate_actor': 'TEXT',
     'last_gate_decision_at': 'TEXT',
     'auto_close_policy': 'TEXT',
+    'quality_gate_mode': 'TEXT',
+    'review_gate_state': 'TEXT',
+    'qa_gate_state': 'TEXT',
 }
 
 
@@ -216,6 +222,7 @@ def initialize_db(conn: sqlite3.Connection) -> None:
             last_gate_actor TEXT,
             last_gate_decision_at TEXT,
             auto_close_policy TEXT,
+            quality_gate_mode TEXT,
             created_at TEXT,
             dispatched_at TEXT,
             ack_at TEXT,
@@ -230,6 +237,8 @@ def initialize_db(conn: sqlite3.Connection) -> None:
             summary TEXT,
             review_state TEXT,
             verify_ok INTEGER,
+            review_gate_state TEXT,
+            qa_gate_state TEXT,
             task_dir TEXT NOT NULL,
             task_json_path TEXT NOT NULL,
             write_scope_json TEXT NOT NULL DEFAULT '[]',

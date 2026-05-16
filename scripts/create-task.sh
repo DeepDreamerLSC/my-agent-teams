@@ -129,6 +129,16 @@ def dedupe(values: list[str]) -> list[str]:
     return output
 
 
+def derive_quality_gate_mode(*, task_type: str, execution_mode: str, target_environment: str, task_level: str, review_required: bool, test_required: bool) -> str:
+    if not (review_required and test_required):
+        return 'single'
+    if target_environment == 'prod' or execution_mode == 'deploy':
+        return 'serial'
+    if task_type in {'deployment', 'integration'} or task_level == 'integration':
+        return 'serial'
+    return 'parallel'
+
+
 def normalize_task_type(raw: str, *, execution_mode: str, target_environment: str, task_level: str) -> Optional[str]:
     stripped = raw.strip().lower()
     if stripped:
@@ -326,6 +336,14 @@ task_type = normalize_task_type(
 if task_type == 'deployment':
     owner_approval_required = True
 auto_close_policy = 'review_pass_only' if (read_only or task_type == 'design') and not test_required else 'manual_after_review'
+quality_gate_mode = derive_quality_gate_mode(
+    task_type=task_type,
+    execution_mode=execution_mode,
+    target_environment=target_environment,
+    task_level=normalized_task_level,
+    review_required=review_required,
+    test_required=test_required,
+)
 claim_scope = derive_claim_scope(
     agents=agents,
     task_type=task_type,
@@ -370,6 +388,9 @@ obj = {
     'owner_approved_by': owner_approved_by_raw.strip() or None,
     'owner_approved_at': owner_approved_at,
     'auto_close_policy': auto_close_policy,
+    'quality_gate_mode': quality_gate_mode,
+    'review_gate_state': 'skipped' if not review_required else None,
+    'qa_gate_state': 'skipped' if not test_required else None,
     'write_scope': write_scope,
     'depends_on': [],
     'blocks': [],

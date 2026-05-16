@@ -26,6 +26,17 @@ const CURRENT_STATUS_LABELS = {
   archived: '已归档',
 }
 
+const MERGE_GATE_LABELS = {
+  review_pending: '待审查',
+  review_rejected: '审查驳回',
+  quality_pending: '并行质控中',
+  qa_pending: '待QA',
+  qa_failed: 'QA未通过',
+  pm_acceptance_pending: '待PM收口',
+  closed: '已收口',
+  blocked: '阻塞',
+}
+
 // Gantt phases: key matches backend milestones keys, color/label for chart rendering
 const GANTT_PHASES = [
   { key: 'pooled', label: '入池等待', color: '#1677ff' },
@@ -223,7 +234,7 @@ if (typeof module !== 'undefined' && module.exports) {
     esc, formatTime, groupByBoardStatus, truncateTitle, mapToBoardStatus,
     transformBoardPayload, transformAgentPayload,
     hoursBetween, formatDurationHours, buildFilterOptions, applyTaskFilters,
-    BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, STATUS_TO_BOARD,
+    BOARD_COLUMNS, BOARD_LABELS, CURRENT_STATUS_LABELS, MERGE_GATE_LABELS, STATUS_TO_BOARD,
     GANTT_PHASES, getTaskGanttPhaseSegments,
     formatSecondsCompact, transformAggregateForAnalytics, transformDailyMetrics, computeAgentEfficiency,
   }

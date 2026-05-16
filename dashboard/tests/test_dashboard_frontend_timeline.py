@@ -162,6 +162,9 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
                 assigned_agent: 'dev-1',
                 owner_pm: 'pm-chief',
                 reviewer: 'review-1',
+                quality_gate_mode: 'parallel',
+                review_gate_state: 'approved',
+                qa_gate_state: 'pending',
                 current_status: 'working',
                 board_status: 'working',
                 created_at: '2026-05-04T00:00:00+08:00',
@@ -174,7 +177,9 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
                 dispatch_to_ack_hours: null,
                 ack_to_result_hours: null,
                 result_to_review_hours: null,
+                result_to_qa_hours: null,
                 review_to_verify_hours: null,
+                quality_to_acceptance_hours: null,
                 verify_to_close_hours: null,
                 total_cycle_hours: null
               }},
@@ -185,7 +190,8 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
               hasFallbackDuration: html.includes('>-<'),
               hasEmptyCommunication: html.includes('沟通时间线') && html.includes('暂无记录'),
               hasTaskId: html.includes('task-1'),
-              hasOwnerPm: html.includes('pm-chief')
+              hasOwnerPm: html.includes('pm-chief'),
+              hasQualityGateLabels: html.includes('并行') && html.includes('已通过') && html.includes('待QA')
             }}));
             """
         )
@@ -194,6 +200,7 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertTrue(result["hasEmptyCommunication"])
         self.assertTrue(result["hasTaskId"])
         self.assertTrue(result["hasOwnerPm"])
+        self.assertTrue(result["hasQualityGateLabels"])
 
     def test_gantt_time_filter_includes_intersecting_phase_intervals(self):
         script = textwrap.dedent(

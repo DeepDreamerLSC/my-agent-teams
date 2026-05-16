@@ -32,6 +32,7 @@ def _task_record(**overrides):
         'last_gate_actor': None,
         'last_gate_decision_at': None,
         'auto_close_policy': 'manual_after_review',
+        'quality_gate_mode': 'serial',
         'created_at': '2026-05-04T00:00:00+08:00',
         'dispatched_at': '2026-05-04T00:10:00+08:00',
         'ack_at': '2026-05-04T00:20:00+08:00',
@@ -46,6 +47,8 @@ def _task_record(**overrides):
         'summary': None,
         'review_state': None,
         'verify_ok': None,
+        'review_gate_state': 'pending',
+        'qa_gate_state': 'pending',
         'task_dir': '/tmp/task-1',
         'task_json_path': '/tmp/task-1/task.json',
         'write_scope_json': '[]',
@@ -152,6 +155,30 @@ class GanttPayloadTests(unittest.TestCase):
         self.assertEqual(pooled['start_at'], '2026-05-04T00:05:00+08:00')
         self.assertEqual(pooled['source']['end']['field'], 'generated_at')
         self.assertEqual(pooled['precision'], 'inferred')
+
+    def test_parallel_quality_gate_starts_review_and_qa_from_result_completion(self):
+        with self.conn:
+            upsert_task(self.conn, _task_record(
+                task_id='parallel-quality',
+                merge_gate_state='quality_pending',
+                quality_gate_mode='parallel',
+                review_gate_state='pending',
+                qa_gate_state='pending',
+                completed_at='2026-05-04T01:00:00+08:00',
+                review_completed_at='2026-05-04T02:00:00+08:00',
+                verify_completed_at='2026-05-04T03:00:00+08:00',
+                current_status_at='2026-05-04T03:30:00+08:00',
+                updated_at='2026-05-04T03:30:00+08:00',
+                last_synced_at='2026-05-04T03:30:00+08:00',
+            ))
+        payload = build_gantt_payload(self.conn)
+        item = next(entry for entry in payload['items'] if entry['task_id'] == 'parallel-quality')
+        review = next(segment for segment in item['phase_segments'] if segment['key'] == 'review')
+        qa = next(segment for segment in item['phase_segments'] if segment['key'] == 'qa')
+        self.assertEqual(review['start_at'], '2026-05-04T01:00:00+08:00')
+        self.assertEqual(review['end_at'], '2026-05-04T02:00:00+08:00')
+        self.assertEqual(qa['start_at'], '2026-05-04T01:00:00+08:00')
+        self.assertEqual(qa['end_at'], '2026-05-04T03:00:00+08:00')
 
 
 if __name__ == '__main__':

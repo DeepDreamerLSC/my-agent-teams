@@ -3,8 +3,7 @@
 # 关键职责：
 # - ack.json 新增 → 更新 task.json 状态为 working
 # - result.json 新增 → 根据任务类型自动通知 PM / reviewer
-# - review 通过 → 自动通知 qa-1
-# - verify 通过 → 自动执行 close-task.sh 收口
+# - review / QA 通过 → 推进 merge gate，并在全部必需 gate 满足后通知 PM 收口
 # - review 驳回 / QA 失败 → 通知 PM 仲裁
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -642,6 +641,35 @@ for reviewer in reviewers:
 PY
 }
 
+task_quality_gate_mode() {
+    local task_dir="$1"
+    local current
+    current=$(task_json_pick "$task_dir" quality_gate_mode 2>/dev/null || true)
+    if [ -n "$current" ]; then
+        echo "$current"
+        return 0
+    fi
+    python3 - "$task_dir/task.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+review_required = str(task.get('review_required') or '').strip().lower() in {'1', 'true', 'yes', 'y'}
+test_required = str(task.get('test_required') or '').strip().lower() in {'1', 'true', 'yes', 'y'}
+task_type = str(task.get('task_type') or '').strip().lower()
+execution_mode = str(task.get('execution_mode') or '').strip().lower()
+target_environment = str(task.get('target_environment') or '').strip().lower()
+task_level = str(task.get('task_level') or '').strip().lower()
+if not (review_required and test_required):
+    print('single')
+elif target_environment == 'prod' or execution_mode == 'deploy' or task_type in {'deployment', 'integration'} or task_level == 'integration':
+    print('serial')
+else:
+    print('parallel')
+PY
+}
+
 list_dev_agents() {
     python3 - "$CONFIG_PATH" <<'PY'
 import json
@@ -1212,23 +1240,34 @@ reconcile_open_merge_gate() {
     local current_status="$3"
     [ "$current_status" = "ready_for_merge" ] || return 1
 
-    local gate review_level summary
+    local gate review_level summary current_review_state current_qa_state
     gate=$(task_json_pick "$task_dir" merge_gate_state)
     review_level=$(task_json_pick "$task_dir" review_level)
     summary=$(json_pick "$task_dir/result.json" summary)
+    current_review_state=$(review_state "$task_dir" "$review_level")
+    current_qa_state=$(verify_state "$task_dir/verify.json")
 
     case "$gate" in
         review_pending)
-            if [ ! -f "$task_dir/review.json" ] && [ ! -f "$task_dir/design-review.json" ] && [ ! -f "$task_dir/review.md" ] && [ ! -f "$task_dir/design-review.md" ]; then
+            if [ "$current_review_state" = "pending" ]; then
                 auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                 return $?
             fi
             ;;
         qa_pending)
-            if [ ! -f "$task_dir/verify.json" ]; then
+            if [ "$current_qa_state" = "missing" ] || [ "$current_qa_state" = "pending" ]; then
                 auto_dispatch_qa "$task_id"
                 return $?
             fi
+            ;;
+        quality_pending)
+            if [ "$current_review_state" = "pending" ]; then
+                auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary" || true
+            fi
+            if [ "$current_qa_state" = "missing" ] || [ "$current_qa_state" = "pending" ]; then
+                auto_dispatch_qa "$task_id" || true
+            fi
+            return 0
             ;;
     esac
     return 1
@@ -1267,7 +1306,7 @@ normalize_legacy_task_status() {
         review_rejected|qa_failed|blocked)
             set_task_gate_state "$task_dir" "blocked" "watcher normalized legacy review status" "$inferred_gate_state" "$( [ "$inferred_gate_state" = "review_rejected" ] && echo review || { [ "$inferred_gate_state" = "qa_failed" ] && echo qa || echo ""; } )" "watcher" "$now_iso"
             ;;
-        review_pending|qa_pending|pm_acceptance_pending)
+        review_pending|qa_pending|quality_pending|pm_acceptance_pending)
             set_task_gate_state "$task_dir" "ready_for_merge" "watcher normalized legacy review status" "$inferred_gate_state" "" "watcher" "$now_iso"
             ;;
         closed)
@@ -1440,6 +1479,8 @@ set_task_gate_state() {
     local rework_reason="${5:-__KEEP__}"
     local last_gate_actor="${6:-}"
     local last_gate_decision_at="${7:-}"
+    local review_gate_state="${8:-__KEEP__}"
+    local qa_gate_state="${9:-__KEEP__}"
     local output=""
     local effective_last_gate_decision_at="$last_gate_decision_at"
     if [ "$effective_last_gate_decision_at" != "__KEEP__" ]; then
@@ -1449,7 +1490,7 @@ set_task_gate_state() {
             effective_last_gate_decision_at="__KEEP__"
         fi
     fi
-    output=$(python3 - "$task_dir" "$new_status" "$reason" "$merge_gate_state" "$rework_reason" "$last_gate_actor" "$effective_last_gate_decision_at" <<'PY'
+    output=$(python3 - "$task_dir" "$new_status" "$reason" "$merge_gate_state" "$rework_reason" "$last_gate_actor" "$effective_last_gate_decision_at" "$review_gate_state" "$qa_gate_state" <<'PY'
 import json
 import os
 import sys
@@ -1464,6 +1505,8 @@ merge_gate_state = sys.argv[4]
 rework_reason = sys.argv[5]
 last_gate_actor = sys.argv[6]
 last_gate_decision_at = sys.argv[7]
+review_gate_state = sys.argv[8]
+qa_gate_state = sys.argv[9]
 
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
@@ -1511,11 +1554,21 @@ if new_status:
 if merge_gate_state != "__KEEP__" and task.get('merge_gate_state') != merge_gate_state:
     task['merge_gate_state'] = merge_gate_state
     fields_changed = True
-    if merge_gate_state in {'review_pending', 'qa_pending', 'pm_acceptance_pending'}:
+    if merge_gate_state in {'review_pending', 'qa_pending', 'quality_pending', 'pm_acceptance_pending'}:
         execution_round = next_execution_round()
         if task.get('execution_round') != execution_round:
             task['execution_round'] = execution_round
             fields_changed = True
+if review_gate_state != "__KEEP__":
+    value = None if review_gate_state in {"", "null", "None"} else review_gate_state
+    if task.get('review_gate_state') != value:
+        task['review_gate_state'] = value
+        fields_changed = True
+if qa_gate_state != "__KEEP__":
+    value = None if qa_gate_state in {"", "null", "None"} else qa_gate_state
+    if task.get('qa_gate_state') != value:
+        task['qa_gate_state'] = value
+        fields_changed = True
 if rework_reason != "__KEEP__":
     value = None if rework_reason in {"", "null", "None"} else rework_reason
     if task.get('rework_reason') != value:
@@ -1802,6 +1855,28 @@ review_state() {
     esac
 }
 
+is_truthy() {
+    local value="${1:-}"
+    case "$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')" in
+        1|true|yes|y|on) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+review_gate_state() {
+    local task_dir="$1"
+    local normalized
+    normalized=$(artifact_pick review "$task_dir" normalized_status)
+    case "$normalized" in
+        approve) echo "approved" ;;
+        request_changes) echo "rejected" ;;
+        blocked) echo "blocked" ;;
+        invalid) echo "invalid" ;;
+        pending|missing|"") echo "pending" ;;
+        *) echo "pending" ;;
+    esac
+}
+
 first_review_conclusion() {
     local task_dir="$1"
     local summary
@@ -1828,6 +1903,20 @@ verify_state() {
     esac
 }
 
+qa_gate_state() {
+    local task_dir="${1%/verify.json}"
+    local normalized
+    normalized=$(artifact_pick verify "$task_dir" normalized_status)
+    case "$normalized" in
+        pass) echo "passed" ;;
+        fail) echo "failed" ;;
+        blocked) echo "blocked" ;;
+        invalid) echo "invalid" ;;
+        missing|"") echo "pending" ;;
+        *) echo "pending" ;;
+    esac
+}
+
 verify_summary() {
     local verify_file="$1"
     local task_dir="${verify_file%/verify.json}"
@@ -1836,12 +1925,13 @@ verify_summary() {
 
 resolve_merge_gate_state() {
     local task_dir="$1"
-    local status merge_gate_state review_required test_required review_level rstate vstate
+    local status merge_gate_state review_required test_required review_level rstate vstate quality_gate_mode
     status=$(get_task_status "$task_dir")
     merge_gate_state=$(task_json_pick "$task_dir" merge_gate_state)
     review_required=$(task_json_pick "$task_dir" review_required)
     test_required=$(task_json_pick "$task_dir" test_required)
     review_level=$(task_json_pick "$task_dir" review_level)
+    quality_gate_mode=$(task_quality_gate_mode "$task_dir")
     rstate=$(review_state "$task_dir" "$review_level")
     vstate=$(verify_state "$task_dir/verify.json")
 
@@ -1874,6 +1964,12 @@ resolve_merge_gate_state() {
         echo "qa_failed"
     elif [ "$rstate" = "fail" ]; then
         echo "review_rejected"
+    elif [ "$quality_gate_mode" = "parallel" ] && { [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; } && { [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; }; then
+        if [ "$rstate" = "pass" ] && [ "$vstate" = "pass" ]; then
+            echo "pm_acceptance_pending"
+        else
+            echo "quality_pending"
+        fi
     elif { [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; } && { [ "$review_required" != "True" ] && [ "$review_required" != "true" ] && [ "$review_required" != "1" ] || [ "$rstate" = "pass" ]; }; then
         if [ "$vstate" = "pass" ]; then
             echo "pm_acceptance_pending"
@@ -1926,7 +2022,8 @@ queue_state_file() {
 queue_state_current_task() {
     local queue_kind="$1"
     local agent_id="$2"
-    python3 - "$(queue_state_file "$queue_kind" "$agent_id")" "$TASKS_ROOT" "$queue_kind" <<'PY'
+    local task_id=""
+    task_id=$(python3 - "$(queue_state_file "$queue_kind" "$agent_id")" "$TASKS_ROOT" "$queue_kind" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -1952,35 +2049,39 @@ if not task_path.exists():
 task = json.loads(task_path.read_text(encoding='utf-8'))
 status = str(task.get('status') or '')
 gate = str(task.get('merge_gate_state') or '')
-allowed_gate = 'review_pending' if queue_kind == 'review' else 'qa_pending'
-if status != 'ready_for_merge' or gate != allowed_gate:
+allowed_gates = {'review_pending'} if queue_kind == 'review' else {'qa_pending'}
+quality_gate_mode = str(task.get('quality_gate_mode') or '').strip().lower()
+if quality_gate_mode == 'parallel':
+    allowed_gates.add('quality_pending')
+if status != 'ready_for_merge' or gate not in allowed_gates:
     state_path.unlink(missing_ok=True)
     raise SystemExit(1)
-# 如果队列任务已有终态审查/QA结论，说明主循环还没流转 gate，先清理 queue state 避免卡住
-if queue_kind == 'review':
-    review_json = tasks_root / task_id / 'review.json'
-    if review_json.exists():
-        try:
-            r = json.loads(review_json.read_text(encoding='utf-8'))
-            verdict = str(r.get('verdict') or r.get('status') or '').strip().lower()
-            if verdict in ('approve', 'approved', 'request_changes', 'reject', 'rejected', 'pass', 'fail', 'blocked'):
-                state_path.unlink(missing_ok=True)
-                raise SystemExit(1)
-        except (json.JSONDecodeError, KeyError):
-            pass
-elif queue_kind == 'qa':
-    verify_json = tasks_root / task_id / 'verify.json'
-    if verify_json.exists():
-        try:
-            v = json.loads(verify_json.read_text(encoding='utf-8'))
-            verdict = str(v.get('verdict') or v.get('status') or '').strip().lower()
-            if verdict in ('pass', 'fail', 'blocked'):
-                state_path.unlink(missing_ok=True)
-                raise SystemExit(1)
-        except (json.JSONDecodeError, KeyError):
-            pass
 print(task_id)
 PY
+) || return 1
+
+    [ -n "$task_id" ] || return 1
+    if [ "$queue_kind" = "review" ]; then
+        local review_level state
+        review_level=$(task_json_pick "$TASKS_ROOT/$task_id" review_level)
+        state=$(review_state "$TASKS_ROOT/$task_id" "$review_level")
+        case "$state" in
+            invalid|pass|fail)
+                queue_state_clear_for_task "review" "$agent_id" "$task_id"
+                return 1
+                ;;
+        esac
+    else
+        local vstate
+        vstate=$(verify_state "$TASKS_ROOT/$task_id/verify.json")
+        case "$vstate" in
+            invalid|pass|fail)
+                queue_state_clear_for_task "qa" "$agent_id" "$task_id"
+                return 1
+                ;;
+        esac
+    fi
+    echo "$task_id"
 }
 
 queue_state_set() {
@@ -2054,6 +2155,14 @@ clear_qa_queue_state() {
     done <<< "$(list_qa_agents)"
 }
 
+clear_qa_queue_state_for_task() {
+    local task_id="$1"
+    while IFS= read -r qa_agent; do
+        [ -n "$qa_agent" ] || continue
+        queue_state_clear_for_task "qa" "$qa_agent" "$task_id"
+    done <<< "$(list_qa_agents)"
+}
+
 list_review_candidates_for_agent() {
     local agent_id="$1"
     python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
@@ -2073,7 +2182,12 @@ for task_path in tasks_root.glob('*/task.json'):
         continue
     if str(task.get('status') or '') != 'ready_for_merge':
         continue
-    if str(task.get('merge_gate_state') or '') != 'review_pending':
+    gate = str(task.get('merge_gate_state') or '')
+    quality_gate_mode = str(task.get('quality_gate_mode') or '').strip().lower()
+    allowed_gates = {'review_pending'}
+    if quality_gate_mode == 'parallel':
+        allowed_gates.add('quality_pending')
+    if gate not in allowed_gates:
         continue
     reviewers = task.get('reviewers') if isinstance(task.get('reviewers'), list) else []
     reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
@@ -2121,7 +2235,12 @@ for task_path in tasks_root.glob('*/task.json'):
         continue
     if str(task.get('status') or '') != 'ready_for_merge':
         continue
-    if str(task.get('merge_gate_state') or '') != 'qa_pending':
+    gate = str(task.get('merge_gate_state') or '')
+    quality_gate_mode = str(task.get('quality_gate_mode') or '').strip().lower()
+    allowed_gates = {'qa_pending'}
+    if quality_gate_mode == 'parallel':
+        allowed_gates.add('quality_pending')
+    if gate not in allowed_gates:
         continue
     claim_scope = task.get('claim_scope') if isinstance(task.get('claim_scope'), list) else []
     scope = [str(item).strip() for item in claim_scope if str(item).strip()]
@@ -2816,6 +2935,7 @@ run_task_watcher_loop() {
                 review_level=$(task_json_pick "$task_dir" review_level)
                 review_required=$(task_json_pick "$task_dir" review_required)
                 test_required=$(task_json_pick "$task_dir" test_required)
+                quality_gate_mode=$(task_quality_gate_mode "$task_dir")
 
                 if [ "$result_status" = "invalid" ]; then
                     if ! is_notified "$result_invalid_key"; then
@@ -2834,16 +2954,32 @@ run_task_watcher_loop() {
                         gate_decision_at=$(now_iso)
                         gate_state="pm_acceptance_pending"
                         next_status="ready_for_merge"
-                        if [ "$review_required" = "True" ] || [ "$review_required" = "true" ] || [ "$review_required" = "1" ]; then
+                        review_subgate="skipped"
+                        qa_subgate="skipped"
+                        if is_truthy "$review_required" && is_truthy "$test_required" && [ "$quality_gate_mode" = "parallel" ]; then
+                            gate_state="quality_pending"
+                            review_subgate="pending"
+                            qa_subgate="pending"
+                        elif is_truthy "$review_required"; then
                             gate_state="review_pending"
-                        elif [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
+                            review_subgate="pending"
+                            if is_truthy "$test_required"; then
+                                qa_subgate="pending"
+                            fi
+                        elif is_truthy "$test_required"; then
                             gate_state="qa_pending"
+                            qa_subgate="pending"
                         fi
-                        set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at"
+                        set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at" "$review_subgate" "$qa_subgate"
                         current_status="$next_status"
                         if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                             notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
                             emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
+                        elif [ "$gate_state" = "quality_pending" ]; then
+                            auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
+                            auto_dispatch_qa "$task_id"
+                            log "$task_id: 已进入并行质量闸门（review + QA）"
+                            auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                         elif [ "$gate_state" = "review_pending" ]; then
                             auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                             log "$task_id: 已进入 review 队列，review_level=$review_level"
@@ -2865,6 +3001,9 @@ run_task_watcher_loop() {
                     if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
                         result_push_title="【技术方案完成】"
                         result_push_next="请 PM 汇总并确认后续动作"
+                    elif [ "$gate_state" = "quality_pending" ]; then
+                        result_push_title="【进入并行质控】"
+                        result_push_next="已同时通知 review 与 QA 开始处理"
                     elif [ "$gate_state" = "review_pending" ]; then
                         result_push_title="【进入审查】"
                         result_push_next="已通知 reviewer 开始审查"
@@ -2956,22 +3095,50 @@ run_task_watcher_loop() {
                 elif [ "$state" = "pass" ]; then
                     clear_review_queue_state_for_task "$task_dir"
                     test_required=$(task_json_pick "$task_dir" test_required)
+                    quality_gate_mode=$(task_quality_gate_mode "$task_dir")
+                    current_qa_gate_state=$(qa_gate_state "$task_dir")
+                    current_status_now=$(get_task_status "$task_dir")
                     if [ "$test_required" = "True" ] || [ "$test_required" = "true" ] || [ "$test_required" = "1" ]; then
                         if [ "$review_route_pending" -eq 1 ]; then
                             gate_decision_at=$(now_iso)
-                            set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed review pass and queued qa" "qa_pending" "" "review" "$gate_decision_at"
-                            current_status="ready_for_merge"
-                            auto_dispatch_qa "$task_id"
-                            log "$task_id: review 通过，已进入 QA 队列"
+                            if [ "$current_status_now" != "ready_for_merge" ]; then
+                                set_task_gate_state "$task_dir" "" "watcher observed review pass while task not ready_for_merge" "__KEEP__" "__KEEP__" "review" "$gate_decision_at" "approved" "__KEEP__"
+                            elif [ "$quality_gate_mode" = "parallel" ]; then
+                                if [ "$current_qa_gate_state" = "passed" ]; then
+                                    set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel review pass with qa already passed" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "__KEEP__"
+                                    current_status="ready_for_merge"
+                                    notify_pm "[task-watcher] $task_id 审查与 QA 已通过，请查看任务目录并决定是否最终收口。"
+                                    emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                    log "$task_id: 并行质量闸门已全部完成，进入 PM 收口"
+                                else
+                                    set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel review pass and waiting for qa" "quality_pending" "" "review" "$gate_decision_at" "approved" "__KEEP__"
+                                    current_status="ready_for_merge"
+                                    if [ "$current_qa_gate_state" = "pending" ] || [ "$current_qa_gate_state" = "missing" ]; then
+                                        auto_dispatch_qa "$task_id"
+                                    fi
+                                    log "$task_id: review 通过，等待并行 QA 完成"
+                                fi
+                            else
+                                set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed review pass and queued qa" "qa_pending" "" "review" "$gate_decision_at" "approved" "pending"
+                                current_status="ready_for_merge"
+                                auto_dispatch_qa "$task_id"
+                                log "$task_id: review 通过，已进入 QA 队列"
+                            fi
                         fi
                         if [ "$review_push_pending" -eq 1 ]; then
-                            push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "已通知 QA 开始验证" || log "$task_id: review pass 事件飞书补推待重试"
+                            if [ "$quality_gate_mode" = "parallel" ] && [ "$current_qa_gate_state" = "passed" ]; then
+                                push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【质控完成待收口】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "审查与 QA 已通过，等待 PM 最终验收" || log "$task_id: review pass 事件飞书补推待重试"
+                            elif [ "$quality_gate_mode" = "parallel" ]; then
+                                push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过，等待QA】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "QA 完成后自动进入 PM 验收" || log "$task_id: review pass 事件飞书补推待重试"
+                            else
+                                push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "已通知 QA 开始验证" || log "$task_id: review pass 事件飞书补推待重试"
+                            fi
                         fi
                     else
                         auto_close_policy=$(task_json_pick "$task_dir" auto_close_policy)
                         if [ "$review_route_pending" -eq 1 ]; then
                             gate_decision_at=$(now_iso)
-                            set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at"
+                            set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "skipped"
                             if [ "$auto_close_policy" = "review_pass_only" ]; then
                                 if ! auto_close_review_only_task "$task_dir" "$task_id"; then
                                     notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
@@ -2990,7 +3157,7 @@ run_task_watcher_loop() {
                     clear_review_queue_state_for_task "$task_dir"
                     if [ "$review_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
-                        set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at"
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at" "rejected" "__KEEP__"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id 审查未通过，请查看 review 产物并仲裁。"
                         emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
@@ -3006,7 +3173,7 @@ run_task_watcher_loop() {
             fi
         fi
 
-        # 检测 verify.json → QA 通过自动收口；QA 失败通知 PM 仲裁
+        # 检测 verify.json → QA 通过推进 merge gate；QA 失败通知 PM 仲裁
         if [ -f "$task_dir/verify.json" ]; then
             verify_key="${task_id}_verify_route"
             verify_push_key="${task_id}_verify_push"
@@ -3031,42 +3198,50 @@ run_task_watcher_loop() {
                     fi
                 elif [ "$vstate" = "pass" ]; then
                     clear_qa_queue_state
+                    review_required=$(task_json_pick "$task_dir" review_required)
+                    review_level=$(task_json_pick "$task_dir" review_level)
+                    summary=$(json_pick "$task_dir/result.json" summary)
+                    quality_gate_mode=$(task_quality_gate_mode "$task_dir")
+                    current_review_gate_state=$(review_gate_state "$task_dir" "$review_level")
                     if [ "$verify_route_pending" -eq 1 ]; then
                         current_status=$(get_task_status "$task_dir")
-                        if [ "$current_status" = "ready_for_merge" ]; then
-                            _auto_close_retry_key="${task_id}_auto_close_retry"
-                            _retry_count=0
-                            if [ -f "$STATE_DIR/$_auto_close_retry_key" ]; then
-                                _retry_count=$(cat "$STATE_DIR/$_auto_close_retry_key" 2>/dev/null || echo 0)
+                        gate_decision_at=$(now_iso)
+                        if [ "$current_status" != "ready_for_merge" ]; then
+                            set_task_gate_state "$task_dir" "" "watcher observed qa pass while task not ready_for_merge" "__KEEP__" "__KEEP__" "qa" "$gate_decision_at" "__KEEP__" "passed"
+                        elif is_truthy "$review_required" && [ "$quality_gate_mode" = "parallel" ]; then
+                            if [ "$current_review_gate_state" = "approved" ]; then
+                                set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel qa pass with review already approved" "pm_acceptance_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
+                                notify_pm "[task-watcher] $task_id 审查与 QA 已通过，请查看任务目录并决定是否最终收口。"
+                                emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                log "$task_id: QA 通过，并行质量闸门已全部完成"
+                            else
+                                set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel qa pass and waiting for review" "quality_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
+                                if [ "$current_review_gate_state" = "pending" ]; then
+                                    auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
+                                fi
+                                log "$task_id: QA 通过，等待并行审查完成"
                             fi
-                            if [ "$_retry_count" -ge 3 ]; then
-                                _gate_decision_at=$(now_iso)
-                                set_task_gate_state "$task_dir" "blocked" "auto_close failed 3 times" "blocked" "auto_close_failure" "watcher" "$_gate_decision_at"
-                                notify_pm "[task-watcher] $task_id 自动收口连续失败 3 次，已标记 blocked，请检查 close-task.sh 与任务状态。"
-                                emit_system_chat_event watcher "$task_id" "自动收口连续失败 3 次，已标记 blocked。" "$PM_SESSION" degraded notify
-                                rm -f "$STATE_DIR/$_auto_close_retry_key"
-                                current_status="blocked"
-                                continue
-                            fi
-                            if ! auto_close_task "$task_dir" "$task_id" "$vsummary"; then
-                                _retry_count=$(( _retry_count + 1 ))
-                                echo "$_retry_count" > "$STATE_DIR/$_auto_close_retry_key"
-                                notify_pm "[task-watcher] $task_id QA 已通过，但自动收口失败（第 ${_retry_count}/3 次），请检查 close-task.sh 与任务状态。"
-                                emit_system_chat_event watcher "$task_id" "QA 已通过但自动收口失败（${_retry_count}/3）。" "$PM_SESSION" degraded notify
-                                continue
-                            fi
-                            rm -f "$STATE_DIR/$_auto_close_retry_key"
                         else
-                            notify_pm "[task-watcher] $task_id QA 已通过但未自动收口，请检查任务状态。"
-                            emit_system_chat_event watcher "$task_id" "QA 已通过但未自动收口。" "$PM_SESSION" degraded notify
-                            continue
+                            set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed qa verify pass" "pm_acceptance_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
+                            notify_pm "[task-watcher] $task_id QA 已通过，请查看任务目录并决定是否最终收口。"
+                            emit_system_chat_event watcher "$task_id" "QA 已通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                            log "$task_id: QA 通过，进入 PM 收口"
+                        fi
+                    fi
+                    if [ "$verify_push_pending" -eq 1 ]; then
+                        if is_truthy "$review_required" && [ "$quality_gate_mode" = "parallel" ] && [ "$current_review_gate_state" = "approved" ]; then
+                            push_task_event_with_retry "$verify_push_key" "$task_dir/verify.json" "【质控完成待收口】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "审查与 QA 已通过，等待 PM 最终验收" || log "$task_id: QA pass 事件飞书补推待重试"
+                        elif is_truthy "$review_required" && [ "$quality_gate_mode" = "parallel" ]; then
+                            push_task_event_with_retry "$verify_push_key" "$task_dir/verify.json" "【QA通过，等待审查】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "审查通过后自动进入 PM 验收" || log "$task_id: QA pass 事件飞书补推待重试"
+                        else
+                            push_task_event_with_retry "$verify_push_key" "$task_dir/verify.json" "【QA通过待收口】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "等待 PM 最终验收" || log "$task_id: QA pass 事件飞书补推待重试"
                         fi
                     fi
                 elif [ "$vstate" = "fail" ]; then
                     clear_qa_queue_state
                     if [ "$verify_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
-                        set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at"
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at" "__KEEP__" "failed"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
                         emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify

@@ -84,6 +84,16 @@ def dedupe(values: list[str]) -> list[str]:
     return output
 
 
+def derive_quality_gate_mode(*, task_type: str, execution_mode: str, target_environment: str, task_level: str, review_required: bool, test_required: bool) -> str:
+    if not (review_required and test_required):
+        return 'single'
+    if target_environment == 'prod' or execution_mode == 'deploy':
+        return 'serial'
+    if task_type in {'deployment', 'integration'} or task_level == 'integration':
+        return 'serial'
+    return 'parallel'
+
+
 def normalize_task_type(raw: str) -> Optional[str]:
     stripped = str(raw).strip().lower()
     if not stripped:
@@ -325,6 +335,16 @@ else:
         task['reviewer'] = reviewers[0]
 
 task['review_deadline'] = normalize_iso(task.get('review_deadline')) if task.get('review_deadline') else None
+task['quality_gate_mode'] = derive_quality_gate_mode(
+    task_type=task_type,
+    execution_mode=execution_mode,
+    target_environment=target_environment,
+    task_level=task_level,
+    review_required=bool(task.get('review_required')),
+    test_required=bool(task.get('test_required')),
+)
+task['review_gate_state'] = 'skipped' if not bool(task.get('review_required')) else task.get('review_gate_state')
+task['qa_gate_state'] = 'skipped' if not bool(task.get('test_required')) else task.get('qa_gate_state')
 
 now = datetime.now().astimezone().isoformat(timespec='seconds')
 previous = task['status']

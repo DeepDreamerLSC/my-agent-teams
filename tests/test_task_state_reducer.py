@@ -40,6 +40,20 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
         self.assertEqual(payload['actions'][0]['type'], 'dispatch_review')
 
+    def test_result_success_parallel_quality_gate_dispatches_review_and_qa(self):
+        task_dir = self._copy_fixture('result-success-review-pending')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task['quality_gate_mode'] = 'parallel'
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['patches']['status'], 'ready_for_merge')
+        self.assertEqual(payload['patches']['merge_gate_state'], 'quality_pending')
+        self.assertEqual(payload['patches']['review_gate_state'], 'pending')
+        self.assertEqual(payload['patches']['qa_gate_state'], 'pending')
+        self.assertEqual([action['type'] for action in payload['actions'][:2]], ['dispatch_review', 'dispatch_qa'])
+
     def test_review_rejected_routes_to_blocked(self):
         task_dir = self._copy_fixture('review-rejected')
         payload = run_reducer(task_dir)
@@ -174,6 +188,83 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertEqual(payload['artifacts']['review']['normalized_status'], 'pending')
         self.assertEqual(payload['patches']['merge_gate_state'], 'review_pending')
         self.assertTrue(any(item['type'] == 'dispatch_review' for item in payload['actions']))
+
+    def test_parallel_quality_gate_review_only_completion_keeps_quality_pending(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task.update({
+            'status': 'ready_for_merge',
+            'merge_gate_state': 'quality_pending',
+            'quality_gate_mode': 'parallel',
+        })
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').write_text(json.dumps({
+            'task_id': 'task-review-rejected',
+            'reviewer': 'review-1',
+            'status': 'approve',
+            'summary': 'review ok',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'verify.json').unlink(missing_ok=True)
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['patches']['merge_gate_state'], 'quality_pending')
+        self.assertEqual(payload['patches']['review_gate_state'], 'approved')
+        self.assertEqual(payload['patches']['qa_gate_state'], 'pending')
+        self.assertTrue(any(item['type'] == 'dispatch_qa' for item in payload['actions']))
+
+    def test_parallel_quality_gate_qa_only_completion_keeps_quality_pending(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task.update({
+            'status': 'ready_for_merge',
+            'merge_gate_state': 'quality_pending',
+            'quality_gate_mode': 'parallel',
+        })
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').unlink(missing_ok=True)
+        (task_dir / 'verify.json').write_text(json.dumps({
+            'task_id': 'task-review-rejected',
+            'tester': 'qa-1',
+            'status': 'pass',
+            'summary': 'qa ok',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['patches']['merge_gate_state'], 'quality_pending')
+        self.assertEqual(payload['patches']['review_gate_state'], 'pending')
+        self.assertEqual(payload['patches']['qa_gate_state'], 'passed')
+        self.assertTrue(any(item['type'] == 'dispatch_review' for item in payload['actions']))
+
+    def test_parallel_quality_gate_complete_routes_to_pm_acceptance(self):
+        task_dir = self._copy_fixture('review-rejected')
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task.update({
+            'status': 'ready_for_merge',
+            'merge_gate_state': 'quality_pending',
+            'quality_gate_mode': 'parallel',
+        })
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'review.json').write_text(json.dumps({
+            'task_id': 'task-review-rejected',
+            'reviewer': 'review-1',
+            'status': 'approve',
+            'summary': 'review ok',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        (task_dir / 'verify.json').write_text(json.dumps({
+            'task_id': 'task-review-rejected',
+            'tester': 'qa-1',
+            'status': 'pass',
+            'summary': 'qa ok',
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir)
+
+        self.assertEqual(payload['patches']['merge_gate_state'], 'pm_acceptance_pending')
+        self.assertEqual(payload['patches']['review_gate_state'], 'approved')
+        self.assertEqual(payload['patches']['qa_gate_state'], 'passed')
+        self.assertTrue(any(item['type'] == 'notify_pm_acceptance' for item in payload['actions']))
 
 
 if __name__ == '__main__':

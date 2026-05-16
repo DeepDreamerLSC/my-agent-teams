@@ -50,6 +50,7 @@ class TaskDetailQueryTests(unittest.TestCase):
                 'last_gate_actor': 'review',
                 'last_gate_decision_at': '2026-05-04T01:10:00+08:00',
                 'auto_close_policy': 'manual_after_review',
+                'quality_gate_mode': 'parallel',
                 'created_at': '2026-05-04T00:00:00+08:00',
                 'dispatched_at': '2026-05-04T00:10:00+08:00',
                 'ack_at': '2026-05-04T00:20:00+08:00',
@@ -64,6 +65,8 @@ class TaskDetailQueryTests(unittest.TestCase):
                 'summary': 'done',
                 'review_state': None,
                 'verify_ok': None,
+                'review_gate_state': 'approved',
+                'qa_gate_state': 'pending',
                 'task_dir': '/tmp/task-1',
                 'task_json_path': '/tmp/task-1/task.json',
                 'write_scope_json': '[]',
@@ -157,6 +160,9 @@ class TaskDetailQueryTests(unittest.TestCase):
         self.assertEqual(detail['task']['target_environment'], 'dev')
         self.assertEqual(detail['task']['review_level'], 'standard')
         self.assertEqual(detail['task']['merge_gate_state'], 'qa_pending')
+        self.assertEqual(detail['task']['quality_gate_mode'], 'parallel')
+        self.assertEqual(detail['task']['review_gate_state'], 'approved')
+        self.assertEqual(detail['task']['qa_gate_state'], 'pending')
 
     def test_query_handles_empty_communications(self):
         empty = build_task_communications_payload(self.conn, 'missing-task')
@@ -204,6 +210,7 @@ class TaskDetailApiTests(unittest.TestCase):
                 'last_gate_actor': None,
                 'last_gate_decision_at': None,
                 'auto_close_policy': 'manual_after_review',
+                'quality_gate_mode': 'single',
                 'created_at': '2026-05-04T00:00:00+08:00',
                 'dispatched_at': '2026-05-04T00:05:00+08:00',
                 'ack_at': '2026-05-04T00:10:00+08:00',
@@ -218,6 +225,8 @@ class TaskDetailApiTests(unittest.TestCase):
                 'summary': None,
                 'review_state': None,
                 'verify_ok': None,
+                'review_gate_state': 'skipped',
+                'qa_gate_state': 'skipped',
                 'task_dir': '/tmp/task-2',
                 'task_json_path': '/tmp/task-2/task.json',
                 'write_scope_json': '[]',
@@ -262,6 +271,7 @@ class TaskDetailApiTests(unittest.TestCase):
                 'last_gate_actor': None,
                 'last_gate_decision_at': None,
                 'auto_close_policy': 'manual_after_review',
+                'quality_gate_mode': 'single',
                 'created_at': '2026-05-04T00:00:00+08:00',
                 'dispatched_at': None,
                 'ack_at': None,
@@ -276,6 +286,8 @@ class TaskDetailApiTests(unittest.TestCase):
                 'summary': None,
                 'review_state': None,
                 'verify_ok': None,
+                'review_gate_state': 'skipped',
+                'qa_gate_state': 'skipped',
                 'task_dir': str(pooled_dir),
                 'task_json_path': str(pooled_dir / 'task.json'),
                 'write_scope_json': '[]',

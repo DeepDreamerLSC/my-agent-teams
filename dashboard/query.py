@@ -71,6 +71,14 @@ def _is_skip_review_task(task: dict[str, Any]) -> bool:
     return not bool(task.get('review_required')) or review_level == 'skip'
 
 
+def _is_parallel_quality_gate(task: dict[str, Any]) -> bool:
+    return (
+        bool(task.get('review_required'))
+        and bool(task.get('test_required'))
+        and str(task.get('quality_gate_mode') or '').strip().lower() == 'parallel'
+    )
+
+
 def _gantt_end_reference(task: dict[str, Any], generated_at: str) -> str | None:
     if task.get('current_status') in TERMINAL_GANTT_STATUSES or task.get('board_status') == 'done':
         for field in GANTT_END_REFERENCE_FIELDS:
@@ -93,6 +101,21 @@ def _time_source(field: str, *, source: str = 'tasks_read_model', precision: str
         'source': source,
         'precision': precision,
     }
+
+
+def _latest_time_and_field(*pairs: tuple[str, str | None]) -> tuple[str | None, str | None]:
+    best_dt: datetime | None = None
+    best_value: str | None = None
+    best_field: str | None = None
+    for field, value in pairs:
+        parsed = _parse_time(value)
+        if parsed is None:
+            continue
+        if best_dt is None or parsed > best_dt:
+            best_dt = parsed
+            best_value = parsed.isoformat(timespec='seconds')
+            best_field = field
+    return best_value, best_field
 
 
 def _append_phase_segment(
@@ -135,6 +158,7 @@ def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list
     end_reference = _gantt_end_reference(task, generated_at)
     end_reference_field = _gantt_end_reference_field(task)
     skip_review = _is_skip_review_task(task)
+    parallel_quality_gate = _is_parallel_quality_gate(task)
     test_required = bool(task.get('test_required'))
     gate = str(task.get('merge_gate_state') or '')
     current_status = str(task.get('current_status') or '')
@@ -184,8 +208,11 @@ def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list
     )
 
     if not skip_review:
-        review_wait_end = task.get('review_completed_at') or task.get('verify_completed_at') or end_reference
-        review_wait_end_field = 'review_completed_at' if task.get('review_completed_at') else 'verify_completed_at' if task.get('verify_completed_at') else end_reference_field
+        review_wait_end = task.get('review_completed_at')
+        review_wait_end_field = 'review_completed_at' if review_wait_end else None
+        if not review_wait_end and gate in {'review_pending', 'review_rejected', 'quality_pending'}:
+            review_wait_end = end_reference
+            review_wait_end_field = end_reference_field
         _append_phase_segment(
             segments,
             key='review',
@@ -194,12 +221,13 @@ def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list
             start=task.get('completed_at'),
             end=review_wait_end,
             start_source=_time_source('completed_at'),
-            end_source=_time_source(review_wait_end_field, precision='inferred' if review_wait_end_field == 'generated_at' else 'exact'),
+            end_source=_time_source(review_wait_end_field, precision='inferred' if review_wait_end_field == 'generated_at' else 'exact') if review_wait_end_field else None,
         )
 
-    qa_start = task.get('review_completed_at') if not skip_review else task.get('completed_at')
+    qa_start_field = 'completed_at' if skip_review or parallel_quality_gate else 'review_completed_at'
+    qa_start = task.get(qa_start_field)
     qa_end = task.get('verify_completed_at')
-    if not qa_end and test_required and gate in {'qa_pending', 'qa_failed'}:
+    if not qa_end and test_required and gate in {'qa_pending', 'qa_failed', 'quality_pending'}:
         qa_end = end_reference
     _append_phase_segment(
         segments,
@@ -208,13 +236,22 @@ def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list
         color=GANTT_PHASE_DEFS['qa']['color'],
         start=qa_start,
         end=qa_end,
-        start_source=_time_source('review_completed_at' if not skip_review else 'completed_at'),
+        start_source=_time_source(qa_start_field),
         end_source=_time_source('verify_completed_at') if task.get('verify_completed_at') else generated_source,
     )
 
-    acceptance_start = task.get('verify_completed_at')
+    acceptance_start_field: str | None = None
+    if parallel_quality_gate:
+        acceptance_start, acceptance_start_field = _latest_time_and_field(
+            ('review_completed_at', task.get('review_completed_at')),
+            ('verify_completed_at', task.get('verify_completed_at')),
+        )
+    else:
+        acceptance_start = task.get('verify_completed_at')
+        acceptance_start_field = 'verify_completed_at' if acceptance_start else None
     if not acceptance_start and not test_required:
         acceptance_start = task.get('review_completed_at') if not skip_review else task.get('completed_at')
+        acceptance_start_field = 'review_completed_at' if task.get('review_completed_at') and not skip_review else 'completed_at'
     acceptance_end = None
     if acceptance_start and (
         gate == 'pm_acceptance_pending'
@@ -229,7 +266,7 @@ def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list
         color=GANTT_PHASE_DEFS['pm_acceptance']['color'],
         start=acceptance_start,
         end=acceptance_end,
-        start_source=_time_source('verify_completed_at' if task.get('verify_completed_at') else 'review_completed_at' if task.get('review_completed_at') else 'completed_at'),
+        start_source=_time_source(acceptance_start_field or 'completed_at'),
         end_source=_time_source(end_reference_field, precision='inferred' if end_reference_field == 'generated_at' else 'exact'),
     )
     return segments
@@ -289,6 +326,9 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'last_gate_actor': row['last_gate_actor'],
         'last_gate_decision_at': row['last_gate_decision_at'],
         'auto_close_policy': row['auto_close_policy'],
+        'quality_gate_mode': row['quality_gate_mode'],
+        'review_gate_state': row['review_gate_state'],
+        'qa_gate_state': row['qa_gate_state'],
         'summary': row['summary'],
         'created_at': row['created_at'],
         'dispatched_at': row['dispatched_at'],
@@ -490,16 +530,28 @@ def fetch_communication_events(
 
 def _build_stage_durations(task: dict[str, Any]) -> dict[str, Any]:
     persisted = dict(task.get('persisted_stage_durations') or {})
+    parallel_quality_gate = _is_parallel_quality_gate(task)
+    acceptance_start, _ = _latest_time_and_field(
+        ('review_completed_at', task.get('review_completed_at') if bool(task.get('review_required')) else None),
+        ('verify_completed_at', task.get('verify_completed_at') if bool(task.get('test_required')) else None),
+    )
+    if not acceptance_start and not bool(task.get('test_required')):
+        acceptance_start = task.get('review_completed_at') if not _is_skip_review_task(task) else task.get('completed_at')
     computed = {
         'create_to_dispatch_seconds': _seconds_between(task.get('created_at'), task.get('dispatched_at')),
         'dispatch_to_ack_seconds': _seconds_between(task.get('dispatched_at'), task.get('ack_at')),
         'ack_to_result_seconds': _seconds_between(task.get('ack_at'), task.get('completed_at')),
         'result_to_review_seconds': _seconds_between(task.get('completed_at'), task.get('review_completed_at')),
-        'review_to_verify_seconds': _seconds_between(task.get('review_completed_at'), task.get('verify_completed_at')),
+        'review_to_verify_seconds': None if parallel_quality_gate else _seconds_between(task.get('review_completed_at'), task.get('verify_completed_at')),
+        'result_to_qa_seconds': _seconds_between(task.get('completed_at'), task.get('verify_completed_at')) if bool(task.get('test_required')) else None,
+        'quality_to_acceptance_seconds': _seconds_between(acceptance_start, task.get('current_status_at')) if acceptance_start else None,
         'verify_to_close_seconds': _seconds_between(task.get('verify_completed_at'), task.get('current_status_at')),
         'total_cycle_seconds': _seconds_between(task.get('created_at'), task.get('current_status_at')),
     }
-    durations = {key: persisted.get(key) if persisted.get(key) is not None else computed.get(key) for key in computed}
+    durations = {
+        key: persisted.get(key) if key in persisted and persisted.get(key) is not None else computed.get(key)
+        for key in computed
+    }
     durations_hours = {
         key.replace('_seconds', '_hours'): _duration_hours(value)
         for key, value in durations.items()
@@ -633,6 +685,13 @@ def build_gantt_payload(
         milestone_completed = task['completed_at']
         milestone_review = task['review_completed_at']
         milestone_verify = task['verify_completed_at']
+        qa_milestone_start = milestone_completed if _is_skip_review_task(task) or _is_parallel_quality_gate(task) else milestone_review
+        acceptance_milestone_start, _ = _latest_time_and_field(
+            ('review_completed_at', milestone_review if bool(task.get('review_required')) else None),
+            ('verify_completed_at', milestone_verify if bool(task.get('test_required')) else None),
+        )
+        if not acceptance_milestone_start and not bool(task.get('test_required')):
+            acceptance_milestone_start = milestone_review if not _is_skip_review_task(task) else milestone_completed
         phase_segments = _build_gantt_phase_segments(task, generated_at)
         end_reference = _gantt_end_reference(task, generated_at)
         span_start = phase_segments[0]['start_at'] if phase_segments else (milestone_ack or milestone_dispatched or milestone_created)
@@ -658,8 +717,8 @@ def build_gantt_payload(
                 'reserved': milestone_dispatched,
                 'working': milestone_ack,
                 'review': milestone_completed,
-                'qa': milestone_review if not _is_skip_review_task(task) else milestone_completed,
-                'pm_acceptance': milestone_verify or milestone_review or milestone_completed,
+                'qa': qa_milestone_start,
+                'pm_acceptance': acceptance_milestone_start,
                 'dispatched': milestone_dispatched,
                 'ack': milestone_ack,
                 'completed': milestone_completed,
@@ -960,7 +1019,7 @@ def _summarize_aggregate_tasks(tasks: list[dict[str, Any]]) -> dict[str, Any]:
     for task in tasks:
         stage_durations = _build_stage_durations(task)
         review_wait = stage_durations.get('result_to_review_seconds')
-        qa_wait = stage_durations.get('review_to_verify_seconds')
+        qa_wait = stage_durations.get('result_to_qa_seconds') if _is_parallel_quality_gate(task) else stage_durations.get('review_to_verify_seconds')
         if review_wait is not None:
             review_waits.append(review_wait)
         if qa_wait is not None:

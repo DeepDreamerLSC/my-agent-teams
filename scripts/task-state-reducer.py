@@ -29,6 +29,28 @@ def attention_item(task_id: str, reason_type: str, summary: str, severity: str =
     }
 
 
+def _review_gate_state_from_artifact(review: dict) -> str:
+    normalized = str(review.get('normalized_status') or '').strip().lower()
+    if normalized == 'approve':
+        return 'approved'
+    if normalized == 'request_changes':
+        return 'rejected'
+    if normalized == 'blocked':
+        return 'blocked'
+    return 'pending'
+
+
+def _qa_gate_state_from_artifact(verify: dict) -> str:
+    normalized = str(verify.get('normalized_status') or '').strip().lower()
+    if normalized == 'pass':
+        return 'passed'
+    if normalized == 'fail':
+        return 'failed'
+    if normalized == 'blocked':
+        return 'blocked'
+    return 'pending'
+
+
 def reduce_task_state(task_dir: Path) -> dict:
     task_info = task_artifacts.parse_task(task_dir)
     task = task_info['task']
@@ -37,6 +59,7 @@ def reduce_task_state(task_dir: Path) -> dict:
     gate = task.get('merge_gate_state')
     review_required = boolish(task.get('review_required'))
     test_required = boolish(task.get('test_required'))
+    quality_gate_mode = str(task.get('quality_gate_mode') or '').strip().lower()
     task_level = str(task.get('task_level') or '').strip().lower()
     assigned_agent = str(task.get('assigned_agent') or '').strip()
 
@@ -79,19 +102,30 @@ def reduce_task_state(task_dir: Path) -> dict:
         reason = 'ack_current_round'
     elif result.get('normalized_status') == 'success' and result.get('is_current_round', True):
         patches['status'] = 'ready_for_merge'
-        if review_required:
+        patches['rework_reason'] = None
+        if review_required and test_required and quality_gate_mode == 'parallel':
+            patches['merge_gate_state'] = 'quality_pending'
+            patches['review_gate_state'] = 'pending'
+            patches['qa_gate_state'] = 'pending'
+            actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+            actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+            reason = 'result.success + quality_pending'
+        elif review_required:
             patches['merge_gate_state'] = 'review_pending'
-            patches['rework_reason'] = None
+            patches['review_gate_state'] = 'pending'
+            patches['qa_gate_state'] = 'pending' if test_required else 'skipped'
             actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
             reason = 'result.success + review_required'
         elif test_required:
             patches['merge_gate_state'] = 'qa_pending'
-            patches['rework_reason'] = None
+            patches['review_gate_state'] = 'skipped'
+            patches['qa_gate_state'] = 'pending'
             actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
             reason = 'result.success + qa_required'
         else:
             patches['merge_gate_state'] = 'pm_acceptance_pending'
-            patches['rework_reason'] = None
+            patches['review_gate_state'] = 'skipped'
+            patches['qa_gate_state'] = 'skipped'
             actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
             reason = 'result.success + pm_acceptance'
         if assigned_agent:
@@ -111,41 +145,85 @@ def reduce_task_state(task_dir: Path) -> dict:
     elif status == 'ready_for_merge':
         review_state = review.get('normalized_status')
         verify_state = verify.get('normalized_status')
-        if review_state == 'request_changes':
+        review_gate_state = 'skipped' if not review_required else _review_gate_state_from_artifact(review)
+        qa_gate_state = 'skipped' if not test_required else _qa_gate_state_from_artifact(verify)
+
+        patches['review_gate_state'] = review_gate_state
+        patches['qa_gate_state'] = qa_gate_state
+
+        if review_gate_state == 'rejected':
             patches['status'] = 'blocked'
             patches['merge_gate_state'] = 'review_rejected'
+            patches['review_gate_state'] = 'rejected'
             patches['rework_reason'] = 'review'
             reason = 'review.request_changes'
             attention_items.append(attention_item(task_id, 'blocked', '审查驳回，需要 PM 仲裁', 'L3'))
-        elif review_state == 'blocked':
+        elif review_gate_state == 'blocked':
             patches['status'] = 'blocked'
             patches['merge_gate_state'] = 'blocked'
+            patches['review_gate_state'] = 'blocked'
             patches['rework_reason'] = 'review'
             reason = 'review.blocked'
             attention_items.append(attention_item(task_id, 'blocked', '审查阻塞，需要 PM/arch 仲裁', 'L3'))
-        elif (not review_required or review_state == 'approve') and test_required:
-            if verify_state == 'pass':
+        elif qa_gate_state in {'failed', 'blocked'}:
+            patches['status'] = 'blocked'
+            patches['merge_gate_state'] = 'qa_failed'
+            patches['qa_gate_state'] = qa_gate_state
+            patches['rework_reason'] = 'qa'
+            reason = 'verify.fail'
+            attention_items.append(attention_item(task_id, 'blocked', 'QA 未通过，需要 PM 仲裁', 'L3'))
+        elif review_required and test_required and quality_gate_mode == 'parallel':
+            if review_gate_state == 'approved' and qa_gate_state == 'passed':
                 patches['merge_gate_state'] = 'pm_acceptance_pending'
-                actions.append({'type': 'eligible_for_close', 'to': task.get('owner_pm') or 'pm-chief'})
-                reason = 'verify.pass'
-            elif verify_state in {'fail', 'blocked'}:
-                patches['status'] = 'blocked'
-                patches['merge_gate_state'] = 'qa_failed'
-                patches['rework_reason'] = 'qa'
-                reason = 'verify.fail'
-                attention_items.append(attention_item(task_id, 'blocked', 'QA 未通过，需要 PM 仲裁', 'L3'))
+                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                reason = 'quality_gates_complete'
             else:
+                patches['merge_gate_state'] = 'quality_pending'
+                if review_gate_state == 'pending':
+                    actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+                if qa_gate_state == 'pending':
+                    actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+                reason = 'quality_pending'
+        elif review_required and test_required:
+            if review_gate_state == 'approved' and qa_gate_state == 'passed':
+                patches['merge_gate_state'] = 'pm_acceptance_pending'
+                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                reason = 'serial_quality_gates_complete'
+            elif review_gate_state == 'approved':
                 patches['merge_gate_state'] = 'qa_pending'
+                patches['qa_gate_state'] = 'pending'
                 actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
-                reason = 'qa_pending'
-        elif not test_required and (not review_required or review_state == 'approve'):
+                reason = 'serial_qa_pending'
+            else:
+                patches['merge_gate_state'] = 'review_pending'
+                actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+                reason = 'review_pending'
+        elif not test_required and review_gate_state == 'approved':
             patches['merge_gate_state'] = 'pm_acceptance_pending'
-            actions.append({'type': 'eligible_for_close', 'to': task.get('owner_pm') or 'pm-chief'})
+            actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
             reason = 'review_only_complete'
-        elif review_required and review_state in {'pending', 'missing'}:
+        elif review_required and review_gate_state == 'pending':
             patches['merge_gate_state'] = 'review_pending'
             actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
             reason = 'review_pending'
+        elif review_required and not test_required and review_state == 'approve':
+            patches['merge_gate_state'] = 'pm_acceptance_pending'
+            patches['review_gate_state'] = 'approved'
+            patches['qa_gate_state'] = 'skipped'
+            actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+            reason = 'review_only_complete'
+        elif test_required and not review_required:
+            if qa_gate_state == 'passed':
+                patches['merge_gate_state'] = 'pm_acceptance_pending'
+                patches['review_gate_state'] = 'skipped'
+                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                reason = 'qa_only_complete'
+            else:
+                patches['merge_gate_state'] = 'qa_pending'
+                patches['review_gate_state'] = 'skipped'
+                patches['qa_gate_state'] = 'pending'
+                actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+                reason = 'qa_pending'
 
     return {
         'task_id': task_id,

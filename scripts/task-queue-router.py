@@ -13,9 +13,10 @@ LIB_DIR = Path(__file__).resolve().parent / "lib"
 if str(LIB_DIR) not in sys.path:
     sys.path.insert(0, str(LIB_DIR))
 try:
-    from task_artifacts import parse_review
+    from task_artifacts import parse_review, parse_verify
 except Exception:  # pragma: no cover - fallback keeps the queue router usable standalone.
     parse_review = None
+    parse_verify = None
 
 
 def load_json(path: Path) -> dict:
@@ -54,6 +55,28 @@ def review_artifact_terminal(task_dir: Path) -> bool:
         if status in TERMINAL_REVIEW_STATUSES and not _artifact_stale_after_current_result(task_dir, artifact_path, payload):
             return True
     return False
+
+
+def qa_artifact_terminal(task_dir: Path) -> bool:
+    if parse_verify is not None:
+        try:
+            parsed = parse_verify(task_dir)
+            status = str(parsed.get("normalized_status") or "").strip().lower()
+            source = str(parsed.get("source") or "").strip().lower()
+        except Exception:
+            status = ""
+            source = ""
+        if status in {"pass", "fail", "blocked"} and source != "stale_json":
+            return True
+    artifact_path = task_dir / "verify.json"
+    if not artifact_path.exists():
+        return False
+    try:
+        payload = load_json(artifact_path)
+    except Exception:
+        return False
+    status = str(payload.get("status") or payload.get("verdict") or "").strip().lower()
+    return status in {"pass", "fail", "blocked"} and not _artifact_stale_after_current_result(task_dir, artifact_path, payload)
 
 
 def _artifact_round(payload: dict) -> int | None:
@@ -123,8 +146,11 @@ def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
         if str(task.get("status") or "") != "ready_for_merge":
             continue
         gate = str(task.get("merge_gate_state") or "")
+        quality_gate_mode = str(task.get("quality_gate_mode") or "").strip().lower()
         if queue_kind == "review":
-            if gate != "review_pending":
+            if gate not in {"review_pending", "quality_pending"}:
+                continue
+            if gate == "quality_pending" and quality_gate_mode != "parallel":
                 continue
             if review_artifact_terminal(task_path.parent):
                 continue
@@ -138,7 +164,11 @@ def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
                 continue
             queued_at = str(task.get("updated_at") or task.get("created_at") or "")
         else:
-            if gate != "qa_pending":
+            if gate not in {"qa_pending", "quality_pending"}:
+                continue
+            if gate == "quality_pending" and quality_gate_mode != "parallel":
+                continue
+            if qa_artifact_terminal(task_path.parent):
                 continue
             claim_scope = task.get("claim_scope") if isinstance(task.get("claim_scope"), list) else []
             scope = [str(item).strip() for item in claim_scope if str(item).strip()]
