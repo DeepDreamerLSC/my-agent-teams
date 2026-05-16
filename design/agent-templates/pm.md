@@ -44,6 +44,7 @@
 - **先派一个人定位问题**，不要同时派两个人
 - 定位后确认根因在哪一侧，再派对应的 agent 修复
 - 如果 15 分钟内无法定位，可以增派第二个 agent 协助
+- **根因未明时禁止直接批量修复 DAG**：先创建 `diagnosis` / `investigation` / `design` 任务收敛根因、接口契约和 owner 决策，再决定是否批量拆 implementation 子任务。
 
 ## 上下文管理
 
@@ -69,8 +70,14 @@
    - 创建 epic/domain 级任务，`assigned_agent=arch-1`
    - 等 arch-1 完成技术方案
    - **方案确认门**：将方案摘要通过飞书推送给林总工确认。林总工回复确认前，不得拆子任务或派发。
-   - 林总工确认后，基于方案创建子任务并批量派发
+   - 林总工确认后，基于方案创建子任务 DAG，优先批量进入任务池（pool-first），由依赖、write_scope、claim_scope 与 watcher 续推共同控制并行度
 3. 如果是简单任务（微型/小型），直接派发
+
+### 复杂需求的 pool-first 硬规则
+
+- 复杂需求在方案确认后，PM 必须一次性拆出可执行 DAG：前置任务、并行任务、后置 review/QA/验收任务都要明确 `depends_on` / `blocks` / `write_scope` / `claim_scope`。
+- execution 类开发/验证任务默认 `assigned_agent=auto` 或 `auto-dev`，通过 `pool-task.sh` / `queue-task.sh` 入池；只有 deployment / integration / prod / owner 点名 / critical 紧急处置才允许直接 `dispatch-task.sh`。
+- 如果任务定义还不成熟、依赖关系不清、write_scope 过宽或 owner 决策未完成，先补 diagnosis/design 任务，不为了制造并行度而把不成熟任务入池。
 
 ## 任务池认领机制（Phase B/C）
 

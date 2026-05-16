@@ -68,6 +68,24 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
         )
         return json.loads(completed.stdout)
 
+    def _pool_detail(task_id: str):
+        try:
+            payload = _run_control_script(
+                'task-pool-view.py',
+                '--json',
+                '--explain',
+                task_id,
+                '--tasks-root',
+                app.config['TASKS_ROOT'],
+                '--config',
+                app.config['TASK_CONTROL_CONFIG_PATH'],
+            )
+        except (subprocess.CalledProcessError, json.JSONDecodeError):
+            return None
+        if isinstance(payload, list) and payload:
+            return payload[0]
+        return None
+
     def _board_payload():
         return _with_connection(
             lambda conn: build_board_payload(
@@ -134,7 +152,7 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     def api_pool():
         payload = _run_control_script(
             'task-pool-view.py',
-            '--json',
+            '--summary-json',
             '--tasks-root',
             app.config['TASKS_ROOT'],
             '--config',
@@ -142,7 +160,8 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
         )
         return jsonify({
             'generated_at': utcnow_iso(),
-            'items': payload,
+            'summary': payload.get('summary') or {},
+            'items': payload.get('items') or [],
         })
 
     @app.get('/api/pm-inbox')
@@ -205,6 +224,8 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
         )
         if payload.get('task') is None:
             return jsonify({'error': 'task not found', 'task_id': task_id}), 404
+        if (payload.get('task') or {}).get('current_status') == 'pooled':
+            payload['pool_status'] = _pool_detail(task_id)
         return jsonify(payload)
 
 

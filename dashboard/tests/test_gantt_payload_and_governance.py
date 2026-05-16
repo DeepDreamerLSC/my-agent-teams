@@ -72,6 +72,7 @@ class GanttPayloadTests(unittest.TestCase):
             upsert_task(self.conn, _task_record(
                 task_id='skip-review',
                 review_required=0,
+                test_required=0,
                 review_level='skip',
                 current_status='done',
                 board_status='done',
@@ -82,8 +83,12 @@ class GanttPayloadTests(unittest.TestCase):
         payload = build_gantt_payload(self.conn)
         item = payload['items'][0]
         keys = [segment['key'] for segment in item['phase_segments']]
-        self.assertNotIn('completed', keys)
+        self.assertNotIn('review', keys)
+        self.assertIn('pm_acceptance', keys)
         self.assertEqual(item['display_end_at'], '2026-05-04T01:05:00+08:00')
+        self.assertIn('source', item['phase_segments'][0])
+        self.assertEqual(item['phase_segments'][0]['source']['start']['field'], 'dispatched_at')
+        self.assertIn(item['phase_segments'][0]['precision'], {'exact', 'inferred'})
 
     def test_terminal_blocked_task_uses_current_status_at_as_end(self):
         with self.conn:
@@ -101,7 +106,52 @@ class GanttPayloadTests(unittest.TestCase):
         item = next(entry for entry in payload['items'] if entry['task_id'] == 'failed-task')
         self.assertTrue(item['phase_segments'])
         self.assertEqual(item['phase_segments'][-1]['end_at'], '2026-05-04T02:30:00+08:00')
+        self.assertEqual(item['phase_segments'][-1]['source']['end']['field'], 'current_status_at')
         self.assertEqual(item['display_end_at'], '2026-05-04T02:30:00+08:00')
+
+    def test_mixed_naive_and_aware_times_do_not_break_duration_calculation(self):
+        with self.conn:
+            upsert_task(self.conn, _task_record(
+                task_id='mixed-time-task',
+                created_at='2026-05-04T00:00:00',
+                dispatched_at='2026-05-04T00:10:00+08:00',
+                ack_at='2026-05-04T00:20:00',
+                completed_at='2026-05-04T01:00:00+08:00',
+                current_status_at='2026-05-04T01:10:00+08:00',
+                updated_at='2026-05-04T01:10:00+08:00',
+                last_synced_at='2026-05-04T01:10:00+08:00',
+            ))
+        payload = build_gantt_payload(self.conn)
+        item = next(entry for entry in payload['items'] if entry['task_id'] == 'mixed-time-task')
+        self.assertTrue(item['phase_segments'])
+        self.assertTrue(all(segment['duration_seconds'] >= 0 for segment in item['phase_segments']))
+
+    def test_pooled_task_gets_pooled_segment_with_inferred_end(self):
+        task_dir = Path(self.tmpdir.name) / 'pooled-task'
+        task_dir.mkdir()
+        (task_dir / 'task.json').write_text(
+            '{"pool_entered_at":"2026-05-04T00:05:00+08:00","claim_scope":["dev-1"]}',
+            encoding='utf-8',
+        )
+        with self.conn:
+            upsert_task(self.conn, _task_record(
+                task_id='pooled-task',
+                current_status='pooled',
+                board_status='pending',
+                dispatched_at=None,
+                ack_at=None,
+                completed_at=None,
+                current_status_at='2026-05-04T00:05:00+08:00',
+                updated_at='2026-05-04T00:05:00+08:00',
+                task_dir=str(task_dir),
+                task_json_path=str(task_dir / 'task.json'),
+            ))
+        payload = build_gantt_payload(self.conn)
+        item = next(entry for entry in payload['items'] if entry['task_id'] == 'pooled-task')
+        pooled = next(segment for segment in item['phase_segments'] if segment['key'] == 'pooled')
+        self.assertEqual(pooled['start_at'], '2026-05-04T00:05:00+08:00')
+        self.assertEqual(pooled['source']['end']['field'], 'generated_at')
+        self.assertEqual(pooled['precision'], 'inferred')
 
 
 if __name__ == '__main__':

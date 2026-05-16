@@ -82,6 +82,52 @@ class TaskInboxTests(unittest.TestCase):
         self.assertEqual(items[0]['reason_type'], 'invalid_timeline')
         self.assertEqual(items[0]['summary'], '阶段时间倒挂')
 
+    def test_pool_starvation_item_when_idle_agents_have_no_ready_pool_task(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tasks_root = root / 'tasks'
+            tasks_root.mkdir()
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({
+                'agents': {
+                    'dev-1': {'role': 'fullstack_dev'},
+                },
+                'task_pool': {'default_claim_max_concurrency': 1},
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            dep_dir = tasks_root / 'dep-task'
+            dep_dir.mkdir()
+            (dep_dir / 'task.json').write_text(json.dumps({
+                'id': 'dep-task',
+                'title': '前置任务',
+                'status': 'working',
+                'assigned_agent': 'dev-2',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            pooled_dir = tasks_root / 'pooled-waiting'
+            pooled_dir.mkdir()
+            (pooled_dir / 'task.json').write_text(json.dumps({
+                'id': 'pooled-waiting',
+                'title': '等待依赖的池任务',
+                'status': 'pooled',
+                'priority': 'high',
+                'claim_scope': ['dev-1'],
+                'depends_on': ['dep-task'],
+                'dependency_policy': 'done_only',
+                'pool_entered_at': '2026-05-09T10:00:00+08:00',
+                'task_type': 'development',
+                'domain': 'development',
+                'write_scope': ['/tmp/pooled-waiting'],
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            now = datetime.fromisoformat('2026-05-09T11:00:00+08:00')
+            items = task_inbox.pool_starvation_items(tasks_root, config_path, now)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['reason_type'], 'pool_starvation')
+        self.assertIn('当前可认领任务为 0', items[0]['summary'])
+
 class TaskInboxStaleReviewTests(unittest.TestCase):
     def test_ready_for_merge_with_stale_rejected_review_is_not_pm_blocked(self):
         task_inbox = load_task_inbox_module()

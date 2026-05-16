@@ -1,7 +1,7 @@
 # 并行度、任务池与甘特图真实性优化方案
 
 > 创建日期：2026-05-16  
-> 状态：方案草案  
+> 状态：方案草案（Phase 1/2 已落地，Phase 3/4 待实现）  
 > 适用范围：`my-agent-teams` 的 PM 拆分、任务池认领、watcher 续推、dashboard/Gantt 数据口径  
 > 相关文档：`control-plane-and-task-pool.md`、`task-pool-claiming.md`、`task-board/optimization-plan.md`
 >
@@ -9,7 +9,7 @@
 
 ## 0. 一句话结论
 
-当前并行度不足的主要原因不是 agent 数量绝对不够，而是：
+本轮优化启动前，并行度不足的主要原因不是 agent 数量绝对不够，而是：
 
 ```text
 PM 虽然拆了任务，但仍以直接派发和手动接续为主
@@ -36,6 +36,8 @@ PM 批量拆 DAG
 但这个结论有一个前提：**任务定义必须先正确**。如果根因未明、接口契约未稳、owner 决策未完成，就不应为了并行度而提前铺开修复 DAG；此时正确做法是先创建 diagnosis / investigation / design 任务，把根因和边界收敛后再进入 pool-first。
 
 ## 1. 当前问题判断
+
+以下判断主要用于回放本轮优化前的典型症状与设计动因；其中 artifact 标准化、idle-agent 自动续推、reserved 预留、pool health 与 Gantt 主干分段等能力现已在 Phase 1/2 中落地。
 
 ### 1.0 任务定义不成熟时，过早并行会放大返工
 
@@ -119,7 +121,7 @@ PM 创建任务
 
 ### 1.4 看板/Gantt 失真
 
-当前看板主要根据 `task.json.status`、artifact mtime、transitions 重建状态段。它容易把以下时间混在一起：
+如果看板只根据 `task.json.status`、artifact mtime、transitions 重建状态段，就容易把以下时间混在一起：
 
 - PM 创建但未补全任务的等待时间；
 - 任务在池中等待可认领的时间；
@@ -300,7 +302,7 @@ Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未
 
 如果没有 active root request，也没有成熟待入池任务，则应显示为“团队空闲/无待办”，不应作为饥饿告警。
 
-说明：`pool_starvation` 当前更应视为拟新增的 PM Inbox / dashboard 指标，不是现状已稳定输出的事实信号。
+说明：`pool_starvation` 已作为 PM Inbox / dashboard 的调度健康信号落地；后续要继续优化的是触发解释、治理阈值与 UI 呈现，而不是是否存在该指标本身。
 
 ### 4.2 自动续推优先级
 
@@ -317,11 +319,11 @@ Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未
 
 选中后直接调用 `claim-task.sh`，使任务进入 `dispatched`，并用 reserved 元数据表达“下一条预留任务”语义，再通知 agent ack。
 
-说明：当前仓库已有 `task-pool-router.py`、`task-pool-view.py` 和 watcher 局部 auto-push 基础，但尚未把上述排序规则、可观测解释和全局 idle-agent 扫描完全落地；本节描述的是应收敛到的目标态，而不是所有项均已实现的现状。
+说明：当前仓库已经具备 `task-pool-router.py`、`task-pool-view.py`、watcher 局部 auto-push、idle-agent 扫描、reserved 预留与超时回退等基础能力；本节描述的是继续收敛排序规则、可观测解释和边界行为，而不是从零开始的新设计。
 
 ### 4.3 1 working + 1 reserved
 
-在自动续推和池健康监控稳定后，可试点把执行容量拆成两个限制：
+在自动续推和池健康监控稳定后，应把执行容量拆成两个限制：
 
 ```json
 {
@@ -352,8 +354,8 @@ Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未
 
 - `reserved` **不计入 working，不计入真实吞吐**；
 - `reserved` 超时未 ack 时必须自动回退 `pooled` 或进入 PM Inbox；
-- 当前 `config.json` 仍只有 `default_claim_max_concurrency`，尚无 `default_working_limit/default_reserved_limit` 正式字段，因此本节明确属于目标态设计；
-- 该能力建议作为 feature flag / P2 试点，而不是 Phase 1 默认行为。
+- `config.json` 已具备 `default_working_limit/default_reserved_limit` 等正式字段，能力可以灰度启用，但不再按“仅试点”口径定义；
+- 该能力是最终协作模型的一部分，不是 Phase 1 的临时补丁。
 
 ### 4.4 直接派发保护
 
@@ -425,7 +427,7 @@ PM 拆完后批量入池，而不是边做边想下一条。
 
 ### 6.1 新增阶段口径
 
-以下阶段口径主要描述目标态；当前 dashboard/query 仍以 created / dispatched / ack / completed / review / verify 等粗粒度时间点为主，应在实施时分阶段对齐。
+以下阶段口径是当前 dashboard/Gantt 的统一口径；实现已覆盖 pooled / reserved / working / review / qa / pm_acceptance 的主干分段，后续继续补齐边界解释与历史回放的 inferred 标记。
 
 Gantt 不应只展示粗略 lifecycle，而应拆成以下阶段：
 
@@ -455,10 +457,7 @@ pooled/dispatched/review/QA/PM acceptance 都是等待或队列时间。
 
 UI 与 query 层不应把 inferred 段伪装成 exact；历史数据也应允许标记为 inferred。
 
-`dependencies_ready_at` 当前不是稳定事实字段，落地应分两步：
-
-- Phase 1 先作为 inferred 时间：从依赖任务的 `transitions.jsonl`、标准 artifact 时间或任务状态推断；
-- Phase 2 再由 watcher 在首次发现依赖全部满足时写入持久化字段或 task event，作为 exact/source=watcher 的阶段边界。
+`dependencies_ready_at` 已由 watcher 持久化写入为主；历史回放仍可从 `transitions.jsonl`、标准 artifact 时间或任务状态补推 inferred 值，但新数据应优先以 watcher 记录为准。
 
 ### 6.2 看板新增指标
 
@@ -548,15 +547,15 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 
 ## 8. 实施计划
 
-### Phase 1：规则落地与可观测性
+### Phase 1：规则落地与可观测性（已完成 / 收口中）
 
 目标：让系统先看见瓶颈。
 
-建议拆成两个更容易落地的切口：
+建议按两个切口理解已落地范围：
 
 #### Phase 1A：事实与基础可观测性
 
-先解决“系统事实是否可信”：
+已落地重点：
 
 - PM 模板加入“根因未明先 diagnosis / design，再决定是否批量 DAG”硬规则；
 - Phase 1 文案中显式区分“现状已存在能力”和“目标态待实现能力”；
@@ -566,9 +565,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 
 #### Phase 1B：调度护栏与 Gantt 细化
 
-在事实更稳定后，再收紧调度入口：
-
-改动：
+已落地重点：
 
 - PM 模板加入“复杂需求必须批量 DAG + pool-first”硬规则；
 - `dispatch-task.sh` 增加 direct dispatch 保护；
@@ -576,7 +573,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - Gantt 拆出 pooled/reserved/working/review/QA/PM acceptance，并标记 exact / inferred；
 - 单任务详情显示 pooled 阻塞原因。
 
-验收：
+当前验收口径：
 
 - `list-pool.sh` 能区分可认领、依赖等待、scope 阻塞；
 - dashboard 能显示 idle agent 与 pool depth；
@@ -585,26 +582,26 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - artifact_invalid 下降，并能通过标准脚本生成 artifact；
 - 复杂需求至少能一次性入池多个子任务。
 
-### Phase 2：自动续推与 reserved
+### Phase 2：自动续推与 reserved（已完成 / 收口中）
 
 目标：减少 agent 空闲时间。
 
-改动：
+已落地重点：
 
 - watcher 周期性扫描 idle agent；
 - idle agent 有可认领任务时自动 `claim-task.sh`；
 - auto-claim 前强制校验：依赖满足、write_scope 无冲突、agent 空闲、无 owner/gate 例外；
-- 引入 `reserved_limit`（feature flag / 试点）；
+- 引入 `reserved_limit`（可灰度启用）；
 - done/ready_for_merge 后优先推 reserved 或下一条 pool 任务；
 - dispatched 超时未 ack 时可回退 pooled 或 PM Inbox 提醒。
 
-验收：
+当前验收口径：
 
 - agent 完成任务后无需 PM 手动派下一条；
 - 空闲 agent + pool_ready > 0 时，1 个 scan interval 内出现 reserved/dispatched；
 - 同一 agent 仍最多 1 条 working。
 
-### Phase 3：分层并行 review/QA gate
+### Phase 3：分层并行 review/QA gate（必须实现）
 
 目标：减少后置流水线串行等待。
 
@@ -631,7 +628,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - Gantt 能分别显示 review_wait 与 qa_wait；
 - complex 双审不互相阻塞。
 
-### Phase 4：独立 worktree 与集成队列
+### Phase 4：独立 worktree 与集成队列（必须实现）
 
 目标：提升真正代码并行能力。
 
@@ -660,7 +657,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 4. pool health / idle agent / Gantt 真实阶段；
 5. idle agent 自动续推；
 6. `dependency_policy` 白名单化（默认 `done_only`）；
-7. `1 working + 1 reserved`（试点）；
+7. `1 working + 1 reserved`（后续标准能力）；
 8. 分层 review/QA 并行 gate；
 9. per-task worktree。
 
@@ -721,7 +718,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 
 ## 12. 最小落地切口
 
-如果只做一周内的最小闭环，建议做 7 件事：
+如果回看本轮已经落地的最小闭环，可以概括为 7 件事：
 
 1. PM 模板强制“根因未明先 diagnosis / design”，成熟后再批量 DAG + pool-first；
 2. `write-ack.sh / write-result.sh / write-review.sh / write-verify.sh` 落地，统一 artifact 口径；

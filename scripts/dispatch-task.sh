@@ -8,13 +8,15 @@ CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 ALLOW_WRITE_SCOPE_CONFLICT="${ALLOW_WRITE_SCOPE_CONFLICT:-0}"
+FORCE_DIRECT_DISPATCH="${FORCE_DIRECT_DISPATCH:-0}"
+DIRECT_DISPATCH_REASON="${DIRECT_DISPATCH_REASON:-}"
 
 if [ -z "$TASK_FILE" ]; then
   echo "usage: dispatch-task.sh <task.json>" >&2
   exit 2
 fi
 
-DISPATCH_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$ALLOW_WRITE_SCOPE_CONFLICT" <<'PY'
+DISPATCH_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$ALLOW_WRITE_SCOPE_CONFLICT" "$FORCE_DIRECT_DISPATCH" "$DIRECT_DISPATCH_REASON" <<'PY'
 import json
 import os
 import sys
@@ -172,6 +174,8 @@ def find_scope_conflicts(tasks_root: Path, current_task_id: str, candidate_scope
 task_path = Path(sys.argv[1]).resolve()
 config_path = Path(sys.argv[2]).resolve()
 allow_conflicts = parse_bool(sys.argv[3])
+force_direct_dispatch = parse_bool(sys.argv[4])
+direct_dispatch_reason = str(sys.argv[5] or '').strip()
 task = json.loads(task_path.read_text(encoding='utf-8'))
 config = json.loads(config_path.read_text(encoding='utf-8'))
 
@@ -189,6 +193,13 @@ if assigned_agent in AUTO_ASSIGNED_AGENTS:
     raise SystemExit(f'auto-assigned pending task must enter pool via pool-task.sh / queue-task.sh, not dispatch-task: {assigned_agent}')
 if assigned_agent not in agents:
     raise SystemExit(f'unknown assigned_agent: {assigned_agent}')
+direct_dispatch_override = str(task.get('claim_policy') or '').strip().lower() == 'pull'
+if direct_dispatch_override and not force_direct_dispatch:
+    raise SystemExit('claim_policy=pull task must enter pool via pool-task.sh / queue-task.sh; set FORCE_DIRECT_DISPATCH=1 only with an explicit PM override reason')
+if direct_dispatch_override and force_direct_dispatch:
+    direct_dispatch_reason = direct_dispatch_reason or str(task.get('direct_dispatch_reason') or '').strip()
+    if not direct_dispatch_reason:
+        raise SystemExit('FORCE_DIRECT_DISPATCH requires DIRECT_DISPATCH_REASON or task.direct_dispatch_reason')
 
 agent_payload = agents.get(assigned_agent) or {}
 agent_role = str(agent_payload.get('role') or '').strip().lower()
@@ -322,12 +333,14 @@ task['updated_at'] = now
 task['lease_owner'] = task.get('owner_pm')
 task['lease_acquired_at'] = now
 task['lease_expires_at'] = now
+if direct_dispatch_override and direct_dispatch_reason:
+    task['direct_dispatch_reason'] = direct_dispatch_reason
 with (task_path.parent / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
     fp.write(json.dumps({
         'from': previous,
         'to': 'dispatched',
         'at': now,
-        'reason': 'pm dispatch'
+        'reason': f'pm dispatch (FORCE_DIRECT_DISPATCH override for claim_policy=pull: {direct_dispatch_reason})' if direct_dispatch_override else 'pm dispatch'
     }, ensure_ascii=False) + '\n')
 with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
     json.dump(task, tmp, ensure_ascii=False, indent=2)
@@ -340,6 +353,8 @@ print(json.dumps({
     'task_dir': str(task_path.parent),
     'conflicts': conflicts,
     'task_type': task.get('task_type'),
+    'direct_dispatch_override': direct_dispatch_override,
+    'direct_dispatch_reason': direct_dispatch_reason,
 }, ensure_ascii=False))
 PY
 )

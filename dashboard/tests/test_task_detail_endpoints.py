@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -166,7 +167,18 @@ class TaskDetailQueryTests(unittest.TestCase):
 class TaskDetailApiTests(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.TemporaryDirectory()
-        self.db_path = str(Path(self.tmpdir.name) / 'task-board.sqlite3')
+        root = Path(self.tmpdir.name)
+        self.db_path = str(root / 'task-board.sqlite3')
+        self.tasks_root = root / 'tasks'
+        self.tasks_root.mkdir()
+        self.config_path = root / 'config.json'
+        self.config_path.write_text(json.dumps({
+            'agents': {
+                'dev-1': {'role': 'fullstack_dev'},
+                'dev-2': {'role': 'fullstack_dev'},
+            },
+            'task_pool': {'default_claim_max_concurrency': 1},
+        }, ensure_ascii=False), encoding='utf-8')
         conn = connect_db(self.db_path, initialize=True)
         with conn:
             upsert_task(conn, {
@@ -213,8 +225,66 @@ class TaskDetailApiTests(unittest.TestCase):
                 'last_ingest_source': 'test',
                 'last_synced_at': '2026-05-04T00:10:00+08:00',
             })
+            pooled_dir = self.tasks_root / 'pooled-detail'
+            pooled_dir.mkdir()
+            (pooled_dir / 'task.json').write_text(json.dumps({
+                'id': 'pooled-detail',
+                'title': '池中详情任务',
+                'status': 'pooled',
+                'priority': 'high',
+                'claim_scope': ['dev-1'],
+                'depends_on': ['missing-dep'],
+                'pool_entered_at': '2026-05-04T00:00:00+08:00',
+                'task_type': 'development',
+                'domain': 'development',
+                'write_scope': ['/tmp/pooled-detail'],
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            upsert_task(conn, {
+                'task_id': 'pooled-detail',
+                'title': '池中详情任务',
+                'project': 'my-agent-teams',
+                'domain': 'development',
+                'assigned_agent': 'auto',
+                'reviewer': None,
+                'owner_pm': 'pm-chief',
+                'integration_owner': 'arch-1',
+                'parent_task_id': None,
+                'root_request_id': 'root-3',
+                'review_required': 0,
+                'test_required': 0,
+                'target_environment': 'dev',
+                'priority': 'high',
+                'review_level': 'skip',
+                'current_status': 'pooled',
+                'board_status': 'pending',
+                'merge_gate_state': None,
+                'rework_reason': None,
+                'last_gate_actor': None,
+                'last_gate_decision_at': None,
+                'auto_close_policy': 'manual_after_review',
+                'created_at': '2026-05-04T00:00:00+08:00',
+                'dispatched_at': None,
+                'ack_at': None,
+                'completed_at': None,
+                'review_completed_at': None,
+                'verify_completed_at': None,
+                'current_status_at': '2026-05-04T00:00:00+08:00',
+                'ack_agent': None,
+                'result_agent': None,
+                'lease_acquired_at': None,
+                'updated_at': '2026-05-04T00:00:00+08:00',
+                'summary': None,
+                'review_state': None,
+                'verify_ok': None,
+                'task_dir': str(pooled_dir),
+                'task_json_path': str(pooled_dir / 'task.json'),
+                'write_scope_json': '[]',
+                'artifacts_json': '[]',
+                'last_ingest_source': 'test',
+                'last_synced_at': '2026-05-04T00:00:00+08:00',
+            })
         conn.close()
-        app = create_app(self.db_path)
+        app = create_app(self.db_path, tasks_root=str(self.tasks_root), control_config_path=str(self.config_path))
         self.client = app.test_client()
 
     def tearDown(self):
@@ -232,3 +302,10 @@ class TaskDetailApiTests(unittest.TestCase):
     def test_api_returns_404_for_missing_task(self):
         resp = self.client.get('/api/tasks/not-found/timeline')
         self.assertEqual(resp.status_code, 404)
+
+    def test_detail_includes_pool_blockers_for_pooled_task(self):
+        resp = self.client.get('/api/tasks/pooled-detail/detail')
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertIsNotNone(payload.get('pool_status'))
+        self.assertIn('dependency_missing:missing-dep', payload['pool_status']['blocked_reasons'])

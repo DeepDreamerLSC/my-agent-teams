@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 from datetime import datetime
@@ -10,6 +11,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_ROOT = SCRIPT_DIR.parent
 DEFAULT_GOVERNANCE_FILE = WORKSPACE_ROOT / '.omx' / 'task-board' / 'pm-inbox-governance.json'
+DEFAULT_CONFIG_FILE = WORKSPACE_ROOT / 'config.json'
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
 import task_artifacts  # type: ignore
 
@@ -46,6 +48,8 @@ def recommended_action(reason_type: str, gate: str, status: str) -> str:
         return '检查产物与验证证据，决定 close-task 或继续补证据'
     if reason_type == 'artifact_invalid':
         return '要求执行者修正机器产物 JSON，修正后 watcher 自动继续'
+    if reason_type == 'pool_starvation':
+        return '补齐成熟 pending 任务或处理依赖阻塞，优先恢复可认领池水位'
     if reason_type == 'stale_resume':
         return '使用 resume-task.sh 正规恢复，归档旧工件并清理 sentinel'
     if reason_type == 'timeout':
@@ -57,6 +61,27 @@ def recommended_action(reason_type: str, gate: str, status: str) -> str:
             return '确认是否转派/拆小/提优先级'
         return '检查队列卡点并决定转派或仲裁'
     return '查看任务详情并决定下一步'
+
+
+def make_global_item(reason_type: str, severity: str, summary: str, now: datetime, *, priority: str = 'medium', links: dict | None = None, age_minutes_value: int = 0) -> dict:
+    first_seen = now.isoformat(timespec='seconds')
+    return {
+        'item_id': f'__global__:{reason_type}',
+        'task_id': '__global__',
+        'title': '任务池调度健康',
+        'reason_type': reason_type,
+        'severity': severity,
+        'priority': priority,
+        'status': '',
+        'merge_gate_state': '',
+        'summary': summary,
+        'recommended_action': recommended_action(reason_type, '', ''),
+        'owner': 'pm-chief',
+        'first_seen_at': first_seen,
+        'last_seen_at': first_seen,
+        'age_minutes': age_minutes_value,
+        'links': links or {},
+    }
 
 
 def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now: datetime) -> dict:
@@ -114,7 +139,7 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     for kind, info in [('result', result_info), ('review', review_info), ('verify', verify_info), ('ack', ack_info)]:
         if info.get('valid') is False and info.get('errors'):
             detail = ','.join(info.get('errors') or ['unknown'])
-            items.append(make_item(task_dir, 'artifact_invalid', 'L3', f'{kind} 产物非法：{detail}', now))
+            items.append(make_item(task_dir, 'artifact_invalid', 'L2', f'{kind} 产物非法：{detail}', now))
 
     if status in {'dispatched', 'working'}:
         if ack_info.get('exists') and not ack_info.get('is_current_round', True):
@@ -173,6 +198,59 @@ def load_governance_items(path: Path) -> list[dict]:
     return payload if isinstance(payload, list) else []
 
 
+def _load_pool_view_module():
+    spec = importlib.util.spec_from_file_location('task_pool_view', SCRIPT_DIR / 'task-pool-view.py')
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+def pool_starvation_items(tasks_root: Path, config_path: Path, now: datetime) -> list[dict]:
+    try:
+        pool_view = _load_pool_view_module()
+        config = pool_view.load_json(config_path)
+        agents = config.get('agents') or {}
+        default_concurrency = int((config.get('task_pool') or {}).get('default_claim_max_concurrency', 1))
+        wip_limits = config.get('wip_limits') or {}
+        active_by_agent = pool_view.active_tasks_by_agent(tasks_root)
+        rows = []
+        for task_dir, task in pool_view.pooled_tasks(tasks_root):
+            task['__wip_limits__'] = wip_limits
+            rows.append(pool_view.build_row(task_dir, task, agents, active_by_agent, tasks_root, default_concurrency, now, config))
+        summary = pool_view.build_summary(rows, agents, active_by_agent, tasks_root)
+    except Exception:
+        return []
+
+    has_actionable_backlog = bool(
+        summary.get('pool_waiting_dependency_count')
+        or summary.get('mature_pending_count')
+        or summary.get('pooled_count')
+    )
+    if int(summary.get('idle_agent_count') or 0) <= 0:
+        return []
+    if int(summary.get('pool_ready_count') or 0) > 0:
+        return []
+    if not has_actionable_backlog:
+        return []
+
+    idle_agents = ','.join(summary.get('idle_agents') or [])
+    text = (
+        f"空闲 agent {summary.get('idle_agent_count')} 个（{idle_agents or '未列出'}），"
+        f"当前可认领任务为 0；依赖等待 {summary.get('pool_waiting_dependency_count', 0)}，"
+        f"成熟 pending {summary.get('mature_pending_count', 0)}。"
+    )
+    return [make_global_item(
+        'pool_starvation',
+        'L2',
+        text,
+        now,
+        priority='high',
+        age_minutes_value=int(summary.get('oldest_pool_wait_minutes') or 0),
+        links={'tasks_root': str(tasks_root), 'config': str(config_path)},
+    )]
+
+
 def print_human(items: list[dict]) -> None:
     by_level = {'L3': 0, 'L2': 0, 'L1': 0}
     for item in items:
@@ -209,6 +287,8 @@ def main() -> int:
     items: list[dict] = []
     for task_path in sorted(tasks_root.glob('*/task.json')):
         items.extend(task_items(task_path.parent, now, args.dispatch_timeout_seconds, args.working_timeout_seconds))
+    config_path = Path(args.control_config).expanduser().resolve() if args.control_config else DEFAULT_CONFIG_FILE
+    items.extend(pool_starvation_items(tasks_root, config_path, now))
     items.extend(load_governance_items(Path(args.governance_file).expanduser()))
 
     if args.explain:

@@ -202,7 +202,7 @@ function runTests() {
   })
 
   test('GANTT_PHASES keys match backend milestone names', () => {
-    const expectedKeys = ['created', 'dispatched', 'ack', 'completed', 'review_completed', 'verify_completed']
+    const expectedKeys = ['pooled', 'reserved', 'working', 'review', 'qa', 'pm_acceptance']
     const actualKeys = GANTT_PHASES.map(p => p.key)
     expectedKeys.forEach((k, i) => {
       assertEqual(actualKeys[i], k, `phase ${i} key`)

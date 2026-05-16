@@ -195,6 +195,8 @@ class PoolAndInboxApiTests(unittest.TestCase):
         self.assertEqual(len(payload['items']), 1)
         self.assertEqual(payload['items'][0]['task_id'], 'pooled-task')
         self.assertEqual(payload['items'][0]['eligible_agents'], ['dev-1'])
+        self.assertEqual(payload['summary']['pool_ready_count'], 1)
+        self.assertIn('idle_agent_count', payload['summary'])
 
     def test_pm_inbox_endpoint_returns_blocked_items(self):
         resp = self.client.get('/api/pm-inbox')

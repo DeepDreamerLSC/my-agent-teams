@@ -36,12 +36,12 @@ const EVENT_TYPE_LABELS = {
   nudge: '强制唤醒',
 }
 const GANTT_PHASES = [
-  { key: 'created', label: '创建', color: '#1677ff' },
-  { key: 'dispatched', label: '派发', color: '#13c2c2' },
-  { key: 'ack', label: '接单', color: '#722ed1' },
-  { key: 'completed', label: '等待审查/验收', color: '#faad14' },
-  { key: 'review_completed', label: '审查通过', color: '#52c41a' },
-  { key: 'verify_completed', label: '验证通过', color: '#ff4d4f' },
+  { key: 'pooled', label: '入池等待', color: '#1677ff' },
+  { key: 'reserved', label: '已派发/预留', color: '#13c2c2' },
+  { key: 'working', label: '执行中', color: '#722ed1' },
+  { key: 'review', label: '审查', color: '#faad14' },
+  { key: 'qa', label: 'QA', color: '#52c41a' },
+  { key: 'pm_acceptance', label: 'PM收口', color: '#ff4d4f' },
 ]
 
 
@@ -401,6 +401,7 @@ function renderGantt(ganttPayload) {
       return {
         value: [i, startOffset, endOffset, start, end],
         itemStyle: { color: isLongReviewWait ? '#ff4d4f' : (segment?.color || phase.color) },
+        segment,
       }
     }),
   }))
@@ -413,7 +414,9 @@ function renderGantt(ganttPayload) {
         const phase = phases[params.seriesIndex]
         const start = params.value[3]
         const end = params.value[4]
-        return `<b>${esc(t.title)}</b><br/>${phase.label}: ${formatTime(start)}${end ? ' → ' + formatTime(end) : ''}`
+        const segment = params.data?.segment || {}
+        const precision = segment.precision === 'exact' ? 'exact' : 'inferred'
+        return `<b>${esc(t.title)}</b><br/>${phase.label} [${precision}]: ${formatTime(start)}${end ? ' → ' + formatTime(end) : ''}`
       },
     },
     legend: { data: phases.map(p => p.label), top: 0 },
@@ -524,13 +527,14 @@ function renderTaskDetail(payload) {
   const durations = payload.durations || {}
   const statusTimeline = payload.status_timeline || []
   const communicationTimeline = payload.communication_timeline || []
+  const poolStatus = payload.pool_status || null
 
   detailTitle.textContent = task.title || task.task_id || '任务详情'
   detailSubtitle.textContent = `${task.task_id || ''} · ${task.project || '-'} · ${task.domain || '-'}`
-  detailBody.innerHTML = renderTaskDetailHtml({ task, durations, statusTimeline, communicationTimeline })
+  detailBody.innerHTML = renderTaskDetailHtml({ task, durations, statusTimeline, communicationTimeline, poolStatus })
 }
 
-function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], communicationTimeline = [] }) {
+function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], communicationTimeline = [], poolStatus = null }) {
   return `
     <section class="detail-section">
       <h3>基本信息</h3>
@@ -553,6 +557,8 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
       <div class="detail-summary">${esc(task.summary || '无摘要')}</div>
     </section>
 
+    ${renderPoolStatusHtml(poolStatus)}
+
     <section class="detail-section">
       <h3>阶段耗时</h3>
       <div class="detail-grid">
@@ -574,6 +580,23 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
     <section class="detail-section">
       <h3>沟通时间线</h3>
       ${renderTimelineHtml(communicationTimeline, 'communication')}
+    </section>
+  `
+}
+
+function renderPoolStatusHtml(poolStatus) {
+  if (!poolStatus) return ''
+  const blockers = poolStatus.blocked_reasons || []
+  const eligible = poolStatus.eligible_agents || []
+  return `
+    <section class="detail-section">
+      <h3>任务池阻塞</h3>
+      <div class="detail-grid">
+        ${detailItem('等待时长', `${poolStatus.pool_wait_minutes || 0}m`)}
+        ${detailItem('可认领 Agent', eligible.join(', ') || '-')}
+        ${detailItem('阻塞原因', blockers.join(', ') || '-')}
+        ${detailItem('下一步', poolStatus.next_action || '-')}
+      </div>
     </section>
   `
 }
@@ -684,14 +707,15 @@ function renderSummaryCards(container, cards) {
 
 function renderPoolView(payload) {
   const items = (payload && payload.items) || []
+  const summary = (payload && payload.summary) || {}
   const summaryEl = document.getElementById('pool-summary')
   const tbody = document.querySelector('#pool-table tbody')
   const blocked = items.filter(item => !(item.eligible_agents || []).length).length
   renderSummaryCards(summaryEl, [
-    { label: '池中任务', value: items.length },
-    { label: '可认领', value: items.length - blocked },
-    { label: '阻塞', value: blocked },
-    { label: '最久等待(分)', value: items.reduce((max, item) => Math.max(max, Number(item.pool_wait_minutes || 0)), 0) },
+    { label: '池中任务', value: summary.pooled_count ?? items.length },
+    { label: '可认领', value: summary.pool_ready_count ?? (items.length - blocked) },
+    { label: '空闲Agent', value: summary.idle_agent_count ?? '-' },
+    { label: '产物异常', value: summary.artifact_invalid_count ?? '-' },
   ])
   if (!tbody) return
   tbody.innerHTML = items.length ? items.map(item => `

@@ -59,6 +59,20 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         )
         self.assertEqual(completed.stdout.strip(), 'pooled-a')
 
+    def test_pool_router_can_reserve_next_task_for_agent_with_working_slot_full(self):
+        self._write_task('working-dev-1', {
+            'id': 'working-dev-1', 'title': '当前执行', 'status': 'working',
+            'assigned_agent': 'dev-1', 'task_type': 'development', 'domain': 'development',
+            'write_scope': ['/tmp/current'],
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--agent', 'dev-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload['next_task_id'], 'pooled-a')
+        self.assertEqual(payload['next_task']['eligible_agents'], ['dev-1'])
+
     def test_queue_router_selects_review_and_qa_candidates(self):
         review = subprocess.run(
             ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--queue', 'review', '--agent', 'review-1', '--next'],

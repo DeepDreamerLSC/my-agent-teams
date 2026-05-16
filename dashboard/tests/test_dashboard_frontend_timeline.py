@@ -200,9 +200,9 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
             f"""
             const mod = require({json.dumps(str(DASHBOARD_JS))});
             const payload = [
-              {{ title: 'old', milestones: {{ created: '2026-05-01T09:00:00', dispatched: '2026-05-01T10:00:00' }} }},
-              {{ title: 'match', milestones: {{ created: '2026-05-04T09:00:00', dispatched: '2026-05-04T10:00:00' }} }},
-              {{ title: 'span', milestones: {{ created: '2026-05-03T23:00:00', dispatched: '2026-05-04T01:00:00' }} }}
+              {{ title: 'old', milestones: {{ reserved: '2026-05-01T09:00:00', working: '2026-05-01T10:00:00' }} }},
+              {{ title: 'match', milestones: {{ reserved: '2026-05-04T09:00:00', working: '2026-05-04T10:00:00' }} }},
+              {{ title: 'span', milestones: {{ reserved: '2026-05-03T23:00:00', working: '2026-05-04T01:00:00' }} }}
             ];
             const filtered = mod.applyGanttTimeFilter(payload, {{ mode: 'custom', customStart: '2026-05-04', customEnd: '2026-05-04' }});
             console.log(JSON.stringify({{
@@ -260,7 +260,7 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertEqual(result["startHour"], 0)
         self.assertEqual(result["endHour"], 23)
         self.assertEqual(result["colors"], ["#1677ff", "#13c2c2", "#722ed1", "#faad14", "#52c41a", "#ff4d4f"])
-        self.assertEqual(result["labels"][3], "等待审查/验收")
+        self.assertEqual(result["labels"], ["入池等待", "已派发/预留", "执行中", "审查", "QA", "PM收口"])
 
     def test_gantt_default_mode_is_near_7_days(self):
         script = textwrap.dedent(

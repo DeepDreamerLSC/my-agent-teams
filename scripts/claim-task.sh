@@ -62,6 +62,12 @@ status = str(task.get('status') or '')
 if status != 'pooled':
     raise SystemExit(f'task status must be pooled to claim, got {status}')
 
+task_type = str(task.get('task_type') or '').strip().lower()
+execution_mode = str(task.get('execution_mode') or '').strip().lower()
+target_environment = str(task.get('target_environment') or '').strip().lower()
+if task_type in {'deployment', 'integration'} or execution_mode == 'deploy' or target_environment == 'prod':
+    raise SystemExit('deployment/integration/prod tasks must not be claimed from the general pool')
+
 claim_scope = [str(item).strip() for item in (task.get('claim_scope') or []) if str(item).strip()]
 if claim_scope and agent_id not in claim_scope:
     raise SystemExit(f'agent {agent_id} is not in claim_scope: {claim_scope}')
@@ -78,19 +84,60 @@ for dep in task.get('depends_on') or []:
     if str(dep.get('status') or '') not in allowed:
         raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep.get("status")}')
 
-max_concurrency = int(task.get('claim_max_concurrency') or config.get('task_pool', {}).get('default_claim_max_concurrency', 1))
+def int_value(value, default):
+    try:
+        if value in (None, ''):
+            return default
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+pool_config = config.get('task_pool') or {}
 wip_limits = config.get('wip_limits') or {}
 agent_role = str(((config.get('agents') or {}).get(agent_id) or {}).get('role') or '').strip().lower()
 wip_key = ROLE_WIP_KEYS.get(agent_role)
 role_limit = wip_limits.get(agent_id)
 if role_limit in (None, '') and wip_key:
     role_limit = wip_limits.get(wip_key)
+working_limit = max(1, int_value(pool_config.get('default_working_limit'), 1))
+reserved_limit = max(1, int_value(pool_config.get('default_reserved_limit'), 1))
 if role_limit not in (None, ''):
-    max_concurrency = min(max_concurrency, int(role_limit))
+    working_limit = max(1, min(working_limit, int_value(role_limit, working_limit)))
+active_limit = working_limit + reserved_limit
 active_count = 0
 working_count = 0
+reserved_count = 0
 target_scope = [str(item).strip() for item in (task.get('write_scope') or []) if str(item).strip()]
-resolved_target_scope = [Path(item).expanduser().resolve() for item in target_scope]
+
+def project_roots(payload):
+    project = str(payload.get('project') or '').strip()
+    project_cfg = (config.get('projects') or {}).get(project) or {}
+    dev_root = project_cfg.get('dev_root')
+    prod_root = project_cfg.get('prod_root')
+    return (
+        Path(dev_root).expanduser().resolve() if dev_root else None,
+        Path(prod_root).expanduser().resolve() if prod_root else None,
+    )
+
+
+def resolve_scope_paths(payload):
+    raw_scope = [str(item).strip() for item in (payload.get('write_scope') or []) if str(item).strip()]
+    if not raw_scope:
+        return []
+    dev_root, prod_root = project_roots(payload)
+    target_env = str(payload.get('target_environment') or 'dev').strip().lower()
+    base_root = prod_root if target_env == 'prod' and prod_root is not None else dev_root
+    resolved = []
+    for item in raw_scope:
+        path = Path(item).expanduser()
+        if not path.is_absolute() and base_root is not None:
+            path = base_root / path
+        resolved.append(path.resolve())
+    return resolved
+
+
+resolved_target_scope = resolve_scope_paths(task)
 
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
@@ -111,24 +158,26 @@ for other_path in tasks_root.glob('*/task.json'):
     active_count += 1
     if str(other.get('status') or '') == 'working':
         working_count += 1
-    for raw in (other.get('write_scope') or []):
-        if not str(raw).strip():
-            continue
-        other_scope = Path(str(raw).strip()).expanduser().resolve()
+    if str(other.get('status') or '') == 'dispatched':
+        reserved_count += 1
+    for other_scope in resolve_scope_paths(other):
         for target_scope_item in resolved_target_scope:
             if scopes_overlap(target_scope_item, other_scope):
                 raise SystemExit(f'write_scope conflict with active task: {other_path.parent.name}')
 
-if working_count >= 1:
-    raise SystemExit(f'agent {agent_id} already has a working task')
-if active_count >= max_concurrency:
-    raise SystemExit(f'agent {agent_id} already reached claim_max_concurrency={max_concurrency}')
+if working_count > working_limit:
+    raise SystemExit(f'agent {agent_id} exceeds working_limit={working_limit}')
+if reserved_count >= reserved_limit:
+    raise SystemExit(f'agent {agent_id} already reached reserved_limit={reserved_limit}')
+if active_count >= active_limit:
+    raise SystemExit(f'agent {agent_id} already reached active capacity={active_limit}')
 
 claim_path = task_dir / 'claim.json'
 claim_payload = {
     'task_id': str(task.get('id') or task_dir.name),
     'agent': agent_id,
     'claimed_at': datetime.now().astimezone().isoformat(timespec='seconds'),
+    'reserved': True,
 }
 if reason:
     claim_payload['reason'] = reason
@@ -144,12 +193,25 @@ try:
     if current_status != 'pooled':
         raise SystemExit(f'task status changed while claiming: {current_status}')
 
+    policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
+    allowed = {'done', 'cancelled'}
+    if policy == 'ready_for_merge_ok':
+        allowed.add('ready_for_merge')
+    for dep in task.get('depends_on') or []:
+        dep_path = tasks_root / dep / 'task.json'
+        if not dep_path.exists():
+            raise SystemExit(f'dependency task missing: {dep}')
+        dep_payload = json.loads(dep_path.read_text(encoding='utf-8'))
+        if str(dep_payload.get('status') or '') not in allowed:
+            raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep_payload.get("status")}')
+
     with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
         json.dump(claim_payload, tmp, ensure_ascii=False, indent=2)
         tmp.write('\n')
     os.replace(tmp.name, claim_path)
 
     now = datetime.now().astimezone().isoformat(timespec='seconds')
+    task['pre_claim_assigned_agent'] = task.get('assigned_agent')
     task['assigned_agent'] = agent_id
     task['status'] = 'dispatched'
     task['updated_at'] = now
@@ -159,6 +221,11 @@ try:
     task['claimed_by'] = agent_id
     task['claimed_at'] = claim_payload['claimed_at']
     task['claim_reason'] = reason or None
+    task['reserved_by'] = agent_id
+    task['reserved_at'] = claim_payload['claimed_at']
+    task['reserved_reason'] = reason or 'manual pool claim'
+    if task.get('depends_on') and not task.get('dependencies_ready_at'):
+        task['dependencies_ready_at'] = now
     with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
         json.dump(task, tmp, ensure_ascii=False, indent=2)
         tmp.write('\n')
@@ -169,7 +236,7 @@ try:
             'from': 'pooled',
             'to': 'dispatched',
             'at': now,
-            'reason': f'agent {agent_id} claimed pooled task',
+            'reason': f'agent {agent_id} claimed pooled task' + (f': {reason}' if reason else ''),
         }, ensure_ascii=False) + '\n')
 finally:
     try:

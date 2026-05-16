@@ -243,6 +243,7 @@ def parse_ack(task_dir: Path) -> dict[str, Any]:
         result.update({"valid": False, "normalized_status": "invalid"})
         result["errors"].append(error)
         return result
+    _mark_round_status(result, payload, ctx)
     result.update({"task_id": payload.get("task_id"), "agent": payload.get("agent") or payload.get("agent_id")})
     raw_status = str(payload.get("status") or "acknowledged").strip().lower()
     if payload.get("task_id") not in (None, ctx.task.get("id")):
@@ -296,7 +297,7 @@ def _normalize_result_status(value: Any) -> tuple[str, bool]:
         "fail": "failed",
         "blocked": "blocked",
     }
-    return mapping.get(normalized, "invalid"), normalized == "done"
+    return mapping.get(normalized, "invalid"), normalized == "success"
 
 
 def parse_result(task_dir: Path) -> dict[str, Any]:

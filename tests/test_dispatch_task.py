@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DISPATCH_SCRIPT = REPO_ROOT / "scripts" / "dispatch-task.sh"
+
+
+def _instruction_text() -> str:
+    return "\n".join([
+        "# 任务：直派保护测试",
+        "## 任务类型",
+        "design",
+        "## 目标",
+        "确认方案",
+        "## 任务边界",
+        "只读分析",
+        "## 输入事实",
+        "已有上下文",
+        "## 约束",
+        "不写业务代码",
+        "## 交付物",
+        "result.json",
+        "## 验收标准",
+        "输出摘要",
+        "## 下游动作",
+        "PM 决策",
+    ])
+
+
+class DispatchTaskTests(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmpdir.name)
+        self.dev_root = self.root / "dev"
+        self.prod_root = self.root / "prod"
+        self.tasks_root = self.root / "tasks"
+        self.dev_root.mkdir()
+        self.prod_root.mkdir()
+        self.tasks_root.mkdir()
+        self.config_path = self.root / "config.json"
+        self.config_path.write_text(json.dumps({
+            "agents": {
+                "dev-1": {"role": "fullstack_dev"},
+                "review-1": {"role": "reviewer"},
+                "arch-1": {"role": "architect"},
+            },
+            "projects": {
+                "demo": {
+                    "dev_root": str(self.dev_root),
+                    "prod_root": str(self.prod_root),
+                },
+            },
+            "wip_limits": {"dev": 2},
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        self.task_dir = self.tasks_root / "pull-task"
+        self.task_dir.mkdir()
+        self.task_path = self.task_dir / "task.json"
+        self._write_task()
+        (self.task_dir / "instruction.md").write_text(_instruction_text(), encoding="utf-8")
+        (self.task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def _write_task(self) -> None:
+        self.task_path.write_text(json.dumps({
+            "id": "pull-task",
+            "title": "直派保护测试",
+            "status": "pending",
+            "project": "demo",
+            "domain": "development",
+            "assigned_agent": "dev-1",
+            "execution_mode": "dev",
+            "target_environment": "dev",
+            "task_type": "design",
+            "read_only": True,
+            "write_scope": [],
+            "claim_policy": "pull",
+            "priority": "medium",
+            "review_required": False,
+            "review_level": "skip",
+            "downstream_action": "PM 决策",
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    def _env(self, **overrides: str) -> dict[str, str]:
+        env = {
+            **os.environ,
+            "CONFIG_PATH": str(self.config_path),
+            "SEND_SCRIPT": str(self.root / "missing-send-to-agent.sh"),
+            "SEND_CHAT_SCRIPT": str(self.root / "missing-send-chat.sh"),
+        }
+        env.update(overrides)
+        return env
+
+    def test_claim_policy_pull_rejects_direct_dispatch_without_force(self):
+        completed = subprocess.run(
+            [str(DISPATCH_SCRIPT), str(self.task_path)],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("claim_policy=pull", completed.stderr)
+        task = json.loads(self.task_path.read_text(encoding="utf-8"))
+        self.assertEqual(task["status"], "pending")
+
+    def test_force_direct_dispatch_records_override_reason(self):
+        completed = subprocess.run(
+            [str(DISPATCH_SCRIPT), str(self.task_path)],
+            cwd=str(REPO_ROOT),
+            env=self._env(FORCE_DIRECT_DISPATCH="1", DIRECT_DISPATCH_REASON="PM 确认紧急直派"),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertIn("dispatched pull-task", completed.stdout)
+        task = json.loads(self.task_path.read_text(encoding="utf-8"))
+        self.assertEqual(task["status"], "dispatched")
+        transitions = [
+            json.loads(line)
+            for line in (self.task_dir / "transitions.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        self.assertEqual(transitions[-1]["to"], "dispatched")
+        self.assertIn("FORCE_DIRECT_DISPATCH", transitions[-1]["reason"])
+        self.assertIn("PM 确认紧急直派", transitions[-1]["reason"])
+
+
+if __name__ == "__main__":
+    unittest.main()

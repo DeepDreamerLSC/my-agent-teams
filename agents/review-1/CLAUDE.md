@@ -227,6 +227,7 @@ Agent 完成、失败或阻塞任务时，必须在任务目录写 `result.json`
 }
 ```
 
-- `status=approve`：进入 QA 或 PM 收口
-- `status=request_changes`：进入 blocked / review_rejected
-- `status=blocked`：需要 PM/arch 仲裁
+- `status` 只能使用以下三个值，**禁止使用其他任何值（包括 "approved"、"pass"、"rejected"、"change" 等）**：
+  - `approve`：进入 QA 或 PM 收口
+  - `request_changes`：进入 blocked / review_rejected
+  - `blocked`：需要 PM/arch 仲裁

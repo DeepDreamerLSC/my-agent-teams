@@ -206,6 +206,86 @@ test ! -f "$STATE_DIR/review-queue-review-1.json"
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 
 
+def test_reserved_timeout_returns_task_to_pool(tmp_path: Path):
+    env = _base_env(tmp_path)
+    env["DISPATCH_RESEND_AFTER_SECONDS"] = "1"
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    task_dir = workspace_root / "tasks" / "reserved-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "reserved-task",\n'
+        '  "status": "dispatched",\n'
+        '  "assigned_agent": "dev-1",\n'
+        '  "pre_claim_assigned_agent": "auto",\n'
+        '  "pool_entered_at": "2026-05-09T10:00:00+08:00",\n'
+        '  "claimed_by": "dev-1",\n'
+        '  "claimed_at": "2026-05-09T10:01:00+08:00",\n'
+        '  "reserved_by": "dev-1",\n'
+        '  "reserved_at": "2026-05-09T10:01:00+08:00",\n'
+        '  "lease_acquired_at": "2000-01-01T00:00:00+08:00"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+    (task_dir / "claim.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+return_reserved_to_pool_if_timed_out '{task_dir}' 'reserved-task'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task_dir = Path('{task_dir}')
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'pooled', task
+assert task['assigned_agent'] == 'auto', task
+assert 'reserved_by' not in task, task
+assert list(task_dir.glob('claim.expired.*.json'))
+assert 'to":"pooled"' in (task_dir / 'transitions.jsonl').read_text(encoding='utf-8').replace(' ', '')
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_record_dependencies_ready_persists_exact_watcher_boundary(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    tasks_root = workspace_root / "tasks"
+    dep_dir = tasks_root / "dep-task"
+    task_dir = tasks_root / "pooled-task"
+    dep_dir.mkdir(parents=True)
+    task_dir.mkdir(parents=True)
+    (dep_dir / "task.json").write_text('{"id":"dep-task","status":"done"}\n', encoding="utf-8")
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "pooled-task",\n'
+        '  "status": "pooled",\n'
+        '  "depends_on": ["dep-task"],\n'
+        '  "dependency_policy": "done_only"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+record_dependencies_ready_if_needed '{task_dir}' 'pooled-task'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task_dir = Path('{task_dir}')
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+assert task.get('dependencies_ready_at'), task
+transition_text = (task_dir / 'transitions.jsonl').read_text(encoding='utf-8')
+assert 'dependencies_ready' in transition_text, transition_text
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
 class TaskWatcherStaleArtifactTests(unittest.TestCase):
     def test_pending_stale_review_does_not_clear_review_queue_assignment(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -658,6 +658,61 @@ for agent_id, payload in agents.items():
 PY
 }
 
+list_pool_agents() {
+    python3 - "$CONFIG_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+agents = config.get('agents') or {}
+
+for agent_id, payload in agents.items():
+    role = str((payload or {}).get('role') or '').strip().lower()
+    if role == 'pm' or agent_id.startswith('pm-'):
+        continue
+    if role in {'fullstack_dev', 'reviewer', 'qa', 'architect'} or agent_id.startswith(('dev-', 'review-', 'qa-', 'arch-')):
+        print(agent_id)
+PY
+}
+
+task_pool_bool() {
+    local key="$1"
+    local default_value="${2:-false}"
+    python3 - "$CONFIG_PATH" "$key" "$default_value" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+key = sys.argv[2]
+default = sys.argv[3].strip().lower() in {'1', 'true', 'yes', 'on'}
+value = (config.get('task_pool') or {}).get(key, default)
+if isinstance(value, str):
+    value = value.strip().lower() in {'1', 'true', 'yes', 'on'}
+print('1' if value else '0')
+PY
+}
+
+task_pool_int() {
+    local key="$1"
+    local default_value="${2:-0}"
+    python3 - "$CONFIG_PATH" "$key" "$default_value" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+key = sys.argv[2]
+default = int(sys.argv[3])
+value = (config.get('task_pool') or {}).get(key, default)
+try:
+    print(int(value))
+except Exception:
+    print(default)
+PY
+}
+
 matches_auto_assign_marker() {
     local value="$1"
     [ -z "$value" ] && return 0
@@ -739,6 +794,89 @@ print(count)
 PY
 }
 
+reserved_task_count_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+count = 0
+for task_path in tasks_root.glob('*/task.json'):
+    task = json.loads(task_path.read_text(encoding='utf-8'))
+    if str(task.get('assigned_agent') or '') == agent_id and str(task.get('status') or '') == 'dispatched':
+        count += 1
+print(count)
+PY
+}
+
+reserved_task_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+rows = []
+for task_path in tasks_root.glob('*/task.json'):
+    task = json.loads(task_path.read_text(encoding='utf-8'))
+    if str(task.get('assigned_agent') or '') != agent_id:
+        continue
+    if str(task.get('status') or '') != 'dispatched':
+        continue
+    claimed_at = str(task.get('claimed_at') or task.get('reserved_at') or task.get('lease_acquired_at') or task.get('updated_at') or '')
+    rows.append((claimed_at, str(task.get('id') or task_path.parent.name)))
+for _, task_id in sorted(rows):
+    print(task_id)
+    break
+PY
+}
+
+agent_capacity_limits() {
+    local agent_id="$1"
+    python3 - "$CONFIG_PATH" "$agent_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+agent_id = sys.argv[2]
+pool = config.get('task_pool') or {}
+agents = config.get('agents') or {}
+wip_limits = config.get('wip_limits') or {}
+
+def as_int(value, default):
+    try:
+        if value in (None, ''):
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+working_limit = max(1, as_int(pool.get('default_working_limit'), 1))
+reserved_limit = max(1, as_int(pool.get('default_reserved_limit'), 1))
+role = str((agents.get(agent_id) or {}).get('role') or '').strip().lower()
+role_keys = {
+    'fullstack_dev': 'dev',
+    'reviewer': 'reviewer',
+    'qa': 'qa',
+    'architect': 'architect',
+    'pm': 'pm-chief',
+}
+role_key = role_keys.get(role)
+role_limit = wip_limits.get(agent_id)
+if role_limit in (None, '') and role_key:
+    role_limit = wip_limits.get(role_key)
+if role_limit not in (None, ''):
+    working_limit = max(1, min(working_limit, as_int(role_limit, working_limit)))
+print(f'{working_limit} {reserved_limit} {working_limit + reserved_limit}')
+PY
+}
+
 priority_rank() {
     local value="${1:-}"
     case "$value" in
@@ -809,7 +947,7 @@ is_agent_in_claim_scope() {
 claim_scope_conflict_free() {
     local task_dir="$1"
     local agent_id="$2"
-    python3 - "$task_dir/task.json" "$TASKS_ROOT" "$agent_id" <<'PY'
+    python3 - "$task_dir/task.json" "$TASKS_ROOT" "$agent_id" "$CONFIG_PATH" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -827,10 +965,36 @@ def scopes_overlap(a: Path, b: Path) -> bool:
 task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 tasks_root = Path(sys.argv[2])
 agent_id = sys.argv[3]
-target_scope = [str(item).strip() for item in (task.get('write_scope') or []) if str(item).strip()]
+config = json.loads(Path(sys.argv[4]).read_text(encoding='utf-8'))
+
+def project_roots(payload):
+    project = str(payload.get('project') or '').strip()
+    project_cfg = (config.get('projects') or {}).get(project) or {}
+    dev_root = project_cfg.get('dev_root')
+    prod_root = project_cfg.get('prod_root')
+    return (
+        Path(dev_root).expanduser().resolve() if dev_root else None,
+        Path(prod_root).expanduser().resolve() if prod_root else None,
+    )
+
+def resolve_scope_paths(payload):
+    raw_scope = [str(item).strip() for item in (payload.get('write_scope') or []) if str(item).strip()]
+    if not raw_scope:
+        return []
+    dev_root, prod_root = project_roots(payload)
+    target_env = str(payload.get('target_environment') or 'dev').strip().lower()
+    base_root = prod_root if target_env == 'prod' and prod_root is not None else dev_root
+    output = []
+    for item in raw_scope:
+        path = Path(item).expanduser()
+        if not path.is_absolute() and base_root is not None:
+            path = base_root / path
+        output.append(path.resolve())
+    return output
+
+target_scope = resolve_scope_paths(task)
 if not target_scope:
     raise SystemExit(0)
-target_scope = [Path(item).expanduser().resolve() for item in target_scope]
 
 for task_path in tasks_root.glob('*/task.json'):
     payload = json.loads(task_path.read_text(encoding='utf-8'))
@@ -838,12 +1002,10 @@ for task_path in tasks_root.glob('*/task.json'):
         continue
     if str(payload.get('status') or '') not in {'dispatched', 'working'}:
         continue
-    other_scope = [str(item).strip() for item in (payload.get('write_scope') or []) if str(item).strip()]
-    for raw in other_scope:
-        other = Path(raw).expanduser().resolve()
+    for other in resolve_scope_paths(payload):
         for target in target_scope:
             if scopes_overlap(target, other):
-                print(f'conflict:{task_path.parent.name}:{raw}')
+                print(f'conflict:{task_path.parent.name}:{other}')
                 raise SystemExit(1)
 raise SystemExit(0)
 PY
@@ -862,12 +1024,17 @@ claim_agent_can_accept_task() {
     claim_dependencies_ready "$task_dir" || return 1
     claim_scope_conflict_free "$task_dir" "$agent_id" >/dev/null 2>&1 || return 1
 
-    local working_count active_count max_concurrency
+    local working_count active_count reserved_count limits working_limit reserved_limit active_limit
     working_count=$(working_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
-    [ "${working_count:-0}" -le 0 ] || return 1
+    reserved_count=$(reserved_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
     active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
-    max_concurrency=$(task_claim_max_concurrency "$task_dir" 2>/dev/null || echo 1)
-    [ "${active_count:-0}" -lt "${max_concurrency:-1}" ]
+    limits=$(agent_capacity_limits "$agent_id" 2>/dev/null || echo "1 1 2")
+    working_limit=$(echo "$limits" | awk '{print $1}')
+    reserved_limit=$(echo "$limits" | awk '{print $2}')
+    active_limit=$(echo "$limits" | awk '{print $3}')
+    [ "${working_count:-0}" -le "${working_limit:-1}" ] || return 1
+    [ "${reserved_count:-0}" -lt "${reserved_limit:-1}" ] || return 1
+    [ "${active_count:-0}" -lt "${active_limit:-2}" ]
 }
 
 claim_scope_idle_candidates() {
@@ -925,10 +1092,28 @@ auto_push_next_task_for_agent() {
     local agent_id="$1"
     local trigger_task_id="${2:-}"
     [ -n "$agent_id" ] || return 1
+    [ "$(task_pool_bool auto_claim_idle_agents true 2>/dev/null || echo 1)" = "1" ] || return 1
 
-    local active_count
+    local active_count working_count reserved_task reserved_notice_key now last_notice
     active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
-    [ "${active_count:-0}" -eq 0 ] || return 1
+    if [ "${active_count:-0}" -gt 0 ]; then
+        working_count=$(working_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+        if [ "${working_count:-0}" -eq 0 ]; then
+            reserved_task=$(reserved_task_for_agent "$agent_id" 2>/dev/null || true)
+            if [ -n "$reserved_task" ]; then
+                reserved_notice_key="${reserved_task}_reserved_ready_notice"
+                now=$(date +%s)
+                last_notice=$(cat "$STATE_DIR/$reserved_notice_key" 2>/dev/null || echo 0)
+                if [ $(( now - last_notice )) -gt "$RESEND_COOLDOWN_SECONDS" ]; then
+                    notify_agent "$agent_id" "你已有预留任务可开始：${reserved_task}。请读取 ${TASKS_ROOT}/${reserved_task}/instruction.md，确认后写 ack.json 开始执行。"
+                    emit_system_chat_event nudge "$reserved_task" "预留任务已成为 ${agent_id} 的下一条可执行任务，已提醒 ack。" "$agent_id" info nudge
+                    echo "$now" > "$STATE_DIR/$reserved_notice_key"
+                fi
+                return 0
+            fi
+        fi
+        return 1
+    fi
 
     local next_task=""
     next_task=$(python3 "$TASK_POOL_ROUTER" --tasks-root "$TASKS_ROOT" --config "$CONFIG_PATH" --agent "$agent_id" --next 2>/dev/null || true)
@@ -943,6 +1128,36 @@ auto_push_next_task_for_agent() {
         return 0
     fi
 
+    return 1
+}
+
+auto_reserve_next_task_for_agent() {
+    local agent_id="$1"
+    local trigger_task_id="${2:-}"
+    [ -n "$agent_id" ] || return 1
+    [ "$(task_pool_bool auto_reserve_while_working false 2>/dev/null || echo 0)" = "1" ] || return 1
+
+    local working_count reserved_count limits working_limit reserved_limit
+    working_count=$(working_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    [ "${working_count:-0}" -gt 0 ] || return 1
+    reserved_count=$(reserved_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    limits=$(agent_capacity_limits "$agent_id" 2>/dev/null || echo "1 1 2")
+    working_limit=$(echo "$limits" | awk '{print $1}')
+    reserved_limit=$(echo "$limits" | awk '{print $2}')
+    [ "${working_count:-0}" -le "${working_limit:-1}" ] || return 1
+    [ "${reserved_count:-0}" -lt "${reserved_limit:-1}" ] || return 1
+
+    local next_task=""
+    next_task=$(python3 "$TASK_POOL_ROUTER" --tasks-root "$TASKS_ROOT" --config "$CONFIG_PATH" --agent "$agent_id" --next 2>/dev/null || true)
+    [ -n "$next_task" ] || return 1
+
+    local reason="watcher auto-reserved while ${agent_id} is working"
+    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1; then
+        notify_agent "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。"
+        emit_system_chat_event nudge "$next_task" "watcher 已为 ${agent_id} 预留下一条任务，等待当前 working 完成后 ack。" "$agent_id" info nudge
+        log "${next_task}: 已为 ${agent_id} 预留下一条任务（trigger=${trigger_task_id:-idle sweep}）"
+        return 0
+    fi
     return 1
 }
 
@@ -1958,6 +2173,8 @@ task = json.loads(task_path.read_text(encoding='utf-8'))
 old_status = str(task.get('status') or '')
 now = datetime.now().astimezone().isoformat(timespec='seconds')
 
+if old_status == 'pooled':
+    task['pre_claim_assigned_agent'] = task.get('pre_claim_assigned_agent') or task.get('assigned_agent')
 task['assigned_agent'] = assigned_agent
 task['status'] = 'dispatched'
 task['updated_at'] = now
@@ -1966,10 +2183,15 @@ task['lease_acquired_at'] = now
 task['lease_expires_at'] = now
 if claimed_by:
     task['claimed_by'] = claimed_by
+    task['reserved_by'] = claimed_by
 if claimed_at:
     task['claimed_at'] = claimed_at
+    task['reserved_at'] = claimed_at
 if claim_reason:
     task['claim_reason'] = claim_reason
+    task['reserved_reason'] = claim_reason
+if task.get('depends_on') and not task.get('dependencies_ready_at'):
+    task['dependencies_ready_at'] = now
 task['pool_entered_at'] = task.get('pool_entered_at')
 
 with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
@@ -2154,6 +2376,114 @@ PY
         push_task_event_with_retry "$timeout_push_key" "$task_dir/task.json" "【任务池超时】" "$task_id" "任务在 pooled 中等待超过 ${timeout_minutes} 分钟" "请 PM 判断转派、拆小或提高优先级" || true
     fi
     return 0
+}
+
+record_dependencies_ready_if_needed() {
+    local task_dir="$1"
+    local task_id="$2"
+    [ "$(get_task_status "$task_dir")" = "pooled" ] || return 1
+    dependencies_ready "$task_dir" >/dev/null 2>&1 || return 1
+    python3 - "$task_dir" "$task_id" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task_id = sys.argv[2]
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+if not task.get('depends_on') or task.get('dependencies_ready_at'):
+    raise SystemExit(1)
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+task['dependencies_ready_at'] = now
+task['updated_at'] = now
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': 'pooled',
+        'to': 'pooled',
+        'at': now,
+        'event': 'dependencies_ready',
+        'reason': 'watcher observed all dependencies ready',
+    }, ensure_ascii=False) + '\n')
+print(task_id)
+PY
+}
+
+return_reserved_to_pool_if_timed_out() {
+    local task_dir="$1"
+    local task_id="$2"
+    [ "$(task_pool_bool auto_return_reserved_on_ack_timeout true 2>/dev/null || echo 1)" = "1" ] || return 1
+    [ "$(get_task_status "$task_dir")" = "dispatched" ] || return 1
+    [ ! -f "$task_dir/ack.json" ] || return 1
+
+    local timeout_seconds dispatch_time now
+    timeout_seconds=$(task_pool_int reserved_ack_timeout_seconds "$DISPATCH_RESEND_AFTER_SECONDS" 2>/dev/null || echo "$DISPATCH_RESEND_AFTER_SECONDS")
+    dispatch_time=$(task_dispatch_reference_epoch "$task_dir")
+    [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] || return 1
+    now=$(date +%s)
+    [ $(( now - dispatch_time )) -gt "${timeout_seconds:-300}" ] || return 1
+
+    python3 - "$task_dir" "$task_id" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task_id = sys.argv[2]
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+if str(task.get('status') or '') != 'dispatched':
+    raise SystemExit(1)
+if not (task.get('reserved_by') or task.get('claimed_by')):
+    raise SystemExit(1)
+if not task.get('pool_entered_at'):
+    raise SystemExit(1)
+
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+previous_agent = task.get('assigned_agent')
+task['last_reserved_by'] = task.get('reserved_by') or task.get('claimed_by')
+task['last_reserved_at'] = task.get('reserved_at') or task.get('claimed_at')
+task['last_reserved_timeout_at'] = now
+task['assigned_agent'] = task.get('pre_claim_assigned_agent') or 'auto'
+task['status'] = 'pooled'
+task['updated_at'] = now
+for key in (
+    'claimed_by',
+    'claimed_at',
+    'claim_reason',
+    'reserved_by',
+    'reserved_at',
+    'reserved_reason',
+    'lease_acquired_at',
+    'lease_expires_at',
+):
+    task.pop(key, None)
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+claim_path = task_dir / 'claim.json'
+if claim_path.exists():
+    claim_path.rename(task_dir / f'claim.expired.{now.replace(":", "").replace("+", "_")}.json')
+with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': 'dispatched',
+        'to': 'pooled',
+        'at': now,
+        'reason': f'reserved task timed out without ack; returned to pool from {previous_agent}',
+    }, ensure_ascii=False) + '\n')
+print(previous_agent or '')
+PY
 }
 
 auto_dispatch_review() {
@@ -2349,6 +2679,7 @@ run_task_watcher_loop() {
             process_claim_json "$task_dir" "$task_id" || true
             current_status=$(get_task_status "$task_dir")
             if [ "$current_status" = "pooled" ]; then
+                record_dependencies_ready_if_needed "$task_dir" "$task_id" >/dev/null 2>&1 || true
                 nudge_pooled_task "$task_dir" "$task_id" "$current_status" || true
                 notify_pooled_timeout_if_needed "$task_dir" "$task_id" "$current_status" || true
             fi
@@ -2375,6 +2706,17 @@ run_task_watcher_loop() {
 
         # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
+            if returned_agent=$(return_reserved_to_pool_if_timed_out "$task_dir" "$task_id" 2>/dev/null); then
+                notify_pm "[task-watcher] $task_id 预留后超时未 ack，已回退到 pooled。"
+                if [ -n "$returned_agent" ]; then
+                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已从 ${returned_agent} 回退到 pooled。" "$PM_SESSION" degraded notify
+                else
+                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已回退到 pooled。" "$PM_SESSION" degraded notify
+                fi
+                sync_task_board "$task_dir" "reserved-timeout-returned"
+                current_status="pooled"
+                continue
+            fi
             dispatch_time=$(task_dispatch_reference_epoch "$task_dir")
             now=$(date +%s)
             if [ -n "$dispatch_time" ] && [ "$dispatch_time" -gt 0 ] && [ $(( now - dispatch_time )) -gt "$DISPATCH_RESEND_AFTER_SECONDS" ]; then
@@ -2424,6 +2766,21 @@ run_task_watcher_loop() {
                     mark_notified "$ack_stale_key"
                 fi
             else
+                assigned_agent_for_ack=$(task_json_pick "$task_dir" assigned_agent)
+                [ -n "$assigned_agent_for_ack" ] || assigned_agent_for_ack="$ack_agent"
+                _ack_limits=$(agent_capacity_limits "$assigned_agent_for_ack" 2>/dev/null || echo "1 1 2")
+                _ack_working_limit=$(echo "$_ack_limits" | awk '{print $1}')
+                _ack_working_count=$(working_task_count_for_agent "$assigned_agent_for_ack" 2>/dev/null || echo 0)
+                if [ "${_ack_working_count:-0}" -ge "${_ack_working_limit:-1}" ]; then
+                    _ack_capacity_key="${task_id}_ack_capacity_blocked"
+                    if ! is_notified "$_ack_capacity_key"; then
+                        notify_agent "$assigned_agent_for_ack" "任务 ${task_id} 已预留，但你已有 working 任务。请先完成当前主线，再重新确认本任务。"
+                        notify_pm "[task-watcher] $task_id 收到 ack，但 ${assigned_agent_for_ack} 已达到 working_limit=${_ack_working_limit}，已暂缓进入 working。"
+                        emit_system_chat_event watcher "$task_id" "ack 暂缓：${assigned_agent_for_ack} 已达到 working_limit=${_ack_working_limit}。" "$PM_SESSION" degraded notify
+                        mark_notified "$_ack_capacity_key"
+                    fi
+                    continue
+                fi
                 set_task_status "$task_dir" "working" "watcher observed ack.json"
                 current_status="working"
                 if ! is_notified "$ack_key"; then
@@ -2498,6 +2855,7 @@ run_task_watcher_loop() {
                         else
                             notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
                             emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
+                            auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                         fi
                     fi
 
@@ -2734,6 +3092,12 @@ run_task_watcher_loop() {
         sync_if_changed "$task_dir" "$task_dir/design-review.md" "designreview"
         sync_if_changed "$task_dir" "$task_dir/verify.json" "verify"
     done
+
+    while IFS= read -r pool_agent; do
+        [ -n "$pool_agent" ] || continue
+        auto_push_next_task_for_agent "$pool_agent" "idle sweep" || true
+        auto_reserve_next_task_for_agent "$pool_agent" "working sweep" || true
+    done <<< "$(list_pool_agents)"
 
     while IFS= read -r reviewer_agent; do
         [ -n "$reviewer_agent" ] || continue

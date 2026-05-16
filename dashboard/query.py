@@ -10,6 +10,23 @@ from typing import Any
 ACTIVE_LOAD_STATUSES = {'pending', 'dispatched', 'working', 'blocked'}
 BLOCKED_AGGREGATE_STATUSES = {'blocked', 'failed', 'cancelled', 'timeout'}
 TERMINAL_GANTT_STATUSES = {'done', 'merged', 'archived', 'cancelled', 'failed', 'timeout'}
+GANTT_END_REFERENCE_FIELDS = (
+    'current_status_at',
+    'verify_completed_at',
+    'review_completed_at',
+    'completed_at',
+    'ack_at',
+    'dispatched_at',
+    'created_at',
+)
+GANTT_PHASE_DEFS = {
+    'pooled': {'label': '入池等待', 'color': '#1677ff'},
+    'reserved': {'label': '已派发/预留', 'color': '#13c2c2'},
+    'working': {'label': '执行中', 'color': '#722ed1'},
+    'review': {'label': '审查', 'color': '#faad14'},
+    'qa': {'label': 'QA', 'color': '#52c41a'},
+    'pm_acceptance': {'label': 'PM收口', 'color': '#ff4d4f'},
+}
 READ_ONLY_AGGREGATE_DIMENSIONS = (
     'owner_pm',
     'domain',
@@ -23,9 +40,12 @@ def _parse_time(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value.replace('Z', '+00:00'))
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.astimezone()
+    return parsed.astimezone()
 
 
 def _seconds_between(start: str | None, end: str | None) -> float | None:
@@ -53,24 +73,47 @@ def _is_skip_review_task(task: dict[str, Any]) -> bool:
 
 def _gantt_end_reference(task: dict[str, Any], generated_at: str) -> str | None:
     if task.get('current_status') in TERMINAL_GANTT_STATUSES or task.get('board_status') == 'done':
-        return (
-            task.get('current_status_at')
-            or task.get('verify_completed_at')
-            or task.get('review_completed_at')
-            or task.get('completed_at')
-            or task.get('ack_at')
-            or task.get('dispatched_at')
-            or task.get('created_at')
-        )
+        for field in GANTT_END_REFERENCE_FIELDS:
+            if task.get(field):
+                return task.get(field)
     return generated_at
 
 
-def _append_phase_segment(segments: list[dict[str, Any]], *, key: str, label: str, color: str, start: str | None, end: str | None) -> None:
+def _gantt_end_reference_field(task: dict[str, Any]) -> str:
+    if task.get('current_status') in TERMINAL_GANTT_STATUSES or task.get('board_status') == 'done':
+        for field in GANTT_END_REFERENCE_FIELDS:
+            if task.get(field):
+                return field
+    return 'generated_at'
+
+
+def _time_source(field: str, *, source: str = 'tasks_read_model', precision: str = 'exact') -> dict[str, str]:
+    return {
+        'field': field,
+        'source': source,
+        'precision': precision,
+    }
+
+
+def _append_phase_segment(
+    segments: list[dict[str, Any]],
+    *,
+    key: str,
+    label: str,
+    color: str,
+    start: str | None,
+    end: str | None,
+    start_source: dict[str, str] | None = None,
+    end_source: dict[str, str] | None = None,
+) -> None:
     if not start or not end:
         return
     duration_seconds = _seconds_between(start, end)
     if duration_seconds is None or duration_seconds <= 0:
         return
+    start_source = start_source or _time_source('unknown', precision='inferred')
+    end_source = end_source or _time_source('unknown', precision='inferred')
+    precision = 'exact' if start_source.get('precision') == 'exact' and end_source.get('precision') == 'exact' else 'inferred'
     segments.append({
         'key': key,
         'label': label,
@@ -79,65 +122,115 @@ def _append_phase_segment(segments: list[dict[str, Any]], *, key: str, label: st
         'end_at': end,
         'duration_seconds': duration_seconds,
         'duration_hours': _duration_hours(duration_seconds),
+        'source': {
+            'start': start_source,
+            'end': end_source,
+        },
+        'source_kind': precision,
+        'precision': precision,
     })
 
 
 def _build_gantt_phase_segments(task: dict[str, Any], generated_at: str) -> list[dict[str, Any]]:
     end_reference = _gantt_end_reference(task, generated_at)
+    end_reference_field = _gantt_end_reference_field(task)
     skip_review = _is_skip_review_task(task)
+    test_required = bool(task.get('test_required'))
+    gate = str(task.get('merge_gate_state') or '')
+    current_status = str(task.get('current_status') or '')
     segments: list[dict[str, Any]] = []
+    generated_source = _time_source('generated_at', source='dashboard', precision='inferred')
 
+    pooled_end = task.get('dispatched_at')
+    if not pooled_end and current_status == 'pooled':
+        pooled_end = end_reference
     _append_phase_segment(
         segments,
-        key='created',
-        label='创建',
-        color='#1677ff',
-        start=task.get('created_at'),
-        end=task.get('dispatched_at'),
+        key='pooled',
+        label=GANTT_PHASE_DEFS['pooled']['label'],
+        color=GANTT_PHASE_DEFS['pooled']['color'],
+        start=task.get('pool_entered_at'),
+        end=pooled_end,
+        start_source=_time_source('pool_entered_at', source='task_json'),
+        end_source=_time_source('dispatched_at') if task.get('dispatched_at') else generated_source,
     )
+
+    reserved_end = task.get('ack_at')
+    if not reserved_end and current_status == 'dispatched':
+        reserved_end = end_reference
     _append_phase_segment(
         segments,
-        key='dispatched',
-        label='派发',
-        color='#13c2c2',
+        key='reserved',
+        label=GANTT_PHASE_DEFS['reserved']['label'],
+        color=GANTT_PHASE_DEFS['reserved']['color'],
         start=task.get('dispatched_at'),
-        end=task.get('ack_at'),
+        end=reserved_end,
+        start_source=_time_source('dispatched_at'),
+        end_source=_time_source('ack_at') if task.get('ack_at') else generated_source,
     )
+
+    working_end = task.get('completed_at')
+    if not working_end and current_status == 'working':
+        working_end = end_reference
     _append_phase_segment(
         segments,
-        key='ack',
-        label='接单',
-        color='#722ed1',
+        key='working',
+        label=GANTT_PHASE_DEFS['working']['label'],
+        color=GANTT_PHASE_DEFS['working']['color'],
         start=task.get('ack_at'),
-        end=task.get('completed_at') or end_reference,
+        end=working_end,
+        start_source=_time_source('ack_at'),
+        end_source=_time_source('completed_at') if task.get('completed_at') else generated_source,
     )
 
     if not skip_review:
         review_wait_end = task.get('review_completed_at') or task.get('verify_completed_at') or end_reference
+        review_wait_end_field = 'review_completed_at' if task.get('review_completed_at') else 'verify_completed_at' if task.get('verify_completed_at') else end_reference_field
         _append_phase_segment(
             segments,
-            key='completed',
-            label='等待审查/验收',
-            color='#faad14',
+            key='review',
+            label=GANTT_PHASE_DEFS['review']['label'],
+            color=GANTT_PHASE_DEFS['review']['color'],
             start=task.get('completed_at'),
             end=review_wait_end,
+            start_source=_time_source('completed_at'),
+            end_source=_time_source(review_wait_end_field, precision='inferred' if review_wait_end_field == 'generated_at' else 'exact'),
         )
 
+    qa_start = task.get('review_completed_at') if not skip_review else task.get('completed_at')
+    qa_end = task.get('verify_completed_at')
+    if not qa_end and test_required and gate in {'qa_pending', 'qa_failed'}:
+        qa_end = end_reference
     _append_phase_segment(
         segments,
-        key='review_completed',
-        label='审查通过',
-        color='#52c41a',
-        start=task.get('review_completed_at'),
-        end=task.get('verify_completed_at') or end_reference,
+        key='qa',
+        label=GANTT_PHASE_DEFS['qa']['label'],
+        color=GANTT_PHASE_DEFS['qa']['color'],
+        start=qa_start,
+        end=qa_end,
+        start_source=_time_source('review_completed_at' if not skip_review else 'completed_at'),
+        end_source=_time_source('verify_completed_at') if task.get('verify_completed_at') else generated_source,
     )
+
+    acceptance_start = task.get('verify_completed_at')
+    if not acceptance_start and not test_required:
+        acceptance_start = task.get('review_completed_at') if not skip_review else task.get('completed_at')
+    acceptance_end = None
+    if acceptance_start and (
+        gate == 'pm_acceptance_pending'
+        or current_status in TERMINAL_GANTT_STATUSES
+        or task.get('board_status') == 'done'
+    ):
+        acceptance_end = end_reference
     _append_phase_segment(
         segments,
-        key='verify_completed',
-        label='验证通过',
-        color='#ff4d4f',
-        start=task.get('verify_completed_at'),
-        end=end_reference,
+        key='pm_acceptance',
+        label=GANTT_PHASE_DEFS['pm_acceptance']['label'],
+        color=GANTT_PHASE_DEFS['pm_acceptance']['color'],
+        start=acceptance_start,
+        end=acceptance_end,
+        start_source=_time_source('verify_completed_at' if task.get('verify_completed_at') else 'review_completed_at' if task.get('review_completed_at') else 'completed_at'),
+        end_source=_time_source(end_reference_field, precision='inferred' if end_reference_field == 'generated_at' else 'exact'),
     )
     return segments
 
@@ -156,9 +249,20 @@ def _persisted_stage_durations_from_row(row: sqlite3.Row) -> dict[str, float | N
     return {key: row[key] if key in row_keys else None for key in keys}
 
 
+def _read_task_json_metadata(path_value: str | None) -> dict[str, Any]:
+    if not path_value:
+        return {}
+    try:
+        payload = json.loads(Path(path_value).read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
     write_scope = json.loads(row['write_scope_json'] or '[]')
     artifacts = json.loads(row['artifacts_json'] or '[]')
+    metadata = _read_task_json_metadata(row['task_json_path'])
     started_at = row['ack_at'] or row['dispatched_at'] or row['created_at']
     active_until = row['completed_at'] or row['current_status_at'] or _now_iso()
     active_work_seconds = _seconds_between(started_at, active_until)
@@ -176,6 +280,8 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'target_environment': row['target_environment'],
         'priority': row['priority'],
         'review_level': row['review_level'],
+        'review_required': bool(row['review_required']),
+        'test_required': bool(row['test_required']),
         'current_status': row['current_status'],
         'board_status': row['board_status'],
         'merge_gate_state': row['merge_gate_state'],
@@ -200,6 +306,19 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'last_synced_at': row['last_synced_at'],
         'active_work_seconds': active_work_seconds,
         'persisted_stage_durations': _persisted_stage_durations_from_row(row),
+        'pool_entered_at': metadata.get('pool_entered_at'),
+        'pool_timeout_minutes': metadata.get('pool_timeout_minutes'),
+        'claim_policy': metadata.get('claim_policy'),
+        'claim_scope': metadata.get('claim_scope') if isinstance(metadata.get('claim_scope'), list) else [],
+        'claimed_by': metadata.get('claimed_by'),
+        'claimed_at': metadata.get('claimed_at'),
+        'claim_reason': metadata.get('claim_reason'),
+        'reserved_by': metadata.get('reserved_by'),
+        'reserved_at': metadata.get('reserved_at'),
+        'reserved_reason': metadata.get('reserved_reason'),
+        'dependencies_ready_at': metadata.get('dependencies_ready_at'),
+        'dependency_policy': metadata.get('dependency_policy'),
+        'depends_on': metadata.get('depends_on') if isinstance(metadata.get('depends_on'), list) else [],
     }
 
 
@@ -516,27 +635,6 @@ def build_gantt_payload(
         milestone_verify = task['verify_completed_at']
         phase_segments = _build_gantt_phase_segments(task, generated_at)
         end_reference = _gantt_end_reference(task, generated_at)
-        if (
-            not _is_skip_review_task(task)
-            and task.get('completed_at')
-            and end_reference
-            and not any(segment['key'] == 'completed' for segment in phase_segments)
-            and _seconds_between(task.get('completed_at'), end_reference)
-        ):
-            _append_phase_segment(
-                phase_segments,
-                key='completed',
-                label='等待审查/验收',
-                color='#faad14',
-                start=task.get('completed_at'),
-                end=end_reference,
-            )
-        if phase_segments and end_reference:
-            trailing_gap_seconds = _seconds_between(phase_segments[-1]['end_at'], end_reference)
-            if trailing_gap_seconds:
-                phase_segments[-1]['end_at'] = end_reference
-                phase_segments[-1]['duration_seconds'] = _seconds_between(phase_segments[-1]['start_at'], end_reference)
-                phase_segments[-1]['duration_hours'] = _duration_hours(phase_segments[-1]['duration_seconds'])
         span_start = phase_segments[0]['start_at'] if phase_segments else (milestone_ack or milestone_dispatched or milestone_created)
         span_end = phase_segments[-1]['end_at'] if phase_segments else end_reference
         items.append({
@@ -555,6 +653,13 @@ def build_gantt_payload(
             'phase_segments': phase_segments,
             'milestones': {
                 'created': milestone_created,
+                'pooled': task.get('pool_entered_at'),
+                'dependencies_ready': task.get('dependencies_ready_at'),
+                'reserved': milestone_dispatched,
+                'working': milestone_ack,
+                'review': milestone_completed,
+                'qa': milestone_review if not _is_skip_review_task(task) else milestone_completed,
+                'pm_acceptance': milestone_verify or milestone_review or milestone_completed,
                 'dispatched': milestone_dispatched,
                 'ack': milestone_ack,
                 'completed': milestone_completed,
