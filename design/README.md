@@ -24,6 +24,7 @@
 ### 协作架构与任务池
 - `collaboration/control-plane-and-task-pool.md` — 当前最新综合方案：任务事实层、编排执行层、通信时间线层、只读视图层，以及任务池优化。
 - `collaboration/task-pool-claiming.md` — 任务池认领机制专项方案。
+- `collaboration/parallelism-task-pool-and-gantt-optimization.md` — 并行度、任务池默认使用、watcher 续推与 Gantt 真实性优化方案。
 - `collaboration/feature-shared-context.md` — 功能级共享上下文协作规范。
 
 ### Chat Hub
