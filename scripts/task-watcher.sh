@@ -866,7 +866,7 @@ reconcile_task_state_invariants() {
     local task_dir="$1"
     local task_id="$2"
     local report
-    report=$(python3 "$STATE_INVARIANTS_PY" --task-dir "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || echo '{}')
+    report=$(python3 "$STATE_INVARIANTS_PY" --task-dir "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || printf '{"parse_error": true, "violations": [], "signature": ""}')
     python3 - "$task_dir" "$report" <<'PY'
 import json
 import os
@@ -880,18 +880,24 @@ raw_report = sys.argv[2] or '{}'
 try:
     report = json.loads(raw_report)
 except Exception:
-    report = {}
+    report = {'parse_error': True, 'violations': [], 'signature': ''}
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
 now = datetime.now().astimezone().isoformat(timespec='seconds')
 violations = report.get('violations') if isinstance(report.get('violations'), list) else []
 signature = str(report.get('signature') or '')
+parse_error = bool(report.get('parse_error'))
 previous_signature = str(task.get('state_invariant_signature') or '')
 current_state = str(task.get('control_plane_state') or '')
 changed = False
 notify = False
 
-if violations:
+if parse_error:
+    task['state_invariant_checked_at'] = now
+    if task.get('state_invariant_parse_error_at') != now:
+        task['state_invariant_parse_error_at'] = now
+        changed = True
+elif violations:
     if task.get('state_invariant_violations') != violations:
         task['state_invariant_violations'] = violations
         changed = True
@@ -908,6 +914,9 @@ if violations:
         task['control_plane_updated_at'] = now
         changed = True
 else:
+    if task.get('state_invariant_parse_error_at'):
+        task['state_invariant_parse_error_at'] = None
+        changed = True
     if task.get('state_invariant_violations'):
         task['state_invariant_violations'] = []
         changed = True
@@ -931,6 +940,7 @@ if changed:
 
 print(json.dumps({
     'notify': notify,
+    'parse_error': parse_error,
     'count': len(violations),
     'messages': [str(item.get('message') or '') for item in violations if isinstance(item, dict)],
 }, ensure_ascii=False))
@@ -1460,7 +1470,9 @@ auto_push_next_task_for_agent() {
 
     local reason="watcher auto-continued after ${trigger_task_id:-previous task completion}"
     if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1; then
-        notify_agent "$agent_id" "你当前主线已完成/进入待审。下一条可执行任务已自动续推：${next_task}。请读取 ${TASKS_ROOT}/${next_task}/instruction.md，并在确认后写 ack.json 开始执行。"
+        local workspace_hint=""
+        workspace_hint=$(task_json_pick "$TASKS_ROOT/$next_task" workspace_dispatch_hint)
+        notify_agent "$agent_id" "你当前主线已完成/进入待审。下一条可执行任务已自动续推：${next_task}。请读取 ${TASKS_ROOT}/${next_task}/instruction.md，并在确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}"
         emit_system_chat_event nudge "$next_task" "上一条主线完成后，已自动续推给 ${agent_id} 作为下一条可执行任务。" "$agent_id" info nudge
         log "${next_task}: 已在 ${trigger_task_id:-unknown} 完成后自动续推给 ${agent_id}"
         return 0
@@ -1491,7 +1503,9 @@ auto_reserve_next_task_for_agent() {
 
     local reason="watcher auto-reserved while ${agent_id} is working"
     if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1; then
-        notify_agent "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。"
+        local workspace_hint=""
+        workspace_hint=$(task_json_pick "$TASKS_ROOT/$next_task" workspace_dispatch_hint)
+        notify_agent "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。${workspace_hint:+ ${workspace_hint}}"
         emit_system_chat_event nudge "$next_task" "watcher 已为 ${agent_id} 预留下一条任务，等待当前 working 完成后 ack。" "$agent_id" info nudge
         log "${next_task}: 已为 ${agent_id} 预留下一条任务（trigger=${trigger_task_id:-idle sweep}）"
         return 0
@@ -1726,7 +1740,7 @@ now = datetime.now().astimezone().isoformat(timespec='seconds')
 try:
     patch = json.loads(patch_json)
 except Exception:
-    patch = {}
+    raise SystemExit(f'patch_json_invalid:{patch_path}')
 
 status_changed = bool(new_status) and old_status != new_status
 fields_changed = False
@@ -3190,9 +3204,12 @@ run_task_watcher_loop() {
             current_status=$(get_task_status "$task_dir")
         fi
         invariant_report=$(reconcile_task_state_invariants "$task_dir" "$task_id" 2>/dev/null || echo '{}')
+        invariant_parse_error=$(python3 -c 'import json,sys; print("1" if json.load(sys.stdin).get("parse_error") else "0")' <<< "$invariant_report" 2>/dev/null || echo 0)
         invariant_notify=$(python3 -c 'import json,sys; print("1" if json.load(sys.stdin).get("notify") else "0")' <<< "$invariant_report" 2>/dev/null || echo 0)
         invariant_count=$(python3 -c 'import json,sys; print(int(json.load(sys.stdin).get("count") or 0))' <<< "$invariant_report" 2>/dev/null || echo 0)
-        if [ "${invariant_notify:-0}" = "1" ] && [ "${invariant_count:-0}" -gt 0 ]; then
+        if [ "${invariant_parse_error:-0}" = "1" ]; then
+            log "$task_id: state invariant report parse failed; preserved prior invariant state"
+        elif [ "${invariant_notify:-0}" = "1" ] && [ "${invariant_count:-0}" -gt 0 ]; then
             invariant_summary=$(python3 -c 'import json,sys; payload=json.load(sys.stdin); print("；".join([item for item in payload.get("messages") or [] if item][:2]))' <<< "$invariant_report" 2>/dev/null || echo "")
             notify_pm "[task-watcher] $task_id 检测到状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}"
             emit_system_chat_event watcher "$task_id" "状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}" "$PM_SESSION" degraded notify
@@ -3644,7 +3661,7 @@ run_task_watcher_loop() {
                 vstate=$(verify_state "$task_dir/verify.json")
                 vsummary=$(verify_summary "$task_dir/verify.json")
                 if [ "$vstate" = "invalid" ]; then
-                    clear_qa_queue_state
+                    clear_qa_queue_state_for_task "$task_id"
                     verify_invalid_key="${task_id}_artifact_invalid_verify"
                     if ! is_notified "$verify_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 verify.json 非法，请修正后重试。"
@@ -3652,7 +3669,7 @@ run_task_watcher_loop() {
                         mark_notified "$verify_invalid_key"
                     fi
                 elif [ "$vstate" = "pass" ]; then
-                    clear_qa_queue_state
+                    clear_qa_queue_state_for_task "$task_id"
                     review_required=$(task_json_pick "$task_dir" review_required)
                     review_level=$(task_json_pick "$task_dir" review_level)
                     summary=$(json_pick "$task_dir/result.json" summary)
@@ -3693,7 +3710,7 @@ run_task_watcher_loop() {
                         fi
                     fi
                 elif [ "$vstate" = "fail" ]; then
-                    clear_qa_queue_state
+                    clear_qa_queue_state_for_task "$task_id"
                     if [ "$verify_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
                         set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at" "__KEEP__" "failed"

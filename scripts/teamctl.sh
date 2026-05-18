@@ -329,6 +329,7 @@ start_watcher() {
   ensure_runtime_dirs
   local watcher_pid_file="$STATE_DIR/task-watcher/task-watcher.pid"
   local watchdog_pid_file="$STATE_DIR/task-watcher/task-watcher-watchdog.pid"
+  local standalone_pid=""
   if [ -f "$watchdog_pid_file" ]; then
     pid="$(cat "$watchdog_pid_file" 2>/dev/null || true)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
@@ -339,13 +340,19 @@ start_watcher() {
   if [ -f "$watcher_pid_file" ]; then
     pid="$(cat "$watcher_pid_file" 2>/dev/null || true)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
-      log "task-watcher already running pid=$pid"
-      return 0
+      standalone_pid="$pid"
+      log "detected standalone task-watcher pid=$pid; starting watchdog to take over supervision"
+    elif [ -n "$pid" ]; then
+      rm -f "$watcher_pid_file"
     fi
   fi
   WORKSPACE_ROOT="$WORKSPACE_ROOT" CONFIG_PATH="$CONFIG_PATH" TASKS_ROOT="$TASKS_ROOT" INTERVAL="$WATCHER_INTERVAL" \
     nohup "$SCRIPT_DIR/task-watcher-watchdog.sh" >> "$LOG_DIR/task-watcher.nohup.log" 2>&1 &
-  log "task-watcher watchdog started pid=$! log=$LOG_DIR/task-watcher.nohup.log"
+  if [ -n "$standalone_pid" ]; then
+    log "task-watcher watchdog started pid=$! and will supervise existing watcher pid=$standalone_pid log=$LOG_DIR/task-watcher.nohup.log"
+  else
+    log "task-watcher watchdog started pid=$! log=$LOG_DIR/task-watcher.nohup.log"
+  fi
 }
 
 stop_pid_file() {
@@ -375,8 +382,10 @@ stop_pid_file() {
 }
 
 stop_watcher() {
-  stop_pid_file "$STATE_DIR/task-watcher/task-watcher-watchdog.pid" task-watcher-watchdog || true
-  stop_pid_file "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher || true
+  local rc=0
+  stop_pid_file "$STATE_DIR/task-watcher/task-watcher-watchdog.pid" task-watcher-watchdog || rc=1
+  stop_pid_file "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher || rc=1
+  return "$rc"
 }
 
 start_dashboard() {
@@ -518,37 +527,39 @@ status_cmd() {
   done
 }
 
-COMMAND="${1:-}"
-if [ -z "$COMMAND" ]; then
-  usage >&2
-  exit 2
-fi
-shift || true
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --attach) START_ATTACH=1; shift ;;
-    --force) START_FORCE=1; shift ;;
-    --render-config) RENDER_CONFIG=1; shift ;;
-    -h|--help) usage; exit 0 ;;
-    *) err "unknown option: $1"; usage >&2; exit 2 ;;
-  esac
-done
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  COMMAND="${1:-}"
+  if [ -z "$COMMAND" ]; then
+    usage >&2
+    exit 2
+  fi
+  shift || true
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --attach) START_ATTACH=1; shift ;;
+      --force) START_FORCE=1; shift ;;
+      --render-config) RENDER_CONFIG=1; shift ;;
+      -h|--help) usage; exit 0 ;;
+      *) err "unknown option: $1"; usage >&2; exit 2 ;;
+    esac
+  done
 
-case "$COMMAND" in
-  bootstrap) bootstrap ;;
-  doctor) doctor ;;
-  start-agents) start_agents ;;
-  stop-agents) stop_agents ;;
-  start-watcher) start_watcher ;;
-  stop-watcher) stop_watcher ;;
-  start-dashboard) start_dashboard ;;
-  stop-dashboard) stop_dashboard ;;
-  init-codex-gateway-config) init_codex_gateway_config ;;
-  start-codex-gateway) start_codex_gateway ;;
-  stop-codex-gateway) stop_codex_gateway ;;
-  install-codex-profile) install_codex_profile ;;
-  smoke) smoke ;;
-  status) status_cmd ;;
-  -h|--help|help) usage ;;
-  *) err "unknown command: $COMMAND"; usage >&2; exit 2 ;;
-esac
+  case "$COMMAND" in
+    bootstrap) bootstrap ;;
+    doctor) doctor ;;
+    start-agents) start_agents ;;
+    stop-agents) stop_agents ;;
+    start-watcher) start_watcher ;;
+    stop-watcher) stop_watcher ;;
+    start-dashboard) start_dashboard ;;
+    stop-dashboard) stop_dashboard ;;
+    init-codex-gateway-config) init_codex_gateway_config ;;
+    start-codex-gateway) start_codex_gateway ;;
+    stop-codex-gateway) stop_codex_gateway ;;
+    install-codex-profile) install_codex_profile ;;
+    smoke) smoke ;;
+    status) status_cmd ;;
+    -h|--help|help) usage ;;
+    *) err "unknown command: $COMMAND"; usage >&2; exit 2 ;;
+  esac
+fi

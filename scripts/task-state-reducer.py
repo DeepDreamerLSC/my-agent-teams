@@ -100,7 +100,7 @@ def reduce_task_state(task_dir: Path) -> dict:
     if status == 'dispatched' and ack.get('normalized_status') == 'acknowledged' and ack.get('is_current_round', True):
         patches['status'] = 'working'
         reason = 'ack_current_round'
-    elif result.get('normalized_status') == 'success' and result.get('is_current_round', True):
+    elif status in {'dispatched', 'working'} and result.get('normalized_status') == 'success' and result.get('is_current_round', True):
         patches['status'] = 'ready_for_merge'
         patches['rework_reason'] = None
         if review_required and test_required and quality_gate_mode == 'parallel':

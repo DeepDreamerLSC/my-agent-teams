@@ -32,7 +32,7 @@ if [ -z "$AGENT_ID" ]; then
   esac
 fi
 
-python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$TASKS_ROOT" "$CONFIG_PATH" "$WORKSPACE_ROOT" <<'PY'
+python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$TASKS_ROOT" "$CONFIG_PATH" "$WORKSPACE_ROOT" "$SCRIPT_DIR" <<'PY'
 import json
 import os
 import sys
@@ -46,8 +46,10 @@ reason = sys.argv[3].strip()
 tasks_root = Path(sys.argv[4])
 config_path = Path(sys.argv[5])
 workspace_root = Path(sys.argv[6])
-sys.path.insert(0, str(workspace_root / 'scripts' / 'lib'))
+script_dir = Path(sys.argv[7])
+sys.path.insert(0, str(script_dir / 'lib'))
 from task_pool_rules import pool_gate_blockers  # type: ignore
+from task_workspace import ensure_task_workspace  # type: ignore
 
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -92,18 +94,6 @@ if not claim_scope:
 if claim_scope and agent_id not in claim_scope:
     raise SystemExit(f'agent {agent_id} is not in claim_scope: {claim_scope}')
 
-policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
-allowed = {'done', 'cancelled'}
-if policy == 'ready_for_merge_ok':
-    allowed.add('ready_for_merge')
-for dep in task.get('depends_on') or []:
-    dep_path = tasks_root / dep / 'task.json'
-    if not dep_path.exists():
-        raise SystemExit(f'dependency task missing: {dep}')
-    dep = json.loads(dep_path.read_text(encoding='utf-8'))
-    if str(dep.get('status') or '') not in allowed:
-        raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep.get("status")}')
-
 def int_value(value, default):
     try:
         if value in (None, ''):
@@ -117,18 +107,6 @@ pool_config = config.get('task_pool') or {}
 wip_limits = config.get('wip_limits') or {}
 agent_role = str(((config.get('agents') or {}).get(agent_id) or {}).get('role') or '').strip().lower()
 wip_key = ROLE_WIP_KEYS.get(agent_role)
-role_limit = wip_limits.get(agent_id)
-if role_limit in (None, '') and wip_key:
-    role_limit = wip_limits.get(wip_key)
-working_limit = max(1, int_value(pool_config.get('default_working_limit'), 1))
-reserved_limit = max(1, int_value(pool_config.get('default_reserved_limit'), 1))
-if role_limit not in (None, ''):
-    working_limit = max(1, min(working_limit, int_value(role_limit, working_limit)))
-active_limit = working_limit + reserved_limit
-active_count = 0
-working_count = 0
-reserved_count = 0
-target_scope = [str(item).strip() for item in (task.get('write_scope') or []) if str(item).strip()]
 
 def project_roots(payload):
     project = str(payload.get('project') or '').strip()
@@ -157,8 +135,6 @@ def resolve_scope_paths(payload):
     return resolved
 
 
-resolved_target_scope = resolve_scope_paths(task)
-
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
         path.relative_to(other)
@@ -168,29 +144,6 @@ def is_relative_to(path: Path, other: Path) -> bool:
 
 def scopes_overlap(a: Path, b: Path) -> bool:
     return a == b or is_relative_to(a, b) or is_relative_to(b, a)
-
-for other_path in tasks_root.glob('*/task.json'):
-    other = json.loads(other_path.read_text(encoding='utf-8'))
-    if str(other.get('assigned_agent') or '') != agent_id:
-        continue
-    if str(other.get('status') or '') not in {'dispatched', 'working'}:
-        continue
-    active_count += 1
-    if str(other.get('status') or '') == 'working':
-        working_count += 1
-    if str(other.get('status') or '') == 'dispatched':
-        reserved_count += 1
-    for other_scope in resolve_scope_paths(other):
-        for target_scope_item in resolved_target_scope:
-            if scopes_overlap(target_scope_item, other_scope):
-                raise SystemExit(f'write_scope conflict with active task: {other_path.parent.name}')
-
-if working_count > working_limit:
-    raise SystemExit(f'agent {agent_id} exceeds working_limit={working_limit}')
-if reserved_count >= reserved_limit:
-    raise SystemExit(f'agent {agent_id} already reached reserved_limit={reserved_limit}')
-if active_count >= active_limit:
-    raise SystemExit(f'agent {agent_id} already reached active capacity={active_limit}')
 
 claim_path = task_dir / 'claim.json'
 claim_payload = {
@@ -202,10 +155,66 @@ claim_payload = {
 if reason:
     claim_payload['reason'] = reason
 
+def assert_dependencies_ready(current_task):
+    policy = str(current_task.get('dependency_policy') or 'done_only').strip().lower()
+    allowed = {'done', 'cancelled'}
+    if policy == 'ready_for_merge_ok':
+        allowed.add('ready_for_merge')
+    for dep in current_task.get('depends_on') or []:
+        dep_path = tasks_root / dep / 'task.json'
+        if not dep_path.exists():
+            raise SystemExit(f'dependency task missing: {dep}')
+        dep_payload = json.loads(dep_path.read_text(encoding='utf-8'))
+        if str(dep_payload.get('status') or '') not in allowed:
+            raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep_payload.get("status")}')
+
+
+def assert_capacity_and_conflicts(current_task):
+    role_limit = wip_limits.get(agent_id)
+    if role_limit in (None, '') and wip_key:
+        role_limit = wip_limits.get(wip_key)
+    working_limit = max(1, int_value(pool_config.get('default_working_limit'), 1))
+    reserved_limit = max(1, int_value(pool_config.get('default_reserved_limit'), 1))
+    if role_limit not in (None, ''):
+        working_limit = max(1, min(working_limit, int_value(role_limit, working_limit)))
+    active_limit = working_limit + reserved_limit
+    active_count = 0
+    working_count = 0
+    reserved_count = 0
+    resolved_target_scope = resolve_scope_paths(current_task)
+
+    for other_path in tasks_root.glob('*/task.json'):
+        other = json.loads(other_path.read_text(encoding='utf-8'))
+        if str(other.get('assigned_agent') or '') != agent_id:
+            continue
+        if str(other.get('status') or '') not in {'dispatched', 'working'}:
+            continue
+        active_count += 1
+        if str(other.get('status') or '') == 'working':
+            working_count += 1
+        if str(other.get('status') or '') == 'dispatched':
+            reserved_count += 1
+        for other_scope in resolve_scope_paths(other):
+            for target_scope_item in resolved_target_scope:
+                if scopes_overlap(target_scope_item, other_scope):
+                    raise SystemExit(f'write_scope conflict with active task: {other_path.parent.name}')
+
+    if working_count > working_limit:
+        raise SystemExit(f'agent {agent_id} exceeds working_limit={working_limit}')
+    if reserved_count >= reserved_limit:
+        raise SystemExit(f'agent {agent_id} already reached reserved_limit={reserved_limit}')
+    if active_count >= active_limit:
+        raise SystemExit(f'agent {agent_id} already reached active capacity={active_limit}')
+
+
+agent_lock_path = workspace_root / '.runtime' / 'state' / 'task-watcher' / f'claim-agent-{agent_id}.lock'
+agent_lock_path.parent.mkdir(parents=True, exist_ok=True)
+agent_lock_fd = os.open(agent_lock_path, os.O_CREAT | os.O_RDWR, 0o644)
 lock_path = task_dir / '.claim.lock'
 lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o644)
 try:
     import fcntl
+    fcntl.flock(agent_lock_fd, fcntl.LOCK_EX)
     fcntl.flock(lock_fd, fcntl.LOCK_EX)
 
     task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -217,17 +226,8 @@ try:
     if gate_blockers:
         raise SystemExit('pool gate not satisfied: ' + ', '.join(gate_blockers))
 
-    policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
-    allowed = {'done', 'cancelled'}
-    if policy == 'ready_for_merge_ok':
-        allowed.add('ready_for_merge')
-    for dep in task.get('depends_on') or []:
-        dep_path = tasks_root / dep / 'task.json'
-        if not dep_path.exists():
-            raise SystemExit(f'dependency task missing: {dep}')
-        dep_payload = json.loads(dep_path.read_text(encoding='utf-8'))
-        if str(dep_payload.get('status') or '') not in allowed:
-            raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep_payload.get("status")}')
+    assert_dependencies_ready(task)
+    assert_capacity_and_conflicts(task)
 
     with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
         json.dump(claim_payload, tmp, ensure_ascii=False, indent=2)
@@ -255,6 +255,18 @@ try:
         tmp.write('\n')
     os.replace(tmp.name, task_path)
 
+    workspace_payload = ensure_task_workspace(task_dir, config_path)
+    dispatch_hint = str(workspace_payload.get('dispatch_hint') or '').strip()
+    if dispatch_hint:
+        claim_payload['dispatch_hint'] = dispatch_hint
+        refreshed_task = json.loads(task_path.read_text(encoding='utf-8'))
+        if refreshed_task.get('workspace_dispatch_hint') != dispatch_hint:
+            refreshed_task['workspace_dispatch_hint'] = dispatch_hint
+            with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+                json.dump(refreshed_task, tmp, ensure_ascii=False, indent=2)
+                tmp.write('\n')
+            os.replace(tmp.name, task_path)
+
     with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
         fp.write(json.dumps({
             'from': 'pooled',
@@ -265,6 +277,10 @@ try:
 finally:
     try:
         os.close(lock_fd)
+    except OSError:
+        pass
+    try:
+        os.close(agent_lock_fd)
     except OSError:
         pass
 

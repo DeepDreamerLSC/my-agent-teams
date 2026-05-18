@@ -197,7 +197,7 @@ def derive_workspace_plan(task: dict[str, Any], *, task_dir: Path, config: dict[
             "workspace_path": str(workspace_path),
             "worktree_path": None,
             "workspace_branch": branch,
-            "workspace_base_ref": target_branch or current_branch,
+            "workspace_base_ref": _resolve_base_ref(repo_root, target_branch or current_branch),
             "patch_path": str(_default_patch_path(task_dir, task_id)),
             "workspace_error": None,
             "workspace_prepared_at": None,
@@ -231,7 +231,7 @@ def derive_workspace_plan(task: dict[str, Any], *, task_dir: Path, config: dict[
         "patch_path": str(patch_path),
         "workspace_error": None,
         "workspace_prepared_at": None,
-        "dispatch_hint": f"请在 {active_path} 工作（branch: {branch}，目标分支: {target_branch or current_branch or 'HEAD'}）",
+        "dispatch_hint": f"请在 {active_path} 工作（branch: {branch}，目标基线: {base_ref}）",
         "integration_target_branch": target_branch or current_branch,
     }
 

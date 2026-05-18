@@ -49,7 +49,13 @@ cleanup_watchdog_runtime() {
   fi
 }
 
-trap cleanup_watchdog_runtime EXIT INT TERM
+shutdown_watchdog() {
+  cleanup_watchdog_runtime
+  exit 0
+}
+
+trap cleanup_watchdog_runtime EXIT
+trap shutdown_watchdog INT TERM
 ensure_watchdog_single_instance
 write_watchdog_pid
 

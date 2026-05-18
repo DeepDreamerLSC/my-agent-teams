@@ -169,6 +169,104 @@ class WriteTaskArtifactTests(unittest.TestCase):
         self.assertEqual(updated_task["result_branch"], "task/artifact-task")
         self.assertTrue(updated_task.get("patch_generated_at"))
 
+    def test_result_artifact_uses_workspace_base_ref_when_target_branch_missing(self):
+        repo_root = Path(self.tmpdir.name) / "repo-base-ref"
+        repo_root.mkdir()
+        feature_file = repo_root / "feature.txt"
+        feature_file.write_text("before\n", encoding="utf-8")
+        self._init_git_repo(repo_root)
+        subprocess.run(["git", "checkout", "-b", "task/artifact-task"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+        feature_file.write_text("after\n", encoding="utf-8")
+        subprocess.run(["git", "add", "feature.txt"], cwd=str(repo_root), check=True)
+        subprocess.run(["git", "commit", "-m", "feature"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+
+        task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        task.update({
+            "workspace_mode": "worktree",
+            "workspace_status": "prepared",
+            "workspace_path": str(repo_root),
+            "worktree_path": str(repo_root),
+            "workspace_branch": "task/artifact-task",
+            "workspace_base_ref": "main",
+            "patch_path": str(self.task_dir / "artifacts" / "artifact-task-base-ref.patch"),
+            "target_branch": "integration",
+            "integration_target_branch": "integration",
+        })
+        (self.task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        subprocess.run(
+            [
+                str(SCRIPTS / "write-result.sh"),
+                "artifact-task",
+                "--tasks-root",
+                str(self.tasks_root),
+                "--agent",
+                "dev-1",
+                "--status",
+                "done",
+                "--summary",
+                "基于 workspace_base_ref 产出 patch",
+            ],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        result_payload = json.loads((self.task_dir / "result.json").read_text(encoding="utf-8"))
+        patch_path = Path(result_payload["patch_path"])
+        self.assertTrue(result_payload["patch_exists"])
+        self.assertTrue(patch_path.exists())
+        self.assertIn("feature.txt", patch_path.read_text(encoding="utf-8"))
+
+    def test_result_artifact_captures_untracked_files(self):
+        repo_root = Path(self.tmpdir.name) / "repo-untracked"
+        repo_root.mkdir()
+        tracked = repo_root / "tracked.txt"
+        tracked.write_text("tracked\n", encoding="utf-8")
+        self._init_git_repo(repo_root)
+        subprocess.run(["git", "checkout", "-b", "task/artifact-task"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+        (repo_root / "new-file.txt").write_text("new\n", encoding="utf-8")
+
+        task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        task.update({
+            "workspace_mode": "worktree",
+            "workspace_status": "prepared",
+            "workspace_path": str(repo_root),
+            "worktree_path": str(repo_root),
+            "workspace_branch": "task/artifact-task",
+            "workspace_base_ref": "main",
+            "patch_path": str(self.task_dir / "artifacts" / "artifact-task-untracked.patch"),
+            "target_branch": "integration",
+            "integration_target_branch": "integration",
+        })
+        (self.task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        subprocess.run(
+            [
+                str(SCRIPTS / "write-result.sh"),
+                "artifact-task",
+                "--tasks-root",
+                str(self.tasks_root),
+                "--agent",
+                "dev-1",
+                "--status",
+                "done",
+                "--summary",
+                "未跟踪文件 patch 捕获",
+            ],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        result_payload = json.loads((self.task_dir / "result.json").read_text(encoding="utf-8"))
+        patch_path = Path(result_payload["patch_path"])
+        self.assertTrue(result_payload["patch_exists"])
+        self.assertTrue(patch_path.exists())
+        self.assertIn("new-file.txt", patch_path.read_text(encoding="utf-8"))
+
 
 if __name__ == "__main__":
     unittest.main()

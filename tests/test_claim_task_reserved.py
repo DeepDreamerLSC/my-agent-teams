@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -20,10 +21,24 @@ class ClaimTaskReservedTests(unittest.TestCase):
         self.dev_root = self.root / "dev"
         self.tasks_root.mkdir()
         self.dev_root.mkdir()
+        subprocess.run(["git", "init", "-b", "main"], cwd=str(self.dev_root), check=True, capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(self.dev_root), check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(self.dev_root), check=True)
+        (self.dev_root / "src").mkdir()
+        (self.dev_root / "src" / "base.txt").write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=str(self.dev_root), check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(self.dev_root), check=True, capture_output=True, text=True)
         self.config_path = self.root / "config.json"
         self.config_path.write_text(json.dumps({
             "agents": {"dev-1": {"role": "fullstack_dev"}},
             "projects": {"demo": {"dev_root": str(self.dev_root)}},
+            "defaults": {
+                "workspace_mode": "worktree",
+                "target_branch": "integration",
+            },
+            "workspace_management": {
+                "worktree_root": str(self.root / "worktrees"),
+            },
             "task_pool": {
                 "default_working_limit": 1,
                 "default_reserved_limit": 1,
@@ -41,6 +56,7 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "TASKS_ROOT": str(self.tasks_root),
             "CONFIG_PATH": str(self.config_path),
             "CLAIM_AGENT_ID": "dev-1",
+            "WORKSPACE_ROOT": str(self.root),
         }
 
     def _write_task(self, name: str, payload: dict) -> Path:
@@ -56,6 +72,9 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "priority": "medium",
             "claim_scope": ["dev-1"],
             "pool_entered_at": "2026-05-09T10:00:00+08:00",
+            "execution_mode": "dev",
+            "workspace_mode": "worktree",
+            "target_branch": "integration",
             **payload,
         }
         (task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -168,6 +187,63 @@ class ClaimTaskReservedTests(unittest.TestCase):
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("owner_approval_pending", completed.stderr)
+
+    def test_claim_prepares_worktree_metadata_when_workspace_mode_enabled(self):
+        target_dir = self._write_task("worktree-task", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/base.txt"],
+        })
+
+        subprocess.run(
+            [str(CLAIM_SCRIPT), "worktree-task"],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
+        self.assertEqual(task["workspace_status"], "prepared")
+        self.assertTrue(Path(task["worktree_path"]).exists())
+        self.assertIn("请在", task["workspace_dispatch_hint"])
+
+    def test_concurrent_claims_only_allow_one_reserved_task(self):
+        self._write_task("task-a", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/a.txt"],
+        })
+        self._write_task("task-b", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/b.txt"],
+        })
+
+        results: list[subprocess.CompletedProcess[str]] = []
+
+        def run_claim(task_id: str) -> None:
+            completed = subprocess.run(
+                [str(CLAIM_SCRIPT), task_id],
+                cwd=str(REPO_ROOT),
+                env=self._env(),
+                capture_output=True,
+                text=True,
+            )
+            results.append(completed)
+
+        threads = [threading.Thread(target=run_claim, args=(task_id,)) for task_id in ("task-a", "task-b")]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        successes = [item for item in results if item.returncode == 0]
+        failures = [item for item in results if item.returncode != 0]
+        self.assertEqual(len(successes), 1, results)
+        self.assertEqual(len(failures), 1, results)
+        self.assertIn("reserved_limit", failures[0].stderr)
 
 
 if __name__ == "__main__":

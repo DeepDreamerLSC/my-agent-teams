@@ -127,17 +127,44 @@ def _capture_patch(task: dict[str, Any], payload: dict[str, Any]) -> tuple[bool,
     if not worktree_path.exists():
         return False, f"worktree_missing:{worktree_path}"
 
-    target_branch = str(payload.get("target_branch") or task.get("integration_target_branch") or task.get("target_branch") or "").strip()
+    target_branch = str(
+        payload.get("workspace_base_ref")
+        or task.get("workspace_base_ref")
+        or payload.get("target_branch")
+        or task.get("integration_target_branch")
+        or task.get("target_branch")
+        or ""
+    ).strip()
     patch_text = ""
     if target_branch:
         format_proc = _run_git(worktree_path, "format-patch", "--stdout", f"{target_branch}..HEAD")
         if format_proc.returncode == 0 and format_proc.stdout.strip():
             patch_text = format_proc.stdout
+    diff_proc = None
     if not patch_text:
         diff_proc = _run_git(worktree_path, "diff", "--binary", "HEAD")
         if diff_proc.returncode == 0 and diff_proc.stdout.strip():
             patch_text = diff_proc.stdout
+    untracked_proc = _run_git(worktree_path, "ls-files", "--others", "--exclude-standard")
+    untracked_files = [line.strip() for line in untracked_proc.stdout.splitlines() if line.strip()] if untracked_proc.returncode == 0 else []
+    if untracked_files:
+        untracked_chunks: list[str] = []
+        for item in untracked_files:
+            untracked_diff = subprocess.run(
+                ["git", "-C", str(worktree_path), "diff", "--binary", "--no-index", "--", "/dev/null", item],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if untracked_diff.returncode in {0, 1} and untracked_diff.stdout.strip():
+                untracked_chunks.append(untracked_diff.stdout)
+        if untracked_chunks:
+            patch_text = patch_text + ("\n" if patch_text and not patch_text.endswith("\n") else "") + "".join(untracked_chunks)
     if not patch_text:
+        if untracked_files:
+            return False, f"patch_missing_untracked:{','.join(untracked_files)}"
+        if target_branch and diff_proc and diff_proc.returncode != 0:
+            return False, f"patch_capture_failed:{target_branch}"
         return False, None
 
     patch_path.parent.mkdir(parents=True, exist_ok=True)
@@ -152,6 +179,7 @@ def _persist_result_metadata(task_path: Path, task: dict[str, Any], payload: dic
         "workspace_branch",
         "worktree_path",
         "workspace_path",
+        "workspace_base_ref",
         "patch_path",
         "target_branch",
         "integration_target_branch",
@@ -216,6 +244,7 @@ def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace
         branch = args.branch or str(task.get("workspace_branch") or task.get("result_branch") or inferred.get("branch") or "")
         patch_path = args.patch_path or str(task.get("patch_path") or "")
         target_branch = str(task.get("integration_target_branch") or task.get("target_branch") or "")
+        workspace_base_ref = str(task.get("workspace_base_ref") or "")
         workspace_mode = str(task.get("workspace_mode") or "")
         workspace_status = str(task.get("workspace_status") or "")
         if branch:
@@ -229,6 +258,8 @@ def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace
         if target_branch:
             payload["target_branch"] = target_branch
             payload["integration_target_branch"] = target_branch
+        if workspace_base_ref:
+            payload["workspace_base_ref"] = workspace_base_ref
         if workspace_mode:
             payload["workspace_mode"] = workspace_mode
         if workspace_status:
