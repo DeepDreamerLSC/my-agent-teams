@@ -100,6 +100,15 @@ class DispatchTaskTests(unittest.TestCase):
         env.update(overrides)
         return env
 
+    def _init_git_repo(self, path: Path) -> None:
+        subprocess.run(["git", "init", "-b", "main"], cwd=str(path), check=True, capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(path), check=True)
+        (path / "src").mkdir(exist_ok=True)
+        (path / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "."], cwd=str(path), check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(path), check=True, capture_output=True, text=True)
+
     def test_claim_policy_pull_rejects_direct_dispatch_without_force(self):
         completed = subprocess.run(
             [str(DISPATCH_SCRIPT), str(self.task_path)],
@@ -187,6 +196,84 @@ class DispatchTaskTests(unittest.TestCase):
 
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("verification tasks require exactly one", completed.stderr)
+
+    def test_dispatch_prepares_task_worktree_when_enabled(self):
+        self._init_git_repo(self.dev_root)
+        self.config_path.write_text(json.dumps({
+            "agents": {
+                "dev-1": {"role": "fullstack_dev"},
+                "review-1": {"role": "reviewer"},
+            },
+            "projects": {
+                "demo": {
+                    "dev_root": str(self.dev_root),
+                    "prod_root": str(self.prod_root),
+                },
+            },
+            "defaults": {
+                "workspace_mode": "worktree",
+                "target_branch": "integration",
+            },
+            "workspace_management": {
+                "worktree_root": str(self.root / "worktrees"),
+            },
+            "wip_limits": {"dev": 2},
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        self.task_path.write_text(json.dumps({
+            "id": "worktree-task",
+            "title": "worktree 任务",
+            "status": "pending",
+            "project": "demo",
+            "domain": "development",
+            "assigned_agent": "dev-1",
+            "execution_mode": "dev",
+            "target_environment": "dev",
+            "task_type": "development",
+            "read_only": False,
+            "write_scope": ["src/app.py"],
+            "claim_policy": "push",
+            "priority": "medium",
+            "review_required": True,
+            "review_level": "standard",
+            "reviewer": "review-1",
+            "workspace_mode": "worktree",
+            "target_branch": "integration",
+            "downstream_action": "review",
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (self.task_dir / "instruction.md").write_text("\n".join([
+            "# 任务：worktree 任务",
+            "## 任务类型",
+            "development",
+            "## 目标",
+            "实现变更",
+            "## 任务边界",
+            "只改 src/app.py",
+            "## 输入事实",
+            "已有代码",
+            "## 约束",
+            "按 scope 修改",
+            "## 交付物",
+            "result.json",
+            "## 验收标准",
+            "通过",
+            "## 下游动作",
+            "review",
+        ]), encoding="utf-8")
+
+        completed = subprocess.run(
+            [str(DISPATCH_SCRIPT), str(self.task_path)],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertIn("dispatched worktree-task", completed.stdout)
+        task = json.loads(self.task_path.read_text(encoding="utf-8"))
+        self.assertEqual(task["workspace_status"], "prepared")
+        self.assertTrue(Path(task["worktree_path"]).exists())
+        self.assertTrue(str(task["workspace_branch"]).startswith("task/"))
 
 
 if __name__ == "__main__":

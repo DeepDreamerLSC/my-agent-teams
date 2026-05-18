@@ -168,9 +168,12 @@
   },
   "defaults": {
     "timeout_minutes": 30,
-    "workspace_mode": "main",
+    "workspace_mode": "worktree",
     "target_branch": "integration",
     "task_level": "execution"
+  },
+  "workspace_management": {
+    "worktree_root": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees"
   },
   "protected_paths": [
     "tasks/**",

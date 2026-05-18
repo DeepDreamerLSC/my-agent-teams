@@ -21,6 +21,7 @@ from .query import (
     build_board_payload,
     build_gantt_payload,
     build_health_payload,
+    build_integration_queue_payload,
     build_task_detail_payload,
     build_task_timeline_payload,
     build_task_communications_payload,
@@ -112,6 +113,15 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
             )
         )
 
+    def _integration_queue_payload():
+        return _with_connection(
+            lambda conn: build_integration_queue_payload(
+                conn,
+                project=request.args.get('project'),
+                agent=request.args.get('agent'),
+            )
+        )
+
     @app.get('/')
     def index():
         return render_template('index.html')
@@ -134,6 +144,10 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     @app.get('/api/agents')
     def api_agents():
         return jsonify(_agents_payload())
+
+    @app.get('/api/integration-queue')
+    def api_integration_queue():
+        return jsonify(_integration_queue_payload())
 
     @app.get('/api/tasks')
     def api_tasks_compat():

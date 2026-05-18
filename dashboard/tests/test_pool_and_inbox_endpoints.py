@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from dashboard.app import create_app
+from dashboard.db import connect_db, upsert_task
 
 
 class PoolAndInboxApiTests(unittest.TestCase):
@@ -31,7 +32,9 @@ class PoolAndInboxApiTests(unittest.TestCase):
         self._seed_review_timeout_task()
         self._seed_qa_timeout_task()
         self._seed_missing_review_json_task()
-        self.app = create_app(db_path=str(root / 'task-board.sqlite3'), tasks_root=str(self.tasks_root), control_config_path=str(self.config_path))
+        self.db_path = str(root / 'task-board.sqlite3')
+        self._seed_integration_queue_task_db()
+        self.app = create_app(db_path=self.db_path, tasks_root=str(self.tasks_root), control_config_path=str(self.config_path))
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -188,6 +191,82 @@ class PoolAndInboxApiTests(unittest.TestCase):
         ])
         self._write_task(self.tasks_root / 'qa-timeout-task', task, instruction)
 
+    def _seed_integration_queue_task_db(self):
+        task_dir = self.tasks_root / 'integration-candidate'
+        task_dir.mkdir(parents=True, exist_ok=True)
+        (task_dir / 'task.json').write_text(json.dumps({
+            'id': 'integration-candidate',
+            'title': '待集成候选',
+            'status': 'ready_for_merge',
+            'project': 'demo',
+            'domain': 'development',
+            'assigned_agent': 'dev-1',
+            'integration_owner': 'arch-1',
+            'workspace_mode': 'worktree',
+            'workspace_status': 'prepared',
+            'workspace_path': '/tmp/worktrees/integration-candidate',
+            'worktree_path': '/tmp/worktrees/integration-candidate',
+            'workspace_branch': 'task/integration-candidate',
+            'workspace_base_ref': 'integration',
+            'patch_path': str(task_dir / 'artifacts' / 'candidate.patch'),
+            'integration_target_branch': 'integration',
+            'target_branch': 'integration',
+            'read_only': False,
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        patch_dir = task_dir / 'artifacts'
+        patch_dir.mkdir(exist_ok=True)
+        (patch_dir / 'candidate.patch').write_text('diff --git a/a b/a\n', encoding='utf-8')
+        conn = connect_db(self.db_path, initialize=True)
+        with conn:
+            upsert_task(conn, {
+                'task_id': 'integration-candidate',
+                'title': '待集成候选',
+                'project': 'demo',
+                'domain': 'development',
+                'assigned_agent': 'dev-1',
+                'reviewer': 'review-1',
+                'owner_pm': 'pm-chief',
+                'integration_owner': 'arch-1',
+                'parent_task_id': None,
+                'root_request_id': 'integration-candidate',
+                'review_required': 1,
+                'test_required': 1,
+                'target_environment': 'dev',
+                'priority': 'high',
+                'review_level': 'standard',
+                'current_status': 'ready_for_merge',
+                'board_status': 'ready_for_merge',
+                'merge_gate_state': 'pm_acceptance_pending',
+                'rework_reason': None,
+                'last_gate_actor': 'qa',
+                'last_gate_decision_at': '2026-05-18T10:00:00+08:00',
+                'auto_close_policy': 'manual_after_review',
+                'quality_gate_mode': 'parallel',
+                'created_at': '2026-05-18T09:00:00+08:00',
+                'dispatched_at': '2026-05-18T09:10:00+08:00',
+                'ack_at': '2026-05-18T09:20:00+08:00',
+                'completed_at': '2026-05-18T10:00:00+08:00',
+                'review_completed_at': '2026-05-18T10:10:00+08:00',
+                'verify_completed_at': '2026-05-18T10:20:00+08:00',
+                'current_status_at': '2026-05-18T10:20:00+08:00',
+                'ack_agent': 'dev-1',
+                'result_agent': 'dev-1',
+                'lease_acquired_at': None,
+                'updated_at': '2026-05-18T10:20:00+08:00',
+                'summary': 'ready',
+                'review_state': 'approve',
+                'verify_ok': 1,
+                'review_gate_state': 'approved',
+                'qa_gate_state': 'passed',
+                'task_dir': str(task_dir),
+                'task_json_path': str(task_dir / 'task.json'),
+                'write_scope_json': '["src/demo.py"]',
+                'artifacts_json': '[]',
+                'last_ingest_source': 'test',
+                'last_synced_at': '2026-05-18T10:20:00+08:00',
+            })
+        conn.close()
+
     def test_pool_endpoint_returns_pooled_items(self):
         resp = self.client.get('/api/pool')
         self.assertEqual(resp.status_code, 200)
@@ -207,6 +286,15 @@ class PoolAndInboxApiTests(unittest.TestCase):
         self.assertEqual(task_ids['review-timeout-task'], 'timeout')
         self.assertEqual(task_ids['qa-timeout-task'], 'timeout')
         self.assertEqual(task_ids['review-json-required-task'], 'artifact_invalid')
+
+    def test_integration_queue_endpoint_returns_merge_candidates(self):
+        resp = self.client.get('/api/integration-queue')
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertEqual(payload['summary']['queued_count'], 1)
+        self.assertEqual(payload['items'][0]['task_id'], 'integration-candidate')
+        self.assertEqual(payload['items'][0]['state'], 'queued')
+        self.assertTrue(payload['items'][0]['patch_exists'])
 
 
 if __name__ == '__main__':

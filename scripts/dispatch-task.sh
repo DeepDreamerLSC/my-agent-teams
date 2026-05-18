@@ -7,6 +7,7 @@ WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
+ENSURE_TASK_WORKSPACE_SCRIPT="${ENSURE_TASK_WORKSPACE_SCRIPT:-$WORKSPACE_ROOT/scripts/ensure-task-workspace.py}"
 ALLOW_WRITE_SCOPE_CONFLICT="${ALLOW_WRITE_SCOPE_CONFLICT:-0}"
 FORCE_DIRECT_DISPATCH="${FORCE_DIRECT_DISPATCH:-0}"
 DIRECT_DISPATCH_REASON="${DIRECT_DISPATCH_REASON:-}"
@@ -396,8 +397,14 @@ fi
 
 ASSIGNED_AGENT=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["assigned_agent"])' <<< "$DISPATCH_OUTPUT")
 TASK_DIR=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_dir"])' <<< "$DISPATCH_OUTPUT")
+WORKSPACE_PAYLOAD='{}'
+WORKSPACE_HINT=''
+if [ -f "$ENSURE_TASK_WORKSPACE_SCRIPT" ]; then
+  WORKSPACE_PAYLOAD="$("$ENSURE_TASK_WORKSPACE_SCRIPT" "$TASK_DIR" --config "$CONFIG_PATH" 2>/dev/null || echo '{}')"
+  WORKSPACE_HINT=$(python3 -c 'import json,sys; payload=json.load(sys.stdin); print((payload.get("dispatch_hint") or "").strip())' <<< "$WORKSPACE_PAYLOAD" 2>/dev/null || true)
+fi
 if [ -x "$SEND_SCRIPT" ]; then
-  MESSAGE="请读取 ${TASK_DIR}/instruction.md 并开始执行任务。当前任务类型：${TASK_TYPE}。完成后写 ack.json 和 result.json。"
+  MESSAGE="请读取 ${TASK_DIR}/instruction.md 并开始执行任务。当前任务类型：${TASK_TYPE}。${WORKSPACE_HINT:+${WORKSPACE_HINT} }完成后写 ack.json 和 result.json。"
   SEND_OUTPUT="$(CONFIG_PATH="$CONFIG_PATH" "$SEND_SCRIPT" "$ASSIGNED_AGENT" "$MESSAGE" 2>&1)" || SEND_RC=$?
   SEND_RC="${SEND_RC:-0}"
   python3 - "$TASK_DIR" "$SEND_RC" "$SEND_OUTPUT" <<'PY'

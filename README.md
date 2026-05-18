@@ -82,6 +82,119 @@ scripts/teamctl.sh status
   ```
 - `CODEX_CMD` / `CLAUDE_CMD` 可覆盖 agent 启动命令。
 
+## 将控制面更新应用到一线团队
+
+当仓库里的协作控制面（`scripts/`、`dashboard/`、`design/agent-templates/`、`README.md`）有新能力上线时，推荐按下面步骤把改动切到正在干活的一线团队。
+
+### 1. 只同步代码，不覆盖运行产物
+
+优先使用 `git pull`、`git cherry-pick` 或发布分支同步代码。  
+不要把下面这些目录/文件当成“代码包”直接覆盖到一线机器：
+
+- `tasks/`：真实任务事实源
+- `agents/`：各 agent 当前工作目录与本地上下文
+- `.runtime/`：watcher / dashboard / queue 运行时状态
+- `config.local.json`：本机密钥和通知配置
+
+一句话：**把脚本和模板带过去，不要把现场任务状态冲掉。**
+
+### 2. 切换前先做健康检查
+
+```bash
+cd /path/to/my-agent-teams
+scripts/teamctl.sh doctor
+scripts/teamctl.sh smoke
+```
+
+如果只是快速切换，至少跑 `doctor`；涉及 watcher / control-plane 改动时，建议把 `smoke` 也过一遍。
+
+### 3. 重启控制面，让新逻辑真正生效
+
+控制面脚本更新后，**watcher 必须重启**；否则当前在跑的进程不会自动热加载新逻辑。
+
+```bash
+cd /path/to/my-agent-teams
+scripts/teamctl.sh stop-watcher
+scripts/teamctl.sh start-watcher
+scripts/teamctl.sh status
+```
+
+如果同一批更新还改了 dashboard / 甘特图 / API 查询，再额外重启看板：
+
+```bash
+cd /path/to/my-agent-teams
+scripts/teamctl.sh stop-dashboard
+scripts/teamctl.sh start-dashboard
+```
+
+通常 **不用** 因为控制面更新而重启所有 agent session；只有下面几种情况才需要考虑重启 agent：
+
+- agent 角色模板（`agents/<agent-id>/AGENT.md` / `CLAUDE.md`）刚被重生成并要求重新加载
+- 运行时命令变了（例如 `CODEX_CMD` / `CLAUDE_CMD` 调整）
+- tmux session 本身已经不健康，正好借切换窗口一起恢复
+
+### 4. 一线 PM 切换后的新操作约定
+
+#### 4.1 pull 任务优先走任务池
+
+- `claim_policy=pull` 的任务优先进入 pool
+- 不要把它们当普通 push 任务手工直派
+- 只有明确 override 时，才使用 `FORCE_DIRECT_DISPATCH=1`
+
+#### 4.2 `resume` 和 `reassign` 分开用
+
+原执行者继续做，用 `resume-task.sh`：
+
+```bash
+scripts/resume-task.sh --task-dir /absolute/path/to/tasks/<task-id> --agent <same-agent> --reason "继续当前任务"
+```
+
+换人接手，用 `reassign-task.sh`：
+
+```bash
+scripts/reassign-task.sh --task-dir /absolute/path/to/tasks/<task-id> --agent <new-agent> --reason "会话异常，转派接手"
+```
+
+语义上不要再长期拿 `resume` 代替“换人接手”。
+
+#### 4.3 开始巡检 PM Inbox 的控制面异常
+
+```bash
+cd /path/to/my-agent-teams
+python3 scripts/task-inbox.py --tasks-root ./tasks --control-config ./config.json
+```
+
+当前应重点关注这些原因：
+
+- `delivery_failed`
+- `session_unhealthy`
+- `auto_requeue`
+- `reassigned`
+- `state_invariant_violation`
+
+它们表示的是**调度/连接层恢复问题**，不等于业务执行失败。
+
+### 5. 上线后最小验证清单
+
+建议至少拿 3 类任务做一次小流量验证：
+
+1. 一个普通 `development` 池任务
+2. 一个 `verification` 任务
+3. 一个故意制造 session 不健康的任务，确认 watcher 会重试、转派或回池
+
+上线后重点看：
+
+- watcher 日志里是否出现新的控制面恢复记录
+- PM Inbox 是否能看到控制面异常，而不只是 timeout
+- `pull` 任务是否还在被绕过任务池手工直派
+- `resume` / `reassign` 是否已经被一线按语义分开使用
+
+如果切换后行为异常，优先检查：
+
+- watcher 是否已经重启
+- 一线机器上的 `config.json` 是否还是旧路径/旧 agent 配置
+- 任务目录里是否残留旧轮次 `ack.json` / `result.json`
+
 
 ## Codex Responses Gateway / One API 落地闭环
 

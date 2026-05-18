@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import shutil
 import sys
 import tempfile
@@ -91,6 +92,96 @@ def _resolve_actor(artifact: str, task: dict[str, Any], args: argparse.Namespace
     return str(task.get("assigned_agent") or _agent_from_cwd() or "")
 
 
+def _run_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(cwd), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _infer_git_context_from_cwd() -> dict[str, str]:
+    cwd = Path.cwd().resolve()
+    root_proc = _run_git(cwd, "rev-parse", "--show-toplevel")
+    branch_proc = _run_git(cwd, "rev-parse", "--abbrev-ref", "HEAD")
+    if root_proc.returncode != 0 or branch_proc.returncode != 0:
+        return {}
+    repo_root = root_proc.stdout.strip()
+    branch = branch_proc.stdout.strip()
+    if not repo_root or not branch:
+        return {}
+    return {
+        "worktree_path": repo_root,
+        "branch": branch,
+    }
+
+
+def _capture_patch(task: dict[str, Any], payload: dict[str, Any]) -> tuple[bool, str | None]:
+    patch_path_raw = str(payload.get("patch_path") or "").strip()
+    worktree_path_raw = str(payload.get("worktree_path") or "").strip()
+    if not patch_path_raw or not worktree_path_raw:
+        return False, None
+    worktree_path = Path(worktree_path_raw).expanduser().resolve()
+    patch_path = Path(patch_path_raw).expanduser().resolve()
+    if not worktree_path.exists():
+        return False, f"worktree_missing:{worktree_path}"
+
+    target_branch = str(payload.get("target_branch") or task.get("integration_target_branch") or task.get("target_branch") or "").strip()
+    patch_text = ""
+    if target_branch:
+        format_proc = _run_git(worktree_path, "format-patch", "--stdout", f"{target_branch}..HEAD")
+        if format_proc.returncode == 0 and format_proc.stdout.strip():
+            patch_text = format_proc.stdout
+    if not patch_text:
+        diff_proc = _run_git(worktree_path, "diff", "--binary", "HEAD")
+        if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+            patch_text = diff_proc.stdout
+    if not patch_text:
+        return False, None
+
+    patch_path.parent.mkdir(parents=True, exist_ok=True)
+    patch_path.write_text(patch_text, encoding="utf-8")
+    return True, None
+
+
+def _persist_result_metadata(task_path: Path, task: dict[str, Any], payload: dict[str, Any]) -> None:
+    changed = False
+    updated = dict(task)
+    for key in (
+        "workspace_branch",
+        "worktree_path",
+        "workspace_path",
+        "patch_path",
+        "target_branch",
+        "integration_target_branch",
+        "workspace_mode",
+        "workspace_status",
+    ):
+        if key not in payload:
+            continue
+        value = payload.get(key)
+        if updated.get(key) != value:
+            updated[key] = value
+            changed = True
+    patch_generated_at = payload.get("patch_generated_at")
+    if patch_generated_at and updated.get("patch_generated_at") != patch_generated_at:
+        updated["patch_generated_at"] = patch_generated_at
+        changed = True
+    patch_capture_error = payload.get("patch_capture_error")
+    if updated.get("patch_capture_error") != patch_capture_error:
+        updated["patch_capture_error"] = patch_capture_error
+        changed = True
+    result_branch = payload.get("branch")
+    if updated.get("result_branch") != result_branch:
+        updated["result_branch"] = result_branch
+        changed = True
+    if not changed:
+        return
+    updated["updated_at"] = _now_iso()
+    _atomic_write_json(task_path, updated)
+
+
 def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     status = (args.status or DEFAULT_STATUS[artifact]).strip()
     if status not in STATUS_CHOICES[artifact]:
@@ -120,6 +211,28 @@ def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace
             "agent": actor,
             "finished_at": now,
         })
+        inferred = _infer_git_context_from_cwd()
+        worktree_path = args.worktree_path or str(task.get("worktree_path") or task.get("workspace_path") or inferred.get("worktree_path") or "")
+        branch = args.branch or str(task.get("workspace_branch") or task.get("result_branch") or inferred.get("branch") or "")
+        patch_path = args.patch_path or str(task.get("patch_path") or "")
+        target_branch = str(task.get("integration_target_branch") or task.get("target_branch") or "")
+        workspace_mode = str(task.get("workspace_mode") or "")
+        workspace_status = str(task.get("workspace_status") or "")
+        if branch:
+            payload["branch"] = branch
+            payload["workspace_branch"] = branch
+        if worktree_path:
+            payload["worktree_path"] = worktree_path
+            payload["workspace_path"] = worktree_path
+        if patch_path:
+            payload["patch_path"] = patch_path
+        if target_branch:
+            payload["target_branch"] = target_branch
+            payload["integration_target_branch"] = target_branch
+        if workspace_mode:
+            payload["workspace_mode"] = workspace_mode
+        if workspace_status:
+            payload["workspace_status"] = workspace_status
     elif artifact == "review":
         payload.update({
             "reviewer": actor,
@@ -191,6 +304,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agent", default="")
     parser.add_argument("--reviewer", default="")
     parser.add_argument("--tester", default="")
+    parser.add_argument("--branch", default="")
+    parser.add_argument("--patch-path", default="")
+    parser.add_argument("--worktree-path", default="")
     return parser
 
 
@@ -205,9 +321,18 @@ def main() -> int:
 
     task = _load_json(task_path)
     payload = _build_payload(args.artifact, task, args)
+    if args.artifact == "result":
+        patch_created, patch_error = _capture_patch(task, payload)
+        if patch_created:
+            payload["patch_generated_at"] = _now_iso()
+        payload["patch_capture_error"] = patch_error
+        if payload.get("patch_path"):
+            payload["patch_exists"] = Path(str(payload["patch_path"])).expanduser().exists()
     _validate_payload(args.artifact, task_dir, payload)
     artifact_path = task_dir / ARTIFACT_FILES[args.artifact]
     _atomic_write_json(artifact_path, payload)
+    if args.artifact == "result":
+        _persist_result_metadata(task_path, task, payload)
     parsed = _parse_artifact(args.artifact, task_dir)
     print(json.dumps({
         "task_id": payload["task_id"],

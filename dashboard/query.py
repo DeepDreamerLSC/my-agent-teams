@@ -2,10 +2,16 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+LIB_DIR = Path(__file__).resolve().parents[1] / 'scripts' / 'lib'
+if str(LIB_DIR) not in sys.path:
+    sys.path.insert(0, str(LIB_DIR))
+from task_workspace import derive_integration_queue_item  # type: ignore
 
 ACTIVE_LOAD_STATUSES = {'pending', 'dispatched', 'working', 'blocked'}
 BLOCKED_AGGREGATE_STATUSES = {'blocked', 'failed', 'cancelled', 'timeout'}
@@ -34,6 +40,12 @@ READ_ONLY_AGGREGATE_DIMENSIONS = (
     'parent_task_id',
     'root_request_id',
 )
+
+
+def _boolish(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'y'}
 
 
 def _parse_time(value: str | None) -> datetime | None:
@@ -303,7 +315,7 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
     started_at = row['ack_at'] or row['dispatched_at'] or row['created_at']
     active_until = row['completed_at'] or row['current_status_at'] or _now_iso()
     active_work_seconds = _seconds_between(started_at, active_until)
-    return {
+    task_payload = {
         'task_id': row['task_id'],
         'title': row['title'],
         'project': row['project'],
@@ -359,7 +371,43 @@ def _row_to_task(row: sqlite3.Row) -> dict[str, Any]:
         'dependencies_ready_at': metadata.get('dependencies_ready_at'),
         'dependency_policy': metadata.get('dependency_policy'),
         'depends_on': metadata.get('depends_on') if isinstance(metadata.get('depends_on'), list) else [],
+        'read_only': _boolish(metadata.get('read_only')),
+        'workspace_mode': metadata.get('workspace_mode'),
+        'workspace_status': metadata.get('workspace_status'),
+        'workspace_path': metadata.get('workspace_path'),
+        'workspace_root': metadata.get('workspace_root'),
+        'worktree_path': metadata.get('worktree_path'),
+        'workspace_branch': metadata.get('workspace_branch'),
+        'workspace_base_ref': metadata.get('workspace_base_ref'),
+        'workspace_prepared_at': metadata.get('workspace_prepared_at'),
+        'workspace_error': metadata.get('workspace_error'),
+        'patch_path': metadata.get('patch_path'),
+        'patch_generated_at': metadata.get('patch_generated_at'),
+        'patch_capture_error': metadata.get('patch_capture_error'),
+        'result_branch': metadata.get('result_branch'),
+        'integration_target_branch': metadata.get('integration_target_branch') or metadata.get('target_branch'),
+        'integration_queue_entered_at': metadata.get('integration_queue_entered_at'),
+        'control_plane_state': metadata.get('control_plane_state'),
+        'control_plane_updated_at': metadata.get('control_plane_updated_at'),
+        'dispatch_delivery_retry_count': metadata.get('dispatch_delivery_retry_count'),
+        'dispatch_delivery_consecutive_failures': metadata.get('dispatch_delivery_consecutive_failures'),
+        'last_delivery_attempt_at': metadata.get('last_delivery_attempt_at'),
+        'last_delivery_state': metadata.get('last_delivery_state'),
+        'last_delivery_error': metadata.get('last_delivery_error'),
+        'session_health': metadata.get('session_health'),
+        'reassign_count': metadata.get('reassign_count'),
+        'auto_requeue_count': metadata.get('auto_requeue_count'),
     }
+    integration_info = derive_integration_queue_item(task_payload)
+    task_payload.update({
+        'integration_queue_state': integration_info.get('state'),
+        'integration_queue_entered_at': task_payload.get('integration_queue_entered_at') or integration_info.get('entered_at'),
+        'integration_workspace_status': integration_info.get('workspace_status'),
+        'integration_patch_exists': integration_info.get('patch_exists'),
+        'integration_artifact_state': integration_info.get('artifact_state'),
+        'integration_blocker': integration_info.get('blocker'),
+    })
+    return task_payload
 
 
 def _row_to_task_event(row: sqlite3.Row) -> dict[str, Any]:
@@ -703,6 +751,11 @@ def build_gantt_payload(
             'assigned_agent': task['assigned_agent'],
             'current_status': task['current_status'],
             'board_status': task['board_status'],
+            'control_plane_state': task.get('control_plane_state'),
+            'workspace_status': task.get('workspace_status'),
+            'workspace_branch': task.get('workspace_branch'),
+            'worktree_path': task.get('worktree_path'),
+            'integration_queue_state': task.get('integration_queue_state'),
             'review_required': bool(task.get('review_required')),
             'review_level': task.get('review_level'),
             'display_start_at': span_start,
@@ -730,6 +783,80 @@ def build_gantt_payload(
     return {
         'generated_at': generated_at,
         'filters': {'project': project, 'agent': agent},
+        'items': items,
+    }
+
+
+def build_integration_queue_payload(
+    conn: sqlite3.Connection,
+    *,
+    project: str | None = None,
+    agent: str | None = None,
+) -> dict[str, Any]:
+    tasks = _fetch_tasks(conn, project=project, agent=agent)
+    generated_at = _now_iso()
+    items: list[dict[str, Any]] = []
+    state_counts: dict[str, int] = defaultdict(int)
+    artifact_counts: dict[str, int] = defaultdict(int)
+    order = {
+        'workspace_error': 0,
+        'metadata_missing': 1,
+        'blocked': 2,
+        'queued': 3,
+        'in_progress': 4,
+        'accepted': 5,
+        'merged': 6,
+        'closed': 7,
+    }
+    for task in tasks:
+        integration = derive_integration_queue_item(task)
+        if not integration.get('include'):
+            continue
+        item = {
+            'task_id': task['task_id'],
+            'title': task['title'],
+            'project': task['project'],
+            'assigned_agent': task['assigned_agent'],
+            'integration_owner': task.get('integration_owner'),
+            'current_status': task['current_status'],
+            'merge_gate_state': task.get('merge_gate_state'),
+            'priority': task.get('priority'),
+            'state': integration.get('state'),
+            'entered_at': task.get('integration_queue_entered_at') or integration.get('entered_at'),
+            'target_branch': integration.get('target_branch'),
+            'workspace_branch': integration.get('workspace_branch'),
+            'worktree_path': integration.get('worktree_path'),
+            'patch_path': integration.get('patch_path'),
+            'patch_exists': bool(integration.get('patch_exists')),
+            'workspace_status': integration.get('workspace_status'),
+            'artifact_state': integration.get('artifact_state'),
+            'blocker': integration.get('blocker'),
+            'control_plane_state': integration.get('control_plane_state'),
+        }
+        items.append(item)
+        state_counts[str(item['state'])] += 1
+        artifact_counts[str(item['artifact_state'])] += 1
+    items.sort(
+        key=lambda item: (
+            order.get(str(item.get('state') or ''), 99),
+            -{'critical': 4, 'urgent': 4, 'high': 3, 'medium': 2, 'low': 1}.get(str(item.get('priority') or '').lower(), 0),
+            str(item.get('entered_at') or ''),
+            str(item.get('task_id') or ''),
+        )
+    )
+    return {
+        'generated_at': generated_at,
+        'filters': {'project': project, 'agent': agent},
+        'summary': {
+            'item_count': len(items),
+            'queued_count': state_counts.get('queued', 0),
+            'blocked_count': state_counts.get('blocked', 0),
+            'workspace_error_count': state_counts.get('workspace_error', 0),
+            'metadata_missing_count': state_counts.get('metadata_missing', 0),
+            'accepted_count': state_counts.get('accepted', 0),
+            'artifact_counts': dict(artifact_counts),
+            'state_counts': dict(state_counts),
+        },
         'items': items,
     }
 

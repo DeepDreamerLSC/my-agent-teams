@@ -26,6 +26,23 @@ class TaskDetailQueryTests(unittest.TestCase):
         self.tmpdir.cleanup()
 
     def _seed_task(self):
+        task_dir = Path(self.tmpdir.name) / 'task-1'
+        task_dir.mkdir()
+        (task_dir / 'task.json').write_text(json.dumps({
+            'id': 'task-1',
+            'workspace_mode': 'worktree',
+            'workspace_status': 'prepared',
+            'workspace_path': str(task_dir / 'worktree'),
+            'worktree_path': str(task_dir / 'worktree'),
+            'workspace_branch': 'task/task-1',
+            'workspace_base_ref': 'integration',
+            'patch_path': str(task_dir / 'artifacts' / 'task-1.patch'),
+            'integration_target_branch': 'integration',
+            'control_plane_state': 'session_unhealthy',
+            'dispatch_delivery_retry_count': 2,
+            'session_health': 'missing_session',
+            'read_only': False,
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         with self.conn:
             upsert_task(self.conn, {
                 'task_id': 'task-1',
@@ -67,8 +84,8 @@ class TaskDetailQueryTests(unittest.TestCase):
                 'verify_ok': None,
                 'review_gate_state': 'approved',
                 'qa_gate_state': 'pending',
-                'task_dir': '/tmp/task-1',
-                'task_json_path': '/tmp/task-1/task.json',
+                'task_dir': str(task_dir),
+                'task_json_path': str(task_dir / 'task.json'),
                 'write_scope_json': '[]',
                 'artifacts_json': '[]',
                 'last_ingest_source': 'test',
@@ -163,6 +180,9 @@ class TaskDetailQueryTests(unittest.TestCase):
         self.assertEqual(detail['task']['quality_gate_mode'], 'parallel')
         self.assertEqual(detail['task']['review_gate_state'], 'approved')
         self.assertEqual(detail['task']['qa_gate_state'], 'pending')
+        self.assertEqual(detail['task']['workspace_status'], 'prepared')
+        self.assertEqual(detail['task']['integration_queue_state'], 'queued')
+        self.assertEqual(detail['task']['control_plane_state'], 'session_unhealthy')
 
     def test_query_handles_empty_communications(self):
         empty = build_task_communications_payload(self.conn, 'missing-task')
@@ -185,6 +205,24 @@ class TaskDetailApiTests(unittest.TestCase):
             },
             'task_pool': {'default_claim_max_concurrency': 1},
         }, ensure_ascii=False), encoding='utf-8')
+        task2_dir = root / 'task-2'
+        task2_dir.mkdir()
+        (task2_dir / 'task.json').write_text(json.dumps({
+            'id': 'task-2',
+            'workspace_mode': 'worktree',
+            'workspace_status': 'prepared',
+            'workspace_path': str(task2_dir / 'worktree'),
+            'worktree_path': str(task2_dir / 'worktree'),
+            'workspace_branch': 'task/task-2',
+            'workspace_base_ref': 'integration',
+            'patch_path': str(task2_dir / 'artifacts' / 'task-2.patch'),
+            'integration_target_branch': 'integration',
+            'control_plane_state': 'delivery_failed',
+            'dispatch_delivery_retry_count': 1,
+            'last_delivery_error': 'send failed',
+            'session_health': 'idle_session',
+            'read_only': False,
+        }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
         conn = connect_db(self.db_path, initialize=True)
         with conn:
             upsert_task(conn, {
@@ -227,8 +265,8 @@ class TaskDetailApiTests(unittest.TestCase):
                 'verify_ok': None,
                 'review_gate_state': 'skipped',
                 'qa_gate_state': 'skipped',
-                'task_dir': '/tmp/task-2',
-                'task_json_path': '/tmp/task-2/task.json',
+                'task_dir': str(task2_dir),
+                'task_json_path': str(task2_dir / 'task.json'),
                 'write_scope_json': '[]',
                 'artifacts_json': '[]',
                 'last_ingest_source': 'test',
@@ -332,3 +370,12 @@ class TaskDetailApiTests(unittest.TestCase):
         payload = resp.get_json()
         self.assertIsNotNone(payload.get('pool_status'))
         self.assertIn('dependency_missing:missing-dep', payload['pool_status']['blocked_reasons'])
+
+    def test_detail_includes_workspace_and_control_plane_fields(self):
+        resp = self.client.get('/api/tasks/task-2/detail')
+        self.assertEqual(resp.status_code, 200)
+        payload = resp.get_json()
+        self.assertEqual(payload['task']['workspace_status'], 'prepared')
+        self.assertEqual(payload['task']['workspace_branch'], 'task/task-2')
+        self.assertEqual(payload['task']['control_plane_state'], 'delivery_failed')
+        self.assertEqual(payload['task']['integration_queue_state'], 'in_progress')

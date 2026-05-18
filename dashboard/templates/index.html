@@ -22,6 +22,7 @@
     <button class="tab" data-tab="agents">Agent 统计</button>
     <button class="tab" data-tab="analytics">分析</button>
     <button class="tab" data-tab="pool">任务池</button>
+    <button class="tab" data-tab="integration-queue">集成队列</button>
     <button class="tab" data-tab="pm-inbox">PM Inbox</button>
   </nav>
 
@@ -102,6 +103,26 @@
               <th>可认领</th>
               <th>阻塞原因</th>
               <th>下一步</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="integration-queue" class="view">
+      <div class="panel-summary" id="integration-queue-summary"></div>
+      <div class="panel-table-wrap">
+        <table class="panel-table" id="integration-queue-table">
+          <thead>
+            <tr>
+              <th>任务</th>
+              <th>状态</th>
+              <th>目标分支</th>
+              <th>候选分支</th>
+              <th>Patch</th>
+              <th>工作区</th>
+              <th>阻塞/说明</th>
             </tr>
           </thead>
           <tbody></tbody>

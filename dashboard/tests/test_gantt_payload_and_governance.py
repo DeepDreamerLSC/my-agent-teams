@@ -180,6 +180,28 @@ class GanttPayloadTests(unittest.TestCase):
         self.assertEqual(qa['start_at'], '2026-05-04T01:00:00+08:00')
         self.assertEqual(qa['end_at'], '2026-05-04T03:00:00+08:00')
 
+    def test_gantt_item_surfaces_workspace_and_integration_metadata(self):
+        task_dir = Path(self.tmpdir.name) / 'integration-task'
+        task_dir.mkdir()
+        (task_dir / 'task.json').write_text(
+            '{"workspace_status":"prepared","workspace_branch":"task/integration-task","worktree_path":"/tmp/worktrees/integration-task","patch_path":"/tmp/worktrees/integration-task.patch","integration_target_branch":"integration"}',
+            encoding='utf-8',
+        )
+        with self.conn:
+            upsert_task(self.conn, _task_record(
+                task_id='integration-task',
+                task_dir=str(task_dir),
+                task_json_path=str(task_dir / 'task.json'),
+                current_status='ready_for_merge',
+                board_status='ready_for_merge',
+                merge_gate_state='pm_acceptance_pending',
+            ))
+        payload = build_gantt_payload(self.conn)
+        item = next(entry for entry in payload['items'] if entry['task_id'] == 'integration-task')
+        self.assertEqual(item['workspace_status'], 'prepared')
+        self.assertEqual(item['workspace_branch'], 'task/integration-task')
+        self.assertEqual(item['integration_queue_state'], 'queued')
+
 
 if __name__ == '__main__':
     unittest.main()

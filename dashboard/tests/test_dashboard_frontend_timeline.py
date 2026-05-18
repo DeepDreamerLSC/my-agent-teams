@@ -28,8 +28,10 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
     def test_index_markup_contains_pool_and_pm_inbox_tabs(self):
         html = INDEX_HTML.read_text(encoding="utf-8")
         self.assertIn('data-tab="pool"', html)
+        self.assertIn('data-tab="integration-queue"', html)
         self.assertIn('data-tab="pm-inbox"', html)
         self.assertIn('id="pool-table"', html)
+        self.assertIn('id="integration-queue-table"', html)
         self.assertIn('id="pm-inbox-table"', html)
 
     def test_gantt_filter_bar_markup_contains_quick_ranges_and_date_inputs(self):
@@ -97,7 +99,7 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertTrue(result["hasMessage"])
         self.assertTrue(result["hasPriority"])
 
-    def test_render_pool_and_pm_inbox_views(self):
+    def test_render_pool_integration_and_pm_inbox_views(self):
         script = textwrap.dedent(
             f"""
             const mod = require({json.dumps(str(DASHBOARD_JS))});
@@ -126,6 +128,19 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
                 next_action: '等待认领'
               }}]
             }});
+            mod.renderIntegrationQueueView({{
+              items: [{{
+                task_id: 'merge-1',
+                title: '待合入',
+                state: 'queued',
+                target_branch: 'integration',
+                workspace_branch: 'task/merge-1',
+                patch_path: '/tmp/merge-1.patch',
+                patch_exists: true,
+                worktree_path: '/tmp/worktrees/merge-1',
+                blocker: ''
+              }}]
+            }});
             mod.renderPmInboxView({{
               items: [{{
                 task_id: 'blocked-1',
@@ -139,6 +154,7 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
             }});
             console.log(JSON.stringify({{
               poolHtml: document.getElementById('#pool-table tbody').innerHTML,
+              integrationHtml: document.getElementById('#integration-queue-table tbody').innerHTML,
               inboxHtml: document.getElementById('#pm-inbox-table tbody').innerHTML
             }}));
             """
@@ -146,6 +162,8 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         result = _run_node(script)
         self.assertIn('待认领', result['poolHtml'])
         self.assertIn('dev-1', result['poolHtml'])
+        self.assertIn('待合入', result['integrationHtml'])
+        self.assertIn('integration', result['integrationHtml'])
         self.assertIn('需仲裁', result['inboxHtml'])
         self.assertIn('review_rejected', result['inboxHtml'])
 
@@ -165,8 +183,21 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
                 quality_gate_mode: 'parallel',
                 review_gate_state: 'approved',
                 qa_gate_state: 'pending',
+                control_plane_state: 'delivery_failed',
+                dispatch_delivery_retry_count: 1,
+                session_health: 'idle_session',
                 current_status: 'working',
                 board_status: 'working',
+                workspace_mode: 'worktree',
+                workspace_status: 'prepared',
+                workspace_path: '/tmp/worktrees/task-1',
+                workspace_branch: 'task/task-1',
+                workspace_base_ref: 'integration',
+                integration_target_branch: 'integration',
+                patch_path: '/tmp/task-1.patch',
+                integration_artifact_state: 'branch_only',
+                integration_queue_state: 'in_progress',
+                integration_queue_entered_at: '',
                 created_at: '2026-05-04T00:00:00+08:00',
                 current_status_at: '2026-05-04T00:10:00+08:00',
                 communication_count: 0,
@@ -191,7 +222,9 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
               hasEmptyCommunication: html.includes('沟通时间线') && html.includes('暂无记录'),
               hasTaskId: html.includes('task-1'),
               hasOwnerPm: html.includes('pm-chief'),
-              hasQualityGateLabels: html.includes('并行') && html.includes('已通过') && html.includes('待QA')
+              hasQualityGateLabels: html.includes('并行') && html.includes('已通过') && html.includes('待QA'),
+              hasWorkspaceSection: html.includes('工作区与集成') && html.includes('/tmp/worktrees/task-1'),
+              hasControlPlane: html.includes('投递失败')
             }}));
             """
         )
@@ -201,6 +234,8 @@ class DashboardFrontendTimelineTests(unittest.TestCase):
         self.assertTrue(result["hasTaskId"])
         self.assertTrue(result["hasOwnerPm"])
         self.assertTrue(result["hasQualityGateLabels"])
+        self.assertTrue(result["hasWorkspaceSection"])
+        self.assertTrue(result["hasControlPlane"])
 
     def test_gantt_time_filter_includes_intersecting_phase_intervals(self):
         script = textwrap.dedent(

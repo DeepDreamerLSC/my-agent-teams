@@ -29,6 +29,7 @@ STATE_INVARIANTS_PY="${STATE_INVARIANTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_sta
 TASK_POOL_ROUTER="${TASK_POOL_ROUTER:-$WORKSPACE_ROOT/scripts/task-pool-router.py}"
 TASK_QUEUE_ROUTER="${TASK_QUEUE_ROUTER:-$WORKSPACE_ROOT/scripts/task-queue-router.py}"
 REASSIGN_TASK_SCRIPT="${REASSIGN_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/reassign-task.sh}"
+ENSURE_TASK_WORKSPACE_PY="${ENSURE_TASK_WORKSPACE_PY:-$WORKSPACE_ROOT/scripts/ensure-task-workspace.py}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
@@ -845,6 +846,20 @@ deliver_execution_instruction_and_record() {
 
     record_dispatch_delivery_attempt "$task_dir" "$delivery_state" "$attempts" "$delivery_error" "$session_health"
     [ "$rc" -eq 0 ]
+}
+
+prepare_task_workspace_payload() {
+    local task_dir="$1"
+    [ -f "$ENSURE_TASK_WORKSPACE_PY" ] || {
+        echo '{}'
+        return 0
+    }
+    "$ENSURE_TASK_WORKSPACE_PY" "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || echo '{}'
+}
+
+workspace_hint_from_payload() {
+    local payload="${1:-{}}"
+    python3 -c 'import json,sys; payload=json.load(sys.stdin); print((payload.get("dispatch_hint") or "").strip())' <<< "$payload" 2>/dev/null || true
 }
 
 reconcile_task_state_invariants() {
@@ -2634,6 +2649,7 @@ auto_dispatch_pending_arch() {
     local task_id="$2"
     local assigned_agent="$3"
     local task_level="$4"
+    local workspace_payload workspace_hint
 
     [ "$ARCH_AUTO_DISPATCH" = "1" ] || return 1
     [ "$assigned_agent" = "arch-1" ] || return 1
@@ -2647,7 +2663,9 @@ auto_dispatch_pending_arch() {
     fi
 
     dispatch_task_to_agent "$task_dir" "arch-1" "watcher auto dispatch domain/epic task to arch-1"
-    deliver_execution_instruction_and_record "$task_dir" "$task_id" "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。" || true
+    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-dispatch-arch"
     log "$task_id: 自动派发给 arch-1（domain/epic 并行）"
     return 0
@@ -2658,6 +2676,7 @@ auto_claim_pending_dev() {
     local task_id="$2"
     local assigned_agent="$3"
     local task_level="$4"
+    local workspace_payload workspace_hint
 
     [ "$DEV_AUTO_CLAIM" = "1" ] || return 1
     [ "$task_level" = "execution" ] || return 1
@@ -2676,7 +2695,9 @@ auto_claim_pending_dev() {
     [ -n "$target_agent" ] || return 1
 
     dispatch_task_to_agent "$task_dir" "$target_agent" "watcher auto-claimed pending execution task"
-    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。" || true
+    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-claim-dev"
     log "$task_id: 自动认领并派发给 $target_agent"
     return 0
@@ -2700,6 +2721,7 @@ process_claim_json() {
     local task_dir="$1"
     local task_id="$2"
     local claim_path="$task_dir/claim.json"
+    local workspace_payload workspace_hint
     [ -f "$claim_path" ] || return 1
 
     local claim_agent claim_time claim_reason current_status lock_file
@@ -2726,6 +2748,9 @@ process_claim_json() {
     fi
 
     dispatch_task_to_agent "$task_dir" "$claim_agent" "watcher confirmed claim.json" "$claim_agent" "$claim_time" "$claim_reason"
+    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$claim_agent" "你认领的任务 ${task_id} 已进入 dispatched。请读取 ${task_dir}/instruction.md 并继续执行。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     emit_system_chat_event dispatch "$task_id" "任务已被 ${claim_agent} 认领并进入 dispatched。" "$claim_agent" info dispatch
     notify_pm "[task-watcher] $task_id 已被 ${claim_agent} 认领，进入 dispatched。"
     sync_task_board "$task_dir" "claim-confirmed"
@@ -2912,10 +2937,13 @@ reassign_dispatched_task() {
     local previous_agent="$3"
     local next_agent="$4"
     local reason="$5"
+    local workspace_payload workspace_hint
     [ -x "$REASSIGN_TASK_SCRIPT" ] || return 1
 
     if "$REASSIGN_TASK_SCRIPT" --task-dir "$task_dir" --agent "$next_agent" --reason "$reason" >/dev/null 2>&1; then
-        deliver_execution_instruction_and_record "$task_dir" "$task_id" "$next_agent" "你已接手任务 ${task_id}。请读取 ${task_dir}/instruction.md，并在确认后写 ack.json 开始执行。" || true
+        workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+        workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+        deliver_execution_instruction_and_record "$task_dir" "$task_id" "$next_agent" "你已接手任务 ${task_id}。请读取 ${task_dir}/instruction.md，并在确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}" || true
         notify_pm "[task-watcher] $task_id 因连接/会话恢复已从 ${previous_agent} 转派给 ${next_agent}。"
         emit_system_chat_event watcher "$task_id" "控制面恢复：已从 ${previous_agent} 转派给 ${next_agent}。" "$PM_SESSION" degraded notify
         sync_task_board "$task_dir" "control-plane-reassign"

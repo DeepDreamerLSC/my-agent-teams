@@ -45,6 +45,13 @@ class WriteTaskArtifactTests(unittest.TestCase):
             check=True,
         )
 
+    def _init_git_repo(self, path: Path) -> None:
+        subprocess.run(["git", "init", "-b", "main"], cwd=str(path), check=True, capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(path), check=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(path), check=True)
+        subprocess.run(["git", "add", "."], cwd=str(path), check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(path), check=True, capture_output=True, text=True)
+
     def test_wrappers_write_valid_artifacts_with_current_round(self):
         self._run("write-ack.sh", "--agent", "dev-1", "--summary", "已接单")
         self._run("write-result.sh", "--agent", "dev-1", "--status", "done", "--summary", "已完成")
@@ -108,6 +115,59 @@ class WriteTaskArtifactTests(unittest.TestCase):
         self.assertTrue(parsed["valid"])
         self.assertEqual(parsed["normalized_status"], "success")
         self.assertTrue(parsed["legacy_mapped"])
+
+    def test_result_artifact_infers_branch_and_captures_patch_from_worktree(self):
+        repo_root = Path(self.tmpdir.name) / "repo"
+        repo_root.mkdir()
+        feature_file = repo_root / "feature.txt"
+        feature_file.write_text("before\n", encoding="utf-8")
+        self._init_git_repo(repo_root)
+        subprocess.run(["git", "checkout", "-b", "task/artifact-task"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+        feature_file.write_text("after\n", encoding="utf-8")
+
+        task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        task.update({
+            "workspace_mode": "worktree",
+            "workspace_status": "prepared",
+            "workspace_path": str(repo_root),
+            "worktree_path": str(repo_root),
+            "workspace_branch": "task/artifact-task",
+            "workspace_base_ref": "main",
+            "patch_path": str(self.task_dir / "artifacts" / "artifact-task.patch"),
+            "target_branch": "main",
+            "integration_target_branch": "main",
+        })
+        (self.task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        subprocess.run(
+            [
+                str(SCRIPTS / "write-result.sh"),
+                "artifact-task",
+                "--tasks-root",
+                str(self.tasks_root),
+                "--agent",
+                "dev-1",
+                "--status",
+                "done",
+                "--summary",
+                "带 branch/patch 的结果",
+            ],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        result_payload = json.loads((self.task_dir / "result.json").read_text(encoding="utf-8"))
+        updated_task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        patch_path = Path(result_payload["patch_path"])
+        self.assertEqual(result_payload["branch"], "task/artifact-task")
+        self.assertEqual(result_payload["worktree_path"], str(repo_root))
+        self.assertTrue(result_payload["patch_exists"])
+        self.assertTrue(patch_path.exists())
+        self.assertIn("feature.txt", patch_path.read_text(encoding="utf-8"))
+        self.assertEqual(updated_task["result_branch"], "task/artifact-task")
+        self.assertTrue(updated_task.get("patch_generated_at"))
 
 
 if __name__ == "__main__":

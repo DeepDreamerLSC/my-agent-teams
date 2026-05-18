@@ -198,6 +198,29 @@ class TaskInboxControlPlaneTests(unittest.TestCase):
         self.assertIn('session_unhealthy', reason_types)
         self.assertIn('state_invariant_violation', reason_types)
 
+    def test_workspace_error_item_is_visible(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            task_dir = Path(tmp) / 'workspace-error-task'
+            task_dir.mkdir()
+            task = {
+                'id': 'workspace-error-task',
+                'title': '工作区异常任务',
+                'status': 'dispatched',
+                'priority': 'high',
+                'owner_pm': 'pm-chief',
+                'updated_at': '2026-05-18T10:00:00+08:00',
+                'workspace_status': 'error',
+                'workspace_error': 'git worktree add failed: branch already checked out elsewhere',
+            }
+            (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            now = datetime.fromisoformat('2026-05-18T10:20:00+08:00')
+            items = task_inbox.task_items(task_dir, now, dispatch_timeout_s=300, working_timeout_s=7200)
+
+        reason_types = {item['reason_type'] for item in items}
+        self.assertIn('workspace_error', reason_types)
+
 
 if __name__ == '__main__':
     unittest.main()

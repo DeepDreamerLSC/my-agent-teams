@@ -39,6 +39,24 @@ const QA_GATE_STATE_LABELS = {
   blocked: '阻塞',
   skipped: '跳过',
 }
+const CONTROL_PLANE_LABELS = {
+  delivery_failed: '投递失败',
+  session_unhealthy: '会话异常',
+  auto_requeue: '自动回池',
+  reassigned: '自动转派',
+}
+const INTEGRATION_QUEUE_STATE_LABELS = {
+  queued: '待集成',
+  metadata_missing: '缺少元数据',
+  workspace_error: '工作区异常',
+  blocked: '已阻塞',
+  in_progress: '执行中',
+  accepted: '已收口',
+  merged: '已合入',
+  closed: '已关闭',
+  pending: '未入队',
+  not_applicable: '不适用',
+}
 const EVENT_TYPE_LABELS = {
   created: '创建',
   status_transition: '状态流转',
@@ -136,6 +154,10 @@ async function fetchAgents() {
 
 async function fetchPool() {
   return fetchJson(`${API_BASE}/pool`)
+}
+
+async function fetchIntegrationQueue() {
+  return fetchJson(`${API_BASE}/integration-queue`)
 }
 
 async function fetchPmInbox() {
@@ -570,6 +592,9 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
         ${detailItem('Owner PM', task.owner_pm)}
         ${detailItem('Reviewer', task.reviewer)}
         ${detailItem('Integration Owner', task.integration_owner)}
+        ${detailItem('控制面状态', CONTROL_PLANE_LABELS[task.control_plane_state] || task.control_plane_state)}
+        ${detailItem('投递重试', task.dispatch_delivery_retry_count)}
+        ${detailItem('会话健康', task.session_health)}
         ${detailItem('目标环境', task.target_environment)}
         ${detailItem('审查级别', task.review_level)}
         ${detailItem('返工原因', task.rework_reason)}
@@ -581,6 +606,24 @@ function renderTaskDetailHtml({ task = {}, durations = {}, statusTimeline = [], 
     </section>
 
     ${renderPoolStatusHtml(poolStatus)}
+
+    <section class="detail-section">
+      <h3>工作区与集成</h3>
+      <div class="detail-grid">
+        ${detailItem('工作区模式', task.workspace_mode)}
+        ${detailItem('工作区状态', task.workspace_status)}
+        ${detailItem('工作区路径', task.workspace_path || task.worktree_path)}
+        ${detailItem('工作分支', task.workspace_branch || task.result_branch)}
+        ${detailItem('基线分支', task.workspace_base_ref)}
+        ${detailItem('目标分支', task.integration_target_branch)}
+        ${detailItem('Patch 路径', task.patch_path)}
+        ${detailItem('Patch 状态', task.integration_artifact_state)}
+        ${detailItem('集成队列状态', INTEGRATION_QUEUE_STATE_LABELS[task.integration_queue_state] || task.integration_queue_state)}
+        ${detailItem('入队时间', formatTime(task.integration_queue_entered_at))}
+        ${detailItem('工作区异常', task.workspace_error)}
+        ${detailItem('集成阻塞', task.integration_blocker)}
+      </div>
+    </section>
 
     <section class="detail-section">
       <h3>阶段耗时</h3>
@@ -758,6 +801,32 @@ function renderPoolView(payload) {
       <td>${esc(item.next_action || '-')}</td>
     </tr>
   `).join('') : '<tr><td colspan="7" class="empty-state small">暂无 pooled 任务</td></tr>'
+}
+
+function renderIntegrationQueueView(payload) {
+  const items = (payload && payload.items) || []
+  const summary = (payload && payload.summary) || {}
+  const summaryEl = document.getElementById('integration-queue-summary')
+  const tbody = document.querySelector('#integration-queue-table tbody')
+  renderSummaryCards(summaryEl, [
+    { label: '队列任务', value: summary.item_count ?? items.length },
+    { label: '待集成', value: summary.queued_count ?? items.filter(item => item.state === 'queued').length },
+    { label: '工作区异常', value: summary.workspace_error_count ?? items.filter(item => item.state === 'workspace_error').length },
+    { label: '缺元数据', value: summary.metadata_missing_count ?? items.filter(item => item.state === 'metadata_missing').length },
+    { label: '已收口', value: summary.accepted_count ?? items.filter(item => item.state === 'accepted').length },
+  ])
+  if (!tbody) return
+  tbody.innerHTML = items.length ? items.map(item => `
+    <tr>
+      <td>${esc(item.title || item.task_id)}</td>
+      <td>${esc(INTEGRATION_QUEUE_STATE_LABELS[item.state] || item.state || '-')}</td>
+      <td>${esc(item.target_branch || '-')}</td>
+      <td>${esc(item.workspace_branch || '-')}</td>
+      <td>${esc(item.patch_exists ? (item.patch_path || '已生成') : (item.patch_path || '-'))}</td>
+      <td>${esc(item.worktree_path || item.workspace_status || '-')}</td>
+      <td>${esc(item.blocker || item.artifact_state || '-')}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7" class="empty-state small">暂无 integration queue 项目</td></tr>'
 }
 
 function renderPmInboxView(payload) {
@@ -951,13 +1020,14 @@ function renderRoleEfficiencyChart(agentEff) {
 
 // --- Init ---
 async function init() {
-  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload, poolPayload, pmInboxPayload] = await Promise.all([
+  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload, poolPayload, integrationQueuePayload, pmInboxPayload] = await Promise.all([
     fetchBoard(),
     fetchGantt(),
     fetchAgents(),
     fetchAggregate(),
     fetchDailyMetrics(),
     fetchPool(),
+    fetchIntegrationQueue(),
     fetchPmInbox(),
   ])
 
@@ -968,6 +1038,7 @@ async function init() {
   renderAgentStats(agentsPayload)
   renderAnalytics(aggregatePayload, dailyPayload, agentsPayload)
   renderPoolView(poolPayload)
+  renderIntegrationQueueView(integrationQueuePayload)
   renderPmInboxView(pmInboxPayload)
 }
 
@@ -997,6 +1068,7 @@ if (typeof module !== 'undefined' && module.exports) {
     renderAggregationCharts,
     renderRoleEfficiencyChart,
     renderPoolView,
+    renderIntegrationQueueView,
     renderPmInboxView,
   }
 }
