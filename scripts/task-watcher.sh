@@ -858,8 +858,19 @@ prepare_task_workspace_payload() {
 }
 
 workspace_hint_from_payload() {
-    local payload="${1:-{}}"
-    python3 -c 'import json,sys; payload=json.load(sys.stdin); print((payload.get("dispatch_hint") or "").strip())' <<< "$payload" 2>/dev/null || true
+    local payload="${1-}"
+    [ -n "$payload" ] || payload='{}'
+    python3 - "$payload" <<'PY' 2>/dev/null || true
+import json
+import sys
+
+try:
+    payload = json.loads(sys.argv[1] or '{}')
+except Exception:
+    payload = {}
+
+print((payload.get("dispatch_hint") or "").strip())
+PY
 }
 
 reconcile_task_state_invariants() {
@@ -1436,6 +1447,49 @@ for item in sorted(rows, key=sort_key):
 PY
 }
 
+confirm_claim_request() {
+    local task_dir="$1"
+    local task_id="$2"
+    local claim_path="$task_dir/claim.json"
+    [ -f "$claim_path" ] || return 1
+
+    local claim_agent claim_time claim_reason current_status
+    claim_agent=$(json_pick "$claim_path" agent agent_id)
+    claim_time=$(json_pick "$claim_path" claimed_at timestamp)
+    claim_reason=$(json_pick "$claim_path" reason)
+    [ -n "$claim_agent" ] || { claim_reject "$task_dir" "" "claim.json 缺少 agent"; return 2; }
+
+    current_status=$(get_task_status "$task_dir")
+    [ "$current_status" = "pooled" ] || return 1
+
+    current_status=$(get_task_status "$task_dir")
+    if [ "$current_status" != "pooled" ]; then
+        return 1
+    fi
+    if ! claim_agent_can_accept_task "$task_dir" "$claim_agent"; then
+        claim_reject "$task_dir" "$claim_agent" "不满足认领条件（Pool Gate/依赖/并发/能力/write_scope 冲突）"
+        return 2
+    fi
+
+    dispatch_task_to_agent "$task_dir" "$claim_agent" "watcher confirmed claim.json" "$claim_agent" "$claim_time" "$claim_reason"
+    local workspace_payload workspace_hint
+    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+
+    python3 - "$task_id" "$claim_agent" "$claim_time" "$claim_reason" "$workspace_hint" <<'PY'
+import json
+import sys
+
+print(json.dumps({
+    "task_id": sys.argv[1],
+    "agent": sys.argv[2],
+    "claimed_at": sys.argv[3] or None,
+    "claim_reason": sys.argv[4] or None,
+    "dispatch_hint": sys.argv[5] or None,
+}, ensure_ascii=False))
+PY
+}
+
 auto_push_next_task_for_agent() {
     local agent_id="$1"
     local trigger_task_id="${2:-}"
@@ -1469,11 +1523,15 @@ auto_push_next_task_for_agent() {
     [ -n "$next_task" ] || return 1
 
     local reason="watcher auto-continued after ${trigger_task_id:-previous task completion}"
-    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1; then
+    local task_dir="$TASKS_ROOT/$next_task"
+    local claim_payload=""
+    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1 \
+        && claim_payload=$(confirm_claim_request "$task_dir" "$next_task" 2>/dev/null); then
         local workspace_hint=""
-        workspace_hint=$(task_json_pick "$TASKS_ROOT/$next_task" workspace_dispatch_hint)
-        notify_agent "$agent_id" "你当前主线已完成/进入待审。下一条可执行任务已自动续推：${next_task}。请读取 ${TASKS_ROOT}/${next_task}/instruction.md，并在确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}"
+        workspace_hint=$(workspace_hint_from_payload "$claim_payload")
+        deliver_execution_instruction_and_record "$task_dir" "$next_task" "$agent_id" "你当前主线已完成/进入待审。下一条可执行任务已自动续推：${next_task}。请读取 ${TASKS_ROOT}/${next_task}/instruction.md，并在确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}" || true
         emit_system_chat_event nudge "$next_task" "上一条主线完成后，已自动续推给 ${agent_id} 作为下一条可执行任务。" "$agent_id" info nudge
+        sync_task_board "$task_dir" "auto-claim-dev"
         log "${next_task}: 已在 ${trigger_task_id:-unknown} 完成后自动续推给 ${agent_id}"
         return 0
     fi
@@ -1502,11 +1560,15 @@ auto_reserve_next_task_for_agent() {
     [ -n "$next_task" ] || return 1
 
     local reason="watcher auto-reserved while ${agent_id} is working"
-    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1; then
+    local task_dir="$TASKS_ROOT/$next_task"
+    local claim_payload=""
+    if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1 \
+        && claim_payload=$(confirm_claim_request "$task_dir" "$next_task" 2>/dev/null); then
         local workspace_hint=""
-        workspace_hint=$(task_json_pick "$TASKS_ROOT/$next_task" workspace_dispatch_hint)
-        notify_agent "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。${workspace_hint:+ ${workspace_hint}}"
+        workspace_hint=$(workspace_hint_from_payload "$claim_payload")
+        deliver_execution_instruction_and_record "$task_dir" "$next_task" "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。${workspace_hint:+ ${workspace_hint}}" || true
         emit_system_chat_event nudge "$next_task" "watcher 已为 ${agent_id} 预留下一条任务，等待当前 working 完成后 ack。" "$agent_id" info nudge
+        sync_task_board "$task_dir" "auto-reserve-dev"
         log "${next_task}: 已为 ${agent_id} 预留下一条任务（trigger=${trigger_task_id:-idle sweep}）"
         return 0
     fi
@@ -1714,7 +1776,8 @@ update_task_record() {
     local task_dir="$1"
     local new_status="${2:-}"
     local reason="${3:-watcher status update}"
-    local patch_json="${4:-{}}"
+    local patch_json="${4-}"
+    [ -n "$patch_json" ] || patch_json='{}'
     local patch_file=""
     local output=""
     patch_file=$(mktemp "${STATE_DIR}/patch.XXXXXX.json" 2>/dev/null || mktemp)
@@ -1793,7 +1856,8 @@ set_task_status() {
 
 set_task_fields() {
     local task_dir="$1"
-    local patch_json="${2:-{}}"
+    local patch_json="${2-}"
+    [ -n "$patch_json" ] || patch_json='{}'
     local reason="${3:-watcher metadata update}"
     update_task_record "$task_dir" "" "$reason" "$patch_json"
 }
@@ -2741,42 +2805,22 @@ claim_reject() {
 process_claim_json() {
     local task_dir="$1"
     local task_id="$2"
-    local claim_path="$task_dir/claim.json"
-    local workspace_payload workspace_hint
-    [ -f "$claim_path" ] || return 1
-
-    local claim_agent claim_time claim_reason current_status lock_file
-    claim_agent=$(json_pick "$claim_path" agent agent_id)
-    claim_time=$(json_pick "$claim_path" claimed_at timestamp)
-    claim_reason=$(json_pick "$claim_path" reason)
-    current_status=$(get_task_status "$task_dir")
-    [ "$current_status" = "pooled" ] || return 1
-    [ -n "$claim_agent" ] || { claim_reject "$task_dir" "" "claim.json 缺少 agent"; return 0; }
-
-    lock_file="$task_dir/.claim.lock"
-    exec 9>"$lock_file"
-    flock -n 9 || return 0
-
-    current_status=$(get_task_status "$task_dir")
-    if [ "$current_status" != "pooled" ]; then
-        flock -u 9
+    local claim_payload workspace_hint claim_agent
+    if ! claim_payload=$(confirm_claim_request "$task_dir" "$task_id" 2>/dev/null); then
+        local rc=$?
+        [ "$rc" -eq 2 ] && return 0
         return 1
     fi
-    if ! claim_agent_can_accept_task "$task_dir" "$claim_agent"; then
-        claim_reject "$task_dir" "$claim_agent" "不满足认领条件（Pool Gate/依赖/并发/能力/write_scope 冲突）"
-        flock -u 9
-        return 0
-    fi
 
-    dispatch_task_to_agent "$task_dir" "$claim_agent" "watcher confirmed claim.json" "$claim_agent" "$claim_time" "$claim_reason"
-    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
-    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+    claim_agent=$(python3 -c 'import json,sys; print((json.load(sys.stdin).get("agent") or "").strip())' <<< "$claim_payload" 2>/dev/null || true)
+    workspace_hint=$(workspace_hint_from_payload "$claim_payload")
+    [ -n "$claim_agent" ] || return 1
+
     deliver_execution_instruction_and_record "$task_dir" "$task_id" "$claim_agent" "你认领的任务 ${task_id} 已进入 dispatched。请读取 ${task_dir}/instruction.md 并继续执行。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     emit_system_chat_event dispatch "$task_id" "任务已被 ${claim_agent} 认领并进入 dispatched。" "$claim_agent" info dispatch
     notify_pm "[task-watcher] $task_id 已被 ${claim_agent} 认领，进入 dispatched。"
     sync_task_board "$task_dir" "claim-confirmed"
     log "$task_id: 已确认 ${claim_agent} 的 claim.json，进入 dispatched"
-    flock -u 9
     return 0
 }
 

@@ -11,6 +11,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CLAIM_SCRIPT = REPO_ROOT / "scripts" / "claim-task.sh"
+TASK_WATCHER = REPO_ROOT / "scripts" / "task-watcher.sh"
+ENSURE_TASK_WORKSPACE = REPO_ROOT / "scripts" / "ensure-task-workspace.py"
 
 
 class ClaimTaskReservedTests(unittest.TestCase):
@@ -19,8 +21,10 @@ class ClaimTaskReservedTests(unittest.TestCase):
         self.root = Path(self.tmpdir.name)
         self.tasks_root = self.root / "tasks"
         self.dev_root = self.root / "dev"
+        self.scripts_root = self.root / "scripts"
         self.tasks_root.mkdir()
         self.dev_root.mkdir()
+        self.scripts_root.mkdir()
         subprocess.run(["git", "init", "-b", "main"], cwd=str(self.dev_root), check=True, capture_output=True, text=True)
         subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(self.dev_root), check=True)
         subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(self.dev_root), check=True)
@@ -46,6 +50,9 @@ class ClaimTaskReservedTests(unittest.TestCase):
             },
             "wip_limits": {"dev": 1},
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        for name in ("claim-task.sh", "ensure-task-workspace.py", "task-pool-router.py"):
+            (self.scripts_root / name).symlink_to(REPO_ROOT / "scripts" / name)
+        (self.scripts_root / "lib").symlink_to(REPO_ROOT / "scripts" / "lib")
 
     def tearDown(self):
         self.tmpdir.cleanup()
@@ -57,6 +64,17 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "CONFIG_PATH": str(self.config_path),
             "CLAIM_AGENT_ID": "dev-1",
             "WORKSPACE_ROOT": str(self.root),
+        }
+
+    def _watcher_env(self) -> dict[str, str]:
+        return {
+            **self._env(),
+            "TASK_WATCHER_TEST_MODE": "1",
+            "STATE_DIR": str(self.root / ".runtime" / "state" / "task-watcher"),
+            "LOG_DIR": str(self.root / ".runtime" / "logs"),
+            "LOG_FILE": str(self.root / ".runtime" / "logs" / "task-watcher.log"),
+            "WATCHER_STDOUT_LOG": str(self.root / ".runtime" / "logs" / "task-watcher.log"),
+            "ENSURE_TASK_WORKSPACE_PY": str(ENSURE_TASK_WORKSPACE),
         }
 
     def _write_task(self, name: str, payload: dict) -> Path:
@@ -92,6 +110,46 @@ class ClaimTaskReservedTests(unittest.TestCase):
         (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
         return task_dir
 
+    def _confirm_claim_request(self, task_id: str) -> dict:
+        task_dir = self.tasks_root / task_id
+        completed = subprocess.run(
+            [
+                "bash",
+                "-lc",
+                f"source '{TASK_WATCHER}' && confirm_claim_request '{task_dir}' '{task_id}'",
+            ],
+            cwd=str(REPO_ROOT),
+            env=self._watcher_env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return json.loads(completed.stdout)
+
+    def test_claim_writes_request_without_dispatching_task(self):
+        target_dir = self._write_task("request-only-task", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/base.txt"],
+        })
+
+        completed = subprocess.run(
+            [str(CLAIM_SCRIPT), "request-only-task"],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        claim = json.loads(completed.stdout)
+        task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
+        queued_claim = json.loads((target_dir / "claim.json").read_text(encoding="utf-8"))
+        self.assertEqual(claim["claim_status"], "requested")
+        self.assertEqual(task["status"], "pooled")
+        self.assertEqual(task["assigned_agent"], "auto")
+        self.assertEqual(queued_claim["agent"], "dev-1")
+
     def test_claim_allows_one_reserved_while_agent_has_one_working_task(self):
         self._write_task("working-task", {
             "status": "working",
@@ -114,11 +172,13 @@ class ClaimTaskReservedTests(unittest.TestCase):
         )
 
         claim = json.loads(completed.stdout)
+        confirm = self._confirm_claim_request("next-task")
         task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
-        self.assertTrue(claim["reserved"])
+        self.assertEqual(claim["claim_status"], "requested")
         self.assertEqual(task["status"], "dispatched")
         self.assertEqual(task["reserved_by"], "dev-1")
         self.assertEqual(task["pre_claim_assigned_agent"], "auto")
+        self.assertEqual(confirm["agent"], "dev-1")
 
     def test_claim_blocks_second_reserved_task_for_same_agent(self):
         self._write_task("reserved-task", {
@@ -166,6 +226,7 @@ class ClaimTaskReservedTests(unittest.TestCase):
             check=True,
         )
 
+        self._confirm_claim_request("next-task")
         task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
         self.assertIn("dependencies_ready_at", task)
 
@@ -204,10 +265,11 @@ class ClaimTaskReservedTests(unittest.TestCase):
             check=True,
         )
 
+        confirm = self._confirm_claim_request("worktree-task")
         task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
         self.assertEqual(task["workspace_status"], "prepared")
         self.assertTrue(Path(task["worktree_path"]).exists())
-        self.assertIn("请在", task["workspace_dispatch_hint"])
+        self.assertIn("请在", confirm["dispatch_hint"])
 
     def test_concurrent_claims_only_allow_one_reserved_task(self):
         self._write_task("task-a", {
@@ -244,6 +306,57 @@ class ClaimTaskReservedTests(unittest.TestCase):
         self.assertEqual(len(successes), 1, results)
         self.assertEqual(len(failures), 1, results)
         self.assertIn("reserved_limit", failures[0].stderr)
+
+    def test_auto_reserve_confirms_request_and_delivers_workspace_hint(self):
+        self._write_task("working-task", {
+            "status": "working",
+            "assigned_agent": "dev-1",
+            "write_scope": ["src/current"],
+        })
+        target_dir = self._write_task("next-task", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/next"],
+        })
+
+        send_log = self.root / "send.log"
+        send_script = self.scripts_root / "send-to-agent.sh"
+        send_script.write_text(
+            "#!/bin/bash\n"
+            f"printf '%s' \"$2\" > '{send_log}'\n"
+            "echo \"delivered to $1 (runtime=codex, attempt=1)\"\n",
+            encoding="utf-8",
+        )
+        send_script.chmod(0o755)
+
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config.setdefault("task_pool", {})["auto_reserve_while_working"] = True
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        subprocess.run(
+            [
+                "bash",
+                "-lc",
+                f"source '{TASK_WATCHER}' && auto_reserve_next_task_for_agent dev-1 'working sweep'",
+            ],
+            cwd=str(REPO_ROOT),
+            env={
+                **self._watcher_env(),
+                "SEND_SCRIPT": str(send_script),
+            },
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
+        message = send_log.read_text(encoding="utf-8")
+        self.assertEqual(task["status"], "dispatched")
+        self.assertEqual(task["reserved_by"], "dev-1")
+        self.assertEqual(task["workspace_status"], "prepared")
+        self.assertTrue(Path(task["worktree_path"]).exists())
+        self.assertIn("当前任务完成前不要写该任务 ack", message)
+        self.assertIn("请在", message)
 
 
 if __name__ == "__main__":

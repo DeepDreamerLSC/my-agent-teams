@@ -49,7 +49,6 @@ workspace_root = Path(sys.argv[6])
 script_dir = Path(sys.argv[7])
 sys.path.insert(0, str(script_dir / 'lib'))
 from task_pool_rules import pool_gate_blockers  # type: ignore
-from task_workspace import ensure_task_workspace  # type: ignore
 
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -150,7 +149,7 @@ claim_payload = {
     'task_id': str(task.get('id') or task_dir.name),
     'agent': agent_id,
     'claimed_at': datetime.now().astimezone().isoformat(timespec='seconds'),
-    'reserved': True,
+    'claim_status': 'requested',
 }
 if reason:
     claim_payload['reason'] = reason
@@ -185,19 +184,42 @@ def assert_capacity_and_conflicts(current_task):
 
     for other_path in tasks_root.glob('*/task.json'):
         other = json.loads(other_path.read_text(encoding='utf-8'))
-        if str(other.get('assigned_agent') or '') != agent_id:
+        other_status = str(other.get('status') or '')
+        other_dir = other_path.parent
+        other_scopes = resolve_scope_paths(other)
+
+        if str(other.get('assigned_agent') or '') == agent_id and other_status in {'dispatched', 'working'}:
+            active_count += 1
+            if other_status == 'working':
+                working_count += 1
+            if other_status == 'dispatched':
+                reserved_count += 1
+            for other_scope in other_scopes:
+                for target_scope_item in resolved_target_scope:
+                    if scopes_overlap(target_scope_item, other_scope):
+                        raise SystemExit(f'write_scope conflict with active task: {other_dir.name}')
             continue
-        if str(other.get('status') or '') not in {'dispatched', 'working'}:
+
+        if other_dir == task_dir or other_status != 'pooled':
             continue
+
+        other_claim_path = other_dir / 'claim.json'
+        if not other_claim_path.exists():
+            continue
+        try:
+            other_claim = json.loads(other_claim_path.read_text(encoding='utf-8'))
+        except Exception:
+            other_claim = {}
+        other_claim_agent = str(other_claim.get('agent') or other_claim.get('agent_id') or '').strip()
+        if other_claim_agent != agent_id:
+            continue
+
         active_count += 1
-        if str(other.get('status') or '') == 'working':
-            working_count += 1
-        if str(other.get('status') or '') == 'dispatched':
-            reserved_count += 1
-        for other_scope in resolve_scope_paths(other):
+        reserved_count += 1
+        for other_scope in other_scopes:
             for target_scope_item in resolved_target_scope:
                 if scopes_overlap(target_scope_item, other_scope):
-                    raise SystemExit(f'write_scope conflict with active task: {other_path.parent.name}')
+                    raise SystemExit(f'write_scope conflict with pending claim: {other_dir.name}')
 
     if working_count > working_limit:
         raise SystemExit(f'agent {agent_id} exceeds working_limit={working_limit}')
@@ -229,51 +251,21 @@ try:
     assert_dependencies_ready(task)
     assert_capacity_and_conflicts(task)
 
+    if claim_path.exists():
+        try:
+            existing_claim = json.loads(claim_path.read_text(encoding='utf-8'))
+        except Exception:
+            existing_claim = {}
+        existing_agent = str(existing_claim.get('agent') or existing_claim.get('agent_id') or '').strip()
+        if existing_agent == agent_id:
+            print(json.dumps(existing_claim or claim_payload, ensure_ascii=False))
+            raise SystemExit(0)
+        raise SystemExit(f'task already has pending claim from {existing_agent or "another agent"}')
+
     with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
         json.dump(claim_payload, tmp, ensure_ascii=False, indent=2)
         tmp.write('\n')
     os.replace(tmp.name, claim_path)
-
-    now = datetime.now().astimezone().isoformat(timespec='seconds')
-    task['pre_claim_assigned_agent'] = task.get('assigned_agent')
-    task['assigned_agent'] = agent_id
-    task['status'] = 'dispatched'
-    task['updated_at'] = now
-    task['lease_owner'] = task.get('owner_pm')
-    task['lease_acquired_at'] = now
-    task['lease_expires_at'] = now
-    task['claimed_by'] = agent_id
-    task['claimed_at'] = claim_payload['claimed_at']
-    task['claim_reason'] = reason or None
-    task['reserved_by'] = agent_id
-    task['reserved_at'] = claim_payload['claimed_at']
-    task['reserved_reason'] = reason or 'manual pool claim'
-    if task.get('depends_on') and not task.get('dependencies_ready_at'):
-        task['dependencies_ready_at'] = now
-    with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
-        json.dump(task, tmp, ensure_ascii=False, indent=2)
-        tmp.write('\n')
-    os.replace(tmp.name, task_path)
-
-    workspace_payload = ensure_task_workspace(task_dir, config_path)
-    dispatch_hint = str(workspace_payload.get('dispatch_hint') or '').strip()
-    if dispatch_hint:
-        claim_payload['dispatch_hint'] = dispatch_hint
-        refreshed_task = json.loads(task_path.read_text(encoding='utf-8'))
-        if refreshed_task.get('workspace_dispatch_hint') != dispatch_hint:
-            refreshed_task['workspace_dispatch_hint'] = dispatch_hint
-            with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
-                json.dump(refreshed_task, tmp, ensure_ascii=False, indent=2)
-                tmp.write('\n')
-            os.replace(tmp.name, task_path)
-
-    with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
-        fp.write(json.dumps({
-            'from': 'pooled',
-            'to': 'dispatched',
-            'at': now,
-            'reason': f'agent {agent_id} claimed pooled task' + (f': {reason}' if reason else ''),
-        }, ensure_ascii=False) + '\n')
 finally:
     try:
         os.close(lock_fd)
