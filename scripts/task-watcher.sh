@@ -25,8 +25,10 @@ SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/close-task.sh}"
 ARTIFACTS_PY="${ARTIFACTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_artifacts.py}"
+STATE_INVARIANTS_PY="${STATE_INVARIANTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_state_invariants.py}"
 TASK_POOL_ROUTER="${TASK_POOL_ROUTER:-$WORKSPACE_ROOT/scripts/task-pool-router.py}"
 TASK_QUEUE_ROUTER="${TASK_QUEUE_ROUTER:-$WORKSPACE_ROOT/scripts/task-queue-router.py}"
+REASSIGN_TASK_SCRIPT="${REASSIGN_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/reassign-task.sh}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
@@ -44,6 +46,7 @@ WATCHER_STDOUT_LOG="${WATCHER_STDOUT_LOG:-$LOG_FILE}"
 LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 DISPATCH_RESEND_AFTER_SECONDS="${DISPATCH_RESEND_AFTER_SECONDS:-300}"
 RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
+DISPATCH_FAILURE_THRESHOLD="${DISPATCH_FAILURE_THRESHOLD:-3}"
 WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
 TASK_WATCHER_TEST_MODE="${TASK_WATCHER_TEST_MODE:-0}"
 NOTIFY_RETRY_COOLDOWN_SECONDS="${NOTIFY_RETRY_COOLDOWN_SECONDS:-$RESEND_COOLDOWN_SECONDS}"
@@ -670,6 +673,251 @@ else:
 PY
 }
 
+parse_send_attempts() {
+    local output="$1"
+    python3 - "$output" <<'PY'
+import re
+import sys
+
+text = sys.argv[1]
+patterns = (
+    re.compile(r'attempt=(\d+)'),
+    re.compile(r'after\s+(\d+)\s+attempts'),
+)
+for pattern in patterns:
+    match = pattern.search(text)
+    if match:
+        print(int(match.group(1)))
+        raise SystemExit(0)
+print(1)
+PY
+}
+
+session_health_state() {
+    local agent_session="$1"
+    if [ -z "$agent_session" ]; then
+        echo "unknown"
+        return 0
+    fi
+    if ! tmux has-session -t "$agent_session" 2>/dev/null; then
+        echo "missing_session"
+        return 0
+    fi
+    local is_working
+    is_working=$(agent_has_working_signal "$agent_session")
+    if [ "${is_working:-0}" -gt 0 ] 2>/dev/null; then
+        echo "working_signal"
+        return 0
+    fi
+    echo "idle_session"
+}
+
+record_dispatch_delivery_attempt() {
+    local task_dir="$1"
+    local delivery_state="$2"
+    local attempts="${3:-1}"
+    local delivery_error="${4:-}"
+    local session_health="${5:-unknown}"
+    python3 - "$task_dir" "$delivery_state" "$attempts" "$delivery_error" "$session_health" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+delivery_state = sys.argv[2].strip()
+attempts_raw = sys.argv[3].strip()
+delivery_error = sys.argv[4].strip()
+session_health = sys.argv[5].strip() or 'unknown'
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+try:
+    attempts = max(1, int(attempts_raw or '1'))
+except Exception:
+    attempts = 1
+
+attempt_count = int(task.get('dispatch_delivery_attempt_count') or 0) + attempts
+retry_count = int(task.get('dispatch_delivery_retry_count') or 0) + 1
+failure_count = int(task.get('dispatch_delivery_consecutive_failures') or 0)
+if delivery_state in {'delivery_failed', 'session_unhealthy'}:
+    failure_count += 1
+    task['control_plane_state'] = delivery_state
+    task['control_plane_updated_at'] = now
+else:
+    failure_count = 0
+    if str(task.get('control_plane_state') or '') in {'delivery_failed', 'session_unhealthy'}:
+        task['control_plane_state'] = None
+        task['control_plane_updated_at'] = now
+
+task['dispatch_delivery_attempt_count'] = attempt_count
+task['dispatch_delivery_retry_count'] = retry_count
+task['dispatch_delivery_consecutive_failures'] = failure_count
+task['last_delivery_attempt_at'] = now
+task['last_delivery_state'] = delivery_state or None
+task['last_delivery_error'] = delivery_error or None
+task['session_health'] = session_health
+task['updated_at'] = now
+
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+PY
+}
+
+clear_dispatch_recovery_state() {
+    local task_dir="$1"
+    python3 - "$task_dir" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+changed = False
+
+defaults = {
+    'dispatch_delivery_consecutive_failures': 0,
+    'session_health': None,
+}
+for key, value in defaults.items():
+    if task.get(key) != value:
+        task[key] = value
+        changed = True
+
+if str(task.get('control_plane_state') or '') in {'delivery_failed', 'session_unhealthy'}:
+    task['control_plane_state'] = None
+    task['control_plane_updated_at'] = now
+    changed = True
+
+if changed:
+    task['updated_at'] = now
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+        json.dump(task, tmp, ensure_ascii=False, indent=2)
+        tmp.write('\n')
+    os.replace(tmp.name, task_path)
+PY
+}
+
+deliver_execution_instruction_and_record() {
+    local task_dir="$1"
+    local task_id="$2"
+    local agent_session="$3"
+    local message="$4"
+    local session_health output rc attempts delivery_state delivery_error
+
+    session_health=$(session_health_state "$agent_session")
+    output=""
+    rc=0
+    if [ -x "$SEND_SCRIPT" ]; then
+        output=$(CONFIG_PATH="$CONFIG_PATH" "$SEND_SCRIPT" "$agent_session" "$message" 2>&1) || rc=$?
+    else
+        rc=127
+        output="send script unavailable: $SEND_SCRIPT"
+    fi
+
+    attempts=$(parse_send_attempts "$output")
+    if [ "$rc" -eq 0 ]; then
+        delivery_state="delivered"
+        delivery_error=""
+        log "$task_id: 投递成功 -> ${agent_session} | $(truncate_utf8 "$output" 160)"
+    else
+        if [ "$session_health" = "missing_session" ]; then
+            delivery_state="session_unhealthy"
+        else
+            delivery_state="delivery_failed"
+        fi
+        delivery_error=$(truncate_utf8 "$output" 240)
+        if [ "$session_health" != "missing_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
+            legacy_send_tmux "$agent_session" "$message" || true
+        fi
+        log "$task_id: 投递失败 -> ${agent_session} | state=${delivery_state} | $(truncate_utf8 "$output" 200)"
+    fi
+
+    record_dispatch_delivery_attempt "$task_dir" "$delivery_state" "$attempts" "$delivery_error" "$session_health"
+    [ "$rc" -eq 0 ]
+}
+
+reconcile_task_state_invariants() {
+    local task_dir="$1"
+    local task_id="$2"
+    local report
+    report=$(python3 "$STATE_INVARIANTS_PY" --task-dir "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || echo '{}')
+    python3 - "$task_dir" "$report" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+report = json.loads(sys.argv[2] or '{}')
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+violations = report.get('violations') if isinstance(report.get('violations'), list) else []
+signature = str(report.get('signature') or '')
+previous_signature = str(task.get('state_invariant_signature') or '')
+current_state = str(task.get('control_plane_state') or '')
+changed = False
+notify = False
+
+if violations:
+    if task.get('state_invariant_violations') != violations:
+        task['state_invariant_violations'] = violations
+        changed = True
+    if previous_signature != signature:
+        task['state_invariant_violation_count'] = int(task.get('state_invariant_violation_count') or 0) + 1
+        task['state_invariant_signature'] = signature
+        notify = True
+        changed = True
+    task['state_invariant_checked_at'] = now
+    if current_state not in {'reassigned', 'auto_requeue'}:
+        if task.get('control_plane_state') != 'state_invariant_violation':
+            task['control_plane_state'] = 'state_invariant_violation'
+            changed = True
+        task['control_plane_updated_at'] = now
+        changed = True
+else:
+    if task.get('state_invariant_violations'):
+        task['state_invariant_violations'] = []
+        changed = True
+    if previous_signature:
+        task['state_invariant_signature'] = ''
+        changed = True
+    if current_state == 'state_invariant_violation':
+        task['control_plane_state'] = None
+        task['control_plane_updated_at'] = now
+        changed = True
+    if task.get('state_invariant_checked_at') != now:
+        task['state_invariant_checked_at'] = now
+        changed = True
+
+if changed:
+    task['updated_at'] = now
+    with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+        json.dump(task, tmp, ensure_ascii=False, indent=2)
+        tmp.write('\n')
+    os.replace(tmp.name, task_path)
+
+print(json.dumps({
+    'notify': notify,
+    'count': len(violations),
+    'messages': [str(item.get('message') or '') for item in violations if isinstance(item, dict)],
+}, ensure_ascii=False))
+PY
+}
+
 list_dev_agents() {
     python3 - "$CONFIG_PATH" <<'PY'
 import json
@@ -1095,6 +1343,27 @@ claim_scope_idle_candidates() {
             echo "$agent_id"
         fi
     done <<< "$(task_claim_scope "$task_dir")"
+}
+
+select_reassign_candidate() {
+    local task_dir="$1"
+    local current_agent="$2"
+    while IFS= read -r agent_id; do
+        [ -n "$agent_id" ] || continue
+        [ "$agent_id" = "$current_agent" ] && continue
+        if is_idle_agent "$agent_id" && claim_agent_can_accept_task "$task_dir" "$agent_id"; then
+            echo "$agent_id"
+            return 0
+        fi
+    done <<< "$(task_claim_scope "$task_dir")"
+    return 1
+}
+
+dispatch_failure_threshold_exceeded() {
+    local task_dir="$1"
+    local failures
+    failures=$(task_json_pick "$task_dir" dispatch_delivery_consecutive_failures 2>/dev/null || echo 0)
+    [ "${failures:-0}" -ge "${DISPATCH_FAILURE_THRESHOLD:-3}" ]
 }
 
 list_pooled_candidates_for_agent() {
@@ -2334,6 +2603,16 @@ if claim_reason:
 if task.get('depends_on') and not task.get('dependencies_ready_at'):
     task['dependencies_ready_at'] = now
 task['pool_entered_at'] = task.get('pool_entered_at')
+task['dispatch_delivery_attempt_count'] = 0
+task['dispatch_delivery_retry_count'] = 0
+task['dispatch_delivery_consecutive_failures'] = 0
+task['last_delivery_attempt_at'] = None
+task['last_delivery_error'] = None
+task['last_delivery_state'] = None
+task['session_health'] = None
+if str(task.get('control_plane_state') or '') not in {'reassigned', 'auto_requeue'}:
+    task['control_plane_state'] = None
+task['control_plane_updated_at'] = now
 
 with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_path.parent), encoding='utf-8') as tmp:
     json.dump(task, tmp, ensure_ascii=False, indent=2)
@@ -2368,7 +2647,7 @@ auto_dispatch_pending_arch() {
     fi
 
     dispatch_task_to_agent "$task_dir" "arch-1" "watcher auto dispatch domain/epic task to arch-1"
-    notify_agent "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。"
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-dispatch-arch"
     log "$task_id: 自动派发给 arch-1（domain/epic 并行）"
     return 0
@@ -2397,7 +2676,7 @@ auto_claim_pending_dev() {
     [ -n "$target_agent" ] || return 1
 
     dispatch_task_to_agent "$task_dir" "$target_agent" "watcher auto-claimed pending execution task"
-    notify_agent "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。"
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-claim-dev"
     log "$task_id: 自动认领并派发给 $target_agent"
     return 0
@@ -2627,6 +2906,97 @@ print(previous_agent or '')
 PY
 }
 
+reassign_dispatched_task() {
+    local task_dir="$1"
+    local task_id="$2"
+    local previous_agent="$3"
+    local next_agent="$4"
+    local reason="$5"
+    [ -x "$REASSIGN_TASK_SCRIPT" ] || return 1
+
+    if "$REASSIGN_TASK_SCRIPT" --task-dir "$task_dir" --agent "$next_agent" --reason "$reason" >/dev/null 2>&1; then
+        deliver_execution_instruction_and_record "$task_dir" "$task_id" "$next_agent" "你已接手任务 ${task_id}。请读取 ${task_dir}/instruction.md，并在确认后写 ack.json 开始执行。" || true
+        notify_pm "[task-watcher] $task_id 因连接/会话恢复已从 ${previous_agent} 转派给 ${next_agent}。"
+        emit_system_chat_event watcher "$task_id" "控制面恢复：已从 ${previous_agent} 转派给 ${next_agent}。" "$PM_SESSION" degraded notify
+        sync_task_board "$task_dir" "control-plane-reassign"
+        log "$task_id: 控制面恢复后已从 ${previous_agent} 转派给 ${next_agent}"
+        return 0
+    fi
+    log "$task_id: reassign-task.sh 执行失败，无法从 ${previous_agent} 转派到 ${next_agent}"
+    return 1
+}
+
+requeue_dispatched_task_to_pool() {
+    local task_dir="$1"
+    local task_id="$2"
+    local reason="$3"
+    python3 - "$task_dir" "$task_id" "$reason" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task_id = sys.argv[2]
+reason = sys.argv[3].strip()
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+if str(task.get('status') or '') != 'dispatched':
+    raise SystemExit(1)
+
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+previous_agent = str(task.get('assigned_agent') or '')
+task['last_connection_failed_agent'] = previous_agent
+task['last_auto_requeue_at'] = now
+task['last_auto_requeue_reason'] = reason
+task['auto_requeue_count'] = int(task.get('auto_requeue_count') or 0) + 1
+task['assigned_agent'] = task.get('pre_claim_assigned_agent') or 'auto'
+task['status'] = 'pooled'
+task['updated_at'] = now
+task['dispatch_delivery_attempt_count'] = 0
+task['dispatch_delivery_retry_count'] = 0
+task['dispatch_delivery_consecutive_failures'] = 0
+task['last_delivery_state'] = 'auto_requeue'
+task['last_delivery_error'] = reason or task.get('last_delivery_error')
+task['last_delivery_attempt_at'] = now
+task['session_health'] = None
+task['control_plane_state'] = 'auto_requeue'
+task['control_plane_updated_at'] = now
+for key in (
+    'claimed_by',
+    'claimed_at',
+    'claim_reason',
+    'reserved_by',
+    'reserved_at',
+    'reserved_reason',
+    'lease_acquired_at',
+    'lease_expires_at',
+):
+    task.pop(key, None)
+
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+
+claim_path = task_dir / 'claim.json'
+if claim_path.exists():
+    claim_path.rename(task_dir / f'claim.requeued.{now.replace(":", "").replace("+", "_")}.json')
+
+with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': 'dispatched',
+        'to': 'pooled',
+        'at': now,
+        'reason': f'watcher auto requeue after control-plane recovery failure: {reason}',
+    }, ensure_ascii=False) + '\n')
+
+print(previous_agent)
+PY
+}
+
 auto_dispatch_review() {
     local task_dir="$1"
     local task_id="$2"
@@ -2784,6 +3154,14 @@ run_task_watcher_loop() {
         if normalize_legacy_task_status "$task_dir" "$current_status" >/dev/null 2>&1; then
             current_status=$(get_task_status "$task_dir")
         fi
+        invariant_report=$(reconcile_task_state_invariants "$task_dir" "$task_id" 2>/dev/null || echo '{}')
+        invariant_notify=$(python3 -c 'import json,sys; print("1" if json.load(sys.stdin).get("notify") else "0")' <<< "$invariant_report" 2>/dev/null || echo 0)
+        invariant_count=$(python3 -c 'import json,sys; print(int(json.load(sys.stdin).get("count") or 0))' <<< "$invariant_report" 2>/dev/null || echo 0)
+        if [ "${invariant_notify:-0}" = "1" ] && [ "${invariant_count:-0}" -gt 0 ]; then
+            invariant_summary=$(python3 -c 'import json,sys; payload=json.load(sys.stdin); print("；".join([item for item in payload.get("messages") or [] if item][:2]))' <<< "$invariant_report" 2>/dev/null || echo "")
+            notify_pm "[task-watcher] $task_id 检测到状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}"
+            emit_system_chat_event watcher "$task_id" "状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}" "$PM_SESSION" degraded notify
+        fi
 
         # 已关闭任务不再触发自动流转，但仍需在文件变更后同步到任务看板 SQLite
         case "$current_status" in
@@ -2866,19 +3244,38 @@ run_task_watcher_loop() {
                 if task_has_progress_artifact "$task_dir"; then
                     log "$task_id: dispatched 超时检查跳过，已发现后续工件，优先按显式工件继续流转"
                 else
-                    is_working=$(agent_has_working_signal "$agent_session")
-                    [ "$is_working" -gt 0 ] && continue
+                    session_health=$(session_health_state "$agent_session")
+                    if [ "$session_health" = "working_signal" ]; then
+                        continue
+                    fi
                     last_resend=$(cat "$STATE_DIR/$resend_key" 2>/dev/null)
                     if [ -z "$last_resend" ] || [ $(( now - last_resend )) -gt "$RESEND_COOLDOWN_SECONDS" ]; then
-                        if [ -n "$agent_session" ]; then
-                            instruction="$task_dir/instruction.md"
-                            if [ -f "$instruction" ]; then
-                                notify_agent "$agent_session" "请重新读取 ${task_dir}/instruction.md 并继续执行，完成后写 ack.json / result.json。"
-                                emit_system_chat_event nudge "$task_id" "任务超时未确认，已触发重新唤醒。" "$agent_session" degraded nudge
-                                log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，兜底重发指令给 $agent_session"
-                                push_task_event "【任务重发】" "$task_id" "超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已重新发送给 ${agent_session}" "等待 agent 写入 ack.json"
-                            fi
+                        instruction="$task_dir/instruction.md"
+                        if [ -f "$instruction" ]; then
+                            deliver_execution_instruction_and_record "$task_dir" "$task_id" "$agent_session" "请重新读取 ${task_dir}/instruction.md 并继续执行，完成后写 ack.json / result.json。" || true
+                            emit_system_chat_event nudge "$task_id" "任务超时未确认，已触发控制面重试。" "${agent_session:-$PM_SESSION}" degraded nudge
+                            log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，已执行控制面重试"
+                            push_task_event "【任务重发】" "$task_id" "超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已对 ${agent_session:-unknown} 执行重试" "等待 agent 写入 ack.json"
                             echo "$now" > "$STATE_DIR/$resend_key"
+                        fi
+                        if dispatch_failure_threshold_exceeded "$task_dir"; then
+                            failure_state=$(task_json_pick "$task_dir" last_delivery_state 2>/dev/null || echo "delivery_failed")
+                            failure_reason=$(task_json_pick "$task_dir" last_delivery_error 2>/dev/null || echo "")
+                            threshold_reason="control-plane recovery reached ${DISPATCH_FAILURE_THRESHOLD} consecutive ${failure_state:-delivery_failed} attempts"
+                            [ -n "$failure_reason" ] && threshold_reason="${threshold_reason}: ${failure_reason}"
+                            if next_agent=$(select_reassign_candidate "$task_dir" "$agent_session" 2>/dev/null || true) && [ -n "$next_agent" ]; then
+                                if reassign_dispatched_task "$task_dir" "$task_id" "$agent_session" "$next_agent" "$threshold_reason"; then
+                                    current_status=$(get_task_status "$task_dir")
+                                    continue
+                                fi
+                            fi
+                            if previous_agent=$(requeue_dispatched_task_to_pool "$task_dir" "$task_id" "$threshold_reason" 2>/dev/null); then
+                                notify_pm "[task-watcher] $task_id 连续 ${DISPATCH_FAILURE_THRESHOLD} 次控制面恢复失败，已从 ${previous_agent:-unknown} 自动回收到 pooled。"
+                                emit_system_chat_event watcher "$task_id" "控制面恢复失败，已自动回收到 pooled。" "$PM_SESSION" degraded notify
+                                sync_task_board "$task_dir" "control-plane-requeue"
+                                current_status="pooled"
+                                continue
+                            fi
                         fi
                     fi
                 fi
@@ -2923,6 +3320,7 @@ run_task_watcher_loop() {
                     continue
                 fi
                 set_task_status "$task_dir" "working" "watcher observed ack.json"
+                clear_dispatch_recovery_state "$task_dir"
                 current_status="working"
                 if ! is_notified "$ack_key"; then
                     log "$task_id: agent ${ack_agent:-?} 已确认，状态 working"

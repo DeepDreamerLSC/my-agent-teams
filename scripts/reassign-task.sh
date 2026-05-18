@@ -11,7 +11,7 @@ STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
 
 usage() {
   cat <<'EOF'
-usage: resume-task.sh --task-dir <task-dir> --agent <agent-id> --reason <reason> [--keep-result-history]
+usage: reassign-task.sh --task-dir <task-dir> --agent <agent-id> --reason <reason> [--keep-result-history]
 EOF
 }
 
@@ -66,7 +66,11 @@ if not task_path.exists():
 task = load_json(task_path)
 old_status = str(task.get('status') or '')
 if old_status in {'done', 'cancelled', 'archived'}:
-    raise SystemExit(f'task status {old_status} is not resumable')
+    raise SystemExit(f'task status {old_status} is not reassignable')
+
+previous_agent = str(task.get('assigned_agent') or '')
+if previous_agent and previous_agent == agent_id:
+    raise SystemExit('reassign target must differ from current assigned_agent')
 
 now = datetime.now().astimezone()
 now_iso = now.isoformat(timespec='seconds')
@@ -74,17 +78,24 @@ stamp = now.strftime('%Y%m%dT%H%M%S')
 history_dir = task_dir / 'history'
 history_dir.mkdir(parents=True, exist_ok=True)
 
-resume_record = {
+record = {
     'task_id': str(task.get('id') or task_dir.name),
-    'resumed_at': now_iso,
-    'resumed_by': 'pm-chief',
-    'assigned_agent': agent_id,
+    'reassigned_at': now_iso,
+    'reassigned_by': 'task-watcher',
+    'from_agent': previous_agent,
+    'to_agent': agent_id,
     'reason': reason,
     'archived_files': [],
 }
 
 archive_names = [
-    'ack.json', 'claim.json', 'review.json', 'design-review.json', 'review.md', 'design-review.md', 'verify.json'
+    'ack.json',
+    'claim.json',
+    'review.json',
+    'design-review.json',
+    'review.md',
+    'design-review.md',
+    'verify.json',
 ]
 for name in archive_names:
     src = task_dir / name
@@ -92,7 +103,7 @@ for name in archive_names:
         continue
     dst = history_dir / f"{src.stem}.{stamp}{src.suffix}"
     shutil.move(str(src), str(dst))
-    resume_record['archived_files'].append(dst.name)
+    record['archived_files'].append(dst.name)
 
 result_path = task_dir / 'result.json'
 if result_path.exists():
@@ -102,10 +113,9 @@ if result_path.exists():
         result_path.unlink()
     else:
         shutil.move(str(result_path), str(dst))
-    resume_record['archived_files'].append(dst.name)
+    record['archived_files'].append(dst.name)
 
-resume_meta = history_dir / f'resume.{stamp}.json'
-atomic_write(resume_meta, resume_record)
+atomic_write(history_dir / f'reassign.{stamp}.json', record)
 
 prefix = f"{task.get('id') or task_dir.name}_"
 clear_keys = {
@@ -131,20 +141,30 @@ if state_dir.exists():
             except Exception:
                 path.unlink(missing_ok=True)
                 continue
-            if str(payload.get('task_id') or '') == resume_record['task_id']:
+            if str(payload.get('task_id') or '') == record['task_id']:
                 path.unlink(missing_ok=True)
 
 resume_round = int(task.get('resume_round') or 0) + 1
+reassign_count = int(task.get('reassign_count') or 0) + 1
 task['status'] = 'dispatched'
 task['assigned_agent'] = agent_id
+task['claimed_by'] = agent_id
+task['claimed_at'] = now_iso
+task['claim_reason'] = f'reassign: {reason}'
+task['reserved_by'] = agent_id
+task['reserved_at'] = now_iso
+task['reserved_reason'] = f'reassign: {reason}'
 task['updated_at'] = now_iso
 task['merge_gate_state'] = None
 task['rework_reason'] = reason
-task['last_gate_actor'] = 'pm-chief'
+task['last_gate_actor'] = 'task-watcher'
 task['last_gate_decision_at'] = now_iso
 task['resume_round'] = resume_round
-task['last_resumed_at'] = now_iso
-task['last_resumed_by'] = 'pm-chief'
+task['last_reassigned_at'] = now_iso
+task['last_reassigned_by'] = 'task-watcher'
+task['last_reassigned_from'] = previous_agent
+task['last_reassigned_reason'] = reason
+task['reassign_count'] = reassign_count
 task['lease_owner'] = task.get('owner_pm') or 'pm-chief'
 task['lease_acquired_at'] = now_iso
 task['lease_expires_at'] = now_iso
@@ -155,7 +175,7 @@ task['last_delivery_attempt_at'] = None
 task['last_delivery_error'] = None
 task['last_delivery_state'] = None
 task['session_health'] = None
-task['control_plane_state'] = None
+task['control_plane_state'] = 'reassigned'
 task['control_plane_updated_at'] = now_iso
 task['state_invariant_violations'] = []
 task['state_invariant_signature'] = ''
@@ -167,9 +187,15 @@ with transitions_path.open('a', encoding='utf-8') as fp:
         'from': old_status,
         'to': 'dispatched',
         'at': now_iso,
-        'reason': f'resume-task: {reason}',
-        'actor': 'pm-chief',
+        'reason': f'reassign-task: {reason}',
+        'actor': 'task-watcher',
     }, ensure_ascii=False) + '\n')
 
-print(json.dumps({'task_id': resume_record['task_id'], 'resume_round': resume_round, 'archived_files': resume_record['archived_files']}, ensure_ascii=False))
+print(json.dumps({
+    'task_id': record['task_id'],
+    'from_agent': previous_agent,
+    'to_agent': agent_id,
+    'resume_round': resume_round,
+    'archived_files': record['archived_files'],
+}, ensure_ascii=False))
 PY

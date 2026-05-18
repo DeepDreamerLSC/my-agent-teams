@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -34,6 +35,11 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
         }
     )
     return env
+
+
+def _write_exec(path: Path, content: str) -> None:
+    path.write_text(content, encoding="utf-8")
+    path.chmod(0o755)
 
 
 def test_task_watcher_scripts_pass_shell_syntax_check():
@@ -244,6 +250,156 @@ assert task['assigned_agent'] == 'auto', task
 assert 'reserved_by' not in task, task
 assert list(task_dir.glob('claim.expired.*.json'))
 assert 'to":"pooled"' in (task_dir / 'transitions.jsonl').read_text(encoding='utf-8').replace(' ', '')
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_dispatch_failure_threshold_trips_after_three_control_plane_failures(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    task_dir = workspace_root / "tasks" / "dispatch-fail-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "dispatch-fail-task",\n'
+        '  "status": "dispatched",\n'
+        '  "assigned_agent": "dev-1"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+record_dispatch_delivery_attempt '{task_dir}' 'delivery_failed' '1' 'first failure' 'idle_session'
+record_dispatch_delivery_attempt '{task_dir}' 'session_unhealthy' '1' 'second failure' 'missing_session'
+record_dispatch_delivery_attempt '{task_dir}' 'delivery_failed' '1' 'third failure' 'idle_session'
+dispatch_failure_threshold_exceeded '{task_dir}'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task = json.loads(Path('{task_dir}/task.json').read_text(encoding='utf-8'))
+assert task['dispatch_delivery_retry_count'] == 3, task
+assert task['dispatch_delivery_consecutive_failures'] == 3, task
+assert task['control_plane_state'] == 'delivery_failed', task
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_requeue_dispatched_task_to_pool_tracks_auto_requeue(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    task_dir = workspace_root / "tasks" / "requeue-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "requeue-task",\n'
+        '  "status": "dispatched",\n'
+        '  "assigned_agent": "dev-1",\n'
+        '  "pre_claim_assigned_agent": "auto",\n'
+        '  "claim_policy": "pull",\n'
+        '  "claimed_by": "dev-1",\n'
+        '  "reserved_by": "dev-1"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+    (task_dir / "claim.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+requeue_dispatched_task_to_pool '{task_dir}' 'requeue-task' 'control-plane threshold reached'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task_dir = Path('{task_dir}')
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'pooled', task
+assert task['assigned_agent'] == 'auto', task
+assert task['auto_requeue_count'] == 1, task
+assert task['control_plane_state'] == 'auto_requeue', task
+assert list(task_dir.glob('claim.requeued.*.json'))
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_reassign_dispatched_task_switches_agent_after_control_plane_failure(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    dev_root = workspace_root / "dev"
+    dev_root.mkdir(parents=True, exist_ok=True)
+    config_path = Path(env["CONFIG_PATH"])
+    config_path.write_text(json.dumps({
+        "agents": {
+            "dev-1": {"role": "fullstack_dev"},
+            "dev-2": {"role": "fullstack_dev"},
+        },
+        "projects": {
+            "demo": {"dev_root": str(dev_root)},
+        },
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    send_script = workspace_root / "send-stub.sh"
+    _write_exec(send_script, '#!/bin/bash\necho "delivered to $1 (runtime=codex, attempt=1)"\n')
+    env["SEND_SCRIPT"] = str(send_script)
+    env["REASSIGN_TASK_SCRIPT"] = str(REPO_ROOT / "scripts" / "reassign-task.sh")
+
+    task_dir = workspace_root / "tasks" / "reassign-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(json.dumps({
+        "id": "reassign-task",
+        "status": "dispatched",
+        "assigned_agent": "dev-1",
+        "claim_policy": "pull",
+        "claim_scope": ["dev-1", "dev-2"],
+        "project": "demo",
+        "task_type": "development",
+        "domain": "development",
+        "execution_mode": "dev",
+        "target_environment": "dev",
+        "read_only": False,
+        "write_scope": [str(dev_root / "src" / "worker.ts")],
+        "review_required": True,
+        "test_required": True,
+        "quality_gate_mode": "parallel",
+        "claimed_by": "dev-1",
+        "claimed_at": "2026-05-18T10:00:00+08:00",
+        "reserved_by": "dev-1",
+        "reserved_at": "2026-05-18T10:00:00+08:00",
+        "pre_claim_assigned_agent": "auto",
+        "pool_entered_at": "2026-05-18T09:55:00+08:00",
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+
+    script = f"""
+set -e
+tmux() {{
+  if [ "$1" = "has-session" ]; then
+    [ "$3" = "dev-2" ] && return 0
+    return 1
+  fi
+  if [ "$1" = "capture-pane" ]; then
+    return 0
+  fi
+  if [ "$1" = "send-keys" ]; then
+    return 0
+  fi
+  return 0
+}}
+source '{TASK_WATCHER}'
+reassign_dispatched_task '{task_dir}' 'reassign-task' 'dev-1' 'dev-2' 'threshold reached'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task = json.loads(Path('{task_dir}/task.json').read_text(encoding='utf-8'))
+assert task['assigned_agent'] == 'dev-2', task
+assert task['reassign_count'] == 1, task
+assert task['control_plane_state'] == 'reassigned', task
+assert task['dispatch_delivery_attempt_count'] == 1, task
 PY
 """
     subprocess.run(["bash", "-lc", script], check=True, env=env)

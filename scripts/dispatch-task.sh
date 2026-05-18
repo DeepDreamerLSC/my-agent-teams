@@ -352,6 +352,15 @@ task['updated_at'] = now
 task['lease_owner'] = task.get('owner_pm')
 task['lease_acquired_at'] = now
 task['lease_expires_at'] = now
+task['dispatch_delivery_attempt_count'] = 0
+task['dispatch_delivery_retry_count'] = 0
+task['dispatch_delivery_consecutive_failures'] = 0
+task['last_delivery_attempt_at'] = None
+task['last_delivery_error'] = None
+task['last_delivery_state'] = None
+task['session_health'] = None
+task['control_plane_state'] = None
+task['control_plane_updated_at'] = now
 if direct_dispatch_override and direct_dispatch_reason:
     task['direct_dispatch_reason'] = direct_dispatch_reason
 with (task_path.parent / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
@@ -389,7 +398,51 @@ ASSIGNED_AGENT=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["assign
 TASK_DIR=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_dir"])' <<< "$DISPATCH_OUTPUT")
 if [ -x "$SEND_SCRIPT" ]; then
   MESSAGE="请读取 ${TASK_DIR}/instruction.md 并开始执行任务。当前任务类型：${TASK_TYPE}。完成后写 ack.json 和 result.json。"
-  CONFIG_PATH="$CONFIG_PATH" "$SEND_SCRIPT" "$ASSIGNED_AGENT" "$MESSAGE"
+  SEND_OUTPUT="$(CONFIG_PATH="$CONFIG_PATH" "$SEND_SCRIPT" "$ASSIGNED_AGENT" "$MESSAGE" 2>&1)" || SEND_RC=$?
+  SEND_RC="${SEND_RC:-0}"
+  python3 - "$TASK_DIR" "$SEND_RC" "$SEND_OUTPUT" <<'PY'
+import json
+import os
+import re
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+send_rc = int(sys.argv[2] or '0')
+send_output = sys.argv[3]
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+attempts = 1
+for pattern in (r'attempt=(\d+)', r'after\s+(\d+)\s+attempts'):
+    match = re.search(pattern, send_output)
+    if match:
+        attempts = max(1, int(match.group(1)))
+        break
+
+task['dispatch_delivery_attempt_count'] = attempts
+task['dispatch_delivery_retry_count'] = 1
+task['dispatch_delivery_consecutive_failures'] = 0 if send_rc == 0 else 1
+task['last_delivery_attempt_at'] = now
+task['last_delivery_state'] = 'delivered' if send_rc == 0 else 'delivery_failed'
+task['last_delivery_error'] = None if send_rc == 0 else send_output.strip() or 'send-to-agent failed'
+task['session_health'] = 'unknown'
+task['control_plane_state'] = None if send_rc == 0 else 'delivery_failed'
+task['control_plane_updated_at'] = now
+task['updated_at'] = now
+
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+PY
+  if [ "$SEND_RC" -ne 0 ]; then
+    printf '%s\n' "$SEND_OUTPUT" >&2
+    exit "$SEND_RC"
+  fi
 fi
 
 if [ -x "$SEND_CHAT_SCRIPT" ]; then

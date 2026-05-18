@@ -60,6 +60,16 @@ def recommended_action(reason_type: str, gate: str, status: str) -> str:
         if status == 'pooled':
             return '确认是否转派/拆小/提优先级'
         return '检查队列卡点并决定转派或仲裁'
+    if reason_type == 'delivery_failed':
+        return '检查 send-to-agent 与会话输出，必要时等待阈值后自动转派或人工介入'
+    if reason_type == 'session_unhealthy':
+        return '优先恢复目标 agent 会话；若连续失败已达阈值，确认自动转派/回池是否合理'
+    if reason_type == 'auto_requeue':
+        return '确认任务已回到 pooled，并决定是否补定义、调整 scope 或改派'
+    if reason_type == 'reassigned':
+        return '确认新执行者已收到任务并跟进 ack，必要时补充上下文'
+    if reason_type == 'state_invariant_violation':
+        return '检查 state_invariant_violations 并修正任务元数据或触发正规恢复流程'
     return '查看任务详情并决定下一步'
 
 
@@ -132,6 +142,27 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         if not (status == 'ready_for_merge' and gate == 'review_rejected' and result_info.get('normalized_status') == 'success' and review_info.get('source') == 'stale_json'):
             items.append(make_item(task_dir, 'blocked', 'L3', f'任务处于 {status} / {gate or "无 gate"} 状态，需要 PM 仲裁', now))
             return items
+
+    control_state = str(task_payload.get('control_plane_state') or '').strip().lower()
+    last_delivery_error = str(task_payload.get('last_delivery_error') or '').strip()
+    if control_state == 'delivery_failed':
+        detail = last_delivery_error or 'send-to-agent 未确认送达'
+        items.append(make_item(task_dir, 'delivery_failed', 'L2', f'控制面投递失败：{detail}', now))
+    elif control_state == 'session_unhealthy':
+        detail = last_delivery_error or '目标 agent 会话不健康或缺失'
+        items.append(make_item(task_dir, 'session_unhealthy', 'L2', f'控制面会话异常：{detail}', now))
+    elif control_state == 'auto_requeue':
+        detail = str(task_payload.get('last_auto_requeue_reason') or last_delivery_error or '控制面恢复失败后自动回池').strip()
+        items.append(make_item(task_dir, 'auto_requeue', 'L2', f'任务已自动回收到 pooled：{detail}', now))
+    elif control_state == 'reassigned':
+        detail = str(task_payload.get('last_reassigned_reason') or '连接/会话恢复触发转派').strip()
+        items.append(make_item(task_dir, 'reassigned', 'L2', f'任务已自动转派：{detail}', now))
+
+    invariant_violations = task_payload.get('state_invariant_violations')
+    if isinstance(invariant_violations, list) and invariant_violations:
+        messages = [str(item.get('message') or '') for item in invariant_violations if isinstance(item, dict)]
+        summary = '；'.join([item for item in messages if item][:2]) or '任务状态一致性异常，请检查 state_invariant_violations'
+        items.append(make_item(task_dir, 'state_invariant_violation', 'L3', summary, now))
 
     if gate == 'pm_acceptance_pending':
         items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now))

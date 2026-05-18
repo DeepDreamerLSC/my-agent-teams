@@ -104,6 +104,7 @@ def task_context(task_dir: Path) -> TaskContext:
     task = task or {}
     resume_epoch = max(
         iso_to_epoch(task.get("last_resumed_at")),
+        iso_to_epoch(task.get("last_reassigned_at")),
         _latest_resume_transition_epoch(task_dir / "transitions.jsonl"),
     )
     return TaskContext(task_dir=task_dir, task=task, resume_epoch=resume_epoch)
@@ -131,7 +132,12 @@ def _latest_resume_transition_epoch(path: Path) -> int:
             payload = json.loads(line)
         except Exception:
             continue
-        if str(payload.get("from") or "") != "blocked" or str(payload.get("to") or "") != "dispatched":
+        reason = str(payload.get("reason") or "").strip().lower()
+        from_status = str(payload.get("from") or "")
+        to_status = str(payload.get("to") or "")
+        is_resume = from_status == "blocked" and to_status == "dispatched"
+        is_reassign = reason.startswith("reassign-task:")
+        if not is_resume and not is_reassign:
             continue
         latest = max(latest, iso_to_epoch(payload.get("at")))
     return latest
