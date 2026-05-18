@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "status": "acknowledged",
+  "summary": "已读取 instruction.md 与 task.json，开始核对 paddleocr_vl 归档与 phase3-paddle-quality 当前缺口，补齐数学试卷样例产物并刷新报告及必要回归后回写 result.json。",
+  "agent": "dev-2",
+  "acked_at": "2026-05-17T12:18:18+08:00"
+}

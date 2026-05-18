@@ -58,11 +58,11 @@
   "result_summary": "反馈附件链路三条修复已更新 Release Note、合入并推送 commit e9d8a12b36ecafeda7b5ebfc199801752f17f393，并已部署到生产；生产与本地 HEAD 一致，后端/Hotpick/公网健康检查通过。",
   "last_error": null,
   "created_at": "2026-04-28T16:13:53+08:00",
-  "updated_at": "2026-05-18T15:04:08+08:00",
+  "updated_at": "2026-05-18T18:51:04+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:04+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

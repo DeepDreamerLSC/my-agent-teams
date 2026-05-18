@@ -1,0 +1,8 @@
+{
+  "task_id": "Adapter重构与GLM-OCR迁移",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-14T18:46:20+08:00",
+  "summary": "dev-1 已读取 instruction.md，开始执行 Adapter 重构与 GLM-OCR 迁移。"
+}

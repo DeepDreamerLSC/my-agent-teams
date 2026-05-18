@@ -1,0 +1,22 @@
+{
+  "task_id": "对齐Hybrid默认候选与公式实验开关",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已把 hybrid_experimental 默认候选收口为 mineru_full，并把 enable_formula_experiment 通过 inference_config -> parser_client -> HybridPipelineConfig -> CandidateExtractor/CandidateFilter 真实透传进 pipeline。formula 仍保持 audit-only / shadow-only，不会进入 merge gate。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -> 9 passed, 4 warnings"
+  ],
+  "risks": [
+    "hybrid_experimental 配置仍通过 parser_client 读取 YAML 顶层 hybrid_experimental 段装配；如果后续要把 candidate_profiles / formula 开关做成更严格的 schema 校验，建议补 config 单测。",
+    "本轮未重跑更大范围的 PDF 转 Word 全量测试，只做了与 hybrid 默认候选和公式实验相关的定向回归。"
+  ],
+  "completed_at": "2026-05-17T16:19:51+08:00"
+}

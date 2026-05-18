@@ -1,0 +1,7 @@
+{
+  "task_id": "实现学生版教师版审校版输出变体",
+  "agent": "dev-2",
+  "claimed_at": "2026-05-18T07:28:29+08:00",
+  "reserved": true,
+  "reason": "dev-2承接高优先级输出变体任务，student/teacher/review 变体实现与验证"
+}

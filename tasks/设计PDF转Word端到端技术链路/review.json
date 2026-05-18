@@ -1,0 +1,65 @@
+{
+  "task_id": "设计PDF转Word端到端技术链路",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-16T15:07:56+08:00",
+  "status": "approve",
+  "summary": "审查通过。端到端技术链路文档已经覆盖了任务要求的主线内容：Phase 1 从 PDF 输入到 DOCX 输出的完整数据流、模块接口契约、Phase 2/3 扩展点、错误处理与回退链路、性能预算，以及 formula 专项接口预留。文档主线判断与已确认的后续技术路线、横评最终报告和当前代码骨架保持一致，也明确指出了 `validated PageIR -> parser_response.blocks` 这个 Phase 1 必须补齐的桥接点，足以作为 dev-1/dev-2 后续实现的设计输入。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+      "finding": "4.5 节的 `QuestionRegionPageResult` 契约仍按旧版 detector 口径描述，只列了 `resolvable/question_anchor_count/regions/reason/...` 和 3 个失败语义；但当前 `question_region_detector.py` 已新增 `determinable`、`skip_enhancement`、`distinct_question_anchor_count`、`body_region_count/body_region_ratio`，且真实失败原因还包括 `question_anchor_not_distinct_enough`、`question_region_indeterminate`、`region_confidence_below_threshold`、`region_non_overlap_ratio_below_threshold`。这不阻塞当前设计主线，因为现有消费方仍主要看 `resolvable + regions`，但会让后续 dev 在实现显式 trigger / audit 时少拿到一层已存在的判定信号。",
+      "recommendation": "建议后续在归档或下一轮设计更新时，把 4.5 节补齐为“当前真实输出字段 + 核心消费字段”两层描述，并把失败 reason 枚举写完整，避免 Phase 1/2 实现时重复从源码反推 detector 契约。",
+      "evidence": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md:279-334；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py:52-84；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py:145-161；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py:266-298；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py:513-524"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+      "finding": "4.8 节写“输出 Schema 已由 `build_review_output_schema()` 定义”，但文档展示的是 review JSON 的内层对象结构，而不是当前代码真正传给 backend 的 `{\"type\":\"json_schema\",\"json_schema\":{...}}` 包装契约和 `strict=true` 约束。由于该节是给 Phase 2 实现者看的接口说明，少了这层包装后，后续如果有人仅按文档接线 review worker，很容易把 `output_schema` 传成错误形状。",
+      "recommendation": "建议在 4.8 节补一句“`PageInferenceRequest.output_schema` 传输层使用 `build_review_output_schema()` 返回的 wrapper，对应的模型输出正文才是这里展示的内层 JSON 对象”，把 transport contract 和 model output contract 分开写清楚。",
+      "evidence": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md:503-518；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py:13-18；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py:154-155；/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/review_integrator.py:382-399"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计PDF转Word端到端技术链路/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计PDF转Word端到端技术链路/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计PDF转Word端到端技术链路/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/横评最终报告.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/preprocess.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/base_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/review_integrator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/schemas.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "wc -l /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+      "result": "确认交付文档存在，长度 904 行。"
+    },
+    {
+      "command": "人工审阅 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md 与 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计PDF转Word端到端技术链路/instruction.md",
+      "result": "文档已覆盖 Phase 1 完整数据流、模块 JSON 契约、Phase 2/3 扩展点、错误处理与回退链路、性能预算，以及 formula lane 预留，满足本任务交付范围。"
+    },
+    {
+      "command": "交叉对照 后续技术路线 / 横评最终报告 / conversion_service.py / parser_client.py / hybrid_pipeline.py / review_integrator.py / exercise_ir.py / exercise_detector.py / exercise_docx_assembler.py",
+      "result": "确认文档主线与当前实现骨架一致：默认链路仍是 `apple_baseline -> PageIR -> ExerciseIR -> DOCX`，Hybrid Phase 1 的核心新增点是 `validated PageIR -> parser_response.blocks` 桥接与页级 fallback；同时识别出 QuestionRegion 契约和 review output_schema 描述两处略简化于真实代码的非阻塞点。"
+    },
+    {
+      "command": "检查 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计PDF转Word端到端技术链路/verify.json",
+      "result": "当前任务目录无 `verify.json`，本次审查依据 instruction、result、task、设计文档与相关源码接口完成。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

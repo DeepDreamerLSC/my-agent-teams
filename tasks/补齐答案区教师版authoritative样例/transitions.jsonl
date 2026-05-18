@@ -1,0 +1,2 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-18T13:31:28+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-18T13:32:42+08:00", "reason": "agent dev-2 claimed pooled task: 优先补真实样例 answer_section/answer_area authoritative 证据，并确保 student 默认输出无回归。"}

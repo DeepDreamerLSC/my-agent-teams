@@ -1,0 +1,50 @@
+{
+  "task_id": "对齐Hybrid默认候选与公式实验开关",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T16:29:29+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。当前实现已经把 `hybrid_experimental` 的默认候选收口为 `mineru_full`，并把 `enable_formula_experiment` 从 YAML 顶层配置透传到了 `HybridPipelineConfig -> CandidateExtractor / CandidateFilter`，定向 pytest 也已通过；但存在一个阻塞问题：本轮额外修改了 `conversion_service.py`，给 service meta 新增 `hybrid_formula_experiment_enabled/mode` 字段，而该文件既不在 instruction 允许修改的文件集合里，也不在 `task.json.write_scope` 中。这属于越界修改，不能在本轮直接放行。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+      "finding": "本任务的边界被明确限定为只处理 `parser_client.py`、`hybrid_pipeline.py`、`inference_config.yaml` 与对应测试，`task.json.write_scope` 也只放行了这三类实现/配置文件和两份测试文件；但本轮实际额外改动了 `conversion_service.py`，在 service result meta 中新增了 `hybrid_formula_experiment_enabled` 与 `hybrid_formula_experiment_mode` 等字段。虽然这些字段本身与任务主题相关，但它们已经超出了本轮被授权的修改范围。按当前任务治理规则，这类越界修改不能直接作为通过结果合入。",
+      "recommendation": "请回收本轮越界改动：如果 `conversion_service.py` 的 service meta 扩展确实是这项能力收口所必需，请先由 PM 重新开 scope 或补充 write_scope，再单独提交；如果它不是本轮验收必需项，则应从本轮变更中移除，只保留 `parser_client.py`、`hybrid_pipeline.py`、`inference_config.yaml` 及对应测试范围内的收口。",
+      "evidence": "instruction.md:9-13 明确写“只处理 `parser_client.py`、`hybrid_pipeline.py`、`inference_config.yaml` 与对应测试”；task.json:33-38 的 `write_scope` 不包含 `conversion_service.py`；但 result.json:6-12 明确把 `conversion_service.py` 列为修改文件，且 conversion_service.py:316-329 新增了 `hybrid_formula_experiment_enabled` / `hybrid_formula_experiment_mode` 等 meta 字段。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+      "finding": "本轮核心功能实现本身是成立的：`DEFAULT_HYBRID_CANDIDATE_PROFILES` 已从 `('mineru_full', 'paddleocr_vl')` 收口为 `('mineru_full',)`，YAML 也显式配置了 `candidate_profiles: [mineru_full]` 与 `enable_formula_experiment: false`，`HybridExperimentalPipeline` 也确实把该开关透传进了 `CandidateExtractor` / `CandidateFilter`。`candidate_filter.py` 对 `formula_candidate` 仍强制 `formula_merge_enabled: false`，保持 audit-only/shadow-only 语义。",
+      "recommendation": "返工时不必回退上述核心实现。只需要把越界修改剥离，或先补 scope 再重新提交。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_extractor.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -q",
+      "result": "passed (9 passed, 5 warnings)"
+    },
+    {
+      "command": "静态审阅 parser_client / hybrid_pipeline / candidate_extractor / candidate_filter",
+      "result": "`DEFAULT_HYBRID_CANDIDATE_PROFILES` 已收口为 `('mineru_full',)`；`enable_formula_experiment` 已进入 `HybridPipelineConfig` 并透传到 `CandidateExtractor` / `CandidateFilter`；`candidate_filter.py` 对 `formula_candidate` 仍强制 `formula_merge_enabled: false`，满足 audit-only/shadow-only 约束。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

@@ -1,0 +1,9 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T00:49:11+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-17T00:58:11+08:00", "reason": "pm reconcile after normalized ack.json"}
+{"from": "working", "to": "blocked", "at": "2026-05-17T01:29:26+08:00", "reason": "watcher observed result.json status=blocked"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-17T01:39:06+08:00", "reason": "resume-task: blocked 原因已收敛为本地 Qwen3-VL 服务不可用；请恢复 127.0.0.1:18111 并在现有代码基础上补跑 online_review_probe，若真实指标低于 2026-05-15 的 0.4 基线再做最小修复", "actor": "pm-chief"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T01:49:26+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T01:57:15+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-17T01:58:55+08:00", "reason": "resume-task: review 驳回：当前 18111 端口返回的模型 ID 与 Qwen3-VL 任务目标不一致，尚未证明 qwen3_vl_8b_local 命中真实 Qwen3-VL；请修正服务/端口/配置映射并补充 /v1/models 证据后重跑 online_review 与报告", "actor": "pm-chief"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T09:01:16+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T09:09:05+08:00", "reason": "task-watcher auto close after qa verify pass"}

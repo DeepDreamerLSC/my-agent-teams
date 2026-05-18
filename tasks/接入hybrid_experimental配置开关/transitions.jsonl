@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-15T18:24:41+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-15T18:48:19+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-15T18:53:06+08:00", "reason": "watcher observed review fail"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-15T18:53:47+08:00", "reason": "watcher observed result.json status=success"}

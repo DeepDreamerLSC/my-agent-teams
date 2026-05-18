@@ -1,0 +1,39 @@
+{
+  "task_id": "实现答案区识别与答案分节基础链路",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T21:45:22+08:00",
+  "status": "approve",
+  "summary": "审查通过。上一轮阻塞项已补齐：交付证据已从 synthetic fixture 切换为真实五样例 replay 口径，能够证明当前真实样例已从 archived `answer_section=0/5` 提升到 current `answer_section=2/5`，同时未匹配答案仍被保留为 warning，目标测试复跑通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    "当前真实改善体现在 `answer_section`，`answer_area` 仍为 `0/5`；这符合本任务“优先解决识别并保留下来”的边界，但后续 teacher/review 变体仍需继续补答案区覆盖。",
+    "这次真实样例验证采用对 final-archive 同批 `pages.jsonl` 的 replay 摘要，而不是刷新 authoritative `metrics.json`；QA 复核时应以 `artifacts/pdf2word/p1-answer-sections/summary.json` 为准，不要误读旧 archive metrics。"
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/validator-report.json"
+  ],
+  "verification_evidence": [
+    "`artifacts/pdf2word/p1-answer-sections/summary.json` 已切换到 `validation_basis=real_five_samples_replayed_from_final_archive_hybrid_pages`，不再是 synthetic fixture 口径。",
+    "独立核对真实样例摘要后，aggregate 与样例明细一致：当前 `current_answer_section_sample_count=2`、`current_any_answer_signal_sample_count=2`、`remaining_zero_answer_signal_samples=3`。",
+    "`数学八年级/pages.jsonl` 中存在 `解：原式一6-a` 明显 inline cue，`summary.json` 对应命中 `题后答案与解析 / item 18`。",
+    "`数学试卷/pages.jsonl` 中存在 pages 11-12 的 `解：` cue，`summary.json` 对应命中 `题后答案与解析 / item 17`。",
+    "五下科学、英语八年级、语文五年级的 miss 结果与各自 `validator-report.json` fallback / document_fallback 背景一致，未见伪造命中。",
+    "复跑 `PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-answer-sections-review2 --basetemp=/private/tmp/chiralium-pytest-answer-sections-review2-tmp`，结果 `20 passed, 4 warnings`。"
+  ],
+  "recommended_next_action": "qa-1"
+}

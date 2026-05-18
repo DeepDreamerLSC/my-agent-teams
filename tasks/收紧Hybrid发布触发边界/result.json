@@ -1,0 +1,36 @@
+{
+  "task_id": "收紧Hybrid发布触发边界",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已完成返工。Hybrid gate 不再把 default_mode=quality 视为显式 quality；只有请求本身显式携带 mode=quality 且显式请求 hybrid_experimental 时才允许进入 hybrid，缺失 mode 一律回落到 apple。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
+  ],
+  "rework_fix": {
+    "root_cause": "hybrid_release_is_allowed() 和上层调用方把缺失 mode 归一化成 default_mode，导致 default_mode=quality 时，未显式传 mode 的 hybrid 请求被误判为显式 quality。",
+    "fix": "settings 侧只基于请求原始 mode 判定是否显式 quality；service 和 skill 保留 requested_mode 显式性，不再把 effective/default mode 传入 hybrid gate。",
+    "explicit_quality_rule": "仅当请求本身显式携带 mode=quality 且显式 parser_backend=hybrid_experimental 时，才允许进入 hybrid_experimental。",
+    "missing_mode_rule": "mode=None 时，即使 default_mode=quality，也必须回落到 apple。",
+    "gray_path_after_fix": "灰度/内部评测路径不再依赖配置继承放行；仍保留显式 quality + hybrid_experimental 的受控入口。"
+  },
+  "regression_coverage": {
+    "settings": "新增 default_mode=quality + mode=None + parser_backend=hybrid_experimental 时 resolve_effective_parser_backend() 返回 apple 的断言。",
+    "service": "新增 default_mode=quality 且 convert() 未传 mode、显式请求 hybrid 时，真实 parser_request.parser_backend 仍为 apple 的回归测试。",
+    "skill": "新增 requested_mode 与最终 mode 分离测试，覆盖默认 quality 但未显式请求 quality 时，skill 不放行 hybrid。",
+    "api": "新增缺失 mode 但显式 hybrid 请求时，路由仍只转发默认 balanced 而非 quality 的回归测试。"
+  },
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py -o cache_dir=/private/tmp/chiralium-pytest-hybrid-release-gate-rework --basetemp=/private/tmp/chiralium-pytest-hybrid-release-gate-rework-tmp"
+  ],
+  "risks": [
+    "当前 hybrid 发布边界已严格收口到“显式 quality + 显式 hybrid 请求”。如果后续确实需要更细粒度的灰度/allowlist，建议新增独立显式信号，不要再复用 default_mode 或配置继承。"
+  ],
+  "completed_at": "2026-05-17T20:08:20+08:00"
+}

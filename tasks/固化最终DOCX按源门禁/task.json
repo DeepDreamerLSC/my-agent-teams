@@ -1,0 +1,96 @@
+{
+  "id": "固化最终DOCX按源门禁",
+  "title": "固化 final DOCX source gate，按策略矩阵校验 source_profile 与 fallback 事实",
+  "project": "chiralium",
+  "execution_mode": "dev",
+  "target_environment": "dev",
+  "assigned_agent": "qa-1",
+  "review_required": true,
+  "review_authority": "reviewer",
+  "reviewer": "review-1",
+  "review_level": "standard",
+  "reviewers": [
+    "review-1"
+  ],
+  "review_deadline": null,
+  "review_round": 0,
+  "max_review_rounds": 3,
+  "test_required": true,
+  "status": "done",
+  "task_level": "execution",
+  "owner_pm": "pm-chief",
+  "domain": "development",
+  "task_type": "verification",
+  "read_only": false,
+  "downstream_action": "完成后进入 review-1 审查；通过后作为 final DOCX 常态化验收口径与后续放量评估基线。",
+  "owner_approval_required": false,
+  "owner_approved_by": null,
+  "owner_approved_at": null,
+  "auto_close_policy": "manual_after_review",
+  "quality_gate_mode": "parallel",
+  "review_gate_state": null,
+  "qa_gate_state": null,
+  "write_scope": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance"
+  ],
+  "depends_on": [
+    "补齐按源审计与定向Paddle执行闭环"
+  ],
+  "blocks": [],
+  "artifacts": [
+    {
+      "type": "instruction",
+      "path": "tasks/固化最终DOCX按源门禁/instruction.md",
+      "description": "PM 生成的任务指令"
+    }
+  ],
+  "root_request_id": "固化最终DOCX按源门禁",
+  "parent_task_id": null,
+  "integration_owner": "arch-1",
+  "priority": "high",
+  "timeout_minutes": 45,
+  "lease_owner": "pm-chief",
+  "lease_acquired_at": "2026-05-18T07:05:43+08:00",
+  "lease_expires_at": "2026-05-18T07:05:43+08:00",
+  "workspace_mode": "main",
+  "target_branch": "integration",
+  "result_summary": "已把 final DOCX 常态化验收门禁升级为按源感知 gate。`model_eval_runner.py` 现在会结合 `p1-source-selection/source_selection_strategy.json` 与 `phase3-paddle-quality/report.json` 校验每个样例的 strategy matrix、default/supplemental source_profile、selected pages、fallback pages、负样例 baseline-only 边界和公式 audit-only 边界，并把这些事实写入 `final-acceptance` 产物。当前 5 个样例门禁通过，默认发布口径保持 `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled` 不变。（QA 已通过自动收口） QA 结论：QA 验证通过。final DOCX gate 已从“只看 DOCX 能否打开”升级为“按源感知”的常态化门禁：会按策略矩阵核对 source_profile、selected pages、fallback、负样例 baseline-only 和公式 audit-only 边界，并把结论固化到 `final-acceptance` 报告。当前 5 个归档样例门禁通过，默认发布边界保持不变。",
+  "last_error": null,
+  "merge_gate_state": "closed",
+  "rework_reason": null,
+  "last_gate_actor": "watcher",
+  "last_gate_decision_at": "2026-05-18T07:37:36+08:00",
+  "created_at": "2026-05-17T22:44:40+08:00",
+  "updated_at": "2026-05-18T18:51:04+08:00",
+  "claim_policy": "pull",
+  "claim_scope": [
+    "qa-1"
+  ],
+  "claim_max_concurrency": 1,
+  "dependency_policy": "done_only",
+  "pool_timeout_minutes": 120,
+  "pool_entered_at": "2026-05-17T22:44:41+08:00",
+  "claimed_by": "qa-1",
+  "claimed_at": "2026-05-18T07:05:43+08:00",
+  "claim_reason": "前置QA已完成，开始执行 final DOCX 按源门禁验证",
+  "pre_claim_assigned_agent": "auto",
+  "reserved_by": "qa-1",
+  "reserved_at": "2026-05-18T07:05:43+08:00",
+  "reserved_reason": "前置QA已完成，开始执行 final DOCX 按源门禁验证",
+  "dependencies_ready_at": "2026-05-18T07:05:43+08:00",
+  "execution_round": 0,
+  "state_invariant_violations": [
+    {
+      "code": "quality_gate_template_invalid",
+      "message": "verification tasks require exactly one of review_required/test_required"
+    }
+  ],
+  "state_invariant_violation_count": 1,
+  "state_invariant_signature": "quality_gate_template_invalid",
+  "state_invariant_checked_at": "2026-05-18T18:51:04+08:00",
+  "control_plane_state": "state_invariant_violation",
+  "control_plane_updated_at": "2026-05-18T18:51:04+08:00"
+}

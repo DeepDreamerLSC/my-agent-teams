@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T09:01:26+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T09:05:16+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T09:09:20+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "cancelled", "at": "2026-05-17T09:11:43+08:00", "reason": "pm cancel: superseded by 正式任务 补齐Hybrid回归样例与人工抽检流程 after online review worker closure"}

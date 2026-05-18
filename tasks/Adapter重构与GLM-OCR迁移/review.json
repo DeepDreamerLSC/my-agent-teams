@@ -1,0 +1,50 @@
+{
+  "task_id": "Adapter重构与GLM-OCR迁移",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-14T21:12:11+08:00",
+  "status": "approve",
+  "summary": "复审通过。本轮已修复上轮阻塞问题：parser_adapters 包级 DocumentOCRAdapter 导出与 inference registry/factory 已切到真实 document_ocr_adapter.DocumentOCRAdapter，且新增回归测试覆盖了公开导出与 create_adapter('glm_ocr'/'paddleocr_vl') 的类型连通性。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "backend/app/services/pdf_to_word/parser_adapters/normalizers/glm_ocr.py",
+      "finding": "设计文档 Section 9 要求缺失 confidence 时默认补 1.0 并记录 warning；当前实现仍只做 setdefault('confidence', 1.0) 静默补值，未把该信息写入 warnings。",
+      "recommendation": "后续若继续打磨 normalizer 质量，建议补 warning，并加一条单测验证该行为。"
+    },
+    {
+      "severity": "info",
+      "file": "backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+      "finding": "paddleocr_vl 现在已通过 registry 返回真实 DocumentOCRAdapter 类型，但因 paddle 专属 normalizer 尚未接入，create_adapter('paddleocr_vl') 当前仍会得到 normalizer=None 的占位运行态。",
+      "recommendation": "后续接入 PaddleOCR-VL 时补齐 normalizer 注册与 profile 联调，再做一次端到端验证。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/Adapter重构与GLM-OCR迁移/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/Adapter重构与GLM-OCR迁移/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/PDF转Word本地模型横评推理架构落地方案.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/document_ocr_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/glm_ocr.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_document_ocr_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_config.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_glm_ocr_adapter.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/base_adapter.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/adapter_utils.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/document_ocr_adapter.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/__init__.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/base.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/glm_ocr.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_document_ocr_adapter.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_config.py",
+      "result": "passed"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_inference_config.py tests/test_pdf_to_word_document_ocr_adapter.py tests/test_glm_ocr_adapter.py -q",
+      "result": "passed (30 passed, 4 warnings)"
+    },
+    {
+      "command": "内联脚本：校验 parser_adapters.DocumentOCRAdapter / ADAPTER_CLASS_REGISTRY['document_ocr'] 指向真实实现，并检查 create_adapter('glm_ocr'/'paddleocr_vl') 返回类型",
+      "result": "passed：exported_is_real=True；registry_document_ocr_is_real=True；glm_is_real_doc_ocr=True；glm_is_glm_wrapper=True；paddle_type=app.services.pdf_to_word.parser_adapters.document_ocr_adapter.DocumentOCRAdapter"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

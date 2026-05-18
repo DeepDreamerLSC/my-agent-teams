@@ -1,0 +1,7 @@
+{
+  "task_id": "实现HybridExperimentalPipeline骨架",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-15T19:12:00+08:00",
+  "summary": "已读取任务指令，开始实现 HybridExperimentalPipeline 骨架：仅做 baseline pass-through，并预留后续增强接入点。"
+}

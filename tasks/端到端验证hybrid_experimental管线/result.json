@@ -1,0 +1,86 @@
+{
+  "task_id": "端到端验证hybrid_experimental管线",
+  "agent": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-16T13:35:36+08:00",
+  "summary": "已按 review rework 完成真实生产 HybridExperimentalPipeline 的 5 样例端到端验证：测试不再使用 ArtifactWiredHybridPipeline 子类，而是通过 artifact-backed adapter_factory 驱动真实 production pipeline；并已重生成 artifacts/pdf2word/hybrid-e2e-validation/report.json 与各样例 hybrid-pages.jsonl / validator-report.json。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/hybrid-pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/validator-report.json"
+  ],
+  "production_code_modified": [],
+  "production_code_change_reason": "未修改生产 hybrid_pipeline.py。本轮先复核了生产接线状态，确认真实 detect/select/extract/filter/review/merge/validate 路径已在 production 文件中存在，本次 rework 只修正验证方式与验证产物。",
+  "tests": [
+    "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q -> 3 passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -c \"from tests.test_hybrid_e2e import build_hybrid_e2e_report, REPORT_ROOT; build_hybrid_e2e_report(REPORT_ROOT)\" -> report regenerated"
+  ],
+  "metrics": {
+    "validation_mode": "production_pipeline",
+    "pipeline_class": "HybridExperimentalPipeline",
+    "pass_through_all_equal": true,
+    "enhancement_chain_sample_count": 4,
+    "fallback_triggered_sample_count": 5,
+    "candidate_profile_resolution": {
+      "configured": [
+        "mineru_full",
+        "paddleocr_vl"
+      ],
+      "requested_via_adapter_factory": [
+        "mineru",
+        "paddleocr_vl"
+      ]
+    },
+    "report_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation"
+  },
+  "sample_summary": [
+    {
+      "sample_name": "五下科学",
+      "candidate_count": 39,
+      "merge_decision_count": 39,
+      "fallback_pages": 6,
+      "document_fallback": true
+    },
+    {
+      "sample_name": "数学八年级",
+      "candidate_count": 20,
+      "merge_decision_count": 20,
+      "fallback_pages": 8,
+      "document_fallback": true
+    },
+    {
+      "sample_name": "数学试卷",
+      "candidate_count": 27,
+      "merge_decision_count": 27,
+      "fallback_pages": 12,
+      "document_fallback": true
+    },
+    {
+      "sample_name": "英语八年级",
+      "candidate_count": 9,
+      "merge_decision_count": 9,
+      "fallback_pages": 12,
+      "document_fallback": true
+    },
+    {
+      "sample_name": "语文五年级",
+      "candidate_count": 0,
+      "merge_decision_count": 0,
+      "fallback_pages": 13,
+      "document_fallback": true
+    }
+  ],
+  "risks": [
+    "5 个真实样例当前仍全部 document_fallback=true，validator 最终保留的是 baseline 等价结果；这证明 fallback 机制可用，但还不能证明增强结果已能稳定留存。",
+    "review worker 本轮仍未配置，report 中 review_mode=skipped_no_review_worker；因此本次验证覆盖到真实 production pipeline 的 review skip 路径，而非在线 review 集成路径。"
+  ]
+}

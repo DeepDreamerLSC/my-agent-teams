@@ -1,0 +1,64 @@
+{
+  "task_id": "补齐Hybrid回归样例与人工抽检流程",
+  "agent": "qa-1",
+  "status": "done",
+  "completed_at": "2026-05-17T09:45:00+08:00",
+  "summary": "已完成 Hybrid 回归与人工抽检口径的正式收口。基于预整理模板结构，修正了过期事实（'全部 fallback' → '3/5 样例有 fallback'、'skipped_no_review_worker' → 'online_review'），补入了当前真实 online review worker 指标（json_valid_rate=1.0、review_acceptance_rate=1.0、service_available=true），形成了包含 7 步检查流程、11 项必检指标、4 组 checklist 的可重复执行质量基线。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid回归抽检模板.md"
+  ],
+  "deliverables": [
+    {
+      "item": "样例分组与重点抽检页",
+      "status": "已固化",
+      "detail": "4 正样例（数学试卷/数学八年级/英语八年级/五下科学）+ 1 负样例（语文五年级），8 类重点抽检页按检查目的分组"
+    },
+    {
+      "item": "7 步逐页检查流程",
+      "status": "已固化",
+      "detail": "Baseline一致性 → 顺序/题号 → Candidate/Fallback → PageIR差异 → ExerciseIR → DOCX(人工) → Online Review Worker，每步含输入、检查项、判定标准"
+    },
+    {
+      "item": "必检指标一览",
+      "status": "已固化",
+      "detail": "11 项指标含当前值与阈值：pass_through_all_equal=true, review_mode=online_review, json_valid_rate=1.0(>=0.6), review_acceptance_rate=1.0(>=0.6), candidate_count 等"
+    },
+    {
+      "item": "Online Review Worker 指标",
+      "status": "已补入",
+      "detail": "从预整理版占位改为真实指标：json_valid_rate=1.0, review_acceptance_rate=1.0, service_available=true, reviewed_candidate_count=5。阈值固定为 >= 0.6。"
+    },
+    {
+      "item": "回归执行命令",
+      "status": "已固化",
+      "detail": "包含 pytest 6 组测试命令、curl 服务检查命令、python 指标读取命令，qa-1 可直接复制执行"
+    },
+    {
+      "item": "报告模板（逐样例 + 汇总）",
+      "status": "已固化",
+      "detail": "JSON 格式模板含 step_1~step_7 字段，汇总含 review_mode/json_valid_rate 等真实指标位"
+    },
+    {
+      "item": "Checklist（4 组）",
+      "status": "已固化",
+      "detail": "自动化检查 9 项 + Review Worker 检查 4 项 + 人工抽检 4 项 + 待下游就绪 2 项"
+    }
+  ],
+  "facts_corrected_from_pretemplate": [
+    "修正'全部 fallback'为'3/5 样例有 fallback'（fallback_triggered_sample_count=3）",
+    "修正'skipped_no_review_worker'为'online_review'（review_mode=online_review）",
+    "修正'Step 7 占位'为真实指标（json_valid_rate=1.0, review_acceptance_rate=1.0, service_available=true）",
+    "新增必检指标一览表（11 项含当前值与阈值）",
+    "新增回归执行命令（pytest + curl + python，可直接复制）",
+    "修正已知限制为'部分样例 fallback'而非'全部 fallback'"
+  ],
+  "tests": [
+    "本任务为文档整理型 verification，无自动化测试",
+    "验证方式：grep 确认无过期事实残留（skipped_no_review_worker 仅出现在合法比较上下文），确认 online_review/json_valid_rate=1.0 等新事实已写入"
+  ],
+  "risks": [
+    "ExerciseIR 挂接检查（Step 5）仍待下游集成测试就绪后补入正式结论",
+    "DOCX 抽检（Step 6）需人工执行，无法全自动化",
+    "Online review worker 依赖本地 127.0.0.1:18111 在线，服务不可用时 review_mode 应退化为 service_unavailable"
+  ]
+}

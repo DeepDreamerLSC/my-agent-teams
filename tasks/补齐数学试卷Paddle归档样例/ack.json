@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-17T17:32:52+08:00",
+  "status": "accepted",
+  "notes": "已按最新 instruction 重开处理：拆分 source_dir 与 archive_dir 契约，保持数学试卷样例 provenance 语义诚实，同时保证 phase3/e2e 继续稳定消费。"
+}

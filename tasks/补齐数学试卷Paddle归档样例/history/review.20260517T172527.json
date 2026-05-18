@@ -1,0 +1,49 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T16:19:25+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。当前交付确实消除了 `phase3-paddle-quality` 与 `test_hybrid_e2e.py` 上的 artifact gap，`数学试卷` 的 Paddle 候选统计也已经进入刷新后的报告，且 `pytest backend/tests/test_hybrid_e2e.py -q` 通过；但阻塞问题仍在 provenance 契约本身：`source_manifest.json` / `profile_manifest.json` 把 `数学试卷.source_dir` 改写成了 final-archive 自身目录，而结果文件又明确承认无法回指到最初 `20260515-112748` model-eval 运行目录。按任务 instruction“若当前文件无法证明来自真实可复核运行，则不能直接当作 done”以及验收标准 1，这轮还不能算完成了‘可追溯归档闭环’。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+      "finding": "当前 `数学试卷` 样例的 `source_dir` 被改写为 `/final-archive/profiles/paddleocr_vl/数学试卷` 自身目录，而不是可回指的原始运行来源。`final-archive/README.md` 明确约定 `source_manifest.json` 用来记录“原始来源”，`profile_manifest.json` 也仍然把整个 profile 锚定在 `run_label=20260515-112748` 的 model-eval 根目录上；但结果文件同时承认该原始 run 根本不存在 `数学试卷` 子目录。因此这次修改解决的是‘让 phase3/e2e 能消费回填归档’，并没有真正补成‘可追溯 provenance 闭环’。在这种前提下，把任务状态写成 `done`、把闭环描述成已完成，和 instruction 里“如果当前文件无法证明来自真实可复核运行，则不能直接当作 done”的约束相冲突。",
+      "recommendation": "请不要再用 `source_dir=final-archive/.../数学试卷` 伪装成原始来源。要么补出一套真实 provenance 证据并显式写入契约，例如能对应到具体 run/source/input/hash/生成时间的来源字段；要么保留该样例仍存在 provenance gap 的事实，把任务结果调整为未完成闭环，而不是宣称已完成。若 owner 最终接受‘仅证明可被 phase3/e2e 稳定消费’的新口径，也应先显式改任务验收，再统一调整 manifest/README 契约表述。",
+      "evidence": "README.md:5-7、13-18、40-41 说明 `source_manifest.json` 记录原始来源且归档优先使用 `model-eval` 原始产物；profile_manifest.json:4-8、36-50 仍把 profile 锚定到 `20260515-112748` run，但把 `数学试卷.source_dir` 指向 final-archive 自身目录；source_manifest.json:4-14 也采用了同样的自指路径；result.json:93-100 明确写 `original_run_level_provenance_complete=no`；test_hybrid_e2e.py:127-146 只会把 `sample.source_dir` 当作消费目录读取 `pages.jsonl/metrics.json/warnings.json`，并不能反证其是原始来源目录。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+      "finding": "这轮对 Phase 3 报告、数学试卷 `profile-audits.json` / `validator-report.json` 的刷新，以及 `test_hybrid_e2e.py` 的 overlay 回归断言本身是有价值的；它们已经证明回填目录可以被当前 Phase 3 / e2e 链路稳定消费。",
+      "recommendation": "返工时不必回退这部分结果。建议在补齐 provenance 契约后保留现有的 candidate_count=51、candidate_gain_vs_mineru=24 和 e2e 回归断言，只修正 manifest/source 语义与任务状态口径。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/profile-audits.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q",
+      "result": "passed (6 passed, 5 warnings)"
+    },
+    {
+      "command": "静态核对 `final-archive` provenance 契约与刷新后的 manifest/result 口径",
+      "result": "`README.md` 明确把 `source_manifest.json` 定义为“记录原始来源”；而当前 `数学试卷` 的 `source_manifest.json` / `profile_manifest.json` 却把 `source_dir` 指回 final-archive 自身目录，同时 `result.json` 又承认无法回指到最初 `20260515-112748` model-eval 运行目录，说明当前仍是‘可消费回填样例’，不是‘原始来源已可追溯’。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

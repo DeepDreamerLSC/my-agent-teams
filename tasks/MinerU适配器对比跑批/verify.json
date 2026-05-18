@@ -1,0 +1,37 @@
+{
+  "task_id": "MinerU适配器对比跑批",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-14T00:45:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。5 项验收标准全部满足：MinerU CLI is_available 复核通过后才执行跑批、5 个样例全部跑完（0 failed）、每个样例产物齐全（pages.jsonl/metrics.json/warnings.json/output.docx）、comparison_report 包含逐样例 apple_baseline vs mineru 对比、报告结论明确为 0/5 显著优于基线（未达 >=3/5 阈值）。review-1 经 round 1 修正判定逻辑后 approve。",
+  "test_commands": [
+    "ls 5 个 mineru 样例目录，确认均含 pages.jsonl、metrics.json、warnings.json、output.docx  (passed)",
+    "校验 comparison_report.json overall_conclusion 与逐样例结论一致性：significantly_better_sample_count=0, conclusion_counts={mineru_better:0, not_better:1, mineru_worse:4}  (passed)"
+  ],
+  "scenarios_verified": [
+    "数学 八年级下册pdf: mineru not_better（block 57 vs 471, formula+14, 但 missing 56.2% 题号）",
+    "数学试卷: mineru_worse（block 78 vs 1531, missing 77.8% 题号, 更慢）",
+    "英语 八年级下册: mineru_worse（block 34 vs 1266, question_sequence 空, missing 100% 题号, 更慢）",
+    "语文五年级: mineru_worse（block 45 vs 403, question_sequence 空, 更慢）",
+    "五下科学: mineru_worse（block 43 vs 342, question_sequence 空, missing 100% 题号, 更慢）",
+    "availability_check: CLI 存在 + help 返回 0 + OCR 缓存就绪",
+    "overall_conclusion: 0/5 显著优于, meets_threshold=false"
+  ],
+  "files_reviewed": [
+    "artifacts/pdf2word/model-eval/20260514-170529/comparison_report.json",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/mineru_summary.json",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/五下科学/",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/数学 八年级下册pdf/",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/数学试卷/",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/英语 八年级下册/",
+    "artifacts/pdf2word/model-eval/20260514-170529/mineru/语文五年级/"
+  ],
+  "regressions_found": [],
+  "risks": [
+    "执行方式为 cli_direct（非 model_eval_runner profile 跑批），comparison_report 为重算而非重跑产物（非阻塞，review 已标记）",
+    "题号序列对比为启发式数字抽取，非人工标注真值；MinerU 在 3/5 样例上 question_sequence 为空，可能与其输出格式有关（非阻塞，后续跑批可复验）",
+    "MinerU 的 image_candidate_count 和 formula_candidate_count 系统性高于 apple_baseline，但 block_count 大幅低于基线，说明两者 block 粒度/结构化程度差异较大"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "task_id": "实现PaddleOCRVL选择性触发与缓存",
+  "resumed_at": "2026-05-17T11:13:43+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "review成立：Paddle 触发越界到整本，需要收紧到 enhancement context 并补负例测试与 e2e 门禁",
+  "archived_files": [
+    "ack.20260517T111343.json",
+    "review.20260517T111343.json",
+    "review.20260517T111343.md",
+    "result.20260517T111343.json"
+  ]
+}

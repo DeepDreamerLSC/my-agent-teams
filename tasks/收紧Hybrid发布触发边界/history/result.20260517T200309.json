@@ -1,0 +1,35 @@
+{
+  "task_id": "收紧Hybrid发布触发边界",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已收紧 Hybrid 发布触发边界。默认同步路径与 auto 解析不再继承到 hybrid_experimental；apple 继续作为默认同步 parser；hybrid 仅在显式受控条件下进入。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
+  ],
+  "controlled_hybrid_entry": {
+    "default_path": "auto / 默认同步路径一律先按 released parser 解析，不再因 settings.parse_backend=hybrid_experimental 被动进入 hybrid。",
+    "default_effective_backend": "apple（若本地 Apple worker 可用；否则退回 mock）",
+    "official_release_path": "显式 parser_backend=hybrid_experimental 且 mode=quality 时允许进入 hybrid_experimental。",
+    "gray_or_internal_eval_path": "若现有配置已把 settings.parse_backend 设为 hybrid_experimental，则仍需显式请求 hybrid_experimental 才放行，可作为灰度/内部评测 allowlist；仅配置继承本身不会触发 hybrid。",
+    "blocked_combination_example": "balanced + parser_backend=hybrid_experimental 在公共路径下会回落到 apple，而不是进入 hybrid。"
+  },
+  "implementation_notes": [
+    "在 settings.py 新增共享 gate：resolve_released_parser_backend() / hybrid_release_is_allowed()，把 hybrid 的显式请求、quality 模式和灰度 allowlist 条件收口到一个地方。",
+    "parser_client.py、conversion_service.py、skill.py 统一复用这套 gate，修掉 settings.parse_backend / skill 默认解析带来的隐式 hybrid 继承。",
+    "manifest.json 与 inference_config.yaml 本轮未改动：skill 对外暴露面仍保持 auto/apple/mock，不额外放开 hybrid。"
+  ],
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py -o cache_dir=/private/tmp/chiralium-pytest-hybrid-release-gate --basetemp=/private/tmp/chiralium-pytest-hybrid-release-gate-tmp"
+  ],
+  "risks": [
+    "灰度/内部评测 allowlist 目前沿用 settings.parse_backend=hybrid_experimental 这一现有配置语义；若后续需要按用户、租户或路由维度做更细的灰度，还需要单独设计显式策略。"
+  ],
+  "completed_at": "2026-05-17T19:51:57+08:00"
+}

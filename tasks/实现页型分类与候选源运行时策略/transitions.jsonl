@@ -1,0 +1,4 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-17T22:44:41+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-17T22:45:41+08:00", "reason": "agent dev-1 claimed pooled task: watcher auto-continued after Adapter重构与GLM-OCR迁移"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T23:15:31+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-18T00:48:57+08:00", "reason": "task-watcher auto close after qa verify pass"}

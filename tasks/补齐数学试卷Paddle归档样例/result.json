@@ -1,0 +1,94 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-17T17:34:59+08:00",
+  "summary": "已按最新验收口径收口数学试卷 Paddle 样例的 provenance 契约：source_dir 恢复为原始来源语义并保持缺失，archive_dir 单独表示当前可消费的回填归档目录；phase3/e2e 在新契约下仍稳定消费。",
+  "modified_files": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+      "action": "modified",
+      "description": "明确定义 source_dir 仅表示原始 model-eval 来源，archive_dir 表示 final-archive 内当前可消费目录，不再混淆 provenance 与消费路径。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+      "action": "modified",
+      "description": "将 paddleocr_vl/数学试卷 恢复为 source_dir=null，并新增 archive_dir/provenance_status/archived_files；同时把 profile 计数字段改回诚实语义，新增 archive_consumable_sample_count。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/profile_manifest.json",
+      "action": "modified",
+      "description": "同步 archive_manifest 的新契约，区分原始来源缺口与当前归档可消费状态。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+      "action": "modified",
+      "description": "为数学试卷样例显式写入 source_dir=null、archive_dir、provenance_status=source_missing_archive_consumable、archived_files 与 remaining gap 说明。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+      "action": "modified",
+      "description": "Artifact harness 改为优先消费 archive_dir，回退 source_dir；回归断言改为校验数学试卷的 source_dir=null 与 archive_dir 存在。"
+    }
+  ],
+  "contract": {
+    "source_dir": {
+      "meaning": "原始 model-eval 运行目录中的来源路径",
+      "math_exam_value": null
+    },
+    "archive_dir": {
+      "meaning": "final-archive 内当前可被 phase3/e2e 消费的归档目录",
+      "math_exam_value": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷"
+    },
+    "provenance_status": "source_missing_archive_consumable"
+  },
+  "phase3_and_e2e_consumption": {
+    "math_exam_phase3": {
+      "selected_pages": [
+        1,
+        8,
+        9,
+        11
+      ],
+      "page_scope_size": 12,
+      "selected_ratio": 0.3333,
+      "candidate_counts": {
+        "mineru_full": 27,
+        "paddleocr_vl": 51
+      },
+      "merge_decision_counts": {
+        "accepted": 46,
+        "rejected": 32
+      },
+      "fallback_pages": 0,
+      "profile_audits_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/profile-audits.json",
+      "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/validator-report.json"
+    },
+    "report_aggregate_metrics": {
+      "total_selected_pages": 9,
+      "total_scope_pages": 32,
+      "selected_ratio": 0.2812,
+      "cache_hits_second_run": 9,
+      "cache_misses_first_run": 9,
+      "paddle_candidate_count": 61,
+      "mineru_candidate_count": 57,
+      "fallback_triggered_sample_count": 3
+    }
+  },
+  "remaining_gap": {
+    "status": "present_and_intentional",
+    "details": "原始 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl 下仍不存在 数学试卷 子目录，因此 original run-level provenance 仍未闭合。该缺口现在通过 source_dir=null 与 provenance_status=source_missing_archive_consumable 被显式暴露，不再伪装为已闭环。"
+  },
+  "tests": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q",
+      "result": "passed",
+      "evidence": "6 passed, 5 warnings"
+    }
+  ],
+  "acceptance_assessment": {
+    "source_and_archive_contracts_honest_and_self_consistent": "yes",
+    "phase3_and_e2e_still_consumable": "yes",
+    "original_run_level_provenance_closed": "no"
+  }
+}

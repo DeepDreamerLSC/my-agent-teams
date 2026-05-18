@@ -1,0 +1,47 @@
+{
+  "task_id": "补评GLM-4.6V-Flash模型横评",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-16T23:55:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。验收标准逐项核实：5/5 样例已跑完，comparison_report.json 完整且可追溯，inference_config.yaml 中 glm_46v_flash profile 已显式设为 enabled:false（一次性评测服务已正确收口），review-1 审查通过无阻塞项。",
+  "acceptance_criteria": [
+    {
+      "criterion": "推理服务可正常启动",
+      "result": "pass",
+      "evidence": "comparison_report.json 记录 smoke_test='GET /v1/models returned 200 and create_adapter(\"glm_46v_flash\").is_available() == True'，确认评测期间服务正常运行。当前已停用属预期行为（一次性评测）。"
+    },
+    {
+      "criterion": "create_adapter('glm_46v_flash').is_available() 返回 True",
+      "result": "pass",
+      "evidence": "评测期间返回 True（见 comparison_report.json smoke_test 字段）。当前 profile 已禁用，is_available()=False 是 rework 后的正确状态。"
+    },
+    {
+      "criterion": "5 个样例全部跑完",
+      "result": "pass",
+      "evidence": "comparison_report.json 包含 5 个样例（五下科学、数学八年级下册pdf、数学试卷、英语八年级下册、语文五年级），磁盘上 glm_46v_flash/ 下对应 5 个子目录均存在。failed_samples=[]。"
+    },
+    {
+      "criterion": "有对比报告",
+      "result": "pass",
+      "evidence": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/comparison_report.json 存在，含完整 baseline vs glm_46v_flash 逐样例对比数据与总结。"
+    }
+  ],
+  "scenarios_verified": [
+    "inference_config.yaml glm_46v_flash profile 为 enabled:false",
+    "artifacts 目录 20260516-104815 结构完整（comparison_report.json + 5 样例子目录）",
+    "comparison_report.json 数据与 result.json sample_summary 一致",
+    "review-1 审查结论为 approve，无阻塞发现"
+  ],
+  "test_commands": [
+    "cat inference_config.yaml | grep -A8 'glm_46v_flash:' — 确认 enabled: false",
+    "ls artifacts/pdf2word/model-eval/20260516-104815/glm_46v_flash/ — 确认 5 样例目录存在",
+    "对比 comparison_report.json 与 result.json 的 block_count/total_seconds 字段 — 数据一致"
+  ],
+  "non_blocking_observations": [
+    "5/5 样例均带有 'VLM review JSON 解析失败，已返回空结果。' warning，说明 structured JSON 输出稳定性需单独治理。因 profile 已默认禁用，不影响本轮收口。",
+    "GLM-4.6V-Flash block_count 和时延均显著劣于 apple_baseline（block_count 仅 baseline 的 0.7%~3.7%，时延约 4~5x），定位为 VLM review 对照而非主 parser 是合理的。"
+  ],
+  "regressions_found": []
+}

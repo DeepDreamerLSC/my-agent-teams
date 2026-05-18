@@ -1,0 +1,57 @@
+{
+  "task_id": "执行PDF转Word最终五样例总验收",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T18:08:25+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。当前总验收报告的核心发布建议本身大体站得住：我补跑的 32 个关键 pytest 仍然全部通过，`apple 默认 + hybrid_experimental/quality 灰度 + formula audit-only` 的总体判断没有被我复核出新的代码层反例；但这项任务的核心交付是“最终五样例总验收报告”，而当前产物仍有两条明确阻塞问题：其一，公式专项部分沿用 2026-05-17 12:21:38 的旧 crop-manifest 评审产物，仍写 `ocr_ready_crop_count=0`、`真实公式 OCR 结果尚未就绪`，没有纳入同日 `20260517-174500` 的真实 OCR 实验结果；其二，五样例逐样例结论里仍缺少 instruction 明确要求的“答案/作答区处理”这一项验收结论。作为最终总验收报告，这两点都必须先补齐。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_report.md",
+      "finding": "公式专项结论使用了过时证据。报告在第 3.3 节和 summary.json 中仍引用 `/phase4-formula-crop-eval/review-20260517-formula-crop/formula_crop_eval_report.json`，写明 `ocr_ready_crop_count = 0` 并据此得出“真实公式 OCR/可编辑输出尚未就绪”；但当前工作区里已经存在更晚的真实实验产物 `/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json`，其生成时间是 `2026-05-17T17:46:04+08:00`，明确记录了 `ocr_ready_crop_count = 17`，且 `ocr-results/` 下实际存在 85 个逐 crop 结果文件。这会让‘当前是否阶段性完成、还差什么’的最终验收报告对公式专项的现状判断落后于同日已产生的证据。",
+      "recommendation": "请刷新总验收报告与 summary.json 的公式专项部分，至少做到二选一：1. 直接纳入 `20260517-174500` 这组真实公式 crop OCR 实验产物，并明确它仍然只作为 supplementary evidence、不改变默认发布建议；2. 如果你坚持只引用更早、已审过的公式证据，也必须在报告里显式写清楚‘截止时间/证据冻结点’，说明为什么不纳入 `2026-05-17T17:46:04+08:00` 之后已生成的更晚产物，而不能继续把 `ocr_ready_crop_count=0` 表述成当前事实。",
+      "evidence": "final_acceptance_report.md:80-83、171-180 与 final_acceptance_summary.json:55-58、222-226 仍指向 `review-20260517-formula-crop` 并写 `ocr_ready_crop_count=0`；而 `phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json:1-37` 已写 `generated_at=2026-05-17T17:46:04+08:00`、`ocr_ready_crop_count=17`，且 `find .../20260517-174500/ocr-results -type f | wc -l` 实测为 `85`。"
+    },
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+      "finding": "五样例逐样例人工抽检结论仍不完整。instruction 明确要求对 5 个样例分别给出“题号顺序、阅读顺序、图片/表格保留、公式现状、答案/作答区处理”结论，但当前 report 的五样例总览表只覆盖了前四项和总体判断，没有把“答案/作答区处理”单列或逐样例展开；summary.json 的 `samples[]` 结构同样没有任何逐样例 `answer_area` / `option_handling` / `exercise_docx` 结论字段。这意味着这份‘最终五样例总验收’少了一项被 instruction 明确点名的验收维度。",
+      "recommendation": "请把‘答案/作答区处理’补到五样例逐样例结论里，而不是只保留聚合总述。最低要求应是在 report 的五样例总览表与 summary.json 的 `samples[]` 中，为每个样例增加一列/一组字段，明确写出当前对答案区、作答区、选项结构化是否正常、是否依赖 fallback、是否缺 authoritative Word 证据的结论。",
+      "evidence": "instruction.md:31-33 要求“五样例自动化 + 人工抽检结论完整”，交付物 3 明确点名“答案/作答区处理”；但 final_acceptance_report.md:89-95 的五样例总览表没有该列，99-156 的逐样例详情也未逐样例覆盖该项；只有 182-187 给出了聚合层面的总述。final_acceptance_summary.json:89-202 的 `samples[]` 仅含 `sample_name/group/fallback_pages/appended_pages/kind_counts/formula_status/sample_verdict` 等字段，没有任何逐样例 answer/work-area 结论。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+      "finding": "当前总验收的主链结论本身大体是成立的：复跑 32 个关键 pytest 仍然全部通过，`apple default + hybrid_experimental quality` 的阶段性发布建议没有被我复核到新的代码层反例。",
+      "recommendation": "返工重点应放在‘更新最终报告事实状态与 blocker 分层’，不需要推翻当前对默认发布边界的总体判断。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word最终五样例总验收/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word最终五样例总验收/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word最终五样例总验收/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word最终五样例总验收/verify.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/review-20260517-formula-crop/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_report.md"
+  ],
+  "test_evidence": [
+    {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-final-accept /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_question_region_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py -q",
+      "result": "passed (32 passed, 4 warnings)"
+    },
+    {
+      "command": "静态复核 final_acceptance 报告与公式 crop 最新产物",
+      "result": "final_acceptance_report.md / final_acceptance_summary.json 仍引用 `review-20260517-formula-crop` 并写 `ocr_ready_crop_count=0`；但 `phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json` 已记录 `ocr_ready_crop_count=17`，且 `ocr-results/` 下实际存在 85 个逐 crop 结果文件。"
+    },
+    {
+      "command": "静态复核五样例抽检 checklist 完整性",
+      "result": "当前 report 的五样例总览和 summary.json 的 `samples[]` 仍缺逐样例 `答案/作答区处理` 结论，只有聚合层面的第 5.3 节总述，未满足 instruction 对每个样例逐项给结论的要求。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "汇总PDF转Word横评对比报告",
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "summary": "已重新读取 instruction.md，开始基于 artifacts/pdf2word/model-eval 汇总 7 个 profile 横评报告。",
+  "acked_at": "2026-05-15T13:33:40+08:00"
+}

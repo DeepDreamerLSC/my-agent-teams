@@ -1,0 +1,139 @@
+{
+  "task_id": "打通公式Crop级OCR实验闭环",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-17T17:47:37+08:00",
+  "summary": "已打通公式 crop 级 OCR 实验闭环。`model_eval_runner.py --formula-crop-eval` 现在会先生成/读取 `formula_crop_inputs.jsonl` 与 `expected-crops/`，再按 page-image profile 做真实 OCR、把每个 crop 的结果写入 `ocr-results/`，并在报告里同时给出 blocked 原因、格式失败/空结果/基线对齐失败统计与推荐方向。本轮真实 run 产出 85 个逐 crop 结果文件；在当前本地环境里 `paddleocr_vl` 与 `qwen3_vl_8b` 可跑，`glm_ocr` 与 `qwen3_vl_32b` healthcheck 502，`glm_46v_flash` 服务可达但 profile 仍为 disabled。综合成功数、耗时与 blocked 情况，当前最值得继续投入的公式专项方向是 `qwen3_vl_8b` 的 crop 级后续 A/B，但总体 exact-match 仍偏低，必须继续保持 formula audit-only / merge-disabled。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通公式Crop级OCR实验闭环/ack.json"
+  ],
+  "tests": [
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q",
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_formula_pipeline.py -q",
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --formula-crop-eval --formula-baseline-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline --output-dir /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval --run-label 20260517-174500"
+  ],
+  "artifacts_written": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_inputs.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_missing_assets.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/expected-crops/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/ocr-results/"
+  ],
+  "repro": {
+    "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --formula-crop-eval --formula-baseline-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline --output-dir /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval --run-label 20260517-174500",
+    "input_baseline": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline",
+    "output_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500"
+  },
+  "current_state": {
+    "focus_page_count": 9,
+    "formula_candidate_count": 18,
+    "manifest_crop_count": 17,
+    "unmaterialized_candidate_count": 1,
+    "ocr_ready_crop_count": 17,
+    "materialized_crop_count": 17,
+    "materialized_omml_count": 17,
+    "ocr_result_file_count": 85,
+    "ocr_status_counts": {
+      "success": 3,
+      "needs_manual_review": 0,
+      "baseline_alignment_failed": 26,
+      "format_failed": 3,
+      "empty": 2,
+      "blocked": 51
+    }
+  },
+  "profiles_run": [
+    {
+      "profile_name": "paddleocr_vl",
+      "health_ok": true,
+      "blocked_reason": null,
+      "status_counts": {
+        "success": 1,
+        "needs_manual_review": 0,
+        "baseline_alignment_failed": 14,
+        "format_failed": 0,
+        "empty": 2,
+        "blocked": 0
+      },
+      "average_inference_seconds": 9.213
+    },
+    {
+      "profile_name": "qwen3_vl_8b",
+      "health_ok": true,
+      "blocked_reason": null,
+      "status_counts": {
+        "success": 2,
+        "needs_manual_review": 0,
+        "baseline_alignment_failed": 12,
+        "format_failed": 3,
+        "empty": 0,
+        "blocked": 0
+      },
+      "average_inference_seconds": 4.6166
+    },
+    {
+      "profile_name": "glm_ocr",
+      "health_ok": false,
+      "blocked_reason": "OpenAI-compatible vision backend 不可用：healthcheck status=502",
+      "status_counts": {
+        "success": 0,
+        "needs_manual_review": 0,
+        "baseline_alignment_failed": 0,
+        "format_failed": 0,
+        "empty": 0,
+        "blocked": 17
+      },
+      "average_inference_seconds": null
+    },
+    {
+      "profile_name": "qwen3_vl_32b",
+      "health_ok": false,
+      "blocked_reason": "OpenAI-compatible vision backend 不可用：healthcheck status=502",
+      "status_counts": {
+        "success": 0,
+        "needs_manual_review": 0,
+        "baseline_alignment_failed": 0,
+        "format_failed": 0,
+        "empty": 0,
+        "blocked": 17
+      },
+      "average_inference_seconds": null
+    },
+    {
+      "profile_name": "glm_46v_flash",
+      "health_ok": true,
+      "blocked_reason": "profile_disabled_in_config",
+      "status_counts": {
+        "success": 0,
+        "needs_manual_review": 0,
+        "baseline_alignment_failed": 0,
+        "format_failed": 0,
+        "empty": 0,
+        "blocked": 17
+      },
+      "average_inference_seconds": null
+    }
+  ],
+  "recommendation": {
+    "verdict": "prefer_qwen3_vl_8b_for_formula_crop_followup",
+    "recommended_profile": "qwen3_vl_8b",
+    "reasons": [
+      "qwen3_vl_8b 在本轮 17 个 crop 中拿到 2 个 exact success，且平均耗时约 4.62s/crop，快于 paddleocr_vl 的 9.21s/crop。",
+      "paddleocr_vl 虽然也能跑通真实链路，但只有 1 个 exact success，并出现 2 个空结果。",
+      "当前两个可跑 profile 的 baseline_alignment_failed 仍然偏多，因此这份推荐只代表后续公式专项优先试验方向，不代表已具备接线主链路条件。"
+    ]
+  },
+  "risks": [
+    "当前 34 个可实际执行的 crop 结果中，exact success 只有 3 个，说明公式 crop 识别能力仍远未达到可接主链路的水平。",
+    "qwen3_vl_8b 在部分宽区域 crop 上会返回多段 JSON/多公式拼接结果，导致格式失败或基线对齐失败；后续需要做 crop 清洗/拆分或更严格的输出约束。",
+    "本轮 blocked=51 里包含两个本地 HTTP profile 的 502 和一个 disabled profile；如果 owner 要扩大对比面，需先修复这些服务或显式放开 profile。"
+  ],
+  "next_steps": [
+    "继续保持 formula_candidate 默认 audit-only / merge-disabled，不把本轮 OCR 结果直接接入正文或 merge gate。",
+    "以下一轮公式专项优先继续 `qwen3_vl_8b` crop 级 A/B，并针对 `baseline_alignment_failed` 高发的数学大框做更细粒度切框或 prompt/输出约束优化。",
+    "在继续投入模型前，先利用本轮 `ocr-results/` 中的逐 crop JSON 做失败归因，区分是 baseline 噪声、crop 过大、还是模型输出格式不稳定。"
+  ]
+}

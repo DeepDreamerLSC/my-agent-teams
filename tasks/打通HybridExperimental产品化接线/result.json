@@ -1,0 +1,24 @@
+{
+  "task_id": "打通HybridExperimental产品化接线",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已把 parser_client 里的 hybrid_experimental 从 apple/mock 占位分支切到真实 HybridExperimentalPipeline。显式 parser_backend=hybrid_experimental 现在会进入 production_pipeline，并把 baseline_profile、candidate_profiles、enhancement/fallback 统计透传到 service meta；auto/apple 默认解析逻辑未改，相关回归测试已通过。另同步把 HybridExperimentalAdapter.parse 对齐到同一条真实 pipeline，避免 adapter 侧继续继承 apple baseline 行为。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -> 18 passed, 4 warnings",
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -k 'hybrid_experimental or create_adapter_hybrid_experimental_returns_dedicated_adapter_and_identity' -> 3 passed, 5 deselected, 4 warnings"
+  ],
+  "risks": [
+    "本轮没有新增真实模型在线 smoke 或新的端到端 PDF 样本产物；验收证据集中在生产入口接线、返回 contract 与定向 pytest。",
+    "hybrid_experimental 的 candidate/review 详细策略目前通过 inference_config 顶层 hybrid_experimental section 加代码默认值装配；若后续要把 review_profile 等配置开放成一等字段，建议补专门的 config loader 测试。"
+  ],
+  "completed_at": "2026-05-17T12:25:35+08:00"
+}

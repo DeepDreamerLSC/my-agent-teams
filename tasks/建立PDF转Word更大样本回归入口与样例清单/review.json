@@ -1,0 +1,37 @@
+{
+  "task_id": "建立PDF转Word更大样本回归入口与样例清单",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-18T09:46:05+08:00",
+  "status": "approve",
+  "summary": "审查通过。实现已在 model_eval_runner 中补齐更大样本回归入口、manifest/schema 与统一 regression summary 产物，并基于现有五样例 authoritative archive + hybrid e2e 事实跑通首版基线；未发现阻塞合并的问题。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "backend/app/services/pdf_to_word/model_eval_runner.py",
+      "finding": "当前入口汇总的是现有 archive/e2e/golden/meta 事实，不会自动发现新的真实 PDF 样本；missing_source_pdf_count=5 也说明样本扩充仍需后续人工补录来源。",
+      "recommendation": "后续 QA/owner 扩样时继续沿用同一 manifest schema 补 source_pdf、采样来源和人工抽检结论，把该入口作为统一摘要层而不是自动采样层。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立PDF转Word更大样本回归入口与样例清单/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立PDF转Word更大样本回归入口与样例清单/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立PDF转Word更大样本回归入口与样例清单/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_summary.md"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -o cache_dir=/private/tmp/chiralium-pytest-regression-cache --basetemp=/private/tmp/chiralium-pytest-regression-tmp -q",
+      "result": "passed (16 passed, 4 warnings)"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --regression-summary --archive-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive --hybrid-e2e-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation --output-dir /private/tmp/chiralium-p2-regression-review --run-label current-five-sample-baseline-review",
+      "result": "passed (artifacts generated under /private/tmp/chiralium-p2-regression-review/current-five-sample-baseline-review)"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

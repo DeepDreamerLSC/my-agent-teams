@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐ExerciseIR和DOCX的图片表格输出",
+  "agent_id": "dev-2",
+  "acknowledged_at": "2026-05-16T16:45:00+08:00",
+  "status": "accepted",
+  "notes": "已重新读取 instruction.md 与 task.json，并按 rework 要求重新排查 hybrid PageIR -> exercise_detector -> exercise_ir -> docx_assembler 全链路。此次允许修改 exercise_detector.py，重点修复 accepted image/table 在真实样例中未进入 ExerciseIR / DOCX 的问题，并将用真实 hybrid-phase1 candidates 回放验证数学试卷、英语八年级以及另外 3 个横评样例。"
+}

@@ -1,0 +1,52 @@
+{
+  "task_id": "实现PDF转Word异步任务接口与状态查询",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已新增 POST /api/pdf-to-word/jobs 与 GET /api/pdf-to-word/jobs/{job_id}，并补充单进程本地落盘版 PDF→Word 异步 job service：创建 job 后以 asyncio.create_task 在后台执行，状态覆盖 queued/running/succeeded/failed，成功后可返回 output DOCX 路径，失败时保留可解释错误信息；同步 /api/pdf-to-word/convert 路径保持不回归。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/job_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_async_jobs.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/async_job_api_summary.md"
+  ],
+  "tests": [
+    "PASS: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_pdf_to_word_api.py tests/test_pdf_to_word_async_jobs.py -o cache_dir=/private/tmp/chiralium-pytest-pdf-job-cache --basetemp=/private/tmp/chiralium-pytest-pdf-job-tmp -q` -> `12 passed, 4 warnings in 0.15s`"
+  ],
+  "api_contract": {
+    "create_job": {
+      "method": "POST",
+      "path": "/api/pdf-to-word/jobs",
+      "response_status": 202,
+      "fields": [
+        "file",
+        "mode",
+        "parser_backend"
+      ]
+    },
+    "get_job": {
+      "method": "GET",
+      "path": "/api/pdf-to-word/jobs/{job_id}",
+      "statuses": [
+        "queued",
+        "running",
+        "succeeded",
+        "failed"
+      ]
+    },
+    "artifact_summary_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/async_job_api_summary.md"
+  },
+  "artifacts": {
+    "job_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/jobs",
+    "summary_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/async_job_api_summary.md"
+  },
+  "known_limitations": [
+    "当前为单进程、本地磁盘实现，后台执行依赖当前 API 进程内的 asyncio.create_task。",
+    "尚未覆盖 cancel、复杂超时治理、进程重启后的自动恢复、多机调度。",
+    "若进程在 queued/running 中断，当前只保留落盘状态，不会自动重放。"
+  ],
+  "risks": [
+    "后续若要支持更强恢复能力，需要引入更稳健的任务队列/worker 或重放机制。",
+    "当前状态查询只提供产物路径，不含下载接口；若要前端直接消费，还需后续补充下载或签名 URL 方案。"
+  ],
+  "completed_at": "2026-05-18T09:04:41+08:00"
+}

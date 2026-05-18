@@ -1,0 +1,7 @@
+{
+  "task_id": "收紧Hybrid发布触发边界",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T19:51:57+08:00",
+  "summary": "已重新读取 instruction.md 并执行任务。将通过共享 backend gate 收紧 hybrid_experimental 的触发边界，确保 auto/default 不因 settings.parse_backend 或 skill/API 参数继承误入 hybrid，同时保留显式 quality 路径与灰度/内部评测受控入口。"
+}

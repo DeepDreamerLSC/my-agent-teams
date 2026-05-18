@@ -1,0 +1,16 @@
+{
+  "task_id": "MinerU本地Adapter接入PDF转Word",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已按 review-1 仅修复两个阻塞问题：1) MinerU 配置改为优先从 app.core.config.settings / ENV_FILE 透传；2) MinerU 输出读取统一使用实际运行 PDF 的 stem，不再依赖 source_name。并补了两条回归测试覆盖这两个失败场景。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py"
+  ],
+  "tests": [
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest -p no:cacheprovider tests/test_pdf_to_word_mineru_client.py tests/test_pdf_to_word_service.py -q"
+  ],
+  "risks": [],
+  "completed_at": "2026-05-14T16:30:34+08:00"
+}

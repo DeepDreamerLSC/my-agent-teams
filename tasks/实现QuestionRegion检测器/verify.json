@@ -1,0 +1,37 @@
+{
+  "task_id": "实现QuestionRegion检测器",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-15T19:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 通过。QuestionRegionDetector 可从 baseline PageIR 识别题号 anchor 并生成 question regions，输出结构包含 page_index/question_id/region_bbox/resolvable 等全部要求字段。数学/英语/科学样例可检测，语文五年级 13 页全部标记为 unresolvable。5 个测试通过。",
+  "test_commands": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/python -m pytest tests/test_question_region_detector.py -q",
+      "result": "passed (5 passed, 4 warnings)"
+    },
+    {
+      "command": "reviewer 复跑 apple_baseline 5 样例",
+      "result": "与 result.json 一致：五下科学 6/6 可判定 40 regions；数学八年级 7/8 可判定 53 regions；数学试卷 12/12 可判定 134 regions；英语八年级 10/12 可判定 94 regions；语文五年级 13/13 不可判定 0 regions"
+    }
+  ],
+  "scenarios_verified": [
+    "QuestionRegion 包含全部要求字段：page_index, question_id, region_bbox, resolvable",
+    "QuestionRegionPageResult 包含页级判定：resolvable, question_anchor_count, regions, reason, bbox_present_ratio, region_non_overlap_ratio, reading_order_valid, page_confidence",
+    "数学样例可检测：数学试卷 12/12 页可判定，134 regions；数学八年级 7/8 页可判定，53 regions",
+    "英语样例可检测：英语八年级 10/12 页可判定，94 regions",
+    "科学样例可检测：五下科学 6/6 页可判定，40 regions",
+    "语文五年级标记为 unresolvable：13/13 页不可判定，0 anchor，0 regions，全部 reason=question_region_not_detectable",
+    "不可判定页不做强推断：anchor 数不足直接返回 resolvable=false",
+    "双栏检测：基于 x-gap 启发式拆列，避免左右栏题号串扰",
+    "bbox_present_ratio / reading_order_valid / region_non_overlap_ratio / page_confidence 共同约束可判定性",
+    "write_scope 合规：仅新增 question_region_detector.py 和 test_question_region_detector.py，未修改现有 PageIR 结构"
+  ],
+  "regressions_found": [],
+  "risks": [
+    "真实 artifacts 测试断言偏宽松（主要验证 detectability rate >= 0.6 和 >0），未固化精确页数/anchor 计数",
+    "双栏检测基于启发式 x-gap 规则（MIN_GAP=120pt, MIN_RATIO=0.25），后续若接入更稳定列信息可替换",
+    "anchor 规则以文本题号正则为主，对完全无可识别题号或高度版式化页面直接降级为 unresolvable"
+  ]
+}

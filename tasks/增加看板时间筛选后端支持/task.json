@@ -48,5 +48,6 @@
   "result_summary": "PM决策：看板时间筛选功能优先级低，当前积压严重，暂不实施",
   "last_error": null,
   "created_at": "2026-04-25T08:37:41+08:00",
-  "updated_at": "2026-05-06T06:48:49+08:00"
+  "updated_at": "2026-05-18T18:51:05+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:05+08:00"
 }

@@ -1,0 +1,46 @@
+{
+  "task_id": "实现Hybrid题号顺序与阅读顺序校验器",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T01:11:10+08:00",
+  "status": "approve",
+  "summary": "审查通过。实现已按任务边界补齐 Hybrid Phase 2 的题号顺序/阅读顺序页级校验：`order_resolver.py` 去掉 silent renumber 并保留顺序诊断，`QuestionRegionDetector` 会输出 `order_verdict`、`order_reasons`、`question_sequence_*` 审计字段，`HybridValidator` 会把 `wrong_order`、`question_sequence_regression`、`question_anchor_conflict`、`reading_order_invalid` 作为 fallback gate。本人复跑了任务要求的三组 pytest，结果为 `15 passed, 4 warnings`；并抽检真实 baseline 样例，确认 `数学试卷` 为 `12/12 ok`、`英语 八年级下册` 为 `8 ok + 2 wrong_order + 2 not_detectable`、`语文五年级` 为 `13/13 question_region_not_detectable` 且 `order_verdict=not_applicable`。任务目标满足，可进入 QA 回归。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_validator.py",
+      "finding": "当前 validator 在调用方未传 `question_region_results` 时会内部重新运行 `QuestionRegionDetector`。这满足本轮 write_scope 约束下的生产兜底，但也让 validator 与 detector 出现额外耦合。",
+      "recommendation": "后续若放开 `hybrid_pipeline.py` 的 write_scope，建议把 `question_region_results` 显式透传给 validator，避免重复计算并让门禁接线更清晰。",
+      "evidence": "`hybrid_validator.py:79-82` 在 `question_region_results is None` 时直接执行 `self._question_region_detector.detect_pages(baseline_page_list)`。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现Hybrid题号顺序与阅读顺序校验器/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现Hybrid题号顺序与阅读顺序校验器/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现Hybrid题号顺序与阅读顺序校验器/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/order_resolver.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_validator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_question_region_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/数学试卷/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/英语 八年级下册/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/语文五年级/pages.jsonl"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_question_region_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-hybrid-order-review --basetemp=/private/tmp/chiralium-pytest-hybrid-order-review-tmp",
+      "result": "passed (15 passed, 4 warnings)"
+    },
+    {
+      "command": "用 QuestionRegionDetector 抽检真实 baseline 样例：数学试卷 / 英语 八年级下册 / 语文五年级",
+      "result": "数学试卷：12/12 resolvable，reasons={'ok': 12}；英语八年级：8 resolvable，reasons={'ok': 8, 'question_sequence_regression': 2, 'question_region_not_detectable': 2}，verdicts={'ok': 8, 'wrong_order': 2, 'not_applicable': 2}；语文五年级：13/13 question_region_not_detectable，verdicts={'not_applicable': 13}。"
+    },
+    {
+      "command": "静态审阅顺序诊断与门禁代码",
+      "result": "确认 `resolve_block_order()` 仅保留阅读顺序排序、不再改写题号；`QuestionRegionDetector` 在顺序异常时返回 `order_verdict='wrong_order'` 与具体 `order_reasons`；`HybridValidator` 会据此整页 fallback 到 baseline。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

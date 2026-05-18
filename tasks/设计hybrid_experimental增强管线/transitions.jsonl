@@ -1,0 +1,3 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-15T14:27:57+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "blocked", "at": "2026-05-15T18:10:09+08:00", "reason": "watcher observed result.json status=blocked"}
+{"from": "dispatched", "to": "blocked", "at": "2026-05-15T18:11:16+08:00", "reason": "watcher observed result.json status=blocked"}

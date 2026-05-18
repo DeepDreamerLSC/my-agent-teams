@@ -1,0 +1,50 @@
+{
+  "task_id": "归档横评样例到artifacts目录",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-15T21:51:42+08:00",
+  "status": "approved",
+  "summary": "审查通过。`artifacts/pdf2word/final-archive/` 已按任务要求建立统一归档结构，包含 `profiles/`、`reports/`、`README.md` 与 `archive_manifest.json`；6 个 profile 已归档，`glm_46v_flash` 以 blocked 形式占位。样例名已统一标准化，README 和 manifest 也明确记录了 `mineru_full` 缺失 5/5 `output.docx`、`paddleocr_vl` 缺失“数学试卷”以及 `glm_46v_flash` 暂无数据等来源缺口，符合“只复制、不改原始数据”的任务边界。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+      "finding": "README 已清楚说明本次优先使用 `artifacts/pdf2word/model-eval/` 原始 runner 产物作为归档来源，因此没有把 `example/扫描件 /docx横评对比/` 下的手工 DOCX 额外复制进 `final-archive`。这不违背当前 instruction，但后续如果林总工希望把“手工整理版 DOCX”与“runner 原始产物”同时收编，需要单独补一轮归档策略。",
+      "recommendation": "后续若需要对外展示或人工对比，可再增补一个 `manual-docx/` 或在 README 中扩展交叉索引，把 `example/扫描件 /docx横评对比/` 的手工整理资产纳入归档总览。 "
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/归档横评样例到artifacts目录/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/归档横评样例到artifacts目录/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/归档横评样例到artifacts目录/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/mineru_lite/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/mineru_full/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/glm_ocr/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/qwen3_vl_8b/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/glm_46v_flash/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/comparison_report_status.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "find /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive -type f | wc -l",
+      "result": "159 个文件，和 result.json 中 `generated_file_count=159` 一致。"
+    },
+    {
+      "command": "find /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles -maxdepth 3 -type f",
+      "result": "确认 6 个 archived profile 与 1 个 blocked profile 的目录、样例文件和 `source_manifest.json` 已落盘；`paddleocr_vl/数学试卷/` 为空样例目录，仅保留缺失说明，符合 README/manifest 声明。"
+    },
+    {
+      "command": "读取 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md 与 archive_manifest.json",
+      "result": "确认样例名统一为 `五下科学 / 数学八年级 / 数学试卷 / 英语八年级 / 语文五年级`，并明确记录 `mineru_full`、`paddleocr_vl`、`glm_46v_flash` 的源数据缺口与 blocked 状态。"
+    },
+    {
+      "command": "find /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval -name 'comparison_report.json' | sort；读取 final-archive/reports/comparison_report_status.json",
+      "result": "归档中的 comparison_report 收录状态与源目录可用性一致：`mineru_lite`、`mineru_full`、`glm_ocr`、`qwen3_vl_8b` 已收录，`apple_baseline` 无独立 report，`paddleocr_vl` 和 `glm_46v_flash` 也已在状态文件中说明缺失原因。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

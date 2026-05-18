@@ -1,0 +1,68 @@
+{
+  "task_id": "补齐按源审计与定向Paddle执行闭环",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已补齐 Hybrid per-source merge audit 与 paddleocr_vl 定向执行审计闭环。每次 run 现在能基于 source_selection、候选过滤结果和 validator fallback 事实输出按 sample/page_type/candidate_kind/source_profile 拆分的 accepted/rejected/fallback/final_accepted 明细；profile_audits 也补入 cache、latency、candidate_count、accepted_count、rejected_count、fallback_count、final_accepted_count 与 reason 统计。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/page_ir_merger.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_page_ir_merger.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/五下科学/per-source-merge-audit.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学八年级/per-source-merge-audit.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/per-source-merge-audit.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/英语八年级/per-source-merge-audit.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/语文五年级/per-source-merge-audit.json"
+  ],
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_page_ir_merger.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -o cache_dir=/private/tmp/chiralium-pytest-source-audit --basetemp=/private/tmp/chiralium-pytest-source-audit-tmp"
+  ],
+  "audit_fields_added": [
+    "HybridPipelineRun.per_source_merge_audit.rows[]: sample_name/page_index/page_type/candidate_kind/source_profile/candidate_count/accepted_count/rejected_count/ambiguous_count/skipped_count/fallback_count/final_accepted_count/decision_counts/merge_reason_counts/fallback_reason_counts/candidate_ids",
+    "ProfileExecutionAudit: accepted_count/rejected_count/ambiguous_count/skipped_count/fallback_count/final_accepted_count/latency_seconds/merge_reasons/fallback_reasons/per_source_rows",
+    "PageIR appended block meta: candidate_kind"
+  ],
+  "paddle_execution_policy": {
+    "default_priority": false,
+    "runs_only_in_mode": "quality",
+    "source_selection_required": true,
+    "allowed_trigger_reasons": [
+      "table_heavy",
+      "image_dense",
+      "mineru_shortfall",
+      "baseline_low_confidence",
+      "allowlist"
+    ],
+    "kept_out_of_default_full_book_enhancement": true,
+    "formula_candidate_merge_enabled": false
+  },
+  "phase3_paddle_quality_summary": {
+    "report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "sample_count": 5,
+    "total_selected_pages": 21,
+    "total_scope_pages": 32,
+    "selected_ratio": 0.6562,
+    "cache_hits_second_run": 21,
+    "cache_misses_first_run": 21,
+    "paddle_candidate_count": 97,
+    "mineru_candidate_count": 57,
+    "paddle_accepted_count": 50,
+    "paddle_rejected_count": 47,
+    "paddle_fallback_count": 0,
+    "paddle_final_accepted_count": 50,
+    "fallback_triggered_sample_count": 3,
+    "interpretation_policy": {
+      "paddle_candidates_with_zero_final_accepted": "treat_as_noise_filtered_successfully_not_default_priority_evidence",
+      "paddle_final_accepted_positive": "treat_as_targeted_supplemental_value_on_selected_pages_only",
+      "paddle_default_priority": false
+    }
+  },
+  "risks": [
+    "phase3 报告基于现有 final-archive PageIR 资产复跑，未调用新的在线 OCR 服务。",
+    "当前 Paddle selected_ratio 为 21/32，仍是 selected pages 执行，不是默认全书增强；后续 QA 可按 per-source-merge-audit.json 逐样例核对具体触发页。",
+    "语文负样例仍保持 baseline_only / no_paddle_candidates；公式候选仍按 audit-only 被拒绝，没有放开正文 merge。"
+  ],
+  "completed_at": "2026-05-18T01:07:40+08:00"
+}

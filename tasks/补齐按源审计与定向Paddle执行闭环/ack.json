@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐按源审计与定向Paddle执行闭环",
+  "agent": "dev-2",
+  "status": "working",
+  "summary": "已确认依赖任务实现页型分类与候选源运行时策略为 done 且 merge_gate_state=closed；当前任务已分配给 dev-2，开始在 write_scope 内补齐 per-source merge audit 与 paddleocr_vl 定向执行审计闭环。",
+  "acked_at": "2026-05-18T00:51:12+08:00"
+}

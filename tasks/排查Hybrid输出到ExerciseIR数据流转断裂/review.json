@@ -1,0 +1,45 @@
+{
+  "task_id": "排查Hybrid输出到ExerciseIR数据流转断裂",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-16T16:43:51+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前修复已经把真实 `HybridExperimentalPipeline` 产出的 visual blocks 接回了 ExerciseIR 主链路：我复跑 `tests.test_hybrid_e2e._run_pipeline(enable_enhancement=True)` 后直接将 `result.pages` 喂给 `detect_exercise_document()` + `assemble_exercise_docx_bytes()`，得到 `数学试卷` 的 `drawing_count=20` / `media_count=20`，以及 `英语八年级` 的 `drawing_count=2` / `media_count=2`。同时 detector/docx/integration 三组 pytest 全部通过，说明这轮不再只是“渲染器支持合成 payload”，而是真实 hybrid 产物已经能进入最终 Word。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py",
+      "finding": "当前 visual payload 的传递仍然依赖 `ContentBlock.__post_init__()` 通过 `inspect.stack()` 回溯局部变量 `block`。这让主链路在当前代码下可用，但契约仍然偏隐式，后续若重构 detector 或中间包装层，payload 注入可能静默失效。",
+      "recommendation": "后续若继续演进 Phase 2/3，建议把 image/table 的 visual payload 显式挂在 ExerciseIR 数据结构或 detector 输出契约上，并补一条覆盖真实 hybrid image/table 输入的回归测试，替代当前基于调用栈的隐式依赖。",
+      "evidence": "`exercise_ir.py:30-40` 在 `__post_init__()` 内改写 `kind/text`；`exercise_ir.py:101-106` 只在栈帧局部变量 `block` 为 `PDFSourceBlock` 时生效。现有 pytest 虽已覆盖 detector/docx/integration 主路径，但还没有专门固化“重构后局部变量名变化时仍能传 payload”的显式契约。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查Hybrid输出到ExerciseIR数据流转断裂/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查Hybrid输出到ExerciseIR数据流转断裂/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/排查Hybrid输出到ExerciseIR数据流转断裂/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m pytest tests/test_pdf_exercise_detector.py tests/test_pdf_exercise_docx_assembler.py -o cache_dir=/private/tmp/chiralium-pytest-cache --basetemp=/private/tmp/chiralium-pytest-temp",
+      "result": "passed (3 passed, 4 warnings)"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m pytest tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-cache-int --basetemp=/private/tmp/chiralium-pytest-temp-int",
+      "result": "passed (2 passed, 4 warnings)"
+    },
+    {
+      "command": "使用 `.venv/bin/python` 直接复跑 `tests.test_hybrid_e2e._run_pipeline()` 并串接 `detect_exercise_document()` + `assemble_exercise_docx_bytes()`",
+      "result": "`数学试卷` 得到 `drawing_count=20`、`media_count=20`、`table_count=0`；`英语八年级` 得到 `drawing_count=2`、`media_count=2`、`table_count=0`。英语样例中的 accepted `table` 本身只携带 `image_path` / `table_caption`，没有 `table_html` / `table_rows`，因此 DOCX 侧按图片 fallback 落盘，符合 result.json 的说明。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

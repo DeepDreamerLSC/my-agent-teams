@@ -1,0 +1,7 @@
+{
+  "task_id": "提取图片公式候选并验证增强可行性",
+  "agent": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-15T13:35:30+08:00",
+  "summary": "已重新读取任务指令，开始基于现有 apple_baseline / MinerU / PaddleOCR-VL 评测 artifacts 做候选提取、题号归属匹配和离线增强可行性分析，并准备回写报告与 result.json。"
+}

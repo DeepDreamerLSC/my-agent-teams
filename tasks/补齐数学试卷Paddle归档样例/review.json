@@ -1,0 +1,44 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T17:37:14+08:00",
+  "status": "approve",
+  "summary": "审查通过。此前的阻塞点是 `数学试卷` 的 provenance 契约把 `source_dir` 自指到 final-archive 自身目录；本轮已按新验收口径修正为：`source_dir` 只表示原始 model-eval 来源，当前缺失时保持 `null`，`archive_dir` 单独表示 phase3/e2e 可消费的归档目录，`provenance_status=source_missing_archive_consumable` 显式保留 remaining gap。`test_hybrid_e2e.py` 也已按该契约优先消费 `archive_dir`，回归实测通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+      "finding": "当前通过的是“契约收口且可稳定消费”，不是“original-run provenance 已补齐”。`数学试卷` 的原始 `20260515-112748` run 目录仍缺失，该 gap 现在被诚实保留。",
+      "recommendation": "后续如果要把该样例升级为完整 provenance 闭环，应补真实原始 run 证据，再把 `source_dir` 从 `null` 切回可复核来源；在那之前继续以 `archive_dir + provenance_status` 作为消费契约。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/profile-audits.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/validator-report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q",
+      "result": "passed (6 passed, 4 warnings)"
+    },
+    {
+      "command": "静态复核 README / archive_manifest / profile_manifest / source_manifest / phase3 report / test_hybrid_e2e",
+      "result": "`README.md` 已把 `source_dir` 定义为原始来源、`archive_dir` 定义为当前可消费目录；`profile_manifest.json`、`archive_manifest.json` 与 `数学试卷/source_manifest.json` 均改为 `source_dir=null`、`archive_dir=<final-archive/.../数学试卷>`、`provenance_status=source_missing_archive_consumable`；`test_hybrid_e2e.py` 读取样例时已优先 `archive_dir` 回退 `source_dir`，并对 `数学试卷` 断言 `source_dir is None`、`archive_dir` 存在；`phase3-paddle-quality/report.json` 中该样例统计仍保持可消费状态（selected_pages=[1,8,9,11]，candidate_counts={mineru_full:27,paddleocr_vl:51}，fallback_pages=0）。"
+    },
+    {
+      "command": "静态核对原始 model-eval 来源是否仍缺失",
+      "result": "本地检查 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl/数学试卷` 目录不存在，因此当前 `source_dir=null` 与 remaining provenance gap 的表述是诚实且可复核的。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

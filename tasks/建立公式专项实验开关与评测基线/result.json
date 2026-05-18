@@ -1,0 +1,70 @@
+{
+  "task_id": "建立公式专项实验开关与评测基线",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已把公式专项从隐式 audit-only 收口为显式实验开关 + 可复用基线产物。默认行为保持不变：formula_candidate 仍会被抽取用于审计，但默认不会进入正文 merge；同时已新增 phase4-formula-baseline 基线目录，固化样例页、候选计数、audit-only 原因与未来可扩展字段占位。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_extractor.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_extractor.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/sample-baseline.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/focus-pages.json"
+  ],
+  "default_policy": {
+    "formula_candidate_extracted": true,
+    "formula_candidate_merge_enabled_by_default": false,
+    "formula_candidate_filter_reason": "formula_candidate_rejected_audit_only",
+    "behavior_note": "默认仍是 audit-only，不会直接并回正文。"
+  },
+  "experiment_flag": {
+    "extractor_location": "candidate_extractor.CandidateExtractor(enable_formula_experiment=False)",
+    "filter_location": "candidate_filter.CandidateFilter(enable_formula_experiment=False)",
+    "default_enabled": false,
+    "default_mode": "disabled_audit_only",
+    "when_enabled": "shadow_collect_only",
+    "merge_enabled_even_when_flag_on": false
+  },
+  "baseline_artifacts": {
+    "root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline",
+    "summary_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/summary.json",
+    "sample_baseline_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/sample-baseline.json",
+    "focus_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/focus-pages.json",
+    "aggregate": {
+      "samples_with_formula_candidates": 3,
+      "formula_candidate_count": 18,
+      "focus_page_count": 9,
+      "counts_by_profile": {
+        "mineru_full": 18,
+        "paddleocr_vl": 0
+      }
+    },
+    "focus_samples": [
+      "mineru_full/数学 八年级下册pdf",
+      "mineru_full/五下科学",
+      "mineru_full/英语 八年级下册"
+    ],
+    "future_placeholder_fields": [
+      "latex",
+      "omml",
+      "image_path"
+    ]
+  },
+  "implementation_notes": [
+    "CandidateExtractor 现在显式暴露 enable_formula_experiment 开关，并在 summary/features 中写出 formula_experiment_enabled / formula_experiment_mode / placeholder 字段。",
+    "CandidateFilter 现在显式暴露同名开关，并在拒绝公式候选时把 formula_merge_enabled=false、实验模式和 audit_reason 回写到 filters，便于后续实验直接复用。",
+    "即使显式打开公式实验开关，当前模式也仍是 shadow_collect_only，不会改变默认 merge 行为。"
+  ],
+  "validation": {
+    "pytest_command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_extractor.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_filter.py -o cache_dir=/private/tmp/chiralium-pytest-formula-baseline --basetemp=/private/tmp/chiralium-pytest-formula-baseline-tmp",
+    "pytest_passed": true,
+    "pytest_cases_passed": 10,
+    "pytest_warnings": 4
+  },
+  "follow_ups": [
+    "后续公式 OCR / crop lane 可以直接复用 phase4-formula-baseline 的 focus-pages.json 作为样例页入口。",
+    "若未来要从 audit-only 转向可编辑链路，建议先把 latex/omml/image_path 三个占位字段变成真实产物，再新增独立 merge gate，而不是复用当前默认链路。"
+  ],
+  "completed_at": "2026-05-17T10:40:30+08:00"
+}

@@ -1,0 +1,59 @@
+{
+  "task_id": "实现PaddleOCRVL选择性触发与缓存",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T11:10:24+08:00",
+  "status": "request_changes",
+  "summary": "本轮不能通过。当前实现虽然补上了 Paddle 的按页缓存、profile audit 和 Phase 3 报告，但还没有守住任务最核心的边界：`paddleocr_vl` 不能整本同步跑。实际产物显示 `语文五年级` 在 quality 模式下被 `baseline_low_confidence` 规则扩成了 13/13 页全量触发，已经等价于整本 Paddle 跑批；现有单测和 e2e 也没有把这条门禁卡住，因此需要返工收紧触发策略并补测试。",
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+      "finding": "`_select_paddle_pages()` 当前直接以 `baseline_pages` 的全量页集合作为 `page_scope`，并把所有 `baseline_low_confidence` 页加入 `selected_pages`；当某个样例所有页都低置信且 `enhancement_pages` 为空时，Paddle 仍会被扩成整本触发。",
+      "recommendation": "收紧 Paddle 触发门控，确保 `selected_pages` 必须同时满足“位于允许的 enhancement context / selected pages / crops 范围内”这一上界，不能仅因 `baseline_low_confidence` 就在无 enhancement 上下文时放大到全书；必要时应在无 enhancement context 时直接 `skipped_reason=no_enhancement_context`。",
+      "evidence": "代码中 `_select_paddle_pages()` 使用 `page_scope = sorted({page.page_index for page in baseline_pages})`，随后对所有 `page_scope` 页面应用 `baseline_low_confidence` 规则（[hybrid_pipeline.py](/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py:497) 起）；实际产物 [profile-audits.json](/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/语文五年级/profile-audits.json:13) 显示 `语文五年级` 的 `paddleocr_vl.selected_pages` 为 1..13 全页，`cache_misses=13`。"
+    },
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+      "finding": "现有测试没有覆盖“低置信页不能把 Paddle 放大成整本触发”的负例，导致违反任务边界的实现仍能全绿通过。",
+      "recommendation": "补一条明确的防回归测试：构造 `enhancement_pages=[]` 或极少数 enhancement page、同时 baseline 页全部/大部分 low-confidence 的场景，断言 Paddle 不得选中整本页集；e2e 侧也应对 `selected_ratio` 或 `selected_pages/page_scope` 增加门禁，而不是只要求产物存在。",
+      "evidence": "当前单测只覆盖了“quality 才触发”“按选中页触发”“缓存复用”“balanced 不触发”等正向场景（[test_hybrid_pipeline.py](/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py:181) 起），Phase 3 e2e 仅断言 `selected_pages` / `trigger_reasons` / 路径存在（[test_hybrid_e2e.py](/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py:738) 起），没有任何断言防止 `selected_ratio=1.0` 的整本 Paddle 触发。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+      "finding": "Phase 3 报告已经包含触发页、触发比例、缓存命中和 fallback 指标，这部分审计结构是合格的；问题主要在于当前报告暴露出了整本触发行为。",
+      "recommendation": "返工时保留现有报告结构，但应额外把“是否触达整本触发上限”或类似 guardrail 指标也写进报告，避免后续只看产物存在却看不出边界已经失守。",
+      "evidence": "报告已写出 `selected_pages`、`selected_ratio`、`cache_hits_second_run`、`fallback_pages` 等字段；其中 `语文五年级.selected_ratio=1.0` 正是本次阻塞问题的直接信号。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PaddleOCRVL选择性触发与缓存/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PaddleOCRVL选择性触发与缓存/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PaddleOCRVL选择性触发与缓存/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/语文五年级/profile-audits.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/profile-audits.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc python3 -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+      "result": "通过。"
+    },
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -q",
+      "result": "5 个用例通过，4 条既有 FastAPI `on_event` deprecation warnings；但当前测试未覆盖“不得整本触发 Paddle”的负例。"
+    },
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q",
+      "result": "5 个用例通过，4 条既有 FastAPI `on_event` deprecation warnings；Phase 3 e2e 只校验产物与基础指标存在，未对 `selected_ratio` 或全量页触发设置门禁。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

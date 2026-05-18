@@ -1,0 +1,7 @@
+{
+  "task_id": "接入hybrid_experimental配置开关",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-15T16:05:00+08:00",
+  "summary": "已重新读取任务指令，开始补齐 hybrid_experimental 的配置开关、backend resolve、Skill/API 透传支持与回归测试。"
+}

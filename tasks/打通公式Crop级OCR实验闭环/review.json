@@ -1,0 +1,44 @@
+{
+  "task_id": "打通公式Crop级OCR实验闭环",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T17:51:49+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前交付已把公式 crop 级 OCR 从“只有 baseline 资产”推进到“可复跑实验闭环”：CLI 入口支持 `--formula-crop-eval`，会按当前注册的 `page_image` profile 选择实验对象，逐 crop 写出真实 `ocr-results/`，并在报告中区分 `success / needs_manual_review / baseline_alignment_failed / format_failed / empty / blocked`。本轮真实产物 `20260517-174500` 下已落出 85 个逐 crop 结果文件，`paddleocr_vl` 与 `qwen3_vl_8b` 可跑、其余 profile 的 blocked 原因也被显式记录；formula 默认 `audit-only / merge-disabled` 语义未被放开。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json",
+      "finding": "实验闭环已经打通，但当前 34 个可实际执行的 crop 结果里 exact success 只有 3 个，`baseline_alignment_failed` 仍占多数。",
+      "recommendation": "把这轮结果继续作为公式专项 A/B 与失败归因输入，保持 `formula_candidate` 默认 audit-only / merge-disabled，不要把当前 crop OCR 结果直接接入主转换链路。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通公式Crop级OCR实验闭环/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通公式Crop级OCR实验闭环/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通公式Crop级OCR实验闭环/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_formula_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_inputs.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/ocr-results/"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-review-model /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q",
+      "result": "passed (12 passed, 4 warnings)"
+    },
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-review-formula /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_formula_pipeline.py -q",
+      "result": "passed (4 passed, 4 warnings)"
+    },
+    {
+      "command": "静态复核 model_eval_runner / artifacts",
+      "result": "`model_eval_runner.py` 已通过 `_resolve_formula_crop_profile_names()` 从 `config.list_profiles(include_disabled=True)` 中筛出 `input_mode=page_image` 的 profile，不锁死单一模型；`build_formula_crop_eval_summary(..., run_ocr_experiments=True)` 会逐 crop 写 `ocr-results/<profile>/<source_profile>/<sample>/page-xxx/crop-yy.json`，并按 `success / needs_manual_review / baseline_alignment_failed / format_failed / empty / blocked` 聚合统计；本轮真实 run `20260517-174500` 下 `ocr-results/` 实际存在 85 个结果文件，报告中也如实记录了 `paddleocr_vl`、`qwen3_vl_8b` 可跑以及 `glm_ocr`、`qwen3_vl_32b` 的 healthcheck 502、`glm_46v_flash` 的 `profile_disabled_in_config`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "实现PaddleOCRVL选择性触发与缓存",
+  "status": "acknowledged",
+  "summary": "已重新读取 instruction.md 与 task.json，开始按 review 要求返工：收紧 Paddle 触发上界到 enhancement context，补负例单测与 e2e 越界门禁，并重生成 phase3-paddle-quality 报告。",
+  "round": 0,
+  "agent": "dev-2",
+  "acked_at": "2026-05-17T11:26:16+08:00"
+}

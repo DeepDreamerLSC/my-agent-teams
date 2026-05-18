@@ -1,0 +1,27 @@
+{
+  "task_id": "MinerU切换full模式重跑样例对比",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已将 MinerU 切换为 full 模式并通过 model_eval_runner 重跑 5 个样例，生成 full vs apple_baseline / lite 对比报告。结论：full 模式未达到 >=3/5 阈值，未优于 baseline，也未优于 lite。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-090642/comparison_report.json"
+  ],
+  "tests": [
+    "model_eval_runner 跑批：/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --config /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml --samples-dir '/Users/linsuchang/Desktop/work/chiralium/example/扫描件 ' --output-dir /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval --profiles mineru",
+    "对比报告重算：读取 20260514-144102/apple_baseline、20260514-170529/mineru 与 20260515-090642/mineru 的 pages.jsonl / metrics.json 生成 comparison_report.json"
+  ],
+  "artifacts": {
+    "mineru_full_run_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-090642/mineru",
+    "baseline_run_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline",
+    "lite_run_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/mineru",
+    "comparison_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-090642/comparison_report.json"
+  },
+  "conclusion": {
+    "vs_baseline_better_samples": 0,
+    "vs_lite_better_samples": 0,
+    "threshold_met": false,
+    "decision": "full 模式当前不建议替换主 parser"
+  },
+  "completed_at": "2026-05-15T09:51:08+08:00"
+}

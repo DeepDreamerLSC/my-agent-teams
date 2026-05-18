@@ -1,0 +1,30 @@
+{
+  "task_id": "接入GLM-OCR适配器到横评框架",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-14T00:15:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。5 项验收标准全部满足：GLMOCRAdapter 继承 BaseParserAdapter 并实现 parse()/is_available()、ADAPTER_REGISTRY 已注册 glm_ocr、is_available() 未安装时返回 False、6 条 mock 测试全部通过、未修改 base_adapter.py 和 model_eval_runner.py 核心逻辑。review-1 已 approve 无 blocking findings。",
+  "test_commands": [
+    "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' backend/.venv/bin/python -m pytest backend/tests/test_glm_ocr_adapter.py -q  (6 passed, 4 warnings, dev-1 + review-1 均复跑确认)"
+  ],
+  "scenarios_verified": [
+    "is_available() 在无 GLM_OCR_API_URL 且 SDK 未安装时返回 False",
+    "is_available() 在 SDK 模块存在时返回 True",
+    "parse() 在不可用时抛出 RuntimeError 含明确安装指引",
+    "mock 完整管线：render → _parse_rendered_page → AdapterResult 含 PageIR/PDFSourceBlock/EvalMetrics/model_load_seconds",
+    "block kind 别名归一：formula→formula_candidate, equation→formula_candidate, picture→image, figure→image",
+    "ADAPTER_REGISTRY[\"glm_ocr\"] 注册正确"
+  ],
+  "files_reviewed": [
+    "backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py",
+    "backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "backend/tests/test_glm_ocr_adapter.py"
+  ],
+  "regressions_found": [],
+  "risks": [
+    "is_available() 配置 GLM_OCR_API_URL 时只检查环境变量存在，不探测 HTTP 服务是否真正可连通（非阻塞，review 已标记，后续可补 health/ping）",
+    "HTTP/SDK 调用契约仅经 mock 验证，真实 GLM-OCR 环境返回字段待后续跑批任务实测确认（非阻塞）"
+  ]
+}

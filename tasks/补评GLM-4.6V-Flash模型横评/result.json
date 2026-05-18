@@ -1,0 +1,78 @@
+{
+  "task_id": "补评GLM-4.6V-Flash模型横评",
+  "agent": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-16T13:47:29+08:00",
+  "summary": "已按 review 小修：保留既有 5 样例补评数据不重跑，在 inference_config.yaml 中将 glm_46v_flash profile 设为 enabled=false。历史补评数据仍有效，但 MLX 本地服务是一次性评测服务，当前已停用，不再作为默认可选 profile。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml"
+  ],
+  "service": {
+    "url": "http://127.0.0.1:18121/v1",
+    "model_path": "/Users/linsuchang/Desktop/work/models/glm-46v-flash-4bit",
+    "lifecycle": "one_shot_eval_service_stopped",
+    "profile_enabled_after_rework": false,
+    "historical_eval_healthcheck": "GET /v1/models returned 200 during the completed evaluation run",
+    "adapter_available_now": false
+  },
+  "tests": [
+    "本轮未重跑评测；沿用已完成的 20260516-104815 跑批产物",
+    "已将 inference_config.yaml 中 glm_46v_flash.enabled 从 true 调整为 false"
+  ],
+  "metrics": {
+    "run_label": "20260516-104815",
+    "sample_count": 5,
+    "failed_samples": [],
+    "samples_with_nonzero_blocks": 5,
+    "samples_beating_baseline_by_block_count": 0,
+    "glm_total_seconds": 1740.4462,
+    "baseline_total_seconds": 352.7105,
+    "conclusion": "GLM-4.6V-Flash 已完成真实本地补评，但 block_count 和时延均显著劣于 apple_baseline，更适合作为 VLM review 对照，不适合作为主 parser。"
+  },
+  "sample_summary": [
+    {
+      "sample_name": "五下科学",
+      "baseline_block_count": 342,
+      "glm_block_count": 5,
+      "baseline_total_seconds": 53.026,
+      "glm_total_seconds": 197.5382
+    },
+    {
+      "sample_name": "数学 八年级下册pdf",
+      "baseline_block_count": 471,
+      "glm_block_count": 24,
+      "baseline_total_seconds": 41.4121,
+      "glm_total_seconds": 386.9521
+    },
+    {
+      "sample_name": "数学试卷",
+      "baseline_block_count": 1531,
+      "glm_block_count": 28,
+      "baseline_total_seconds": 88.179,
+      "glm_total_seconds": 340.281
+    },
+    {
+      "sample_name": "英语 八年级下册",
+      "baseline_block_count": 1266,
+      "glm_block_count": 22,
+      "baseline_total_seconds": 89.1256,
+      "glm_total_seconds": 424.6061
+    },
+    {
+      "sample_name": "语文五年级",
+      "baseline_block_count": 403,
+      "glm_block_count": 10,
+      "baseline_total_seconds": 80.9678,
+      "glm_total_seconds": 391.0688
+    }
+  ],
+  "artifacts": {
+    "run_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815",
+    "comparison_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/comparison_report.json"
+  },
+  "risks": [
+    "5/5 样例都有 `VLM review JSON 解析失败，已返回空结果。` warning，说明 structured JSON 输出稳定性仍需单独治理。",
+    "本任务只补评了 GLM-4.6V-Flash 作为 VLM review 对照价值，不改变当前主 parser 结论。",
+    "当前 profile 已显式 disabled；如后续需要再次使用，需重新启动 MLX 服务后再手动开启。"
+  ]
+}

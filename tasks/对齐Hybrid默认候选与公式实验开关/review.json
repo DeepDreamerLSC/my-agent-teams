@@ -1,0 +1,39 @@
+{
+  "task_id": "对齐Hybrid默认候选与公式实验开关",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T16:53:00+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前交付已将 `hybrid_experimental` 默认候选收口为 `mineru_full`，并把 `enable_formula_experiment` 从配置接入到 `HybridPipelineConfig -> CandidateExtractor / CandidateFilter`；formula 仍保持 audit-only / shadow-only，不进入 merge。PM 返工补充后，`conversion_service.py` 已纳入本轮 write_scope，且本次在该文件中的处理仅用于回收此前越界引入的 formula service meta 字段，未新增新的公式服务层能力。定向 pytest 实测通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+      "finding": "formula experiment 的可观测性现收口在原始 parser response 的 `response.meta.hybrid_pipeline`，service meta 只保留 `hybrid_candidate_profiles`、增强页数、候选计数等服务层摘要字段，不再暴露 `hybrid_formula_experiment_enabled` / `hybrid_formula_experiment_mode`。",
+      "recommendation": "后续如果需要追踪 formula shadow lane，请优先消费 parser 原始响应中的 `meta.hybrid_pipeline`，不要再把 formula experiment 状态回灌到 service meta。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/对齐Hybrid默认候选与公式实验开关/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+      "result": "passed (9 passed, 4 warnings)"
+    },
+    {
+      "command": "静态复核 parser_client / hybrid_pipeline / conversion_service / candidate_filter / tests",
+      "result": "`DEFAULT_HYBRID_CANDIDATE_PROFILES` 已收口为 `('mineru_full',)`；`hybrid_experimental.enable_formula_experiment=false` 与 `candidate_profiles=[mineru_full]` 已在 YAML 显式表达；`HybridPipelineConfig.enable_formula_experiment` 已透传到 `CandidateExtractor` / `CandidateFilter`；`candidate_filter.py` 仍将 `formula_candidate` 直接拒绝并写入 `formula_merge_enabled: false`；`conversion_service.py` 不再导出 `hybrid_formula_experiment_enabled` / `hybrid_formula_experiment_mode`，而 `test_hybrid_backend_resolve.py` 同时断言 service meta 中缺失这两个字段、raw parser response 中仍保留 `enable_formula_experiment` 与 `formula_experiment_mode=disabled_audit_only`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

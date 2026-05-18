@@ -1,0 +1,35 @@
+{
+  "task_id": "建立Hybrid更大样本收益分布回归与抽检清单",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-18T13:37:01+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "收益分布回归与补样清单已生成。产物明确说明当前收益集中在哪些样例/页型/来源，诚实区分了已覆盖的五样例事实与仍待补样的空白，并可直接作为下一轮扩样与人工抽检任务输入。",
+  "acceptance_criteria": [
+    {
+      "criterion": "产物能说明当前收益集中在哪些样例/页型/来源，而不是只重复五样例总数",
+      "result": "pass",
+      "evidence": "`benefit_distribution_summary.json` 按页型、来源组合、trigger reason 和样例排名给出分布。结论明确指出 `math_exam_image_dense` / `数学试卷` 是当前最高收益带，而 `mineru_full+paddleocr_vl` 是现有增益来源组合。"
+    },
+    {
+      "criterion": "报告中明确列出仍需补样的维度与优先级",
+      "result": "pass",
+      "evidence": "`sampling_checklist.json` 与 `report.md` 给出 `P0/P1/P2` 三档补样清单，覆盖 `math_exam_image_dense`、`language_exercise_sparse_media_with_fallback_pages`、科学实验混排页、数学图表混排页和负样例边界。"
+    },
+    {
+      "criterion": "结论与已有 artifacts 事实一致，不放大覆盖范围",
+      "result": "pass",
+      "evidence": "manifest 和 summary 都明确写明 `strict_large_corpus=false`、`covered_real_samples=5`，并重复说明当前不是新增真实大样本文档集。收益数字直接来自现有 `regression_summary.json`、`phase3-paddle-quality/report.json`、`hybrid_experimental_authoritative_archive_report.json`。"
+    },
+    {
+      "criterion": "结果可直接作为下一轮补样/抽检任务的输入",
+      "result": "pass",
+      "evidence": "产物包含结构化 manifest、summary 和 sampling checklist，已将下一轮补样目标、原因、优先级和验收关注点写成可执行清单。"
+    }
+  ],
+  "test_commands": [
+    "无新增自动化测试；本轮是基于既有 artifacts 的 verification/reporting 任务，核心校验通过读取并交叉核对 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_summary.json`、`/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json`、`/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json` 完成。"
+  ],
+  "regressions_found": []
+}

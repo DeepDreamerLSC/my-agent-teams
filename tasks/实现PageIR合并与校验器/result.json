@@ -1,0 +1,45 @@
+{
+  "task_id": "实现PageIR合并与校验器",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-15T19:42:53+08:00",
+  "summary": "已实现 PageIRMerger 与 HybridValidator：accepted image/table 候选会在保留 baseline blocks 的前提下追加到对应页面；新增 blocks 注入 source_profile、merge_action、candidate_id、assignment 信息；validator 对页级 schema/几何/baseline 保真进行校验，失败时整页回退 baseline，并支持写出 hybrid-pages.jsonl 与 validator-report.json。",
+  "modified_files": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/page_ir_merger.py",
+      "action": "created",
+      "description": "新增 PageIRMerger、PageMergeAudit；只合并 accepted image/table 候选，保留 baseline 顺序，补充 merge metadata，并支持写出 hybrid-pages.jsonl。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_validator.py",
+      "action": "created",
+      "description": "新增 HybridValidator、HybridValidationReport、PageValidationResult；校验 page/block schema、bbox 边界、追加 block 来源字段、baseline blocks 保真，并在页失败时 fallback 到 baseline。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_page_ir_merger.py",
+      "action": "created",
+      "description": "覆盖 accepted candidate 追加、baseline 不变、merge metadata 注入、hybrid-pages.jsonl 输出。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py",
+      "action": "created",
+      "description": "覆盖合法 merged page 通过、缺失 merge metadata 回退、bbox 越界回退、baseline 文本被修改时回退，以及 validator-report.json 输出。"
+    }
+  ],
+  "acceptance_mapping": {
+    "accepted_image_table_append": "PageIRMerger 仅接收 decision=accepted 且 kind in {image, table} 的候选，并按页追加到 baseline blocks 之后。",
+    "baseline_blocks_preserved": "validator 要求 hybrid_page.blocks 的 baseline 前缀与 baseline_page.blocks 完全一致；否则 baseline_blocks_modified 并整页回退。",
+    "source_metadata": "新增 block 包含 source_profile、merge_action、candidate_id、assigned_question_id、assigned_region_id、assignment_status、assignment_score、confidence。",
+    "page_level_fallback": "HybridValidator.validate_pages 对单页失败返回 baseline 页面，不影响其他页。",
+    "audit_outputs": "PageIRMerger.write_pages_jsonl 输出 hybrid-pages.jsonl；HybridValidator.write_validator_report 输出 validator-report.json。"
+  },
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_page_ir_merger.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_extractor.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_filter.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_question_region_detector.py",
+      "result": "passed (18 passed, 4 warnings)"
+    }
+  ],
+  "warnings": [
+    "pytest 输出 4 条 FastAPI on_event 弃用 warning，为仓库现有警告，与本次实现无关。"
+  ]
+}

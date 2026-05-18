@@ -1,0 +1,43 @@
+{
+  "task_id": "跑apple_baseline真实样例基线数据",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-14T14:52:55+08:00",
+  "status": "approve",
+  "summary": "审查通过。已按任务要求完成 5 个真实样例的 apple_baseline 跑批，产物目录完整，baseline_summary.json 汇总字段齐全，未发现阻塞问题。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/baseline_summary.json",
+      "finding": "题号序列已成功提取，但从样例结果看存在明显 OCR 噪声/误抽取（如 0、00、66、150、123456789 等），因此该字段更适合作为基线观测数据，不宜直接当成结构化质量结论。",
+      "recommendation": "后续做 GLM-OCR / MinerU 对比时，可把 question_sequence 同时作为“题号抽取质量”观察项，并增加人工 spot check。"
+    },
+    {
+      "severity": "info",
+      "file": "artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/*/metrics.json",
+      "finding": "本次真实耗时包含首次 PaddleOCR 模型下载/缓存成本，因此 total_seconds 更接近“冷启动基线”，不完全等同于稳定热启动耗时。",
+      "recommendation": "后续横评若要比较推理效率，建议增加二次热启动复跑数据。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/跑apple_baseline真实样例基线数据/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/跑apple_baseline真实样例基线数据/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/baseline_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/五下科学/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/数学 八年级下册pdf/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/数学试卷/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/英语 八年级下册/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/语文五年级/metrics.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "检查 artifacts/pdf2word/model-eval/20260514-144102/apple_baseline 下 5 个样例目录均存在 pages.jsonl、metrics.json、warnings.json、output.docx",
+      "result": "passed"
+    },
+    {
+      "command": "校验 baseline_summary.json 与各样例 metrics.json / output.docx 一致性（sample_count=5, failed_samples=0, block_count/page_count/total_seconds 对齐）",
+      "result": "passed"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

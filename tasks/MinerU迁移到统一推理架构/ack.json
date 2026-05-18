@@ -1,0 +1,7 @@
+{
+  "task_id": "MinerU迁移到统一推理架构",
+  "agent": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-14T22:26:30.392211+08:00",
+  "summary": "已读取任务指令，开始迁移 MinerU 到统一推理框架，并按 write_scope 先实现 normalizer、更新 inference_config.yaml、补测试。"
+}

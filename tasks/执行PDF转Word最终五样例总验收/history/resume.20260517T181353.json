@@ -1,0 +1,14 @@
+{
+  "task_id": "执行PDF转Word最终五样例总验收",
+  "resumed_at": "2026-05-17T18:13:53+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "qa-1",
+  "reason": "review 驳回：刷新公式证据、补齐答案/作答区处理、同步更新 blocker 分层",
+  "archived_files": [
+    "ack.20260517T181353.json",
+    "review.20260517T181353.json",
+    "review.20260517T181353.md",
+    "verify.20260517T181353.json",
+    "result.20260517T181353.json"
+  ]
+}

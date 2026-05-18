@@ -1,0 +1,115 @@
+{
+  "task_id": "制定数学试卷Paddle补样解阻方案",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-17T13:59:59+08:00",
+  "summary": "已完成对数学试卷 Paddle 补样 blocker 的复核与解阻方案设计。结论是：上游 blocked 结论在 2026-05-17 12:38 前成立，但截至 2026-05-17 13:32，final-archive/profiles/paddleocr_vl/数学试卷/ 已出现新的 metrics/pages/output/warnings 文件，问题已不再是“完全无产物”，而是“新产物缺少 provenance、manifest 未刷新、Phase 3 报告仍停留在 source_dir=null 的旧状态”。不建议按原 blocked 任务在当前机器上直接加时重开；应先确认 13:32 新产物来源，若能补证则改开一个更小的 provenance/manifest/Phase3 刷新任务，若无法补证再改用更快设备或外部算力重跑。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-unblock-plan/数学试卷Paddle补样解阻方案.md"
+  ],
+  "tests": [
+    "未运行自动化测试；本任务为只读设计与事实核验。",
+    "已核对 instruction.md、task.json、上游 blocked 任务 result.json、phase3-paddle-quality/report.json、phase3-paddle-quality/数学试卷/profile-audits.json、final-archive/profiles/paddleocr_vl/profile_manifest.json、final-archive/archive_manifest.json、final-archive/README.md、数学试卷样例目录时间戳、pages.jsonl/metrics.json 以及 backend/tests/test_hybrid_e2e.py 的消费逻辑。"
+  ],
+  "blocker_truth": {
+    "verdict": "原 blocker 部分过时，当前主 blocker 已转为 provenance 与报告链路未闭环",
+    "details": [
+      "截至 2026-05-17 11:29:01 +08:00，Phase 3 报告和 profile-audits 仍把 数学试卷 的 paddleocr_vl 记为 candidate_count=0，并提示缺少归档 source_dir。",
+      "截至 2026-05-17 13:32:11 +08:00，final-archive/profiles/paddleocr_vl/数学试卷/ 已新增 metrics.json、pages.jsonl、output.docx、warnings.json。",
+      "截至当前核验时间，source_manifest/profile_manifest/archive_manifest/README 仍沿用 2026-05-15 21:47:55 +08:00 的旧元数据，source_dir 仍为 null，model-eval 下也没有对应 paddleocr_vl/数学试卷 源目录。",
+      "根据 13:32 的 pages.jsonl 静态统计，Phase 3 触发页 1/8/9/11 上至少存在 51 个候选型 block；这说明刷新后的真实 candidate_count 几乎不可能继续为 0，但该值目前仍属于推断，尚未由重生成的 profile-audits 证明。"
+    ]
+  },
+  "options": [
+    {
+      "path": 1,
+      "name": "继续在当前机器上延长 Paddle 推理窗口",
+      "preconditions": [
+        "允许 45-90 分钟级 CPU 窗口",
+        "机器可稳定提供约 12.3GB 以上内存",
+        "接受长时间占用且可能再次无稳定落盘"
+      ],
+      "benefits": [
+        "无需切换环境",
+        "最接近原执行环境"
+      ],
+      "risks": [
+        "耗时高、页间波动大，当前证据不支持它是最低成本路径",
+        "即便再次跑通，仍需补 provenance 和报告刷新"
+      ],
+      "meets_original_acceptance": "conditional"
+    },
+    {
+      "path": 2,
+      "name": "换更快设备或外部已有算力重跑真实样例",
+      "preconditions": [
+        "具备更快 CPU/GPU 或现成算力",
+        "允许记录输入、环境、命令与输出哈希",
+        "可将结果沉淀为正式 source_dir"
+      ],
+      "benefits": [
+        "最有机会一次性获得可复现、可追溯的正式样例",
+        "更符合原 blocked 任务的完整验收"
+      ],
+      "risks": [
+        "存在环境漂移、权限与成本问题",
+        "仍需回写 manifest 和 Phase 3 报告"
+      ],
+      "meets_original_acceptance": "yes"
+    },
+    {
+      "path": 3,
+      "name": "接受降级补样",
+      "preconditions": [
+        "PM/owner 明确把目标改成 Phase 3 候选评估可用",
+        "允许 pages.jsonl/metrics.json/warnings.json 成为主交付"
+      ],
+      "benefits": [
+        "若 13:32 新产物可补证，可最快结束纯 artifact gap"
+      ],
+      "risks": [
+        "会降低归档语义强度",
+        "若 provenance 仍不清楚，后续报告仍有一致性风险"
+      ],
+      "meets_original_acceptance": "no_unless_acceptance_changes"
+    },
+    {
+      "path": 4,
+      "name": "接受保留缺口并固化 known gap",
+      "preconditions": [
+        "owner 决定不再追求该样例的 Paddle 证据闭环"
+      ],
+      "benefits": [
+        "零新增算力成本"
+      ],
+      "risks": [
+        "Paddle 在数学试卷 image-dense 场景上的证据仍不完整",
+        "当前目录新文件与旧报告矛盾仍需要被显式说明或清理"
+      ],
+      "meets_original_acceptance": "no"
+    }
+  ],
+  "recommended_action": {
+    "should_reopen_original_task_as_is": false,
+    "preferred_sequence": [
+      "先确认 2026-05-17 13:32 新产物的真实来源与可追溯性",
+      "若能补证，开一个更小的 provenance/manifest/Phase3 刷新任务，而不是重开长时间重跑任务",
+      "若无法补证且 owner 仍要求满足原验收，再以更快设备或外部算力为前提重开原任务"
+    ],
+    "recommended_path_if_provenance_missing": 2,
+    "recommended_path_if_provenance_available": "metadata_refresh_task",
+    "not_recommended_default_path": 1
+  },
+  "evidence_paths": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐数学试卷Paddle归档样例/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/数学试卷/profile-audits.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷/pages.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "接入GLM-OCR适配器到横评框架",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-14T14:57:13+08:00",
+  "summary": "dev-1 已读取 instruction.md，开始执行 GLM-OCR 适配器接入任务。"
+}

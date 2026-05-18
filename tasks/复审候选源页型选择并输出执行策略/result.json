@@ -1,0 +1,59 @@
+{
+  "task_id": "复审候选源页型选择并输出执行策略",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-17T21:09:19+08:00",
+  "summary": "已输出 P1 候选源页型选择策略：MinerU 继续作为默认增强候选源，PaddleOCR-VL 仅在 table_heavy、image_dense、MinerU 缺候选或人工 allowlist 的 selected pages/crops 中作为补充源；负样例与 document fallback 保持 baseline/fallback；公式候选保持 audit-only / merge-disabled。",
+  "deliverables": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/P1候选源页型选择策略.md",
+      "type": "markdown_strategy_report",
+      "description": "面向开发与 QA 的 P1 候选源页型选择策略，覆盖 sample/page_type/candidate_kind/source_profile、selected pages/crops 触发、fallback 口径与执行任务建议。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json",
+      "type": "structured_strategy_summary",
+      "description": "结构化策略摘要与统计，包含汇总 inventory/accepted、样本页型矩阵、source selection rules 与 execution tasks。"
+    }
+  ],
+  "key_decisions": [
+    "正式发布口径不变：apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled。",
+    "mineru_full 是 image/table 的默认增强源；paddleocr_vl 不是默认全量源，只作为 selected pages/crops 补充 probe。",
+    "table-heavy 页可触发 Paddle 补跑，重点看 final DOCX table XML、题号归属与结构清晰度，不以候选数量直接采纳。",
+    "image-dense 数学试卷仍默认优先 MinerU；Paddle 大量候选但 accepted=0 时应解释为噪声被过滤成功，而不是升级 Paddle 优先级。",
+    "语文五年级这类 question-region 不可稳定判定样本保留 baseline/document fallback，不强行增强。",
+    "formula_candidate 全部 audit-only，不并回正文。"
+  ],
+  "evidence_sources": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/hybrid_experimental增强管线设计.md",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/PDF习题转Word当前可用性差距分析.md",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/PDF转Word本地模型横评最终报告.md"
+  ],
+  "validation": [
+    {
+      "command": "python3 -m json.tool /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json",
+      "status": "passed",
+      "notes": "JSON 可解析。"
+    },
+    {
+      "command": "sed -n '1,220p' /Users/linsuchang/Desktop/work/chiralium/design/pdf2word/P1候选源页型选择策略.md",
+      "status": "passed",
+      "notes": "Markdown 策略报告已落盘并检查。"
+    }
+  ],
+  "tests": {
+    "required": false,
+    "run": false,
+    "notes": "本任务为 design 复审任务，未修改代码，按 task.json 不要求测试。"
+  },
+  "remaining_gaps": [
+    "后续开发需实现 PageTypeClassifier / SourceSelectionPolicy，并将该策略固化到 hybrid 运行入口。",
+    "后续运行需补 per-source merge audit，输出按 sample/page_type/candidate_kind/source_profile 的 accepted/rejected/fallback 明细。",
+    "PaddleOCR-VL selected pages/crops runner 仍需在开发任务中实现并接入 cache、耗时与 accepted 统计。"
+  ],
+  "review_next": "进入 review-1 审查；通过后作为 P1 候选源执行依据。"
+}

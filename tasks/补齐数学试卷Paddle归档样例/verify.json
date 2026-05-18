@@ -1,0 +1,48 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T18:06:59+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。本轮交付完成的是数学试卷 Paddle 样例的 provenance 契约收口，而不是 original-run provenance 补齐：`source_dir` 已恢复为原始 model-eval 来源语义并保持 `null`，`archive_dir` 单独表示当前 final-archive 内可被 phase3/e2e 稳定消费的归档目录，`provenance_status=source_missing_archive_consumable` 诚实暴露剩余缺口；`test_hybrid_e2e.py` 回归通过，说明新契约下消费链路仍成立。",
+  "acceptance_criteria": [
+    {
+      "criterion": "source_manifest / profile_manifest / README / archive_manifest 不再语义冲突",
+      "result": "pass",
+      "evidence": "`README.md` 已将 `source_dir` 定义为原始 model-eval 来源、`archive_dir` 定义为当前归档消费目录；`archive_manifest.json`、`profiles/paddleocr_vl/profile_manifest.json`、`profiles/paddleocr_vl/数学试卷/source_manifest.json` 对 `数学试卷` 均写为 `source_dir=null`、`archive_dir=/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/paddleocr_vl/数学试卷`、`provenance_status=source_missing_archive_consumable`。"
+    },
+    {
+      "criterion": "`test_hybrid_e2e.py` 回归通过，且 `数学试卷` 仍可被 phase3/e2e 稳定消费",
+      "result": "pass",
+      "evidence": "本地复跑 `PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q`，结果为 `6 passed, 4 warnings`；测试已改为优先消费 `archive_dir`、回退 `source_dir`，并对 `数学试卷` 断言 `source_dir is None` 且 `archive_dir` 存在。"
+    },
+    {
+      "criterion": "若 original run-level provenance 仍缺失，必须被明确、诚实、可复核地暴露",
+      "result": "pass",
+      "evidence": "本地核对 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl/数学试卷` 目录不存在；因此当前以 `source_dir=null` 暴露缺口、并以 `archive_dir` 维持消费能力，与任务最新验收口径一致，没有把 final-archive 伪装成原始 run 来源。"
+    },
+    {
+      "criterion": "不修改 Paddle 触发策略与默认链路边界",
+      "result": "pass",
+      "evidence": "result/review 产物与本次静态复核均显示，本轮修改集中在 provenance 契约、manifest/README、phase3 报告口径和 e2e harness 消费逻辑，未涉及 Paddle 触发策略、candidate_filter 或默认 Hybrid 策略边界。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务指令、result.json、review.json、review.md",
+    "静态核对 final-archive README / archive_manifest / profile_manifest / 数学试卷 source_manifest 的字段语义一致性",
+    "静态核对 phase3-paddle-quality/report.json 中 `数学试卷` 样例仍保持可消费统计：selected_pages=[1,8,9,11]，candidate_counts={mineru_full:27,paddleocr_vl:51}，fallback_pages=0",
+    "静态核对 backend/tests/test_hybrid_e2e.py 对 `archive_dir` 优先消费和 `数学试卷` 专项断言",
+    "本地核对原始 model-eval 路径 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl/数学试卷` 仍不存在",
+    "本地复跑 pytest：6 passed, 4 warnings"
+  ],
+  "test_commands": [
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q -> 6 passed, 4 warnings"
+  ],
+  "non_blocking_observations": [
+    "本任务通过的是“契约收口且可稳定消费”，不是“original-run provenance 已补齐”。",
+    "后续若要把 `数学试卷` 升级为完整 provenance 闭环，仍需补出真实原始 run 证据，再把 `source_dir` 从 `null` 切回可复核来源。",
+    "当前 `phase3-paddle-quality/report.json` 与 e2e harness 已证明 `archive_dir` 契约足以支撑消费，但该消费能力不应被表述为原始来源已恢复。"
+  ],
+  "regressions_found": []
+}

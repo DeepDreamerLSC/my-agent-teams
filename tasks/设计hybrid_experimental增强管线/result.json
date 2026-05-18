@@ -1,0 +1,10 @@
+{
+  "task_id": "设计hybrid_experimental增强管线",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-15T18:15:00+08:00",
+  "summary": "已完成 hybrid_experimental 增强管线设计（983 行），涵盖 6 个设计要求。核心结论：baseline 文本为主干，首批只合并 image/table，公式候选默认关闭，Qwen3-VL 只做 review，页面级回退。write_scope 已由 PM 补齐，设计文档已落盘。",
+  "modified_files": ["/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/hybrid_experimental增强管线设计.md"],
+  "tests": ["设计文档 983 行，覆盖 6 个设计要求 + 子任务列表"],
+  "risks": ["方案待 PM 确认后才能拆子任务实现"]
+}

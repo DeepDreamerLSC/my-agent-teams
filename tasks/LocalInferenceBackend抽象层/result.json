@@ -1,0 +1,20 @@
+{
+  "task_id": "LocalInferenceBackend抽象层",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "summary": "已按 review 驳回意见收束修复两个 healthcheck 假阳性问题：CustomHTTPBackend 仅在 2xx 时判成功，404/405 才回退到 base_url POST 空请求，401 等其余 4xx/5xx 返回 not ok；OpenAICompatibleVisionBackend 仅在 GET /models 返回 2xx 时判成功。已补对应 404 fallback 与 401/404 not ok 测试。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/custom_http_backend.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/openai_vision_backend.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_backends.py"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/custom_http_backend.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/openai_vision_backend.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_backends.py -> passed",
+    "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_inference_backends.py -q -> 11 passed, 4 warnings"
+  ],
+  "risks": [
+    "本次仅按 review 要求修复两个 healthcheck 假阳性问题，未改其他 backend 行为或 registry 集成。"
+  ],
+  "completed_at": "2026-05-14T17:05:10+08:00"
+}

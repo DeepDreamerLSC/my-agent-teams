@@ -1,0 +1,35 @@
+{
+  "task_id": "实现HybridExperimentalPipeline骨架",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-15T20:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 通过。HybridExperimentalPipeline 骨架已实现 Phase 1 baseline pass-through，关闭增强时输出与 apple_baseline 等价（仅 profile 重标为 hybrid_experimental）。7 个扩展点已预留 stub。3 个 pipeline 测试通过。",
+  "test_commands": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && .venv/bin/python -m pytest tests/test_hybrid_pipeline.py tests/test_hybrid_backend_resolve.py tests/test_pdf_to_word_inference_config.py -q",
+      "result": "passed (15 passed, 4 warnings)"
+    },
+    {
+      "command": "py_compile hybrid_pipeline.py test_hybrid_pipeline.py",
+      "result": "passed"
+    }
+  ],
+  "scenarios_verified": [
+    "create_adapter('hybrid_experimental') 返回 HybridExperimentalAdapter 实例",
+    "不开增强时 pipeline 输出与 baseline 等价：pages/metrics/warnings/error 完全保留，仅 profile 重标为 hybrid_experimental",
+    "baseline_adapter.parse() 被正确调用并传入 pdf_path/pages/dpi 参数",
+    "HybridPipelineRun 记录完整执行上下文：baseline、question_regions、enhancement_pages、candidates、filtered_candidates、merged_pages、validated_pages",
+    "7 个扩展点已预留 stub：_detect_question_regions, _select_enhancement_pages, _extract_candidates, _filter_and_attach, _review_ambiguous, _merge, _validate_or_fallback",
+    "enable_enhancement=False 时所有增强步骤返回空列表，直接走 pass-through",
+    "_validate_or_fallback 在 merged_pages 为空时回退到 baseline_pages",
+    "write_scope 合规：仅新增 hybrid_pipeline.py 和 test_hybrid_pipeline.py，未修改现有 adapter"
+  ],
+  "regressions_found": [],
+  "risks": [
+    "HybridExperimentalPipeline 尚未接入现有 HybridExperimentalAdapter 运行入口，create_adapter('hybrid_experimental').parse() 不会走到新 pipeline，需要后续接线任务",
+    "骨架内部 dataclass（QuestionRegion/EnhancementCandidate/MergeDecision）字段命名与现有模块（question_region_detector.py/candidate_extractor.py）存在差异（page vs page_index, kind vs block_kind, text vs content），接线时需统一或增加转换层",
+    "本任务只做骨架，候选过滤、归属匹配、PageIR 合并等实际增强逻辑仍需后续任务完成"
+  ]
+}

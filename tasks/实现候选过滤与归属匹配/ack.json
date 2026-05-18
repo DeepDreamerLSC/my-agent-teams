@@ -1,0 +1,9 @@
+{
+  "task_id": "实现候选过滤与归属匹配",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-15T19:13:07+08:00",
+  "acked_at": "2026-05-15T19:13:07+08:00",
+  "summary": "已读取 instruction.md 与 task.json，开始在 write_scope 内实现 CandidateFilter、补测试，并验证过滤统计与 question-bound assignment。"
+}

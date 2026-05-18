@@ -1,0 +1,43 @@
+{
+  "task_id": "Adapter重构与GLM-OCR迁移",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-14T01:00:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。7 项验收标准全部满足：DocumentOCRAdapter 为纯通用类（render→backend.infer_page→normalizer.to_page_ir）、GLM-OCR 通过 document_ocr + glm_ocr_blocks normalizer 工作正常、adapter_utils.py 抽取 9 个公共工具函数、ParserOutputNormalizer Protocol 定义完整（name + to_page_ir）、旧环境变量已移除改走 YAML/InferenceConfig、30 条测试全部通过、apple_baseline 未修改且 base_adapter 向后兼容。review-1 经 round 1 修复 registry 占位接线后 approve。",
+  "test_commands": [
+    "cd backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_inference_config.py tests/test_pdf_to_word_document_ocr_adapter.py tests/test_glm_ocr_adapter.py -q  (30 passed, 4 warnings, dev-1 + review-1 均复跑确认)"
+  ],
+  "scenarios_verified": [
+    "DocumentOCRAdapter + fake backend + fake normalizer → 完整 parse 流程产出 AdapterResult",
+    "GLMOCRNormalizer: mock 响应 → 正确 PageIR/PDFSourceBlock，含 bbox 归一化与 block kind 别名",
+    "GLMOCRNormalizer: OpenAI chat completion 格式响应 → JSON 解析 → PageIR",
+    "GLMOCRNormalizer: JSON 解析失败 → warnings 回退纯文本",
+    "adapter_utils: block kind 别名归一（formula→formula_candidate, picture→image, paragraph→text）",
+    "adapter_utils: bbox 坐标提取支持 x0/y0/x1/y1、left/top/right/bottom、x/y/width/height 三种格式",
+    "registry/create_adapter('glm_ocr') 返回 GLMOCRAdapter（DocumentOCRAdapter 子类）",
+    "registry/create_adapter('paddleocr_vl') 返回真实 DocumentOCRAdapter",
+    "包级 DocumentOCRAdapter 导出指向真实实现（非 Phase A 占位）",
+    "base_adapter __init__ 向后兼容：不传 profile/backend/normalizer 时行为不变"
+  ],
+  "files_reviewed": [
+    "backend/app/services/pdf_to_word/parser_adapters/base_adapter.py",
+    "backend/app/services/pdf_to_word/parser_adapters/adapter_utils.py",
+    "backend/app/services/pdf_to_word/parser_adapters/document_ocr_adapter.py",
+    "backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py",
+    "backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "backend/app/services/pdf_to_word/parser_adapters/normalizers/__init__.py",
+    "backend/app/services/pdf_to_word/parser_adapters/normalizers/base.py",
+    "backend/app/services/pdf_to_word/parser_adapters/normalizers/glm_ocr.py",
+    "backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+    "backend/tests/test_pdf_to_word_document_ocr_adapter.py",
+    "backend/tests/test_pdf_to_word_inference_config.py",
+    "backend/tests/test_glm_ocr_adapter.py"
+  ],
+  "regressions_found": [],
+  "risks": [
+    "GLM normalizer 在 confidence 缺失时静默补 1.0，未按设计文档要求记录 warning（非阻塞，review 已标记）",
+    "paddleocr_vl 通过 registry 返回真实 DocumentOCRAdapter 但 normalizer=None 占位，专属 normalizer 待后续任务接入（非阻塞）"
+  ]
+}

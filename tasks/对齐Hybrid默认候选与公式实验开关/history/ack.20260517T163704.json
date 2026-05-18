@@ -1,0 +1,7 @@
+{
+  "task_id": "对齐Hybrid默认候选与公式实验开关",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T16:05:00+08:00",
+  "summary": "已读取任务说明与写入范围，开始把 hybrid_experimental 默认候选收口到 mineru_full，并把 formula_experiment 开关接入 hybrid pipeline 配置透传。"
+}

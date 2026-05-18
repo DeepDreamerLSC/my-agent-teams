@@ -1,0 +1,67 @@
+{
+  "task_id": "建立PDF转Word更大样本回归入口与样例清单",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已在 model_eval_runner 中新增 --regression-summary / --regression-manifest / --hybrid-e2e-root 入口，支持从样例 manifest 出发汇总 existing authoritative archive + hybrid-e2e facts，输出统一的 regression manifest / regression summary（golden + meta + per-sample）；并生成首版 current-five-sample-baseline 样例清单与摘要产物。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline/regression_summary.md"
+  ],
+  "tests": [
+    "PASS: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_model_eval_runner.py -o cache_dir=/private/tmp/chiralium-pytest-regression-cache --basetemp=/private/tmp/chiralium-pytest-regression-tmp -q` -> `16 passed, 4 warnings in 0.13s`",
+    "PASS: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m app.services.pdf_to_word.model_eval_runner --regression-summary --archive-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive --hybrid-e2e-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation --output-dir /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression --run-label current-five-sample-baseline` -> `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline`"
+  ],
+  "entrypoint": {
+    "cli_flag": "--regression-summary",
+    "optional_manifest_flag": "--regression-manifest",
+    "hybrid_input_flag": "--hybrid-e2e-root",
+    "summary_builder": "build_regression_summary",
+    "artifact_writer": "write_regression_artifacts"
+  },
+  "manifest_structure": {
+    "manifest_version": "pdf2word_regression_manifest/v1",
+    "coverage_tier": "current_five_sample_baseline",
+    "sample_fields": [
+      "sample_name",
+      "source_pdf",
+      "subject",
+      "grade_or_stage",
+      "page_type",
+      "current_baseline_source",
+      "authoritative",
+      "artifact_paths",
+      "notes",
+      "tags"
+    ],
+    "seed_sample_count": 5,
+    "seed_samples": [
+      "五下科学",
+      "数学八年级",
+      "数学试卷",
+      "英语八年级",
+      "语文五年级"
+    ]
+  },
+  "aggregate_summary": {
+    "artifact_run_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-regression/current-five-sample-baseline",
+    "sample_count": 5,
+    "current_baseline_ready_sample_count": 5,
+    "docx_openable_sample_count": 5,
+    "document_fallback_sample_count": 1,
+    "accepted_candidate_total": 35,
+    "missing_source_pdf_count": 5
+  },
+  "known_limitations": [
+    "当前 regression summary 仍主要锚定现有五样例 authoritative/archive/e2e 基线，不代表教辅长尾已覆盖。",
+    "source_pdf 目前仍为空缺主流字段，后续扩样需要补录原始 PDF 路径、采样来源与人工抽检记录。",
+    "该入口当前汇总的是已有产物事实，不会自动发现或下载新的真实 PDF 样本。"
+  ],
+  "next_steps": [
+    "QA/owner 后续可直接在同一 manifest schema 下追加更多真实样例，再复用 --regression-summary 生成统一摘要。",
+    "如需把人工抽检结果纳入常态化，可在 manifest 或 summary 上叠加 reviewer/owner 的人工结论字段。"
+  ],
+  "completed_at": "2026-05-18T09:43:40+08:00"
+}

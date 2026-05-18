@@ -854,7 +854,7 @@ prepare_task_workspace_payload() {
         echo '{}'
         return 0
     }
-    "$ENSURE_TASK_WORKSPACE_PY" "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || echo '{}'
+    python3 "$ENSURE_TASK_WORKSPACE_PY" "$task_dir" --config "$CONFIG_PATH" 2>/dev/null || echo '{}'
 }
 
 workspace_hint_from_payload() {

@@ -1,0 +1,7 @@
+{
+  "task_id": "建立公式专项实验开关与评测基线",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T10:34:30+08:00",
+  "summary": "已接手公式专项实验开关与评测基线任务。将以最小改动把 formula_candidate 的默认关闭策略显式化，补齐对应测试，并重生成 phase4-formula-baseline 产物，保持默认 audit-only 行为不进入正文 merge。"
+}

@@ -1,0 +1,45 @@
+{
+  "task_id": "补齐公式Crop评测资产与OMML基线",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T16:47:19+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前交付已经把 `phase4-formula-crop-eval` 从“只有 expected path 契约”推进到“真实 crop PNG + OMML 基线可复跑输入”：runner 会优先复用 model-eval 的 page render 真正裁出 crop 图，并对 baseline 中可用的 latex/text 生成 OMML；刷新后的报告显示 17 个 baseline 缺失的 `crop_image_path` 和 17 个缺失的 `omml` 已全部补齐，remaining missing asset 为 0，同时继续保留 formula 默认 audit-only / merge-disabled 语义。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "low",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/formula_crop_eval_report.json",
+      "finding": "baseline 聚合仍保留 `unmaterialized_candidate_count=1`，说明 18 个公式候选里仍有 1 个没有进入当前 `examples` 清单。",
+      "recommendation": "这是被诚实暴露而不是伪造补齐，不影响本轮通过；后续若要追求 18/18 的逐 crop 资产覆盖，应先回到 baseline examples 生成侧补齐该候选，而不是在本轮评测资产层伪造一条输入。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐公式Crop评测资产与OMML基线/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐公式Crop评测资产与OMML基线/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐公式Crop评测资产与OMML基线/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/formula_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_formula_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/formula_crop_eval_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/formula_crop_inputs.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/formula_crop_missing_assets.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-160013/expected-crops/"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q",
+      "result": "passed (11 passed, 5 warnings)"
+    },
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_formula_pipeline.py -q",
+      "result": "passed (4 passed, 5 warnings)"
+    },
+    {
+      "command": "静态核对刷新后的 phase4 产物",
+      "result": "`formula_crop_eval_report.json` / `.md`、`formula_crop_inputs.jsonl`、`formula_crop_missing_assets.json` 与 `expected-crops/` 彼此自洽：聚合统计显示 `materialized_crop_count=17`、`materialized_omml_count=17`、`remaining_missing_asset_count=0`、`omml_conversion_failure_count=0`、`crop_materialization_failure_count=0`，`expected-crops/` 下也实际存在 17 个 PNG。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

@@ -1,0 +1,24 @@
+{
+  "task_id": "对齐Hybrid默认候选与公式实验开关",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T17:10:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 通过。测试全过（9 passed），默认候选已收口为 mineru_single（paddleocr_vl 已移除），formula experiment 开关已透传到 CandidateExtractor/CandidateFilter，formula 仍保持 audit-only，conversion_service.py 越界改动已清理。",
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -q",
+      "result": "9 passed, 4 warnings"
+    }
+  ],
+  "scenarios_verified": [
+    "DEFAULT_HYBRID_CANDIDATE_PROFILES = ('mineru_full',) — paddleocr_vl 不再作为默认常驻候选",
+    "inference_config.yaml: enable_formula_experiment=false, candidate_profiles 已显式声明",
+    "hybrid_pipeline.py: enable_formula_experiment 从 config 透传到 CandidateExtractor (line 165) 和 CandidateFilter (line 168)",
+    "conversion_service.py: hybrid_formula_experiment_enabled / hybrid_formula_experiment_mode 字段已移除（grep 无结果）",
+    "formula 仍 audit-only: DEFAULT_ENABLE_FORMULA_EXPERIMENT=False, candidate_filter 仍拒绝 formula_candidate 并写入 formula_merge_enabled=false",
+    "test_hybrid_backend_resolve.py + test_hybrid_pipeline.py: 9 tests 全过，无回归"
+  ],
+  "regressions_found": []
+}

@@ -1,0 +1,53 @@
+{
+  "task_id": "实现Hybrid题号顺序与阅读顺序校验器",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T01:20:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。pytest 15 passed（4 warnings 为既有 FastAPI 弃用告警）；question_region_detector.py 已产出 order_verdict/order_reasons/question_sequence_* 等审计字段；hybrid_validator.py 已将 wrong_order/question_sequence_regression/question_anchor_conflict/reading_order_invalid 纳入 fallback gate；order_resolver.py 已新增 analyze_question_number_sequence 诊断并去掉 silent renumber；review-1 审查通过无阻塞项。",
+  "acceptance_criteria": [
+    {
+      "criterion": "正样例页的题号/阅读顺序异常能被识别并输出明确 verdict / reason",
+      "result": "pass",
+      "evidence": "question_region_detector.py 含 order_verdict (L88)、order_reasons (L89)、question_sequence_numbers 等字段；hybrid_validator.py L209-211 在 order_verdict=='wrong_order' 时 extend reasons 并 fallback。测试 test_detector_marks_sequence_regression_as_wrong_order 和 test_hybrid_validator_falls_back_when_question_region_result_reports_wrong_order 覆盖此路径。"
+    },
+    {
+      "criterion": "语文五年级继续保持不可判定页跳过增强，不发生错误并回",
+      "result": "pass",
+      "evidence": "review-1 抽检确认语文五年级 13/13 页保持 question_region_not_detectable + order_verdict=not_applicable；测试 test_detector_marks_chinese_grade_five_sample_unresolvable_with_zero_anchors 专门覆盖。"
+    },
+    {
+      "criterion": "pytest 三组测试全部通过",
+      "result": "pass",
+      "evidence": "复跑 test_question_region_detector.py + test_hybrid_validator.py + test_pdf_to_word_exercise_pipeline_integration.py → 15 passed, 4 warnings (0.50s)。"
+    },
+    {
+      "criterion": "baseline 路径无回归",
+      "result": "pass",
+      "evidence": "test_conversion_service_does_not_silently_renumber_question_sequence 确认 baseline 不再 silent renumber；test_conversion_service_integrates_exercise_pipeline_with_formula_and_options 和 test_conversion_service_renders_realistic_sample_like_fixtures_with_real_keywords 验证 baseline 渲染路径无退化。"
+    },
+    {
+      "criterion": "输出结果可被后续 review worker / QA 抽检直接引用",
+      "result": "pass",
+      "evidence": "order_verdict/order_reasons/question_sequence_issue_count/question_anchor_conflict_count 字段已在 detector 输出中标准化；hybrid_validator 会将顺序异常写入 page_results.reasons，可直接被下游消费。"
+    }
+  ],
+  "scenarios_verified": [
+    "question_region_detector.py: order_verdict (L88), order_reasons (L89), question_sequence_numbers 字段存在",
+    "hybrid_validator.py: wrong_order (L209), question_sequence_regression (L211), question_anchor_conflict (L211), reading_order_invalid (L211) 作为 fallback gate",
+    "order_resolver.py: analyze_question_number_sequence (L71) 可调用，不再 silent renumber",
+    "15 个测试用例覆盖：detector 7 个、validator 5 个、integration 3 个",
+    "review-1 抽检真实样例：数学试卷 12/12 ok，英语八年级 8 ok + 2 wrong_order + 2 not_detectable，语文五年级 13/13 not_applicable"
+  ],
+  "test_commands": [
+    "pytest tests/test_question_region_detector.py tests/test_hybrid_validator.py tests/test_pdf_to_word_exercise_pipeline_integration.py -q → 15 passed, 4 warnings",
+    "grep -c 'order_verdict' question_region_detector.py → 15 处引用",
+    "grep -c 'wrong_order\\|question_sequence_regression' hybrid_validator.py → 6 处引用"
+  ],
+  "non_blocking_observations": [
+    "validator 在调用方未传 question_region_results 时会内部重跑 detector（hybrid_validator.py L79-82 兜底），后续放开 hybrid_pipeline.py write_scope 后建议改为显式透传（review-1 已标注）。",
+    "当前顺序规则以 baseline 页锚点布局为输入，适合页级 gate 和审计，不等于对所有教材版式都做了最优语义理解。"
+  ],
+  "regressions_found": []
+}

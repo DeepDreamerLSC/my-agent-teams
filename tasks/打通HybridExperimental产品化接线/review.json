@@ -1,0 +1,47 @@
+{
+  "task_id": "打通HybridExperimental产品化接线",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T12:30:17+08:00",
+  "status": "approve",
+  "summary": "审查通过。`parser_backend=hybrid_experimental` 现在已经从 API / service / parser_client 真正接入 `HybridExperimentalPipeline`，不再回落到 apple/mock 占位实现；同时 `auto/apple` 默认解析逻辑保持不变，Hybrid 路径关键指标也已进入 service meta，可被 API 下游和 ExerciseIR 主链路消费。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "low",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+      "finding": "本轮验收证据主要来自入口接线审阅与定向 pytest，还没有新增真实模型在线 smoke 或新的端到端 PDF 样本产物。",
+      "recommendation": "后续若要把 `hybrid_experimental` 进一步作为稳定产品能力推广，建议补一条最小真实样本 smoke 或固化一份产品化验证产物，用于持续观测线上配置与真实输入契约是否继续成立。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通HybridExperimental产品化接线/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通HybridExperimental产品化接线/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通HybridExperimental产品化接线/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+      "result": "passed (18 passed, 5 warnings)"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py -k 'hybrid_experimental or create_adapter_hybrid_experimental_returns_dedicated_adapter_and_identity'",
+      "result": "passed (3 passed, 5 deselected, 5 warnings)"
+    },
+    {
+      "command": "静态审阅 parser/service/adapter diff 与测试断言",
+      "result": "`parser_client.parse_with_backend()` 已在显式 `hybrid_experimental` 时进入 `_run_hybrid_pipeline()`；service 侧通过 `_resolve_parser_backend()` 保持 `auto -> apple/mock` 旧逻辑不变，并把 `hybrid_pipeline` 统计抬升到结果 meta；adapter 侧 `HybridExperimentalAdapter.parse()` 也不再复用 apple baseline 占位行为。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

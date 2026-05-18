@@ -1,0 +1,7 @@
+{
+  "task_id": "推进公式裁块失败归因与对比专项",
+  "status": "working",
+  "summary": "已读取 instruction.md 与 task.json，开始在 model_eval_runner 现有公式 crop 评测链路内补失败归因分桶、对比结论与 p1-formula-crop 产物，保持公式 merge-disabled。",
+  "agent": "dev-2",
+  "acked_at": "2026-05-17T21:09:07+08:00"
+}

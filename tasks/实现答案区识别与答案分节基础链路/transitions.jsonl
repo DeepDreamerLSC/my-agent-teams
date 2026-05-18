@@ -1,0 +1,6 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T21:01:21+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T21:22:44+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T21:29:35+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-17T21:31:28+08:00", "reason": "resume-task: review驳回成立：当前仅有 synthetic 验证，需补真实五样例级 answer_area/answer_section 验证产物，并更新 result.json 中被打破 0/5 的真实样例结论与未命中原因", "actor": "pm-chief"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T21:42:36+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T21:48:26+08:00", "reason": "task-watcher auto close after qa verify pass"}

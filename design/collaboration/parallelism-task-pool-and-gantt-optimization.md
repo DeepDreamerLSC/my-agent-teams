@@ -1,7 +1,7 @@
 # 并行度、任务池与甘特图真实性优化方案
 
 > 创建日期：2026-05-16  
-> 状态：增量实施中（Phase 1/2/3 已落地，Phase 4 待实现）  
+> 状态：增量实施中（Phase 1/2/3 主路径已落地，Phase 3.5 控制面 hardening 与 Phase 4 待实现）  
 > 适用范围：`my-agent-teams` 的 PM 拆分、任务池认领、watcher 续推、dashboard/Gantt 数据口径  
 > 相关文档：`control-plane-and-task-pool.md`、`task-pool-claiming.md`、`task-board/optimization-plan.md`
 >
@@ -141,6 +141,29 @@ PM 创建任务
 
 甘特图如果不拆这些阶段，就会对 PM 调度产生误导。
 
+### 1.5 控制面故障会直接吞掉并行收益
+
+近期实践表明，吞吐损失不只来自“池里没活”，也来自控制面自身断链：
+
+```text
+任务已具备可执行性
+  -> watcher/PM 成功把任务推到 dispatched
+  -> 消息投递失败 / 角色会话 502 / tmux 无响应 / ack 丢失
+  -> 任务停在 dispatched 或 ready_for_merge
+  -> auto-close / gate / 状态归约继续失真
+  -> PM 只能人工排查“到底是连接问题、状态脏了，还是任务本身失败”
+```
+
+近期暴露过的典型故障包括：
+
+- QA 已通过，但 auto-close 因 gate 状态不自洽而失败；
+- agent 会话挂起后，任务长期停在 `dispatched` 且没有 `ack.json`；
+- `resume/转派` 后 `assigned_agent` 已变更，但 `claimed_by / claim_scope / reserved_by` 仍残留旧值；
+- `ack.json / review.json / verify.json` 非法，watcher 停止推进；
+- 角色连接或消息投递失败被误看成执行阻塞，导致 Gantt / dashboard 继续失真。
+
+因此，本文后续优化目标应从“提高并行度”扩展为“提高并行调度 + 控制面稳定性”。
+
 ## 2. 优化目标
 
 ### 2.1 并行度目标
@@ -164,6 +187,8 @@ PM 创建任务
 
 - PM 能区分“值得提前入池的后置任务”和“根因未明、只能先 pending 的候选任务”；
 - 系统优先减少“错误并行”而不是单纯增加 `working` 数；
+- 控制面能区分 delivery/session 故障、执行阻塞与业务失败，不把连接层问题误算成执行效率问题；
+- 三次重试失败且无实际进展的任务，能够被系统化地回收或转派，而不是长期卡死在 `dispatched`；
 - 复杂需求的第一步是确认是否应先产出 diagnosis/design 任务，而不是默认直接拆修复任务。
 
 ### 2.2 非目标
@@ -174,6 +199,7 @@ PM 创建任务
 - 让 Chat Hub 成为任务状态事实源；
 - 让 dashboard 直接写 `task.json` 绕过脚本；
 - 在任务池不稳定前引入复杂分布式队列。
+- 把消息投递失败、角色连接失败直接记成业务 blocked/failed。
 - 在根因未确认前，为了“提高并行度”提前铺满修复 DAG。
 
 ## 3. 新默认流程
@@ -250,7 +276,7 @@ PM 创建任务
 
 ### 3.3 Pool Gate
 
-任务入池前必须满足：
+目标态下，任务入池前应满足：
 
 - `instruction.md` 无占位；
 - development / integration / deployment 等写任务的 `write_scope` 非空且足够窄；
@@ -263,7 +289,9 @@ PM 创建任务
 - `test_required` 明确；
 - 非 prod/deploy/integration 自由池任务。
 
-Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未完成”，而不是进入执行队列。
+说明：以上是目标态 Pool Gate。当前系统已落地的主要是 `instruction.md` 结构/占位校验、特殊任务排除与基础 requeue 保护；development 空 `write_scope`、owner 决策未完成、根因未确认等强 gate 仍需继续 hardening。
+
+目标态下，Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未完成”，而不是进入执行队列。
 
 还应补充以下 gate：
 
@@ -272,6 +300,51 @@ Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未
 - 不存在尚未解决的 owner 决策项；
 - 输入样例 / 契约来源明确，避免 agent 在不同事实集上各自推进；
 - 只读任务的 read_only / write_scope 例外必须在 instruction 与 task.json 中显式体现，避免被通用写任务 gate 误伤。
+
+### 3.4 任务类型与质量闸门模板
+
+最近的收口实践说明：不能为了模板统一，把所有任务都机械设置为 `review_required=true + test_required=true + quality_gate_mode=parallel`。不同 `task_type` 应有更保守的默认 gate 模板：
+
+| task_type | 默认 gate 模板 | 说明 |
+|---|---|---|
+| development | review + QA | 默认开发任务，允许按风险级别选择 serial / parallel，但必须显式声明 |
+| verification | review-only 或 QA-only | 需在建任务时明确；验证类任务不应默认并行 review + QA |
+| design | review-only | 以审查结论为主，不默认要求测试 |
+| integration | review + QA + PM acceptance | 需要更严格收口，必要时加 arch gate |
+| deployment / prod | owner / arch gate 优先 | 不进入自由池默认路径 |
+
+规则上应明确：
+
+- verification 任务若本质是“产出 `verify.json` 或 `review.json` 的收口动作”，必须在创建时选定唯一主 gate；
+- complex/高风险任务可以保留并行 gate，但要在任务定义里显式说明为什么需要并行；
+- `ready_for_merge`、`pm_acceptance_pending`、`done` 的 gate 状态必须与该模板自洽，避免出现 QA 已过但 auto-close 无法收敛的异常链路。
+
+### 3.5 异常接管、回收与转派流程
+
+任务池、reserved 与 auto-push 稳定后，异常接管必须成为一等流程，而不是 PM 的临时手工动作。建议把以下链路写成标准流程：
+
+```text
+dispatched / reserved
+  -> 超时无 ack 或角色会话异常
+  -> 先做消息重试 + 会话健康探测
+  -> 连续 3 次失败且无实际进展
+  -> 在 claim_scope 内尝试转派给空闲候选
+  -> 若无安全候选，则回收到 pooled
+```
+
+需要补充两条明确语义：
+
+- `resume` 只表示原执行者继续；
+- `reassign` 表示换人接手，建议单独提供 `reassign-task.sh`，不要长期把“转派”混进 `resume-task.sh` 的语义里。
+
+回收或转派时必须同时处理：
+
+- 归档旧的 `claim.json / ack.json / result.json / review.json / verify.json`（按当前轮需要归档的工件处理）；
+- 重置当前轮 sentinels、merge gate 与 auto-close retry 计数；
+- 一次性改写 `assigned_agent / claimed_by / claimed_at / claim_scope / reserved_by / reserved_at / claim_reason / reserved_reason` 等一致性字段；
+- 写入 `transitions.jsonl` 与 PM Inbox，明确这是“连接/会话恢复动作”，而不是业务失败。
+
+这样才能把“agent 挂了、消息没送到、任务没人 ack”这类问题从人工排障变成标准化控制面流程。
 
 ## 4. 调度策略优化
 
@@ -372,6 +445,44 @@ Pool Gate 不通过时，任务保持 `pending`，看板应显示为“定义未
 
 这能把“任务池优先”从文档规则进一步收紧为系统默认行为。
 
+### 4.5 连接失败重试与会话健康检查
+
+角色连接与消息投递层应补成三层机制，而不是只有“发一遍消息然后等 ack”：
+
+| 层级 | 目标 | 建议机制 |
+|---|---|---|
+| 投递重试 | 处理瞬时网络/网关抖动 | 快速重试 3 次，建议退避 `5s -> 15s -> 60s` |
+| 会话健康探测 | 区分“会话存在但卡死”和“正常执行中” | 检查 session 是否存在、pane 是否有新输出、是否出现 Working 信号、是否已有 ack/result 新工件 |
+| 故障分流 | 不把连接问题误记成业务失败 | 将异常分类为 `delivery_failed / session_unhealthy / execution_blocked / business_failed` |
+
+实现要求：
+
+- 每次投递都记录 `attempt_count / last_attempt_at / last_delivery_error`；
+- 重试成功后不升级状态，只更新审计记录；
+- 会话存在且已有实际进展迹象时，不再继续盲目重发；
+- 控制面告警必须显式写明：这是投递层故障、会话故障，还是执行故障。
+
+### 4.6 三次失败后的回收与转派
+
+建议把“连续 3 次失败”作为连接恢复的硬阈值。若满足以下条件：
+
+- 当前任务仍在 `dispatched / reserved`；
+- 连续 3 次投递或健康探测失败；
+- 当前轮没有 `ack.json`，也没有 result/review/verify 等实际进展工件；
+
+则系统可以进入恢复动作：
+
+1. **优先转派**：若 `claim_scope` 中存在空闲且无 write_scope 冲突的候选 agent，则转派；
+2. **否则回收**：若没有安全候选，则把任务回收到 `pooled`，等待下一次认领；
+3. **禁止无限重试**：达到 3 次后不再无上限重发，避免任务与告警风暴；
+4. **必须留痕**：写 PM Inbox、Chat/Feishu 事件和 `transitions.jsonl`，说明这是“连接恢复后的回收/转派”。
+
+建议默认原则：
+
+- `dispatched` 但从未 ack 的任务，优先回收或转派；
+- 已 ack 进入 `working` 的任务，除非确认会话异常且无真实进展，否则不自动跨人接管；
+- 连接失败不等于任务失败，不能直接把任务打成 `blocked/failed`。
+
 ## 5. PM 行为优化
 
 ### 5.1 PM 的核心指标从派发数改为池健康
@@ -427,9 +538,9 @@ PM 拆完后批量入池，而不是边做边想下一条。
 
 ### 6.1 新增阶段口径
 
-以下阶段口径是当前 dashboard/Gantt 的统一口径；实现已覆盖 pooled / reserved / working / review / qa / pm_acceptance 的主干分段，后续继续补齐边界解释与历史回放的 inferred 标记。
+以下阶段口径需要区分“已实现主干分段”和“目标态待补齐阶段”。当前实现已覆盖 pooled / reserved / working / review / qa / pm_acceptance 六段主干分段；definition / dependency_wait / blocked 目前更适合作为目标态口径或 milestone/解释层，而不是已完全落地的独立 phase segment。
 
-Gantt 不应只展示粗略 lifecycle，而应拆成以下阶段：
+目标态下，Gantt 不应只展示粗略 lifecycle，而应拆成以下阶段：
 
 | 阶段 | 开始 | 结束 | 含义 |
 |---|---|---|---|
@@ -449,6 +560,8 @@ Gantt 不应只展示粗略 lifecycle，而应拆成以下阶段：
 只有 ack_at -> result_at 才能算 agent working 时间。
 pooled/dispatched/review/QA/PM acceptance 都是等待或队列时间。
 ```
+
+还应补充一条控制面原则：`delivery_failed / session_unhealthy / auto_requeue / reassigned` 属于调度与连接层状态，不等于业务执行失败。Gantt 与统计层应把它们单独归为控制面事件，而不是直接折叠进 working 或 blocked。
 
 还应明确区分：
 
@@ -472,9 +585,17 @@ UI 与 query 层不应把 inferred 段伪装成 exact；历史数据也应允许
 - `review_queue_count`；
 - `qa_queue_count`;
 - `artifact_invalid_count`;
-- `oldest_pool_wait_minutes`;
-- `oldest_review_wait_minutes`;
-- `oldest_qa_wait_minutes`。
+- `dispatch_delivery_retry_count`：消息投递重试次数；
+- `dispatched_no_ack_timeout_count`：已派发但无 ack 的超时任务数；
+- `session_unhealthy_count`：角色会话不健康数；
+- `auto_requeue_count`：连接恢复后被自动回收到池中的任务数；
+- `reassign_count`：因连接/会话问题触发的转派次数；
+- `auto_close_failure_count`：QA/review 已满足但自动收口失败次数；
+- `state_invariant_violation_count`：任务状态一致性异常数；
+- `mean_ack_after_redelivery_seconds`：重发后到 ack 的平均耗时；
+- `oldest_pool_wait_minutes`：最老的任务池等待时长；
+- `oldest_review_wait_minutes`：最老的审查等待时长；
+- `oldest_qa_wait_minutes`：最老的 QA 等待时长。
 
 ### 6.3 单任务详情新增解释
 
@@ -484,7 +605,8 @@ UI 与 query 层不应把 inferred 段伪装成 exact；历史数据也应允许
 - 当前依赖状态；
 - write_scope 冲突对象；
 - 当前 agent 是否空闲；
-- 当前卡在 Pool Gate、dependency、reserved、working、review、QA、PM acceptance 哪一段。
+- 当前卡在 Pool Gate、dependency、reserved、working、review、QA、PM acceptance 哪一段；
+- 当前是否处于 `delivery_failed / session_unhealthy / auto_requeue / reassigned` 等控制面恢复状态。
 
 这比单纯显示 `status=pooled/working` 更能指导 PM。
 
@@ -508,7 +630,7 @@ UI 与 query 层不应把 inferred 段伪装成 exact；历史数据也应允许
 - 甘特图 tooltip 与详情页要显示“该阶段时间来自 artifact / transition / mtime 的哪一种来源”；
 - 历史数据允许不完美，但不能把推断精度伪装成事实精度。
 
-## 7. Artifact 合法性优化
+## 7. Artifact 与状态一致性优化
 
 当前 `artifact_invalid` 会直接阻断自动流转。建议：
 
@@ -545,9 +667,26 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - 不重复刷屏；
 - 修复后自动清除告警。
 
+### 7.3 状态一致性不变量检查
+
+除了 artifact JSON 合法性，还应把任务状态一致性当成正式 gate。建议增加 invariant checker，至少校验以下规则：
+
+- 对从任务池认领、reserved 或转派中的 pull 任务，当前轮 `assigned_agent / claimed_by / reserved_by` 应保持一致，或显式标记为 direct-dispatch 例外；
+- `claim_scope` 应覆盖当前执行者，避免出现“assigned_agent 已换人，但 scope 里还是旧人”的脏状态；
+- `status=working` 必须有当前轮 `ack.json`；
+- `ready_for_merge` 的 gate 状态必须与 `review_required / test_required / quality_gate_mode` 自洽；
+- `status=done` 时 `merge_gate_state` 必须已经收敛到 `closed`；
+- auto-close、resume、reassign、requeue 之后，sentinel 与 retry 计数必须按当前轮重置。
+
+若 invariant 不满足：
+
+- 不应静默继续流转；
+- 应写 PM Inbox 与 `state_invariant_violation` 指标；
+- 允许触发自动修复或要求 PM/arch 仲裁，但必须保留审计痕迹。
+
 ## 8. 实施计划
 
-### Phase 1：规则落地与可观测性（已完成 / 收口中）
+### Phase 1：规则落地与可观测性（主路径已落地 / 异常链路待 hardening）
 
 目标：让系统先看见瓶颈。
 
@@ -582,7 +721,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - artifact_invalid 下降，并能通过标准脚本生成 artifact；
 - 复杂需求至少能一次性入池多个子任务。
 
-### Phase 2：自动续推与 reserved（已完成 / 收口中）
+### Phase 2：自动续推与 reserved（主路径已落地 / 回收转派待稳定）
 
 目标：减少 agent 空闲时间。
 
@@ -590,10 +729,15 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 
 - watcher 周期性扫描 idle agent；
 - idle agent 有可认领任务时自动 `claim-task.sh`；
-- auto-claim 前强制校验：依赖满足、write_scope 无冲突、agent 空闲、无 owner/gate 例外；
+- auto-claim 前已落地的基础校验包括：依赖满足、claim_scope 命中、write_scope 无冲突、agent working/reserved 容量限制；
 - 引入 `reserved_limit`（可灰度启用）；
 - done/ready_for_merge 后优先推 reserved 或下一条 pool 任务；
 - dispatched 超时未 ack 时可回退 pooled 或 PM Inbox 提醒。
+
+待 hardening：
+
+- owner_approval_required / owner 决策未完成等更高层 gate 例外，还没有纳入统一 auto-claim 护栏；
+- 连接失败后的回收/转派虽然已有基础动作，但三次失败阈值、会话健康探测和 invariant 修复仍在补齐。
 
 当前验收口径：
 
@@ -601,7 +745,7 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - 空闲 agent + pool_ready > 0 时，1 个 scan interval 内出现 reserved/dispatched；
 - 同一 agent 仍最多 1 条 working。
 
-### Phase 3：分层并行 review/QA gate（已实现）
+### Phase 3：分层并行 review/QA gate（主路径已实现 / 收口异常链路待 hardening）
 
 目标：减少后置流水线串行等待。
 
@@ -628,6 +772,26 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - Gantt 能分别显示 review_wait 与 qa_wait；
 - complex 双审不互相阻塞。
 
+### Phase 3.5：控制面 hardening（必须实现）
+
+目标：让并行调度在异常链路下也能自恢复，而不是只在主路径上可用。
+
+改动：
+
+- 明确区分 `resume` 与 `reassign` 语义，补齐 `reassign-task.sh`；
+- `send-to-agent / watcher / queue router` 增加投递重试、会话健康探测与三次失败阈值；
+- 连续 3 次失败且无 ack/无实际进展时，按规则执行“优先转派，否则回收 pooled”；
+- 增加 task type × quality gate 模板，避免 verification 类任务被错误套用并行 gate；
+- 增加 invariant checker，收敛 auto-close、gate 状态与转派后的元数据脏状态；
+- dashboard/PM Inbox 单独展示控制面异常，而不是折叠进业务 blocked。
+
+验收：
+
+- `dispatched` 无 ack 的任务能在 3 次失败阈值内自动收敛到 ack / 转派 / 回收三种结果之一；
+- 转派后不再遗留旧的 `claimed_by / claim_scope / reserved_by` 脏字段；
+- auto-close 失败会被显式标记和收敛，不再出现长时间“QA 已过但任务状态悬空”；
+- Gantt / dashboard 能区分连接故障、会话故障与业务阻塞。
+
 ### Phase 4：独立 worktree 与集成队列（必须实现）
 
 目标：提升真正代码并行能力。
@@ -653,17 +817,20 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 
 1. “根因未明先 diagnosis / design” + `pool-first` 规则硬化；
 2. artifact 生成器与 artifact_invalid 收敛；
-3. 补齐文档中的现状/目标态分层标注；
-4. pool health / idle agent / Gantt 真实阶段；
-5. idle agent 自动续推；
-6. `dependency_policy` 白名单化（默认 `done_only`）；
-7. `1 working + 1 reserved`（后续标准能力）；
-8. 分层 review/QA 并行 gate；
-9. per-task worktree。
+3. 控制面 hardening：投递重试、会话健康探测、三次失败后的回收/转派、状态不变量检查；
+4. 补齐文档中的现状/目标态分层标注；
+5. pool health / idle agent / Gantt 真实阶段；
+6. idle agent 自动续推；
+7. `dependency_policy` 白名单化（默认 `done_only`）；
+8. `1 working + 1 reserved`（后续标准能力）；
+9. 分层 review/QA 并行 gate 与 task type 模板化；
+10. per-task worktree。
 
 ## 10. 成功指标
 
-建议每日报告这些指标：
+以下是目标指标集，用于定义成熟态的调度/控制面观测口径；它们不代表已全部进入当前日报或常态化报表。当前已较稳定可聚合的主要是 dashboard/query 层的 pool wait、claim latency、review wait、qa wait、rework_rate 等指标，其余需随后续 hardening 与报表接线逐步补齐。
+
+建议成熟态每日报告这些指标：
 
 | 指标 | 目标 |
 |---|---:|
@@ -671,8 +838,15 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 | dev pool total count | 常态 >= 2 * dev agent count |
 | idle agent with ready pool | < 1 scan interval |
 | pooled timeout count | 下降 |
-| dispatched no ack timeout | 下降 |
+| dispatched_no_ack_timeout_count | 下降 |
 | artifact_invalid count | 下降 |
+| dispatch_delivery_retry_count | 可解释且不持续升高 |
+| auto_close_failure_count | 下降 |
+| session_unhealthy_count | 下降 |
+| auto_requeue_count | 可解释且稳定收敛 |
+| reassign_after_connection_failure_count | 可解释且稳定收敛 |
+| state_invariant_violation_count | 下降 |
+| mean_ack_after_redelivery_seconds | 下降 |
 | ack_to_result median | 更接近真实工作耗时 |
 | pool_wait / review_wait / qa_wait | 能被单独解释 |
 | PM manual dispatch execution ratio | 持续下降 |
@@ -716,6 +890,15 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 - reserved 超时可自动回退 pooled；
 - agent 同时最多 1 条 reserved。
 
+### 风险 5：连接重试与自动转派过于激进，导致任务抖动
+
+缓解：
+
+- 把“连续 3 次失败”作为硬阈值，不做无限重试；
+- 只有在无 `ack.json`、无 result/review/verify 进展时才允许自动回收或转派；
+- 优先在 `claim_scope` 内找空闲且无 write_scope 冲突的候选；
+- 所有回收/转派动作必须写历史归档、`transitions.jsonl` 与 PM Inbox，便于复盘。
+
 ## 12. 最小落地切口
 
 如果回看本轮已经落地的最小闭环，可以概括为 7 件事：
@@ -727,5 +910,12 @@ scripts/write-verify.sh <task-id> --status pass --summary ...
 5. dashboard/CLI 显示 pool ready、dependency waiting、idle agent、pool starvation；
 6. Gantt 拆出 pooled/reserved/working/review/QA/PM acceptance，并标记 exact / inferred；
 7. watcher 对 idle agent 自动 claim 下一条 pooled ready 任务（附安全护栏）。
+
+如果进入下一轮最小 hardening，建议优先追加 4 件事：
+
+1. `send-to-agent` / watcher 的连接失败重试与会话健康探测；
+2. 连续 3 次失败后的“优先转派，否则回收 pooled”闭环；
+3. `reassign-task.sh` 与 `resume-task.sh` 的语义拆分；
+4. artifact + task state invariant checker，避免 auto-close 与转派后遗留脏状态。
 
 这 7 件事完成后，系统会从“PM 人肉串行调度”转向“PM 维护任务库存，watcher 自动喂给空闲 agent”的模式；同时通过 diagnosis 前置、artifact 口径统一和现状/目标态分层标注，避免只是把错误更快地并行放大。

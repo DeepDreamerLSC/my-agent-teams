@@ -1,0 +1,60 @@
+{
+  "task_id": "改造Qwen3-VL为严格review_worker",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-15T18:19:10+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。上一轮缺失的两项交付证据已经补齐：result.json 现已包含真实 5 样例在线验证和 old/new prompt 对比数据，strict page_review 路径也能在代码与本地 smoke test 中走通；但任务写明的首轮验收门槛 `json_valid_rate >= 80%` 仍未达到，当前新 prompt 实测仅 `2/5 = 40%`，且与旧 prompt 持平，因此还不能按本任务验收口径收口。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "task acceptance / online validation",
+      "finding": "本轮已经补做真实 Qwen3-VL 服务上的 5 样例验证，但结果明确显示未达到 instruction.md 的首轮验收目标：`target_json_valid_rate = 0.8`，而 `new_prompt_json_valid_rate = 0.4`、`new_prompt_valid_json_count = 2`。old/new 对比也表明 aggregate valid JSON 数没有提升（2 -> 2），warning 总数反而增加（2 -> 3）。在任务验收标准仍写明 `json_valid_rate ≥ 80%` 的前提下，这一轮不能按 done/ready_for_merge 收口。",
+      "recommendation": "请继续迭代 prompt 约束或加入输出裁剪/重试等补救策略，优先压缩 `detail` 冗长输出并减少 JSON 截断；补修后重新提交 5 样例实测，至少给出 valid_count/total_count/json_valid_rate 和失败类型分布。如果 PM 希望接受“方向验证通过但门槛未达成”的阶段性结果，应改由 PM 明确下调验收口径，而不是沿用当前任务标准直接放行。",
+      "evidence": "instruction.md:46-60；result.json:11-25、26-47、164-169；/private/tmp/qwen3_review_worker_ab.json。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py",
+      "finding": "strict review worker 的代码路径本身是成立的。REVIEW_JSON_SCHEMA 已定义 `page_review.page_number/issues/confidence_summary` 的严格 json_schema；本地 smoke test 也确认 strict `page_review.issues` 能被 normalizer 解析成 `kind=note` 且 `meta.review_issue` 完整的 block。",
+      "recommendation": "补修时可以沿用当前 schema 和 normalizer 方向，把精力集中在提升模型真实输出稳定性，而不是回退到旧的 parser/legacy blocks 结构。",
+      "evidence": "vlm_review_json.py:13-77、86-146、183-206、344-427；本地 smoke test: strict page_review payload -> block_count=1, kind=note, warnings=[]。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_vlm_review_adapter.py",
+      "finding": "当前 9 条 pytest 已通过，但主要仍在覆盖 legacy `blocks/review_suggestions` 路径与通用 adapter 装配；对 strict `page_review` 主路径的专项断言还不够集中，例如正常 `issues` 输入、非法 `issue_type/suggested_action`、以及 `confidence_summary.layout_quality` 异常值等行为没有单独测试。",
+      "recommendation": "后续补修时建议新增 2-3 条 strict review worker 专项测试，把验收关注点从“兼容旧路径”转到“新主路径稳健性”。",
+      "evidence": "test_pdf_to_word_vlm_review_adapter.py:88-173、206-315；现有 `rg` 检索结果仍主要命中 `blocks` / `review_suggestions`。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/改造Qwen3-VL为严格review_worker/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/改造Qwen3-VL为严格review_worker/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/改造Qwen3-VL为严格review_worker/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/prompts/qwen3_vl_page_review.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_vlm_review_adapter.py",
+    "/private/tmp/qwen3_review_worker_ab.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m py_compile app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py",
+      "result": "passed"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_vlm_review_adapter.py -q",
+      "result": "passed (9 passed, 4 warnings)"
+    },
+    {
+      "command": "strict page_review smoke test: 构造 page_review/issues/confidence_summary JSON，经 VLMReviewJSONNormalizer.to_page_ir 解析",
+      "result": "passed: block_count=1, kind=note, review_issue populated, warnings=[]"
+    },
+    {
+      "command": "人工复核 result.json.validation、old_vs_new_comparison 与 /private/tmp/qwen3_review_worker_ab.json",
+      "result": "真实 5 样例在线验证已补齐；new prompt 的 json_valid_rate=0.4（2/5），strict_page_review_rate=0.4（2/5），未达到 instruction 要求的 0.8。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

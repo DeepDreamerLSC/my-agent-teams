@@ -1,0 +1,18 @@
+{
+  "task_id": "接线hybrid_pipeline生产增强链路",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已按 review 驳回意见补修 hybrid_pipeline.py：为 candidate_profiles 增加 profile alias 规范化，_extract_candidates 在调用 create_adapter 前会先把 mineru_full 映射到 mineru，避免 inference_config 中缺少 mineru_full 时触发 KeyError，同时保留候选侧 source_profile 为原始配置值。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py"
+  ],
+  "tests": [
+    "PASS: /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<'PY' ... alias verification passed: ['mineru', 'paddleocr_vl'] ... PY",
+    "PASS: TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py -q",
+    "PASS: TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q"
+  ],
+  "risks": [
+    "当前 alias 表仅覆盖本轮 review 指定的 candidate profile；若后续再引入新的历史别名，需要在同一映射表中继续补充。"
+  ],
+  "completed_at": "2026-05-15T23:20:26+08:00"
+}

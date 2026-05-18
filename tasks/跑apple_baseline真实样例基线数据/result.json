@@ -1,0 +1,73 @@
+{
+  "task_id": "跑apple_baseline真实样例基线数据",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-14T14:48:17+08:00",
+  "summary": "已使用 model_eval_runner 对 5 个真实 PDF 样例跑完 apple_baseline 基线评估，生成每个样例的 pages/metrics/warnings/output.docx 及 baseline_summary.json 汇总。",
+  "artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102",
+  "baseline_summary_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/baseline_summary.json",
+  "samples_completed": 5,
+  "failed_samples": [],
+  "sample_metrics": [
+    {
+      "sample_name": "五下科学",
+      "page_count": 6,
+      "block_count": 342,
+      "image_candidate_count": 0,
+      "formula_candidate_count": 0,
+      "total_seconds": 53.026,
+      "output_docx_exists": true
+    },
+    {
+      "sample_name": "数学 八年级下册pdf",
+      "page_count": 8,
+      "block_count": 471,
+      "image_candidate_count": 0,
+      "formula_candidate_count": 0,
+      "total_seconds": 41.4121,
+      "output_docx_exists": true
+    },
+    {
+      "sample_name": "数学试卷",
+      "page_count": 12,
+      "block_count": 1531,
+      "image_candidate_count": 0,
+      "formula_candidate_count": 0,
+      "total_seconds": 88.179,
+      "output_docx_exists": true
+    },
+    {
+      "sample_name": "英语 八年级下册",
+      "page_count": 12,
+      "block_count": 1266,
+      "image_candidate_count": 0,
+      "formula_candidate_count": 0,
+      "total_seconds": 89.1256,
+      "output_docx_exists": true
+    },
+    {
+      "sample_name": "语文五年级",
+      "page_count": 13,
+      "block_count": 403,
+      "image_candidate_count": 0,
+      "formula_candidate_count": 0,
+      "total_seconds": 80.9678,
+      "output_docx_exists": true
+    }
+  ],
+  "test_commands": [
+    {
+      "command": "backend/.venv/bin/python 内联脚本：调用 app.services.pdf_to_word.model_eval_runner.run_evaluation(samples_dir=example/扫描件 , profiles=[apple_baseline])，随后生成 apple_baseline/baseline_summary.json",
+      "result": "passed (5 samples, 0 failed)"
+    }
+  ],
+  "notes": [
+    "样例目录路径包含末尾空格，已按绝对路径精确处理。",
+    "本次运行首次触发 PaddleOCR 模型下载并缓存，因此真实耗时包含模型下载/加载与 OCR 推理成本。",
+    "按任务要求，若单样例失败应继续后续样例；本次 5 个样例全部完成，failed_samples 为空。"
+  ],
+  "warnings": [
+    "运行日志出现 PaddleOCR/ccache 提示，属于环境信息，不影响本次基线产物落盘。"
+  ]
+}

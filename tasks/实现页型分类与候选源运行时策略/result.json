@@ -1,0 +1,44 @@
+{
+  "task_id": "实现页型分类与候选源运行时策略",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已在 hybrid runtime 落地 PageTypeClassifier 与 SourceSelectionPolicy。一次 run 内现在可输出 document/page 级 page_type、default_source_profile、supplemental_source_profile、selected_pages_or_crops，并由同一套 source_selection 事实驱动 paddleocr_vl 的定向补充执行。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py"
+  ],
+  "page_type_mapping": {
+    "五下科学": "science_experiment_table_and_image_mixed",
+    "数学八年级": "math_exercise_with_sparse_image_and_table",
+    "数学 八年级下册pdf": "math_exercise_with_sparse_image_and_table",
+    "数学试卷": "math_exam_image_dense",
+    "英语八年级": "language_exercise_sparse_media_with_fallback_pages",
+    "英语 八年级下册": "language_exercise_sparse_media_with_fallback_pages",
+    "语文五年级": "negative_non_exercise_or_question_region_unresolvable"
+  },
+  "source_selection_rules": [
+    "默认增强源仍是 mineru_full。",
+    "paddleocr_vl 已接入 hybrid_experimental.candidate_profiles，但只在 source_selection + trigger 命中的 selected pages / crops 上执行，不进入全量默认增强。",
+    "负样例或 enhancement_page_scope 为空时输出 baseline_only 等价事实，并跳过 paddleocr_vl。",
+    "formula_candidate 仍保持 audit_only / merge-disabled，不并回正文。"
+  ],
+  "implementation_notes": [
+    "hybrid_pipeline.py 新增 SourceSelectionPlan / PageSourceSelection，并把 source_selection 挂到 last_run。",
+    "profile_audits 现在会同时带出 document_page_type、default_source_profile、supplemental_source_profile、page_types_by_page、selected_pages_or_crops。",
+    "parser_client.py 会把 last_run.source_selection 透传到 parse_with_backend 响应的 meta.hybrid_pipeline.source_selection。",
+    "inference_config.yaml 新增显式 source_selection 配置，并把 paddleocr_vl 纳入 hybrid_experimental candidate_profiles，确保 runtime 能声明并执行 supplemental source。"
+  ],
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py -o cache_dir=/private/tmp/chiralium-pytest-source-selection --basetemp=/private/tmp/chiralium-pytest-source-selection-tmp"
+  ],
+  "risks": [
+    "当前 source_selection 主要先收口 runtime 事实层与 paddle 定向页选择；per-source accepted/rejected/fallback 明细审计仍留给下游任务“补齐按源审计与定向Paddle执行闭环”。",
+    "service.extract_result_meta 现阶段只继续展开既有 hybrid_* 顶层字段；更细的 source_selection 事实以 parser_response.meta.hybrid_pipeline.source_selection 为主。",
+    "页型映射里对真实五样例做了显式 sample override；更多未覆盖样例当前会回落到通用 language/general 或 negative 判定。"
+  ],
+  "completed_at": "2026-05-17T23:14:31+08:00"
+}

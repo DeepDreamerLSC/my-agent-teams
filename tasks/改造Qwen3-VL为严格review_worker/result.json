@@ -1,0 +1,171 @@
+{
+  "task_id": "改造Qwen3-VL为严格review_worker",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-15T18:13:53+08:00",
+  "summary": "已补充真实 Qwen3-VL 服务（127.0.0.1:18111）上的 5 样例实测与 old/new prompt 对比数据。结论：strict review worker 方向成立，但当前首轮目标 json_valid_rate ≥ 80% 未达到；新 prompt 实测为 2/5=40%，与旧 prompt 持平。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/prompts/qwen3_vl_page_review.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/normalizers/vlm_review_json.py"
+  ],
+  "validation": {
+    "service_url": "http://127.0.0.1:18111/v1",
+    "model_path": "/Users/linsuchang/Desktop/work/chiralium/.runtime/models/qwen3-vl-8b-3bit",
+    "sample_count": 5,
+    "metric_definition": "valid_json_count = JSON 可解析且 normalizer 未产生“JSON 解析失败”警告；strict_page_review_count = 顶层含 page_review 且包含 page_number/issues/confidence_summary。",
+    "target_json_valid_rate": 0.8,
+    "new_prompt_json_valid_rate": 0.4,
+    "new_prompt_valid_json_count": 2,
+    "new_prompt_strict_page_review_rate": 0.4,
+    "new_prompt_strict_page_review_count": 2,
+    "target_met": false,
+    "pytest_target": "tests/test_pdf_to_word_vlm_review_adapter.py",
+    "pytest_passed": true,
+    "raw_report_path": "/private/tmp/qwen3_review_worker_ab.json"
+  },
+  "old_vs_new_comparison": {
+    "old_prompt": {
+      "valid_json_count": 2,
+      "json_valid_rate": 0.4,
+      "strict_page_review_count": 2,
+      "strict_page_review_rate": 0.4,
+      "warning_count_total": 2
+    },
+    "new_prompt": {
+      "valid_json_count": 2,
+      "json_valid_rate": 0.4,
+      "strict_page_review_count": 2,
+      "strict_page_review_rate": 0.4,
+      "warning_count_total": 3
+    },
+    "delta": {
+      "valid_json_count_delta": 0,
+      "warning_count_total_delta": 1,
+      "strict_page_review_count_delta": 0
+    },
+    "interpretation": "本轮 5 样例首页实测中，新 prompt 没有提升 aggregate valid JSON 数（2→2），warning 总数反而从 2 增至 3；但新 prompt 的成功样例输出已稳定落入 strict page_review 结构。"
+  },
+  "sample_breakdown": {
+    "old_prompt": [
+      {
+        "sample": "五下科学.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 2,\n    \"issues\": [\n      {\n        \"issue_type\": \"image_unassigned\",\n        \"source_block_ids\": [  ],\n        \"question_id\":  \"1. 选择题 1. “土壤会影响种子的发芽情况吗？”这属于实验探究中的(  )。\"\n      ,\n      \"suggested_action\": \"reassign\"\n      ,\n      \"confidence\": 0.9\n      ,\n      \"detail\": \"图中“土壤会影响种子的发芽情况吗？”是“提出问题”，而非“建立假设”\"\n      }\n    ]\n  ,\n    \"confidence_summary\":  {\n      \"overall\": 0.9\n      ,\n      \"question_sequence_ok\":  true\n      ,\n      \"layout_quality\":  \"poor\"\n",
+        "parsed_ok": true,
+        "strict_page_review_ok": true,
+        "valid_after_normalizer": true,
+        "warning_count": 0,
+        "warnings": [],
+        "block_count": 1
+      },
+      {
+        "sample": "数学 八年级下册pdf.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 4,\n    \"issues\": [\n      {\n        \"issue_type\": \"image_unassigned\",\n        \"source_block_ids\": [  ],\n        \"question_id\":  \"\"\n      ,\n        \"suggested_action\": \"reassign\"\n      ,\n        \"confidence\": 0.9\n      ,\n        \"detail\": \"未识别的图片/公式/材料块，可选的复核建议是：将未识别的区域作为公式候选块，或作为材料块，或作为图片块，以便后续处理。\"\n      }\n    ]\n  ,\n    \"confidence_summary\":  {\n      \"overall\": 0.9\n    ,\n      \"question_sequence_ok\":  true\n    ,\n      \"layout_quality\":  \"poor\"\n    }\n  }\n}",
+        "parsed_ok": true,
+        "strict_page_review_ok": true,
+        "valid_after_normalizer": true,
+        "warning_count": 0,
+        "warnings": [],
+        "block_count": 1
+      },
+      {
+        "sample": "数学试卷.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"image_unassigned\",\n        \"source_block_ids\": [  ]\n      ,\n      \"question_id\":  \n    \n    \"suggestions\"\n  ,\n  \"suggested_action\": \"reassign\"\n  ,\n  \"confidence\": 0.9\n  ,\n  \"detail\": \"suggested_action 与 detail 未提供，因未提供可操作的上下文，故不提供\"\n  }\n  ]\n  ,\n  \"confidence_summary\":  \n    \n  {\n    \"overall\": 0.9\n  ,\n  \"question_sequence_ok\":",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 0,
+        "warnings": [],
+        "block_count": 1
+      },
+      {
+        "sample": "英语 八年级下册.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 12,\n    \"issues\": [\n      {\n        \"issue_type\": \"material_mismatch\",\n        \"source_block_ids\": [  ],\n        \"question_id\":  \"1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. 1. ",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 1,
+        "warnings": [
+          "VLM review JSON 解析失败，已返回空结果。"
+        ],
+        "block_count": 0
+      },
+      {
+        "sample": "语文五年级.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 2,\n    \"issues\": [\n      {\n        \"issue_type\": \"material_mismatch\",\n        \"source_block_ids\": [  ],\n        \"question_id\":  \"1.1-1.2-1.3-1.4-1.5-1.6-1.7-1.8-1.9-1.10-1.11-1.12-1.13-1.14-1.15-1.16-1.17-1.18-1.19-1.20-1.21-1.22-1.23-1.24-1.25-1.26-1.27-1.28-1.29-1.30-1.31-1.32-1.33-1.34-1.35-1.36-1.37-1.38-1.39-1.40-1.41-1.42-1.43-1.44-1.45-1.46-1.47-1.48-1.49-1.50-1.51-1.52-1.53-1.54-1.55-1.56-1.57-1.58-1.59-1.60-1.61-1.62-1.63-1.64-1.65-1.66-1.67-1.68-",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 1,
+        "warnings": [
+          "VLM review JSON 解析失败，已返回空结果。"
+        ],
+        "block_count": 0
+      }
+    ],
+    "new_prompt": [
+      {
+        "sample": "五下科学.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"wrong_order\",\n        \"source_block_ids\": [],\n        \"question_id\": null,\n        \"suggested_action\": \"reorder\",\n        \"confidence\": 0.0,\n        \"detail\": \"第 2 题的“填空题”部分，其“研究的问题”和“预测”等填空项，其内容是“研究的问题：……？”，“预测：……”，“相同的条件：……”，“不同的条件：……”，“实验的方法：……”，“实验的步骤：……”，“实验的结论：……”，“实验的反思：……”，“实验的改进：……”，“实验的拓展：……”，“实验的延伸：……”，“实验的总结：……”，“实验的评价：……”，“实验的建议：……”，“实验的推广：……”，“实验的创新：……”，“实验的优化：……”，“实验的拓展：……”，“实验的延伸：……”，“实验的总结：",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 1,
+        "warnings": [
+          "VLM review JSON 解析失败，已返回空结果。"
+        ],
+        "block_count": 0
+      },
+      {
+        "sample": "数学 八年级下册pdf.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"wrong_order\",\n        \"source_block_ids\": [],\n        \"question_id\": null,\n        \"suggested_action\": \"reorder\",\n        \"confidence\": 0.95,\n        \"detail\": \"页面中存在多个题号，但题号与题干不对应，例如题号 1 与题干 8 互换，题号 2 与题干 9 互换，题号 3 与题干 6 互换，题号 4 与题干 7 互换，题号 5 与题干 8 互换，题号 6 与题干 7 互换，题号 7 与题干 8 互换，题号 8 与题干 9 互换，题号 9 与题干 10 互换，题号 10 与题干 11 互换，题号 11 与题干 12 互换，题号 12 与题干 13 互换，题号 13 与题干 14 互换，题号 14 与题干 15 互换，题号 15 与题干 16 互换，题号 1",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 1,
+        "warnings": [
+          "VLM review JSON 解析失败，已返回空结果。"
+        ],
+        "block_count": 0
+      },
+      {
+        "sample": "数学试卷.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"wrong_order\",\n        \"source_block_ids\": [],\n        \"question_id\": null,\n        \"suggested_action\": \"reorder\",\n        \"confidence\": 0.95,\n        \"detail\": \"页面中多个题目（如第5题、第6题、第7题、第8题、第9题、第10题、第11题、第12题、第13题、第14题、第15题）的顺序是混乱的，需要按题号重新排序。\"\n      }\n    ],\n    \"confidence_summary\": {\n      \"overall\": 0.95,\n      \"question_sequence_ok\": false,\n      \"layout_quality\": \"good\"\n    }\n  }\n}",
+        "parsed_ok": true,
+        "strict_page_review_ok": true,
+        "valid_after_normalizer": true,
+        "warning_count": 0,
+        "warnings": [],
+        "block_count": 1
+      },
+      {
+        "sample": "英语 八年级下册.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"wrong_order\",\n        \"source_block_ids\": [],\n        \"question_id\": null,\n        \"suggested_action\": \"reorder\",\n        \"confidence\": 0.9,\n        \"detail\": \"页面中存在多个题号，但题号与题干不对应，例如题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与题干不匹配，题号1-9与题干不匹配，题号10-12与",
+        "parsed_ok": false,
+        "strict_page_review_ok": false,
+        "valid_after_normalizer": false,
+        "warning_count": 1,
+        "warnings": [
+          "VLM review JSON 解析失败，已返回空结果。"
+        ],
+        "block_count": 0
+      },
+      {
+        "sample": "语文五年级.pdf",
+        "raw_text_preview": "{\n  \"page_review\": {\n    \"page_number\": 1,\n    \"issues\": [\n      {\n        \"issue_type\": \"wrong_order\",\n        \"source_block_ids\": [],\n        \"question_id\": null,\n        \"suggested_action\": \"reorder\",\n        \"confidence\": 0.0,\n        \"detail\": \"第11段的“⑪”与第12段的“⑫”题号顺序错乱，应将第12段的题号改为“⑫”以匹配其内容，同时将第11段的题号改为“⑪”以匹配其内容。\"\n      }\n    ],\n    \"confidence_summary\": {\n      \"overall\": 0.0,\n      \"question_sequence_ok\": false,\n      \"layout_quality\": \"poor\"\n    }\n  }\n}",
+        "parsed_ok": true,
+        "strict_page_review_ok": true,
+        "valid_after_normalizer": true,
+        "warning_count": 0,
+        "warnings": [],
+        "block_count": 1
+      }
+    ]
+  },
+  "conclusion": {
+    "direction_correct": true,
+    "schema_and_normalizer_ready": true,
+    "online_evidence_completed": true,
+    "meets_acceptance_target": false,
+    "next_step": "继续迭代 prompt 约束或增加后处理裁剪/重试策略，优先压缩 detail 冗长输出，减少长文本导致的 JSON 截断。"
+  }
+}

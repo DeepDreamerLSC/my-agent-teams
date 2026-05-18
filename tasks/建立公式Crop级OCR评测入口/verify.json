@@ -1,0 +1,50 @@
+{
+  "task_id": "建立公式Crop级OCR评测入口",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T12:30:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。pytest 11 passed；model_eval_runner --formula-crop-eval 入口可复跑，基于 phase4-formula-baseline 生成评测契约；报告含 9 focus pages、18 公式候选、17 manifest crops、0 OCR-ready crops、17 缺失 crop_image_path + omml；公式默认行为保持 audit-only（merge_enabled_by_default=false, default_mode=disabled_audit_only）；review-1 审查通过无阻塞项。",
+  "acceptance_criteria": [
+    {
+      "criterion": "存在明确可复跑的公式 crop 级 OCR 评测命令与输出目录",
+      "result": "pass",
+      "evidence": "model_eval_runner.py 含 --formula-crop-eval 入口（2 处引用）；report.json repro 字段含完整命令；phase4-formula-crop-eval/20260517-121800/ 含 6 个交付物（report.json/md, inputs.jsonl, missing_assets.json, expected-crops/, ocr-results/）。"
+    },
+    {
+      "criterion": "报告能直接回答：当前 focus pages 里有哪些可评页、缺哪些输入资产、下一步怎么接模型实验",
+      "result": "pass",
+      "evidence": "report.json aggregate: focus_page_count=9, manifest_crop_count=17, unmaterialized_candidate_count=1, ocr_ready_crop_count=0；missing_asset_summary: crop_image_path=17, omml=17；next_steps 给出补 crop PNG → 接 OCR 模型 → 保持 audit-only 的路径。"
+    },
+    {
+      "criterion": "指定测试通过，且不改变公式默认 audit-only 行为",
+      "result": "pass",
+      "evidence": "pytest test_model_eval_runner.py → 11 passed；report.json baseline.formula_experiment_flag: default_enabled=false, default_mode=disabled_audit_only, merge_enabled_by_default=false。"
+    },
+    {
+      "criterion": "产物能作为下一轮公式专项任务的直接输入",
+      "result": "pass",
+      "evidence": "formula_crop_inputs.jsonl 含 17 条逐 crop 输入（bbox + placeholder + 预期路径）；expected-crops/ 和 ocr-results/ 已建立目录契约；review-1 复跑生成 review-20260517-formula-crop/ 与原始产物关键指标一致。"
+    }
+  ],
+  "scenarios_verified": [
+    "pytest test_model_eval_runner.py → 11 passed, 4 warnings",
+    "phase4-formula-crop-eval/20260517-121800/ 含 6 个交付物",
+    "report aggregate: 9 focus pages, 18 candidates, 17 manifest crops, 1 unmaterialized, 0 OCR-ready",
+    "missing assets: crop_image_path=17, omml=17",
+    "baseline.formula_experiment_flag: default_enabled=false, disabled_audit_only, merge_enabled_by_default=false",
+    "evaluation_scope=formula_crop_level_ocr_manifest_only_keep_audit_only_default",
+    "review-1 复跑产物 review-20260517-formula-crop/ 存在且一致",
+    "review-1 审查通过，blocking_findings=[]"
+  ],
+  "test_commands": [
+    "pytest tests/test_model_eval_runner.py -q → 11 passed, 4 warnings"
+  ],
+  "non_blocking_observations": [
+    "18 个公式候选中 1 个未 materialize 为 crop 输入（数学八年级 p1: 4 candidates → 3 examples），report 已诚实暴露（review-1 已标注为非阻塞）。",
+    "17 条 crop 输入全部缺少 crop_image_path 和 omml，需先补真实 crop PNG 才能接模型实验。",
+    "expected-crops/ 和 ocr-results/ 当前为空目录，只建立路径契约不宣称 OCR 已完成。"
+  ],
+  "regressions_found": []
+}

@@ -51,5 +51,6 @@
   "result_summary": "后续补修与测试补齐任务已完成并完成集成/生产部署，原任务保留 blocked 无法再直接推进，现由 PM 收口为 cancelled（superseded）。",
   "last_error": null,
   "created_at": "2026-04-25T10:54:16+08:00",
-  "updated_at": "2026-04-25T18:24:42+08:00"
+  "updated_at": "2026-05-18T18:50:51+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:50:51+08:00"
 }

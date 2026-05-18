@@ -1,0 +1,7 @@
+{
+  "task_id": "增强答案页与题后解析识别",
+  "agent": "dev-1",
+  "claimed_at": "2026-05-18T07:29:57+08:00",
+  "reserved": true,
+  "reason": "watcher auto-continued after Adapter重构与GLM-OCR迁移"
+}

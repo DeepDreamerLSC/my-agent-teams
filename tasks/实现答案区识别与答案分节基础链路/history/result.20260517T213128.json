@@ -1,0 +1,56 @@
+{
+  "task_id": "实现答案区识别与答案分节基础链路",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已补齐答案区识别与答案分节基础链路。当前规则可把答案页标题、题后‘答案：/解析：’和 blank answer area 识别为 answer signal，并把无法可靠归属的答案内容保留为 unmatched warning，而不是静默丢弃。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json"
+  ],
+  "answer_cues_added": [
+    "答案页标题 cue：参考答案 / 参考答案与解析 / 答案与解析 / 参考解答 / 答案区",
+    "题后 inline cue：答案： / 参考答案： / 解析： / 解： / 解答：",
+    "既有 blank answer area cue：下划线、长横线、作答区等"
+  ],
+  "implementation_notes": [
+    "exercise_detector.py 新增 answer mode 状态机：命中答案页标题后，后续按编号答案物化为 AnswerSection/AnswerItem，不再混入 student 正文。",
+    "题后‘答案：/解析：’现在会被分流到 source_type=inline_solution 的答案分节；续行解析不会再掉回正文 stem。",
+    "无题号答案说明和不存在的题号会以 answer_unmatched / answer_item_unmatched_number warning 保留。",
+    "本轮没有新增平行数据结构；exercise_ir.py 与 exercise_docx_assembler.py 的现有结构已足够承载基础链路，因此未追加生产逻辑修改。",
+    "test_pdf_to_word_exercise_pipeline_integration.py 仅做兼容性小修：把 hybrid 用例改为显式 quality 入口，避免与现行 hybrid gate 冲突。"
+  ],
+  "sample_validation": {
+    "artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json",
+    "aggregate": {
+      "sample_count": 5,
+      "samples_with_answer_area": 1,
+      "samples_with_answer_section": 3,
+      "samples_with_any_answer_signal": 4,
+      "remaining_zero_answer_signal_samples": 1
+    },
+    "broken_zero_of_five": [
+      "answer_page_title_single_match",
+      "inline_answer_and_analysis",
+      "blank_answer_area_only",
+      "answer_page_with_unmatched_fact"
+    ],
+    "still_missing": [
+      {
+        "sample_name": "student_only_without_answer_cue",
+        "reason": "只有 student 正文，没有答案页标题、页底答案区或题后解析 cue，仍需后续 teacher/review 变体或更强版面理解补充。"
+      }
+    ]
+  },
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-answer-sections-final --basetemp=/private/tmp/chiralium-pytest-answer-sections-final-tmp"
+  ],
+  "risks": [
+    "当前只覆盖显式答案 cue；纯隐式答案页、跨页复杂匹配、教师版更细颗粒度解析仍需要后续 teacher/review 变体补充。",
+    "worktree 中的 conversion_service.py 与 exercise_ir.py 另有既有未提交修改，本任务未在这两个文件上追加生产逻辑。"
+  ],
+  "completed_at": "2026-05-17T21:19:47+08:00"
+}

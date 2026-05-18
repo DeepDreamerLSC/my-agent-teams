@@ -1,0 +1,5 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-18T07:27:50+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "pooled", "at": "2026-05-18T09:30:02+08:00", "reason": "pm priority bump: dependencies nearing completion; keep pooled and schedule immediately after upstream QA", "actor": "pm-chief"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-18T09:31:03+08:00", "reason": "agent qa-1 claimed pooled task: watcher auto-continued after 刷新PDF转Word最终验收口径"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-18T12:30:49+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-18T12:49:51+08:00", "reason": "pm acceptance after review and qa for P2 answer baseline"}

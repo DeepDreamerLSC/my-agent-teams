@@ -1,0 +1,69 @@
+{
+  "task_id": "收口Qwen3VL审查Worker严格JSON闭环",
+  "agent_id": "dev-2",
+  "status": "blocked",
+  "completed_at": "2026-05-17T01:28:02+08:00",
+  "summary": "已完成 Qwen3-VL review worker 链路收口代码、测试与 hybrid e2e 报告重生成：HybridExperimentalPipeline 现可为 ambiguous candidate 恢复 rendered_page 并接入 ReviewIntegrator；ReviewIntegrator 已支持 invalid JSON 重试、最终 drop/skip、并保留 service_available/json_valid_rate/review_acceptance_rate 指标；hybrid-e2e report 不再写死 skipped_no_review_worker，并新增 5 样例 real rendered page online probe。当前 blocker 是本地 Qwen3-VL 服务 healthcheck 返回 502，导致真实 online probe 被降级为 service_unavailable，无法产出可比较的真实 json_valid_rate / review_acceptance_rate。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/prompts/qwen3_vl_page_review.md",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/review_integrator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_vlm_review_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_review_integrator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json"
+  ],
+  "validation": {
+    "pytest_command": "pytest backend/tests/test_pdf_to_word_vlm_review_adapter.py backend/tests/test_review_integrator.py backend/tests/test_hybrid_e2e.py",
+    "pytest_passed": true,
+    "pytest_cases_passed": 19,
+    "pytest_warnings": 4,
+    "report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
+    "report_review_mode": "service_unavailable",
+    "sample_review_modes": {
+      "五下科学": "no_review_targets",
+      "数学八年级": "no_review_targets",
+      "数学试卷": "no_review_targets",
+      "英语八年级": "no_review_targets",
+      "语文五年级": "no_review_targets"
+    },
+    "online_review_probe": {
+      "review_mode": "service_unavailable",
+      "sample_count": 5,
+      "reviewed_candidate_count": 0,
+      "json_valid_count": 0,
+      "review_accepted_count": 0,
+      "review_rejected_count": 0,
+      "json_valid_rate": 0.0,
+      "review_acceptance_rate": 0.0,
+      "service_available": false,
+      "service_warning": "OpenAI-compatible vision backend 不可用：healthcheck status=502"
+    }
+  },
+  "delivered_changes": {
+    "review_pipeline": [
+      "HybridExperimentalPipeline._review_ambiguous() 现在会为需要 review 的页补齐 rendered_pages，再传给 ReviewIntegrator。",
+      "当真实 PDF 不可访问但使用离线 artifact 样例时，pipeline 会从 20260514 render artifacts 恢复 page-XXX.json/page-XXX.png 元数据。"
+    ],
+    "review_integrator": [
+      "invalid JSON 现在会自动重试 1 次；重试后仍失败时只 drop 当前 ambiguous candidate，不拖垮整页。",
+      "adapter-backend 路径会给 prompt 注入 candidate hint、retry attempt 和更紧的 JSON 约束。"
+    ],
+    "reporting": [
+      "hybrid-e2e report 现在可区分 no_review_targets / skipped_no_review_worker / online_review / service_unavailable。",
+      "report 新增 online_review_probe，使用 5 个真实 rendered page 样例直连 review worker，便于收集真实在线指标或服务不可用原因。"
+    ]
+  },
+  "blockers": [
+    {
+      "type": "service_unavailable",
+      "scope": "真实 online review 指标验证",
+      "detail": "本地 Qwen3-VL service healthcheck 返回 502；5 个 online probe 样例全部未进入实际 infer_page。",
+      "impact": "本轮无法验证真实 json_valid_rate 是否 >= 0.4 基线，也无法确认是否达到 0.6+。当前 report 中 0.0/0.0 是降级占位值，不代表模型回退。",
+      "evidence": [
+        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json"
+      ]
+    }
+  ],
+  "next_step": "恢复本机 Qwen3-VL 服务（当前 healthcheck 502），然后重新运行 build_hybrid_e2e_report() 或 tests/test_hybrid_e2e.py 中的 online_review_probe，即可在现有代码基础上产出真实 json_valid_rate / review_acceptance_rate，并与 2026-05-15 的 0.4 基线做直接比较。"
+}

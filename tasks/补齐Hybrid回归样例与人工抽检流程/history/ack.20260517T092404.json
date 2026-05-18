@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐Hybrid回归样例与人工抽检流程",
+  "agent": "qa-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T09:35:00+08:00",
+  "summary": "已读取 instruction.md 与 task.json。将直接复用预整理模板结构，修正过期事实（全部 fallback / skipped_no_review_worker），补入当前 online_review 真实指标与最终抽检口径。"
+}

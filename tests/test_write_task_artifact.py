@@ -219,6 +219,56 @@ class WriteTaskArtifactTests(unittest.TestCase):
         self.assertTrue(patch_path.exists())
         self.assertIn("feature.txt", patch_path.read_text(encoding="utf-8"))
 
+    def test_result_artifact_captures_commits_and_uncommitted_tracked_changes(self):
+        repo_root = Path(self.tmpdir.name) / "repo-mixed-changes"
+        repo_root.mkdir()
+        feature_file = repo_root / "feature.txt"
+        feature_file.write_text("before\n", encoding="utf-8")
+        self._init_git_repo(repo_root)
+        subprocess.run(["git", "checkout", "-b", "task/artifact-task"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+        feature_file.write_text("committed\n", encoding="utf-8")
+        subprocess.run(["git", "add", "feature.txt"], cwd=str(repo_root), check=True)
+        subprocess.run(["git", "commit", "-m", "committed feature"], cwd=str(repo_root), check=True, capture_output=True, text=True)
+        feature_file.write_text("committed plus working tree\n", encoding="utf-8")
+
+        task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        task.update({
+            "workspace_mode": "worktree",
+            "workspace_status": "prepared",
+            "workspace_path": str(repo_root),
+            "worktree_path": str(repo_root),
+            "workspace_branch": "task/artifact-task",
+            "workspace_base_ref": "main",
+            "patch_path": str(self.task_dir / "artifacts" / "artifact-task-mixed.patch"),
+            "target_branch": "integration",
+            "integration_target_branch": "integration",
+        })
+        (self.task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        subprocess.run(
+            [
+                str(SCRIPTS / "write-result.sh"),
+                "artifact-task",
+                "--tasks-root",
+                str(self.tasks_root),
+                "--agent",
+                "dev-1",
+                "--status",
+                "done",
+                "--summary",
+                "提交和未提交修改都应进入 patch",
+            ],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        result_payload = json.loads((self.task_dir / "result.json").read_text(encoding="utf-8"))
+        patch_text = Path(result_payload["patch_path"]).read_text(encoding="utf-8")
+        self.assertIn("committed", patch_text)
+        self.assertIn("committed plus working tree", patch_text)
+
     def test_result_artifact_captures_untracked_files(self):
         repo_root = Path(self.tmpdir.name) / "repo-untracked"
         repo_root.mkdir()

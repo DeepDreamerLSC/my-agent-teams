@@ -1,0 +1,230 @@
+{
+  "report_type": "pdf2word_final_acceptance",
+  "task_id": "执行PDF转Word最终五样例总验收",
+  "generated_at": "2026-05-17T17:55:53+08:00",
+  "agent": "qa-1",
+  "overall_verdict": "pass_with_release_constraints",
+  "stage_completion": {
+    "can_be_considered_end_to_end_complete": true,
+    "scope": "phase-level only: apple default chain + explicit hybrid_experimental/quality chain",
+    "summary": "五样例自动化与人工抽检表明，默认 apple 主链和显式 hybrid 质量链路已经闭环；但 hybrid 更大范围默认发布、公式默认上线、Paddle 更强承诺仍不成立。"
+  },
+  "release_recommendation": {
+    "default_sync_backend": "apple",
+    "hybrid_experimental": "quality_gray_only",
+    "formula_policy": "audit_only_shadow_only",
+    "should_widen_hybrid_default": false,
+    "should_restore_paddle_default_resident": false
+  },
+  "automation": {
+    "pytest": {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m pytest tests/test_hybrid_e2e.py tests/test_hybrid_backend_resolve.py tests/test_hybrid_pipeline.py tests/test_question_region_detector.py tests/test_hybrid_validator.py tests/test_pdf_to_word_exercise_pipeline_integration.py tests/test_pdf_exercise_docx_assembler.py -q",
+      "result": "32 passed, 5 warnings"
+    },
+    "hybrid_e2e_report": {
+      "generated_at": "2026-05-17T02:13:57.602315+08:00",
+      "sample_count": 5,
+      "pass_through_all_equal": true,
+      "enhancement_chain_sample_count": 4,
+      "fallback_triggered_sample_count": 3,
+      "review_mode": "online_review"
+    },
+    "online_review_probe": {
+      "json_valid_rate": 1.0,
+      "review_acceptance_rate": 1.0,
+      "service_available": true
+    },
+    "live_review_worker_check": {
+      "checked_at": "2026-05-17T17:55:53+08:00",
+      "health_status": "healthy",
+      "model_id": "mlx-community/Qwen3-VL-8B-Instruct-3bit"
+    },
+    "phase3_paddle_quality": {
+      "generated_at": "2026-05-17T16:15:22.290529+08:00",
+      "total_selected_pages": 9,
+      "paddle_candidate_count": 61,
+      "mineru_candidate_count": 57,
+      "fallback_triggered_sample_count": 3
+    },
+    "formula_baseline": {
+      "generated_at": "2026-05-17T10:38:30+08:00",
+      "formula_candidate_count": 18,
+      "focus_page_count": 9,
+      "default_merge_enabled": false
+    },
+    "formula_crop_eval": {
+      "generated_at": "2026-05-17T12:21:38+08:00",
+      "manifest_ready_crop_count": 17,
+      "ocr_ready_crop_count": 0
+    }
+  },
+  "manual_spot_check": {
+    "authoritative_archive_docx": {
+      "sample_count": 5,
+      "all_openable": true,
+      "all_have_word_media": false,
+      "summary": "final-archive/profiles/apple_baseline/ 下 5 份 DOCX 都可打开，但 5/5 没有 word/media，当前 authoritative 发布证据仍以文本线性化结果为主。"
+    },
+    "hybrid_exercise_docx_probe": [
+      {
+        "sample": "五下科学",
+        "media_count": 4,
+        "has_table_xml": true,
+        "has_omath": false
+      },
+      {
+        "sample": "数学八年级",
+        "media_count": 2,
+        "has_table_xml": true,
+        "has_omath": false
+      },
+      {
+        "sample": "数学试卷",
+        "media_count": 20,
+        "has_table_xml": false,
+        "has_omath": false
+      }
+    ]
+  },
+  "samples": [
+    {
+      "sample_name": "五下科学",
+      "group": "positive",
+      "total_pages": 6,
+      "fallback_pages": [
+        1
+      ],
+      "appended_pages": [
+        3,
+        4,
+        5
+      ],
+      "accepted_candidate_total": 8,
+      "appended_block_total": 8,
+      "kind_counts": {
+        "text": 342,
+        "image": 5,
+        "table": 3
+      },
+      "formula_status": "audit_only",
+      "sample_verdict": "pass_with_fallback_guard"
+    },
+    {
+      "sample_name": "语文五年级",
+      "group": "negative",
+      "total_pages": 13,
+      "fallback_pages": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "appended_pages": [],
+      "accepted_candidate_total": 0,
+      "appended_block_total": 0,
+      "kind_counts": {
+        "text": 403
+      },
+      "formula_status": "no_gain",
+      "sample_verdict": "valid_negative_sample_document_fallback"
+    },
+    {
+      "sample_name": "数学八年级",
+      "group": "positive",
+      "total_pages": 8,
+      "fallback_pages": [],
+      "appended_pages": [
+        2,
+        6,
+        7
+      ],
+      "accepted_candidate_total": 5,
+      "appended_block_total": 5,
+      "kind_counts": {
+        "text": 471,
+        "image": 3,
+        "table": 2
+      },
+      "formula_status": "audit_only",
+      "sample_verdict": "pass"
+    },
+    {
+      "sample_name": "英语八年级",
+      "group": "positive",
+      "total_pages": 12,
+      "fallback_pages": [
+        3,
+        11
+      ],
+      "appended_pages": [
+        4
+      ],
+      "accepted_candidate_total": 1,
+      "appended_block_total": 1,
+      "kind_counts": {
+        "text": 1266,
+        "image": 1
+      },
+      "formula_status": "audit_only",
+      "sample_verdict": "pass_with_limited_gain"
+    },
+    {
+      "sample_name": "数学试卷",
+      "group": "positive",
+      "total_pages": 12,
+      "fallback_pages": [],
+      "appended_pages": [
+        1,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "accepted_candidate_total": 21,
+      "appended_block_total": 21,
+      "kind_counts": {
+        "text": 1531,
+        "image": 21
+      },
+      "formula_status": "not_current_benefit",
+      "sample_verdict": "pass_highest_image_gain"
+    }
+  ],
+  "known_gaps_non_blocking_for_current_chain": [
+    "语文五年级当前仍是 document fallback / no enhancement context",
+    "公式候选已审计但默认 merge 关闭，crop 资产尚未进入真实 OCR",
+    "英语八年级增强收益有限，不适合据此扩大 hybrid 默认范围"
+  ],
+  "blocking_issues_for_broader_default_release": [
+    "缺少 authoritative 的五样例 hybrid 最终 Word 正式归档，当前 apple_baseline 归档 5/5 无 word/media",
+    "数学试卷 paddleocr_vl provenance / manifest / phase3 报告契约未完全收口"
+  ],
+  "in_flight_supplementary_gaps": [
+    "公式专项仍在并行推进，当前只应视为 supplementary evidence，不计入本轮默认发布承诺"
+  ],
+  "recommended_next_actions": [
+    "继续 apple 默认发布，继续 hybrid_experimental quality 灰度",
+    "新增一个五样例 hybrid 最终 Word 正式归档任务，补齐图片/表格进入最终 Word 的 authoritative 证据",
+    "单独收口数学试卷 Paddle provenance / manifest / phase3 报告",
+    "公式继续独立推进，作为 supplementary evidence 跟进，不并入当前默认发布门禁"
+  ],
+  "evidence_paths": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/review-20260517-formula-crop/formula_crop_eval_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "执行PDF转Word最终五样例总验收",
+  "agent": "qa-1",
+  "acknowledged_at": "2026-05-17T17:28:00+08:00",
+  "status": "working",
+  "note": "开始执行五样例总验收，收集自动化回归与人工抽检证据"
+}

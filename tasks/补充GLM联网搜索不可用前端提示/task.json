@@ -8,7 +8,7 @@
   "workspace_mode": "main",
   "target_branch": "integration",
   "created_at": "2026-04-26T10:35:41+08:00",
-  "updated_at": "2026-04-26T11:21:33+08:00",
+  "updated_at": "2026-05-18T18:50:57+08:00",
   "review_deadline": null,
   "review_round": 0,
   "max_review_rounds": 3,
@@ -54,6 +54,6 @@
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:50:57+08:00",
   "state_invariant_violation_count": 0
 }

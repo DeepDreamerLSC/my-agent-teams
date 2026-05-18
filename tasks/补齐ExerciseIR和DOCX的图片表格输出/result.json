@@ -1,0 +1,173 @@
+{
+  "task_id": "补齐ExerciseIR和DOCX的图片表格输出",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-16T17:05:00+08:00",
+  "summary": "已补齐 accepted image/table candidates 从真实 hybrid 输出进入 ExerciseIR 和最终 Word 的链路。根因不在渲染器，而在 exercise_detector 对 visual block 的消费与题号归属：空文本图片被提前过滤、table 被降成 text、assigned_question_id 未被消费、题号识别先被 score-box 清洗吞掉、且 resolve_block_order 会改写跨页题号导致 visual 无法挂回真实题目。修复后，真实样例数学试卷与英语八年级生成的 DOCX 均不再是 media_count=0，且能看到插入的 image/table。",
+  "modified_files": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+      "action": "modified",
+      "description": "显式处理 image/table visual blocks；优先按 assigned_region_id/assigned_question_id 将 visual 绑定到正确题号；为题目尚未出现的 visual 增加 pending 挂载；保留 table kind；改为仅排序不改写题号；调整题号识别与 score-box 清洗顺序，避免 21/22/23 这类题目首行被吞掉。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py",
+      "action": "modified",
+      "description": "将 image/table 源块编码为可传递的 DOCX visual payload marker，保留 image_path、bbox、caption、table_html/table_rows 等信息，供后续 DOCX 装配阶段解析。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+      "action": "modified",
+      "description": "扩展 DOCX 装配能力，支持解析 visual payload，写入 word/media 与 document.xml.rels；图片渲染为 Word drawing；table 优先渲染为可编辑 Word table，若上游无结构仅保留截图，则退化为插入图片以保证在 Word 中可见。"
+    }
+  ],
+  "implementation_notes": [
+    "真实 accepted visual 数据来自 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/*/candidates.filtered.jsonl，而不是 hybrid-e2e-validation 中已回退为 baseline 的 hybrid-pages.jsonl。",
+    "page_ir_merger 的契约是把 accepted image/table 追加到页尾，并通过 meta.assigned_question_id / assigned_region_id 标注题号归属；detector 现在按这个契约消费 visual。",
+    "数学试卷 21 个 accepted visual 中有 1 个源候选缺失 image_path，因此进入 ExerciseIR 但在 DOCX 中只能文本回退，最终 media_count=20；其余 20 个均写入 word/media。",
+    "英语八年级的 accepted table 候选本身只保留截图路径，没有 table_html / rows 结构，因此当前 DOCX 中该 table 以图片方式可见，无法凭空恢复为可编辑表格。"
+  ],
+  "validation": {
+    "syntax_checks": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_docx_assembler.py",
+        "result": "passed"
+      }
+    ],
+    "tests": [
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py -q",
+        "result": "passed",
+        "evidence": "2 passed, 4 warnings"
+      },
+      {
+        "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py -q",
+        "result": "passed",
+        "evidence": "1 passed, 4 warnings"
+      }
+    ],
+    "real_hybrid_replay": {
+      "summary_path": "/private/tmp/hybrid-docx-validation/summary.json",
+      "output_dir": "/private/tmp/hybrid-docx-validation",
+      "method": "用 apple_baseline/pages.jsonl 作为文本基线，追加 hybrid-phase1/candidates.filtered.jsonl 中 decision=accepted 的 image/table candidates，重放 detect_exercise_document -> assemble_exercise_docx_bytes 全链路。",
+      "five_sample_outputs": [
+        {
+          "sample": "数学试卷",
+          "docx_path": "/private/tmp/hybrid-docx-validation/数学试卷.docx",
+          "accepted_count": 21,
+          "accepted_kind_counts": {
+            "image": 21,
+            "table": 0
+          },
+          "question_count": 159,
+          "exercise_visual_count": 21,
+          "media_count": 20,
+          "drawing_count": 20,
+          "table_count": 0,
+          "result": "passed",
+          "note": "21 个 accepted image 全部进入 ExerciseIR；其中 20 个因存在 image_path 被写入 DOCX media，1 个因上游缺 image_path 仅能文本回退。DOCX 中可见插入图片。"
+        },
+        {
+          "sample": "英语八年级",
+          "docx_path": "/private/tmp/hybrid-docx-validation/英语八年级.docx",
+          "accepted_count": 2,
+          "accepted_kind_counts": {
+            "image": 1,
+            "table": 1
+          },
+          "question_count": 96,
+          "exercise_visual_count": 2,
+          "media_count": 2,
+          "drawing_count": 2,
+          "table_count": 0,
+          "result": "passed_with_table_image_fallback",
+          "note": "题号 4 的 accepted image 与题号 5 的 accepted table 均进入 ExerciseIR 并出现在 DOCX。由于 accepted table 缺结构化 rows/html，仅能作为图片插入，无法形成可编辑 Word table。"
+        },
+        {
+          "sample": "五下科学",
+          "docx_path": "/private/tmp/hybrid-docx-validation/五下科学.docx",
+          "accepted_count": 12,
+          "accepted_kind_counts": {
+            "image": 8,
+            "table": 4
+          },
+          "question_count": 40,
+          "exercise_visual_count": 12,
+          "media_count": 6,
+          "drawing_count": 6,
+          "table_count": 1,
+          "result": "passed"
+        },
+        {
+          "sample": "数学八年级",
+          "docx_path": "/private/tmp/hybrid-docx-validation/数学八年级.docx",
+          "accepted_count": 5,
+          "accepted_kind_counts": {
+            "image": 3,
+            "table": 2
+          },
+          "question_count": 55,
+          "exercise_visual_count": 5,
+          "media_count": 2,
+          "drawing_count": 2,
+          "table_count": 1,
+          "result": "passed"
+        },
+        {
+          "sample": "语文五年级",
+          "docx_path": "/private/tmp/hybrid-docx-validation/语文五年级.docx",
+          "accepted_count": 0,
+          "accepted_kind_counts": {
+            "image": 0,
+            "table": 0
+          },
+          "question_count": 0,
+          "exercise_visual_count": 0,
+          "media_count": 0,
+          "drawing_count": 0,
+          "table_count": 0,
+          "result": "baseline_no_visual_candidates"
+        }
+      ]
+    }
+  },
+  "acceptance_status": {
+    "hybrid_pageir_image_table_consumed_by_detector": "satisfied",
+    "exercise_ir_visual_payload_to_docx_flow": "satisfied",
+    "math_exam_docx_media_count_gt_0": "satisfied (media_count=20)",
+    "english_grade8_docx_media_count_gt_0": "satisfied (media_count=2)",
+    "math_exam_and_english_grade8_docx_show_inserted_visuals": "satisfied",
+    "editable_table_in_word": "not_fully_satisfied_for_english_grade8_due_to_upstream_data_shape"
+  },
+  "remaining_risks": [
+    "英语八年级 accepted table（mineru_full:p11:b1）没有 table_html / table_rows，只带 image_path；当前只能保证在 Word 中可见，不能满足“可编辑表格”的严格要求。",
+    "数学试卷有 1 个 accepted image（mineru_full:p1:b9）源数据缺失 image_path，因此无法写入 word/media，只能文本回退。",
+    "当前 detector 仍按规则法抽题；对于跨页重号、版面异常或上游 assigned_question_id 本身错误的情况，后续仍建议补更强的题号/region 契约测试。"
+  ],
+  "artifacts": [
+    {
+      "type": "validation_summary",
+      "path": "/private/tmp/hybrid-docx-validation/summary.json"
+    },
+    {
+      "type": "docx",
+      "path": "/private/tmp/hybrid-docx-validation/数学试卷.docx"
+    },
+    {
+      "type": "docx",
+      "path": "/private/tmp/hybrid-docx-validation/英语八年级.docx"
+    },
+    {
+      "type": "docx",
+      "path": "/private/tmp/hybrid-docx-validation/五下科学.docx"
+    },
+    {
+      "type": "docx",
+      "path": "/private/tmp/hybrid-docx-validation/数学八年级.docx"
+    },
+    {
+      "type": "docx",
+      "path": "/private/tmp/hybrid-docx-validation/语文五年级.docx"
+    }
+  ]
+}

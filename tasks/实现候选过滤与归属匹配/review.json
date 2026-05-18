@@ -1,0 +1,45 @@
+{
+  "task_id": "实现候选过滤与归属匹配",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-15T19:32:54+08:00",
+  "status": "approve",
+  "summary": "审查通过。实现已在 write_scope 内新增 `candidate_filter.py` 与 `test_candidate_filter.py`，并直接复用现有 `QuestionRegionDetector` 与 `CandidateExtractor` 的真实数据结构，完成了面积/越界/文本重叠/类型/formula/重复过滤、question-bound assignment、以及 `candidates.filtered.jsonl` / `merge-decisions.jsonl` 写出能力。我复跑了测试并抽查真实 artifacts，结果与 result.json 一致：`数学试卷` 的 MinerU 候选有 10 个 accepted，`语文五年级` 的 PaddleOCR-VL 候选 20 个全部 `question_region_not_detectable -> skipped`，`英语 八年级下册` 的 formula candidate 也被稳定标记为 reject。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+      "finding": "重复候选在通过几何归属后，如果又被 `_apply_duplicate_filter()` 降级为 `rejected`，当前实现会保留原来的 `assignment_status='assigned'`、`assigned_question_id` 和 `assigned_region_id`。这不影响 `merge_eligible_count`，但会让 `summarize().assignment_counts` 更接近“几何归属结果”而不是“最终可合并结果”。",
+      "recommendation": "如果后续要把 `assignment_counts` 当成最终 merge-ready 统计口径，建议在 duplicate reject 时同步重置 assignment 状态，或在 metrics/reporting 中明确区分“pre-dedup assigned”和“final accepted”。",
+      "evidence": "candidate_filter.py:266-272 duplicate reject 时只改了 `decision/reason/review_required/filters`；本地复现中 `paddle` 候选被 `duplicate_candidate_prefer_mineru` 拒绝后，仍显示 `assignment_status='assigned'` 且 `assigned_question_id='1'`。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现候选过滤与归属匹配/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现候选过滤与归属匹配/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现候选过滤与归属匹配/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/question_region_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_extractor.py",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/hybrid_experimental增强管线设计.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-090642/mineru",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_candidate_filter.py -q",
+      "result": "passed (5 passed, 4 warnings)"
+    },
+    {
+      "command": "人工审阅 candidate_filter.py 与 test_candidate_filter.py",
+      "result": "实现覆盖了设计文档要求的 bbox 越界、面积阈值、文本重叠、类型过滤、formula audit-only reject、question-bound assignment、Paddle 更严格阈值，以及 duplicate prefer MinerU 策略；JSONL 输出同时写出 filtered candidate 与 merge decision。"
+    },
+    {
+      "command": "使用 CandidateExtractor + QuestionRegionDetector + CandidateFilter 复核真实 artifacts",
+      "result": "复核结果与 result.json 一致：`mineru_full:数学试卷` 总 27 候选，其中 accepted 10、rejected 17；`mineru_full:英语 八年级下册` 总 9 候选，其中 formula candidate 1 个被 `formula_candidate_rejected_audit_only`，第 12 页 1 个 table 因 `question_region_not_detectable` 被 skipped；`paddleocr_vl:语文五年级` 总 20 候选全部 skipped，原因均为 `question_region_not_detectable`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

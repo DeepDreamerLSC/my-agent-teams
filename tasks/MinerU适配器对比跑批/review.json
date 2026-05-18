@@ -1,0 +1,46 @@
+{
+  "task_id": "MinerU适配器对比跑批",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-14T18:39:17+08:00",
+  "status": "approve",
+  "summary": "审查通过。5 个样例产物完整，comparison_report 已按修正后的逻辑重算，结论明确为 0/5 样例显著优于 apple_baseline，数据与结论一致。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/comparison_report.json",
+      "finding": "本轮结果已明确标注为 cli_direct，并注明 comparison_report 是在不重跑样例的前提下重算得到；这对当前任务是可接受的，但不等同于一次重新执行全量 MinerU 跑批。",
+      "recommendation": "若后续需要把这份数据作为“正式 profile 跑批”基线，建议单独补一轮通过统一 runner/profile 的复跑任务。"
+    },
+    {
+      "severity": "info",
+      "file": "comparison_report / question_sequence",
+      "finding": "题号序列对比仍是启发式数字抽取，不是人工标注真值；不过当前报告已把该前提和结果边界写清。",
+      "recommendation": "后续若用于最终 parser 选型，建议对关键样例再做人工 spot check。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/MinerU适配器对比跑批/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/MinerU适配器对比跑批/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/MinerU适配器对比跑批/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/comparison_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/mineru/mineru_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/baseline_summary.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "遍历 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/mineru 下 5 个样例目录，确认 pages.jsonl、metrics.json、warnings.json、output.docx 均存在",
+      "result": "passed (5/5 samples complete)"
+    },
+    {
+      "command": "读取 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/comparison_report.json 的 overall_conclusion 与逐样例结论",
+      "result": "passed: significantly_better_sample_count=0, meets_threshold=false, conclusion_counts={mineru_better:0, not_better:1, mineru_worse:4}"
+    },
+    {
+      "command": "核对 comparison_report 的 availability_check / execution_mode / report_recomputed_without_rerun 字段",
+      "result": "passed: execution_mode=cli_direct, availability_check.available=true, report_recomputed_without_rerun=true"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

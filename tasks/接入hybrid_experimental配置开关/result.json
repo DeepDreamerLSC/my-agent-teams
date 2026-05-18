@@ -1,0 +1,59 @@
+{
+  "task_id": "接入hybrid_experimental配置开关",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-15T19:01:05+08:00",
+  "summary": "已按 review 要求补齐 hybrid 身份区分：create_adapter('hybrid_experimental') 现在返回独立的 HybridExperimentalAdapter，实例 profile_name 为 hybrid_experimental；同时保留 settings/parser_client/conversion_service 的显式透传与回归测试。",
+  "modified_files": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+      "description": "将 hybrid_experimental 纳入 SUPPORTED_PARSER_BACKENDS，保证 Skill/API 侧解析不回退。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+      "description": "显式支持 hybrid_experimental，并保留后端名透传。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+      "description": "解析器后端允许 hybrid_experimental 直达，不再被过滤回 apple/mock。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+      "description": "新增最小 HybridExperimentalAdapter，并让 create_adapter('hybrid_experimental') 返回独立实例。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+      "description": "公共 profile registry 同步指向 HybridExperimentalAdapter，避免旧入口回退。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+      "description": "新增 disabled 的 hybrid_experimental profile，默认不进入 auto。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_config.py",
+      "description": "更新 profile 列表与 list-profiles 输出断言。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+      "description": "新增 hybrid_experimental 解析/实例 identity 回归测试。"
+    }
+  ],
+  "test_results": [
+    {
+      "command": "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python3 -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_config.py -q",
+      "status": "passed"
+    },
+    {
+      "command": "PDF_TO_WORD_MOCK_ENABLED=true /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python3 -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py -q",
+      "status": "passed"
+    },
+    {
+      "command": "python3 -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+      "status": "passed"
+    }
+  ],
+  "notes": [
+    "auto 仍只解析为 apple/mock，不指向 hybrid_experimental。",
+    "HybridExperimentalAdapter 仅承担身份区分；行为上仍沿用当前 apple baseline 占位链路，后续由管线任务接入真正的 hybrid orchestration。"
+  ]
+}

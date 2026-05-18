@@ -1,0 +1,44 @@
+{
+  "task_id": "收紧Hybrid发布触发边界",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T19:58:30+0800",
+  "status": "request_changes",
+  "summary": "需要返工。当前实现确实挡住了大部分 `auto/apple` 误入 Hybrid 的路径，且我补跑的 25 个相关测试也都通过；但发布 gate 仍漏了一条关键分支：`hybrid_release_is_allowed()` 把缺省 `mode` 归一化为 `settings.default_mode`，因此只要环境把默认模式配置成 `quality`，公共路径上的显式 `parser_backend=hybrid_experimental` 即使没有显式传 `mode=quality` 也会被放行。这与任务要求和 `result.json` 中“official_release_path=显式 parser_backend=hybrid_experimental 且 mode=quality” 的口径不一致。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+      "finding": "`hybrid_release_is_allowed()` 在 [settings.py](/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py:53) 用 `normalize_conversion_mode(mode, default=settings.default_mode)` 判定是否放行 Hybrid。结合 [conversion_service.py](/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py:37) 和 [skill.py](/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py:82)，一旦部署把 `PDF_TO_WORD_DEFAULT_MODE` 设成 `quality`，那么公共路径上只要显式传 `parser_backend=hybrid_experimental`，即使请求里没有显式 `mode=quality`，也会被错误放行到 Hybrid。我已本地复现：`PDFToWordSettings(default_mode='quality', parse_backend='apple')` 下，`resolve_released_parser_backend('hybrid_experimental', mode=None, settings=...)` 返回 `hybrid_experimental`。",
+      "recommendation": "把“显式请求 quality”与“缺省后 effective mode 恰好变成 quality”区分开。公共发布路径下，只有请求本身明确携带 `mode=quality` 才允许 `hybrid_experimental` 放行；继承 `default_mode=quality` 仍应回落到 `apple`。同时补一条回归测试，覆盖 `default_mode=quality` + 缺失 mode + 显式 hybrid 请求，在 settings/service/skill/API 口径下都不应进入 Hybrid。"
+    }
+  ],
+  "non_blocking_findings": [],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收紧Hybrid发布触发边界/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收紧Hybrid发布触发边界/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收紧Hybrid发布触发边界/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/skills/custom/pdf_to_word/1.0.0/skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_skill.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_api.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest backend/tests/test_hybrid_backend_resolve.py backend/tests/test_pdf_to_word_service.py backend/tests/test_pdf_to_word_skill.py backend/tests/test_pdf_to_word_api.py -o cache_dir=/private/tmp/chiralium-pytest-hybrid-release-gate-review --basetemp=/private/tmp/chiralium-pytest-hybrid-release-gate-review-tmp -q",
+      "result": "passed (25 passed, 4 warnings)"
+    },
+    {
+      "command": "本地复现 release gate 漏判：构造 `PDFToWordSettings(default_mode='quality', parse_backend='apple')`，调用 `resolve_released_parser_backend('hybrid_experimental', mode=None, settings=...)`",
+      "result": "返回 `hybrid_experimental`，说明当前实现把“继承默认 quality”错误当成了“显式 quality 请求”。"
+    },
+    {
+      "command": "静态复核 settings / service / skill 调用链",
+      "result": "`conversion_service.convert()` 会先把缺失 `mode` 归一化为 `self._settings.default_mode`，`skill._resolve_mode()` 也会在无显式参数时回退到 `get_pdf_to_word_settings().default_mode`；因此只修 settings 不补测试，会继续留下公共路径漏放行风险。"
+    }
+  ],
+  "recommended_next_action": "dev-1"
+}

@@ -1,0 +1,55 @@
+{
+  "task_id": "实现答案区识别与答案分节基础链路",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已按 review 要求把交付证据切换为真实五样例口径。保留现有答案区识别与 AnswerSection 逻辑不变，新增基于 final-archive/hybrid_experimental 五样例 pages.jsonl 的 replay 摘要，证明当前真实样例已从 archived 0/5 提升到 current answer_section 2/5，answer_area 仍为 0/5。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json"
+  ],
+  "answer_cues_added": [
+    "答案页标题 cue：参考答案 / 参考答案与解析 / 答案与解析 / 参考解答 / 答案区",
+    "题后 inline cue：答案： / 参考答案： / 解析： / 解： / 解答：",
+    "既有 blank answer area cue：下划线、长横线、作答区等"
+  ],
+  "implementation_notes": [
+    "production detector/assembler 逻辑沿用上轮实现，本轮未继续改代码，只修正交付证据口径。",
+    "summary.json 现在直接引用真实五样例的 final-archive/profiles/hybrid_experimental/<sample>/pages.jsonl、validator-report.json、metrics.json，review/QA 可逐样例回放复核。",
+    "验证方式是对同一批真实 merged pages 用当前 exercise_detector.py replay，而不是继续引用 synthetic validation set。",
+    "test_pdf_to_word_exercise_pipeline_integration.py 之前为兼容现行 hybrid gate 做过显式 quality 入口小修；本轮不再改动。"
+  ],
+  "real_sample_validation": {
+    "artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json",
+    "aggregate": {
+      "sample_count": 5,
+      "archived_answer_area_sample_count": 0,
+      "archived_answer_section_sample_count": 0,
+      "current_answer_area_sample_count": 0,
+      "current_answer_section_sample_count": 2,
+      "current_any_answer_signal_sample_count": 2,
+      "remaining_zero_answer_signal_samples": 3
+    },
+    "real_hits": [
+      "数学八年级：page 2 出现 inline `解：` cue，当前 replay 命中 1 个 `inline_solution` answer section（题号 18）",
+      "数学试卷：pages 11-12 出现 inline `解：` cue，当前 replay 命中 1 个 `inline_solution` answer section（题号 17）"
+    ],
+    "real_misses": [
+      "五下科学：当前 authoritative merged pages 未出现可识别显式答案 cue，因此仍为 0",
+      "英语八年级：当前 authoritative merged pages 未出现可识别显式答案 cue，因此仍为 0",
+      "语文五年级：当前 merged pages 无显式答案 cue，且 validator 全量 fallback、enhancement_pages=[]，当前 detector 也未形成可题号化上下文，仍需后续 teacher/review 变体补充"
+    ]
+  },
+  "tests": [
+    "PASS: PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-answer-sections-resume --basetemp=/private/tmp/chiralium-pytest-answer-sections-resume-tmp"
+  ],
+  "risks": [
+    "当前真实样例改善只体现在 answer_section，answer_area 仍为 0/5。",
+    "本轮没有刷新 authoritative final-archive 里的既有 metrics.json；新摘要采用对同一批真实 pages.jsonl 的 replay 结果，因此 review/QA 需以该独立验证产物而非旧 archive metrics 复核。",
+    "五下科学、英语八年级、语文五年级 当前 merged pages 仍缺少可被规则稳定识别的显式答案 cue，后续仍需 teacher/review 变体或更强版面理解补充。"
+  ],
+  "completed_at": "2026-05-17T21:39:00+08:00"
+}

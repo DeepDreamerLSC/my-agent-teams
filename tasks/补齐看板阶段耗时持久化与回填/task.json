@@ -56,7 +56,7 @@
   "result_summary": "已补齐看板阶段耗时持久化与回填链路：SQLite 新增 `task_stage_durations` 持久化表，`dashboard.ingest` 在同步任务时会落库各阶段耗时，`task-board-sync.py backfill` 可对现有任务做全量回填，`dashboard.query` 现优先读取持久化阶段耗时而不是只做临时计算。（QA 已通过自动收口） QA 结论：QA 验证通过。SQLite task_stage_durations 表已落地，ingest 同步链路可自动计算并持久化 7 段耗时。task-board-sync.py backfill 全量回填正常，查询层已优先读取持久化值。缺失 review/verify 阶段时字段为 null 不报错。",
   "last_error": null,
   "created_at": "2026-05-04T00:55:41+08:00",
-  "updated_at": "2026-05-05T20:21:29+08:00",
+  "updated_at": "2026-05-18T18:51:00+08:00",
   "claim_scope": [
     "dev-2"
   ],
@@ -71,6 +71,6 @@
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:00+08:00",
   "state_invariant_violation_count": 0
 }

@@ -1,0 +1,48 @@
+{
+  "task_id": "实现PaddleOCRVL选择性触发与缓存",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T11:40:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。pytest 11 passed（6 pipeline + 5 e2e）；Paddle 仅在 selected pages 触发，selected_ratio=0.2812（9/32 页），非整本跑批；语文五年级正确跳过（no_enhancement_context，selected_pages=[]）；缓存机制验证通过（9 cache_misses + 9 cache_hits）；默认同步路径无回归；review-1 审查通过无阻塞项。",
+  "acceptance_criteria": [
+    {
+      "criterion": "paddleocr_vl 只在 selected pages / crops 触发，不出现整本同步跑",
+      "result": "pass",
+      "evidence": "report.json aggregate_metrics: total_selected_pages=9, total_scope_pages=32, selected_ratio=0.2812。4 个有 scope 的样例 selected_ratio 均 < 1.0（五下科学 0.4、数学八年级 0.14、数学试卷 0.33、英语八年级 0.25）。语文五年级 selected_pages=[]。"
+    },
+    {
+      "criterion": "quality 模式触发页比例可观测，且在 5 样例上有明确审计结果",
+      "result": "pass",
+      "evidence": "report.json 含 aggregate_metrics（selected_ratio/cache_hits/cache_misses/candidate_counts）和逐样例 profile-audits.json。5 样例全覆盖：4 个有 scope + 1 个 no_enhancement_context。"
+    },
+    {
+      "criterion": "默认同步路径不回归；指定测试通过",
+      "result": "pass",
+      "evidence": "pytest test_hybrid_pipeline.py (6 passed) + test_hybrid_e2e.py (5 passed) = 11 passed。e2e 新增 Phase 3 越界门禁：有 scope 的 selected_ratio < 1.0，无 scope 的显式 skipped_reason。"
+    },
+    {
+      "criterion": "触发报告能支撑后续局部能力模型评估输入",
+      "result": "pass",
+      "evidence": "report.json 含 paddle_candidate_count=10 vs mineru_candidate_count=57、逐样例 trigger_reasons、cache 统计。profile-audits.json 逐样例可追溯。可直接供局部模型评估任务复用。"
+    }
+  ],
+  "scenarios_verified": [
+    "pytest test_hybrid_pipeline.py + test_hybrid_e2e.py → 11 passed",
+    "report.json selected_ratio=0.2812 (9/32 页)，非整本跑批",
+    "语文五年级 profile-audits.json: paddleocr_vl skipped_reason=no_enhancement_context, selected_pages=[]",
+    "4 个有 scope 样例 selected_ratio 均 < 1.0",
+    "cache 机制：9 cache_misses_first_run + 9 cache_hits_second_run",
+    "review-1 审查通过，blocking_findings=[]"
+  ],
+  "test_commands": [
+    "pytest tests/test_hybrid_pipeline.py tests/test_hybrid_e2e.py -q → 11 passed, 4 warnings (46.76s)"
+  ],
+  "non_blocking_observations": [
+    "数学试卷 paddleocr_vl source_dir 缺失，虽然有 image_dense 触发 4 页但无真实 Paddle 候选输出（review-1 已作为非阻塞观察提出）。",
+    "返工前 selected_ratio=0.549（28/51 页），返工后收敛到 0.2812（9/32 页），说明触发上界收紧效果显著。",
+    "profile-audits.json 中 mineru_full 对语文五年级的 skipped_reason=no_enhancement_pages（不同于 paddleocr_vl 的 no_enhancement_context），这是合理的区分。"
+  ],
+  "regressions_found": []
+}

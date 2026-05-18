@@ -1,0 +1,6 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T10:31:02+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T11:07:41+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T11:11:44+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-17T11:13:43+08:00", "reason": "resume-task: review成立：Paddle 触发越界到整本，需要收紧到 enhancement context 并补负例测试与 e2e 门禁", "actor": "pm-chief"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T11:29:57+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T11:35:28+08:00", "reason": "task-watcher auto close after qa verify pass"}

@@ -1,0 +1,56 @@
+{
+  "task_id": "增强答案页与题后解析识别",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-18T08:19:36+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。本轮确实补进了答案页标题、题后解析 heading、已分配视觉作答区等识别能力，专项摘要也给出了 5 样例的命中统计；但当前 `exercise_detector.py` 在进入 `answer_section` 状态后，会把后续遇到的 `table/image` 视觉块优先追加到当前答案项，而不是先按 `assigned_question_id / assigned_region_id` 回挂到对应题目。只要文档出现“题后答案 cue 之后又开始新题，且新题带表格/图片”的场景，就会把新题视觉内容误挂到前一题答案解析下，违反任务里“不得为了提高命中率伪造题号归属”的硬性约束，也会让当前 `p2-answer-teacher/detection/summary.json` 的命中统计失去可信度。因此本任务还不能进入 QA。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+      "finding": "循环开头新增的 `if current_answer_section is not None and block.kind in _VISUAL_BLOCK_KINDS` 分支会直接吞掉所有后续视觉块，并把它们追加到 `current_answer_item`；这个分支发生在 `_attach_visual_block()` 之前，因此即便视觉块已经带了 `assigned_question_id='2' / assigned_region_id='p1:q2:1'`，也不会再被路由回第 2 题，而是被错误挂到前一题答案段里。",
+      "recommendation": "进入答案段后，视觉块仍应先走题目归属解析：优先按 `assigned_region_id / assigned_question_id` 路由到目标题目，只有确认它属于当前答案页中的答案内容时才追加到 `answer_section`。同时补一条回归测试，覆盖“inline answer cue 后开始新题，新题带 assigned visual block”的场景，确保不会把新题表格/图片吞进上一题答案解析。",
+      "evidence": "代码位置见 exercise_detector.py:65-73 与 75-83。最小复现：`1. 第一题` -> `答案：步骤一` -> `2. 第二题` -> `table(meta={assigned_question_id:'2', assigned_region_id:'p1:q2:1'})`。当前 `detect_exercise_document()` 输出中，这个表格会进入 `answer_sections[0].items[0].blocks`，而 `sections[0].items[1]` 仍没有对应视觉内容。"
+    },
+    {
+      "severity": "medium",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/detection/summary.json",
+      "finding": "专项摘要建立在当前 detector 回放结果之上，并宣称 `unmatched_answer_item_count = 0`、若干样例 `hit / hit_with_warnings`。但在题后答案状态会误吞后续视觉块这一阻塞回归未修复前，这些命中统计并不能证明“答案区/答案分节命中正确”，只能证明“命中了某些答案 cue”。",
+      "recommendation": "修正 detector 路由逻辑后重新 replay 五样例，再更新 `summary.json` 中的 aggregate/sample 统计与 risk 说明；必要时把“命中但可能误挂题号”的样例单独列为 failure bucket，而不是继续算作稳定 hit。",
+      "evidence": "summary.json:6-15、68-87 当前给出 `matched_answer_item_count = 3`、`unmatched_answer_item_count = 0` 和 `数学试卷 hit_with_warnings`。但上述统计没有覆盖我复现出的“答案段后新题视觉块误挂”路径，因而不能作为可验收基线。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强答案页与题后解析识别/result.json",
+      "finding": "`result.json` 只写了“已增强并完成 replay/测试”，没有按 instruction 约定交代新增 cue、命中提升幅度、剩余 miss、warning 桶和后续建议。",
+      "recommendation": "补修时把这些结构化信息直接写回 `result.json`，避免 reviewer 只能从代码和 artifacts 反推交付结论。",
+      "evidence": "instruction.md 明确要求 `result.json` 写明新增 cue、命中提升情况、剩余 miss 与后续建议；当前 result.json 仅有简短 summary。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强答案页与题后解析识别/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强答案页与题后解析识别/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/增强答案页与题后解析识别/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_ir.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/detection/summary.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py -o cache_dir=/private/tmp/chiralium-pytest-answer-detection --basetemp=/private/tmp/chiralium-pytest-answer-detection-tmp",
+      "result": "passed (6 passed, 4 warnings)"
+    },
+    {
+      "command": "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -c 'from app.services.pdf_to_word.exercise_detector import detect_exercise_document; from app.services.pdf_to_word.models import PDFSourceBlock, PageBox; blocks=[PDFSourceBlock(kind=\"text\",page=1,text=\"1. 第一题\",bbox=PageBox(page=1,x0=0,y0=0,x1=10,y1=10),column=0,order=0),PDFSourceBlock(kind=\"text\",page=1,text=\"答案：步骤一\",bbox=PageBox(page=1,x0=0,y0=20,x1=10,y1=30),column=0,order=1),PDFSourceBlock(kind=\"text\",page=1,text=\"2. 第二题\",bbox=PageBox(page=1,x0=0,y0=40,x1=10,y1=50),column=0,order=2),PDFSourceBlock(kind=\"table\",page=1,text=\"<table><tr><td>第二题表格</td></tr></table>\",bbox=PageBox(page=1,x0=0,y0=60,x1=50,y1=80),column=0,order=3,meta={\"assigned_question_id\":\"2\",\"assigned_region_id\":\"p1:q2:1\"})]; print(detect_exercise_document(blocks).to_dict())'",
+      "result": "failed review check: 第 2 题表格未挂到 `sections[0].items[1]`，而是被追加进 `answer_sections[0].items[0].blocks`，证明存在错题号归属回归。"
+    },
+    {
+      "command": "静态复核 /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py 与 /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+      "result": "确认新增测试覆盖了答案页标题、题后解析 heading、视觉作答区物化和 unmatched warning 保留，但没有覆盖“答案 cue 后重新进入新题 + assigned visual block”的回切场景。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

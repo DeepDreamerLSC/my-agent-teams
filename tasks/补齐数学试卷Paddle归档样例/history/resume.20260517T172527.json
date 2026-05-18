@@ -1,0 +1,13 @@
+{
+  "task_id": "补齐数学试卷Paddle归档样例",
+  "resumed_at": "2026-05-17T17:25:27+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "PM 调整验收为 provenance 契约收口：要求语义诚实且 phase3/e2e 仍可消费，不再伪造 original-run closed",
+  "archived_files": [
+    "ack.20260517T172527.json",
+    "review.20260517T172527.json",
+    "review.20260517T172527.md",
+    "result.20260517T172527.json"
+  ]
+}

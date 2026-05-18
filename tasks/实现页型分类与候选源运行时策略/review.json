@@ -1,0 +1,38 @@
+{
+  "task_id": "实现页型分类与候选源运行时策略",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T23:19:17+08:00",
+  "status": "approve",
+  "summary": "审查通过。本次交付已把 P1 页型/候选源策略真正接进 `hybrid_experimental` runtime：`HybridExperimentalPipeline` 现在会生成 `source_selection` 事实，并把 `document/page page_type`、`default_source_profile`、`supplemental_source_profile`、`selected_pages_or_crops` 同步到 `last_run`、`profile_audits` 和 parser response `meta.hybrid_pipeline.source_selection`；同时 `paddleocr_vl` 已从“仅配置存在”收口为“仅在 source_selection + trigger 命中的 selected pages 上执行”的补充源，负样例继续走 `baseline_only`，公式仍保持 `audit-only / merge-disabled`。",
+  "blocking_findings": [],
+  "non_blocking_findings": [],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现页型分类与候选源运行时策略/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现页型分类与候选源运行时策略/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现页型分类与候选源运行时策略/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/P1候选源页型选择策略.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py -o cache_dir=/private/tmp/chiralium-pytest-source-selection --basetemp=/private/tmp/chiralium-pytest-source-selection-tmp",
+      "result": "21 个用例全部通过；仅有 4 条既有 FastAPI `on_event` deprecation warnings，与本任务改动无关。"
+    },
+    {
+      "command": "静态复核 /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+      "result": "确认 runtime 已新增 `PageSourceSelection` / `SourceSelectionPlan`，并在 `_build_source_selection_plan()`、`_select_paddle_pages()`、`_merge_source_selection_with_profile_audits()` 中把 sample/page 级 `page_type`、默认源、补充源和 selected pages 串到真实执行路径，而不是只停留在配置层。"
+    },
+    {
+      "command": "对照 P1 策略文档/JSON 与 parser_client/service 暴露路径",
+      "result": "确认当前默认规则与 P1 口径一致：`mineru_full` 仍为默认增强源，`paddleocr_vl` 只作为 selected pages/crops 的补充源，`negative_non_exercise_or_question_region_unresolvable` 会输出 `baseline_only` 并跳过 Paddle，`formula_candidate` 继续保持 `audit-only / merge-disabled`；同时 `parser_client` 已把 `last_run.source_selection` 透传到 `meta.hybrid_pipeline.source_selection`，供下游审计读取。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

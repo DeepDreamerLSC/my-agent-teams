@@ -1,0 +1,32 @@
+{
+  "task_id": "接入GLM-OCR适配器到横评框架",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-14T15:13:37+08:00",
+  "summary": "已实现 GLMOCRAdapter，并接入 ADAPTER_REGISTRY；适配器支持通过本地 HTTP API 或 Python SDK 检测可用性与执行页图 OCR，输出统一的 PageIR / PDFSourceBlock / EvalMetrics 结构，并补齐 mock 测试。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_glm_ocr_adapter.py"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/parser_adapters/glm_ocr_adapter.py backend/app/services/pdf_to_word/parser_adapters/__init__.py backend/tests/test_glm_ocr_adapter.py",
+      "result": "passed"
+    },
+    {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' backend/.venv/bin/python -m pytest backend/tests/test_glm_ocr_adapter.py -q",
+      "result": "passed (6 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "GLMOCRAdapter 优先读取 GLM_OCR_API_URL 调用本地 HTTP 服务；若未配置，则回退检查并调用 Python SDK 模块（默认 glm_ocr）的 predict_page/predict 接口。",
+    "parse() 会先渲染 PDF 页图，再将每页响应转成 PageIR / PDFSourceBlock，并统计 per_page_seconds、block_count、formula_candidate_count 等指标。",
+    "原 task.json.write_scope 未包含 parser_adapters/__init__.py；本次对该文件的注册表更新基于你在当前对话中的明确授权执行。"
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次 GLM-OCR 适配器实现无关。",
+    "当前仅完成适配器接入与 mock 测试，未执行真实 GLM-OCR 环境跑批。"
+  ]
+}

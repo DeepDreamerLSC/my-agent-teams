@@ -1,0 +1,32 @@
+{
+  "task_id": "实现HybridExperimentalPipeline骨架",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-15T19:17:56+08:00",
+  "summary": "已实现 HybridExperimentalPipeline 骨架：Phase 1 仅做 baseline pass-through，调用 apple_baseline 结果并重标为 hybrid_experimental，保留 QuestionRegion / Candidate / Review / Merge 扩展点。",
+  "modified_files": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+      "description": "新增 HybridExperimentalPipeline、配置/上下文/候选/归属/合并决策数据结构，以及 baseline-only pass-through 骨架。"
+    },
+    {
+      "path": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+      "description": "新增骨架回归测试：验证 hybrid adapter 身份、pipeline 与 apple baseline 等价的 pass-through、以及扩展点 stub 行为。"
+    }
+  ],
+  "test_results": [
+    {
+      "command": "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python3 -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_config.py -q",
+      "status": "passed"
+    },
+    {
+      "command": "python3 -m py_compile /Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py",
+      "status": "passed"
+    }
+  ],
+  "notes": [
+    "Phase 1 仅做 baseline pass-through，不接入增强模型。",
+    "parse() 返回的结果 profile 已重标为 hybrid_experimental，便于后续分流与 artifact 命名。",
+    "当前保留的扩展点包括 QuestionRegion、EnhancementCandidate、MergeDecision 及对应的 stub methods。"
+  ]
+}

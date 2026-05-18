@@ -1,0 +1,9 @@
+{
+  "task_id": "实现QuestionRegion检测器",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "acknowledged_at": "2026-05-15T18:51:40+08:00",
+  "acked_at": "2026-05-15T18:51:40+08:00",
+  "summary": "已重新读取 instruction.md，继续在 write_scope 内实现 QuestionRegionDetector、补测试，并汇总 5 个 baseline 样例检测结果。"
+}

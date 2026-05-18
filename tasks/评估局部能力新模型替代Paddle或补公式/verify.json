@@ -1,0 +1,49 @@
+{
+  "task_id": "评估局部能力新模型替代Paddle或补公式",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T11:20:00+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。pytest 9 passed；评估范围已收口为局部能力（evaluation_scope=local_capability_only_no_new_end_to_end_parser_rerun）；报告含明确 owner_recommendation：table_image_lane 建议用 mineru_full 替代 Paddle 作为默认局部增强主投入，formula_lane 不建议接入任何现成模型；runner 有 --local-capability-eval 入口且可复跑（review-1 已复跑确认一致）；review-1 审查通过无阻塞项。",
+  "acceptance_criteria": [
+    {
+      "criterion": "评估范围只限局部能力模型，不回到端到端 parser 比赛",
+      "result": "pass",
+      "evidence": "report.json evaluation_scope='local_capability_only_no_new_end_to_end_parser_rerun'；runner 输入只依赖 final-archive 和 hybrid-phase1 审计产物，不启动新端到端跑批。"
+    },
+    {
+      "criterion": "报告能明确回答'是否值得替代 Paddle'或'是否值得补公式模型'",
+      "result": "pass",
+      "evidence": "owner_recommendation.table_image_lane.verdict='prefer_mineru_full_as_default_local_enhancer'，含 4 条理由（32 vs 8 接受数、13.24s vs 243.10s/页时延、duplicate_candidate_prefer_mineru 策略偏向、Paddle 保留 A/B 备选）；owner_recommendation.formula_lane.verdict 为不建议接入现成模型。"
+    },
+    {
+      "criterion": "有可复现的 runner / 命令 / 样例说明",
+      "result": "pass",
+      "evidence": "model_eval_runner.py L35 --local-capability-eval 入口；report.json repro 字段含完整复跑命令和 run_label；review-1 已复跑并生成 review-20260517-local-capability/ 产物，与原始报告结论一致。"
+    },
+    {
+      "criterion": "结论可供 owner 直接做下一轮模型投入决策",
+      "result": "pass",
+      "evidence": "owner_recommendation 分两条 lane 各给出 verdict/recommended_profile/reasons/next_steps，可直接转化为'继续投 mineru_full'或'开 crop-level 公式 OCR 专项'的决策。"
+    }
+  ],
+  "scenarios_verified": [
+    "pytest tests/test_model_eval_runner.py → 9 passed, 4 warnings",
+    "report.json evaluation_scope 确认不回到端到端 parser",
+    "owner_recommendation.table_image_lane: prefer_mineru_full (32 vs 8 accepted, 13.24s vs 243.10s/page)",
+    "owner_recommendation.formula_lane: do not add formula model now",
+    "report.json repro 含完整复跑命令",
+    "review-20260517-local-capability/ 产物存在（review-1 复跑确认）",
+    "review-1 审查通过，blocking_findings=[]"
+  ],
+  "test_commands": [
+    "pytest tests/test_model_eval_runner.py -q → 9 passed, 4 warnings",
+    "python -m app.services.pdf_to_word.model_eval_runner --local-capability-eval --archive-root ... --hybrid-audit-root ... --output-dir ... --run-label review-20260517-local-capability → 成功复跑"
+  ],
+  "non_blocking_observations": [
+    "mineru_full 汇总 5 样例 vs paddleocr_vl 汇总 4 样例，覆盖数不完全一致。review-1 已复核共同样例（39 页范围）后确认 mineru_full 仍保持优势（接受率 32.35% vs 23.53%），结论不反转。（review-1 已作为非阻塞观察提出）",
+    "本次结论基于现有归档产物的离线汇总，不代表新模型已具备正式接线质量门槛，后续引入新局部模型仍需单独补运行产物和 merge 验证。"
+  ],
+  "regressions_found": []
+}

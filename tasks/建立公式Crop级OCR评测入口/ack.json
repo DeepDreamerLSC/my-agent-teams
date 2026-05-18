@@ -1,0 +1,7 @@
+{
+  "task_id": "建立公式Crop级OCR评测入口",
+  "agent": "arch-1",
+  "status": "working",
+  "summary": "已重新读取 instruction.md 与 task.json，开始补充公式 crop 级 OCR 评测入口、对应测试，并基于现有 phase4-formula-baseline 产物生成首份可复跑评测报告。",
+  "acknowledged_at": "2026-05-17T12:10:08+08:00"
+}

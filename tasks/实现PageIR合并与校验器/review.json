@@ -1,0 +1,44 @@
+{
+  "task_id": "实现PageIR合并与校验器",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-15T19:45:31+08:00",
+  "status": "approve",
+  "summary": "审查通过。实现已在 write_scope 内新增 `page_ir_merger.py`、`hybrid_validator.py` 及对应测试，完成了 accepted image/table 候选向 baseline PageIR 的追加、baseline blocks 前缀保真、来源 metadata 注入、页级 validator/fallback，以及 `hybrid-pages.jsonl` / `validator-report.json` 写出。我复跑了相关测试为 `18 passed, 4 warnings`，并额外抽查 merger/validator 的实际输出，确认追加 block 保留 baseline 文本不变，新增 block 带 `source_profile`、`merge_action`、`candidate_id`、归属信息与 confidence，validator 失败时整页回退 baseline。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/page_ir_merger.py",
+      "finding": "当前 merger 注入的 block metadata 已覆盖本轮验收必需字段，但还没有把设计文档示例中提到的 `merge_confidence`、`filters`、`validator_status` 等审计字段一并固化到新增 block 的 `meta` 中。现阶段不影响“追加 + 保真 + 页级 fallback”主目标，但后续如果要直接靠 merged PageIR 做全链路审计，信息还不算完整。",
+      "recommendation": "后续在把 merger/validator 接入完整 hybrid pipeline 时，建议把 `FilteredCandidate.filters`、assignment/decision 的置信表达以及 validator 结论继续写回 block meta 或旁路 audit，以对齐设计文档 4.1/9.3 的审计口径。",
+      "evidence": "page_ir_merger.py:100-111 当前注入 `candidate_id/source_profile/merge_action/merge_reason/assigned_question_id/assigned_region_id/assignment_status/assignment_score`；设计文档 4.1 示例还列出 `merge_confidence`、`validator_status`、`filters` 等字段。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PageIR合并与校验器/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PageIR合并与校验器/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PageIR合并与校验器/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/page_ir_merger.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/hybrid_validator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_page_ir_merger.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_validator.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/candidate_filter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/models.py",
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/hybrid_experimental增强管线设计.md"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_page_ir_merger.py tests/test_hybrid_validator.py tests/test_candidate_extractor.py tests/test_candidate_filter.py tests/test_question_region_detector.py -q",
+      "result": "passed (18 passed, 4 warnings)"
+    },
+    {
+      "command": "人工审阅 page_ir_merger.py 与 hybrid_validator.py",
+      "result": "merger 仅接收 `decision=accepted` 且 `kind in {image, table}` 的候选，按 baseline blocks 后追加，并注入来源/归属 metadata；validator 校验 baseline blocks 前缀不变、page 几何一致、block kind/bbox 合法、追加 block 必须带 `source_profile` / `merge_action`，失败时按页回退 baseline。"
+    },
+    {
+      "command": "本地最小样例复现 merger + validator 输出",
+      "result": "追加 block 的 `meta` 实际包含 `candidate_id/source_profile/merge_action/merge_reason/assigned_question_id/assigned_region_id/assignment_status/assignment_score`，validator 报告会正确统计 `accepted_candidate_count`、`appended_block_count` 和页级 fallback 状态。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

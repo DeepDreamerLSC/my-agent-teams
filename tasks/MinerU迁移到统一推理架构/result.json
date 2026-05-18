@@ -1,0 +1,20 @@
+{
+  "task_id": "MinerU迁移到统一推理架构",
+  "agent": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-14T22:45:00+08:00",
+  "summary": "已新增 MinerU normalizer、注册 mineru_blocks、补充 mineru 统一推理 profile 与 CLI wrapper，并完成回归测试。",
+  "files_changed": [
+    "backend/app/services/pdf_to_word/parser_adapters/normalizers/mineru.py",
+    "backend/app/services/pdf_to_word/parser_adapters/normalizers/__init__.py",
+    "backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "backend/tests/test_mineru_normalizer.py",
+    "backend/tests/test_pdf_to_word_inference_config.py"
+  ],
+  "tests": [
+    "cd backend && ./.venv/bin/python3 -m pytest tests/test_mineru_normalizer.py -v",
+    "cd backend && ./.venv/bin/python3 -m pytest tests/test_pdf_to_word_inference_config.py -q",
+    "cd backend && ./.venv/bin/python3 -m pytest tests/test_pdf_to_word_mineru_client.py -q",
+    "cd backend && ./.venv/bin/python3 -m pytest tests/test_pdf_to_word_document_ocr_adapter.py -q"
+  ]
+}

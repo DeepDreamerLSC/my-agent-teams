@@ -1,0 +1,133 @@
+{
+  "task_id": "归档Hybrid最终Word五样例",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-17T18:53:36+08:00",
+  "summary": "已补齐 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/` 的 authoritative 五样例最终 Word 正式归档，并把 `hybrid_experimental` 纳入 archive 索引与 README。当前不再只依赖 probe 或中间 pages 产物判断 hybrid 最终效果：5/5 样例均已生成最终 `output.docx` 且 5/5 可打开，其中 4/5 样例进入最终 `word/media`。但这次闭合的是“缺 authoritative hybrid 最终 Word 正式归档”这一 evidence blocker，不代表可以放宽默认发布口径；默认建议仍保持 `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md"
+  ],
+  "tests": [
+    "已完成 authoritative archive 生成与 DOCX openability 校验：5/5 样例生成最终 output.docx，5/5 可打开。",
+    "已核对 `final-archive/profiles/hybrid_experimental/` 下 5 个样例目录均包含 `output.docx`、`pages.jsonl`、`metrics.json`、`warnings.json`、`validator-report.json`、`source_manifest.json`。",
+    "已核对 `profile_manifest.json`、`archive_manifest.json`、`README.md` 与 `reports/hybrid_experimental_authoritative_archive_report.{json,md}` 的索引与结论一致。"
+  ],
+  "archive_result": {
+    "authoritative_hybrid_final_word_archive_gap_closed": true,
+    "broader_release_blocker_closed": true,
+    "authoritative_docx_sample_count": 5,
+    "openable_docx_sample_count": 5,
+    "sample_with_word_media_count": 4,
+    "sample_with_table_xml_count": 2,
+    "explicit_answer_area_materialized_sample_count": 0,
+    "answer_section_materialized_sample_count": 0,
+    "release_boundary_changed": false,
+    "should_widen_hybrid_default_now": false,
+    "should_create_followup_release_scope_task": true
+  },
+  "sample_summary": [
+    {
+      "sample": "五下科学",
+      "docx_kind": "exercise",
+      "docx_openable": true,
+      "word_media_count": 4,
+      "image_entered_final_word": true,
+      "table_entered_final_word": true,
+      "fallback_page_indices": [
+        1
+      ],
+      "answer_area_item_count": 0,
+      "answer_section_count": 0
+    },
+    {
+      "sample": "语文五年级",
+      "docx_kind": "generic_fallback",
+      "docx_openable": true,
+      "word_media_count": 0,
+      "image_entered_final_word": false,
+      "table_entered_final_word": false,
+      "fallback_page_indices": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "answer_area_item_count": 0,
+      "answer_section_count": 0
+    },
+    {
+      "sample": "数学八年级",
+      "docx_kind": "exercise",
+      "docx_openable": true,
+      "word_media_count": 2,
+      "image_entered_final_word": true,
+      "table_entered_final_word": true,
+      "fallback_page_indices": [],
+      "answer_area_item_count": 0,
+      "answer_section_count": 0
+    },
+    {
+      "sample": "英语八年级",
+      "docx_kind": "exercise",
+      "docx_openable": true,
+      "word_media_count": 1,
+      "image_entered_final_word": true,
+      "table_entered_final_word": false,
+      "fallback_page_indices": [
+        3,
+        11
+      ],
+      "answer_area_item_count": 0,
+      "answer_section_count": 0
+    },
+    {
+      "sample": "数学试卷",
+      "docx_kind": "exercise",
+      "docx_openable": true,
+      "word_media_count": 20,
+      "image_entered_final_word": true,
+      "table_entered_final_word": false,
+      "fallback_page_indices": [],
+      "answer_area_item_count": 0,
+      "answer_section_count": 0
+    }
+  ],
+  "implementation_notes": [
+    "归档 provenance 采用诚实口径：`source_dir` 指向 `hybrid-e2e-validation` 套件根目录，并明确说明它不是 timestamped model-eval run，而是一组 authoritative merged-page 验证产物。",
+    "`pages.jsonl` 由各样例的 `hybrid-pages.jsonl` 复制并重命名，以保持 final-archive 各 profile 的统一文件名约定。",
+    "源套件只提供 `hybrid-pages.jsonl` 与 `validator-report.json`；本次归档在 `final-archive` 内基于 authoritative hybrid merged pages 现算生成最终 `output.docx / metrics.json / warnings.json`，没有伪装成源 run 直接产物。",
+    "README 已补充 `hybrid_experimental` 条目、归档完整性说明，以及 authoritative archive 专项报告入口，方便 review-1 与 qa-1 直接复核。"
+  ],
+  "remaining_gaps": [
+    "显式 `answer_area` 与 `answer_section` 在五样例上仍为 `0/5`，本任务未过度宣称这部分能力已 materialize。",
+    "`语文五年级` 仍是 document fallback baseline only，不属于 exercise 结构化成功样例。",
+    "`hybrid-e2e-validation` 来源缺少 timestamped model-eval timing provenance；本次已在 manifest 和报告中保留该限制说明。",
+    "本任务只补 authoritative archive 证据，不修改默认路由，也不意味着可以立即放宽 hybrid 发布承诺。"
+  ],
+  "next_steps": [
+    "按任务流转进入 review-1，对 `final-archive/profiles/hybrid_experimental/`、`archive_manifest.json` 与专项报告做归档完整性审查。",
+    "review 通过后由 qa-1 基于本次 authoritative 归档判断 owner/PM 是否需要单独创建“放宽 hybrid 发布承诺”任务。",
+    "如 owner 确认要放宽发布口径，应新开任务专门评估默认路由与发布承诺，不在本任务内直接扩大范围。"
+  ],
+  "evidence_paths": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/profile_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md"
+  ]
+}

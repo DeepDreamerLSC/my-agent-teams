@@ -1,0 +1,47 @@
+{
+  "task_id": "评估局部能力新模型替代Paddle或补公式",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T11:02:39+08:00",
+  "status": "approve",
+  "summary": "审查通过。本次交付把评估范围收口在“局部能力模型”内，没有回到新的端到端 parser 横评；`model_eval_runner.py` 新增了 `--local-capability-eval` 入口，能基于既有 `final-archive` 与 `hybrid-phase1` 审计产物自动生成 owner 可决策报告；测试与实际复跑均通过，且复跑结果与任务提交的报告在关键结论上完全一致：表格/图片局部增强阶段当前更建议以 `mineru_full` 替代 Paddle 作为默认主投入方向，而公式专项暂不建议接入任何现成模型。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-local-model-eval/20260517-103900/local_capability_report.json",
+      "finding": "报告中的 `mineru_full` 与 `paddleocr_vl` 归档样例覆盖数并不完全一致：`mineru_full` 汇总了 5 个样例，而 `paddleocr_vl` 为 4 个样例。",
+      "recommendation": "后续若要把该报告直接升级为长期比较基线，可在表格或说明中显式标注“全量样例汇总”与“共同样例对齐汇总”两套口径；本轮无需阻塞，因为我已复核共同样例集合（`五下科学`、`数学八年级`、`英语八年级`、`语文五年级`）后，`mineru_full` 仍保持更低时延（13.2937s/页 vs 243.0961s/页）且更高总体接受数（11 vs 8）。",
+      "evidence": "本地复核共同样例后，`mineru_full` 与 `paddleocr_vl` 在相同 39 页范围上的 hybrid 接受数分别为 11 与 8，接受率分别为 32.35% 与 23.53%。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/评估局部能力新模型替代Paddle或补公式/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/评估局部能力新模型替代Paddle或补公式/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/评估局部能力新模型替代Paddle或补公式/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-local-model-eval/20260517-103900/local_capability_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-local-model-eval/20260517-103900/local_capability_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-local-model-eval/review-20260517-local-capability/local_capability_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/五下科学/merge-decisions.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/数学八年级/merge-decisions.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/数学试卷/merge-decisions.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/英语八年级/merge-decisions.jsonl",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1/语文五年级/merge-decisions.jsonl"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q",
+      "result": "9 个用例全部通过，4 条既有 FastAPI `on_event` deprecation warnings，与本任务无关。"
+    },
+    {
+      "command": "PYTHONPATH=/Users/linsuchang/Desktop/work/chiralium/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --local-capability-eval --archive-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive --hybrid-audit-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-phase1 --output-dir /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-local-model-eval --run-label review-20260517-local-capability",
+      "result": "成功复跑并生成 `review-20260517-local-capability/local_capability_report.{json,md}`；与提交产物相比，评估范围、`mineru_full` 替代 Paddle 结论、公式 lane 暂不接模结论、`mineru_full`/`paddleocr_vl` 接受数、`mineru_full` formula skip 数以及 `qwen3_vl_8b` warnings 总数均一致。"
+    },
+    {
+      "command": "静态复核 model_eval_runner.py 与 hybrid-phase1 审计产物",
+      "result": "确认报告结论来自 `final-archive` 的样例统计与 `hybrid-phase1/merge-decisions.jsonl` 的真实 `accept/skip` 决策汇总，而不是手工硬编码端到端比较；`evaluation_scope` 也明确固定为 `local_capability_only_no_new_end_to_end_parser_rerun`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

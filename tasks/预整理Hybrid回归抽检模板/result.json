@@ -1,0 +1,51 @@
+{
+  "task_id": "预整理Hybrid回归抽检模板",
+  "agent": "qa-1",
+  "status": "done",
+  "completed_at": "2026-05-17T09:15:00+08:00",
+  "summary": "已预整理 Hybrid 回归抽检模板，写入 artifacts/pdf2word/final-archive/reports/hybrid回归抽检模板.md。模板覆盖 5 类检查项（顺序/题号、candidate/fallback、ExerciseIR、DOCX、online review worker），明确区分正样例（4 个）与负样例（语文五年级），提供逐页 7 步检查流程、JSON 报告模板结构和可勾选 checklist。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid回归抽检模板.md"
+  ],
+  "template_sections": [
+    {
+      "section": "样例分组",
+      "status": "已固化",
+      "detail": "4 正样例（数学试卷/数学八年级/英语八年级/五下科学）+ 1 负样例（语文五年级），含重点抽检页分组表"
+    },
+    {
+      "section": "顺序/题号检查",
+      "status": "已固化",
+      "detail": "Step 2：order_verdict/order_reasons/question_sequence_issue_count 检查流程已就绪，可基于已完成的题号顺序校验器直接使用"
+    },
+    {
+      "section": "Candidate/Fallback 行为",
+      "status": "已固化",
+      "detail": "Step 3：accepted_candidate_count/fallback_to_baseline/reasons/appended_block_count 检查流程已就绪"
+    },
+    {
+      "section": "ExerciseIR 挂接",
+      "status": "已固化框架，待下游就绪",
+      "detail": "Step 5：检查流程已设计，但需等 ExerciseIR 集成测试完成后补入正式结论"
+    },
+    {
+      "section": "DOCX 可视结果",
+      "status": "已固化框架，需人工执行",
+      "detail": "Step 6：每样例至少抽检 3 页，需人工打开 DOCX 逐页对比"
+    },
+    {
+      "section": "Online Review Worker 指标",
+      "status": "占位，待补入",
+      "detail": "Step 7：json_valid_rate/review_acceptance_rate/review_mode 等 4 项指标已预留栏目，等待在线 review worker 最终收口后补入阈值与结论"
+    }
+  ],
+  "placeholder_count": 10,
+  "tests": [
+    "本任务为文档整理型 verification，无自动化测试；模板覆盖度通过 section 计数和 placeholder 检查确认"
+  ],
+  "risks": [
+    "Online review worker 指标（Step 7）为纯占位，阈值和结论需待正式任务补入",
+    "ExerciseIR 挂接检查（Step 5）依赖下游集成测试就绪",
+    "DOCX 抽检（Step 6）需人工执行，无法全自动化"
+  ]
+}

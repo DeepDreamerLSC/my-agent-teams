@@ -1,0 +1,47 @@
+{
+  "task_id": "LocalInferenceBackend抽象层",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-14T18:35:22+08:00",
+  "status": "approve",
+  "summary": "复审通过。本轮补修已修复此前两个 healthcheck 假阳性问题：CustomHTTPBackend 仅在 2xx 成功、404/405 时才回退到 POST 空请求；OpenAICompatibleVisionBackend 仅在 GET /models 返回 2xx 时判健康。对应回归测试与手工复核均通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "scope",
+      "finding": "本次为补修后的复审，重点复核 custom_http_backend.py、openai_vision_backend.py 与 test_pdf_to_word_inference_backends.py 中针对 404/401 healthcheck 判定的修复；未重新展开 review 首轮已覆盖且本轮未改动的其他 backend 文件。",
+      "recommendation": "后续进入 Phase C/registry 集成时，再对完整 backend 抽象层做一次联动复核。"
+    },
+    {
+      "severity": "info",
+      "file": "backend/app/services/pdf_to_word/parser_adapters/inference/registry.py",
+      "finding": "result.json 里已明确说明：本任务仍未把 Phase A 的 registry create_backend 占位替换为新 factory，这一集成仍留待后续任务处理。",
+      "recommendation": "后续集成任务里应补一条从 registry 到新 backend factory 的联通验证。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/LocalInferenceBackend抽象层/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/LocalInferenceBackend抽象层/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/LocalInferenceBackend抽象层/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/custom_http_backend.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/openai_vision_backend.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_inference_backends.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/backend.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference/registry.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m py_compile app/services/pdf_to_word/parser_adapters/inference/custom_http_backend.py app/services/pdf_to_word/parser_adapters/inference/openai_vision_backend.py tests/test_pdf_to_word_inference_backends.py",
+      "result": "passed"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_inference_backends.py -q",
+      "result": "passed (11 passed, 4 warnings)"
+    },
+    {
+      "command": "内联脚本：CustomHTTP GET /health=404 时验证会 fallback 到 POST /infer_page；OpenAI GET /v1/models=404 时验证返回 ok=False",
+      "result": "passed: custom_404_fallback_ok=True 且请求轨迹为 [(GET,/health),(POST,/infer_page)]；vision_404_ok=False"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

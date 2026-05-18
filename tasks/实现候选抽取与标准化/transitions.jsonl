@@ -1,0 +1,3 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-15T18:25:04+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-15T18:31:24+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-15T18:37:01+08:00", "reason": "task-watcher auto close after qa verify pass"}

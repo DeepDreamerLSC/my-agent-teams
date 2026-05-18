@@ -1,0 +1,51 @@
+{
+  "task_id": "补齐Hybrid回归样例与人工抽检流程",
+  "agent": "qa-1",
+  "status": "done",
+  "completed_at": "2026-05-17T10:10:00+08:00",
+  "summary": "按 review round 1 驳回意见做最小补修。补齐了验收标准点名的三个缺失指标（media_count/has_drawing/has_table_xml），修正了 reviewed_rejected_count → review_rejected_count 字段名与真实报告对齐，同时保留了上一轮已修正的 online_review/json_valid_rate=1.0 等真实事实。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid回归抽检模板.md"
+  ],
+  "rework_changes": [
+    {
+      "item": "新增 Step 4b：媒体/图形/表格指标",
+      "location": "hybrid回归抽检模板.md Step 4b（第 78-90 行附近）",
+      "detail": "新增独立检查步骤，覆盖 media_count（从 hybrid-pages.jsonl 统计 kind=image block 数量）、has_drawing（检查 meta.content_kind + DOCX 人工确认）、has_table_xml（检查 table 类 block + DOCX 人工确认），每项含取值方式、判定标准和数据来源"
+    },
+    {
+      "item": "必检指标一览表新增 3 行",
+      "location": "hybrid回归抽检模板.md 第 3 节必检指标一览",
+      "detail": "新增 media_count（正样例，来源 hybrid-pages.jsonl blocks kind='image'）、has_drawing（人工确认，来源 meta.content_kind + DOCX）、has_table_xml（人工确认，来源 block kind + DOCX）"
+    },
+    {
+      "item": "Checklist 新增 3 项",
+      "location": "hybrid回归抽检模板.md 第 6.1 节自动化检查",
+      "detail": "新增 media_count 检查（正样例 hybrid-pages.jsonl 有 image block）、has_drawing 检查（media_count>0 时人工确认 DOCX）、has_table_xml 检查（table 类 block 时人工确认）"
+    },
+    {
+      "item": "报告模板新增 step_4b_media 字段",
+      "location": "hybrid回归抽检模板.md 第 5.1 节逐样例报告模板",
+      "detail": "新增 step_4b_media: { media_count, has_drawing, has_table_xml } 字段"
+    },
+    {
+      "item": "修正 reviewed_rejected_count → review_rejected_count",
+      "location": "hybrid回归抽检模板.md Step 7 第 122 行",
+      "detail": "字段名已与 report.json -> online_review_probe.metrics 的真实字段名 review_rejected_count 对齐，并写明来源路径"
+    }
+  ],
+  "preserved_from_previous_round": [
+    "review_mode=online_review（非 skipped_no_review_worker）",
+    "json_valid_rate=1.0, review_acceptance_rate=1.0, service_available=true",
+    "fallback_triggered_sample_count=3（非'全部 fallback'）",
+    "7 步检查流程结构、11+3 项必检指标、4 组 checklist"
+  ],
+  "tests": [
+    "本任务为文档型返工，无自动化测试",
+    "验证方式：grep 确认 reviewed_rejected_count 残留为 0，media_count/has_drawing/has_table_xml 出现在 4 个位置（Step 4b + 指标表 + 报告模板 + checklist）"
+  ],
+  "risks": [
+    "media_count/has_drawing/has_table_xml 的取值依赖 hybrid-pages.jsonl 中的 block.kind 和 block.meta 字段，若后续管线变更 block 结构需同步更新取值说明",
+    "has_drawing 和 has_table_xml 最终判定需人工打开 DOCX 确认，无法全自动化"
+  ]
+}

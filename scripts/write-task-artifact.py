@@ -135,16 +135,15 @@ def _capture_patch(task: dict[str, Any], payload: dict[str, Any]) -> tuple[bool,
         or task.get("target_branch")
         or ""
     ).strip()
-    patch_text = ""
+    patch_chunks: list[str] = []
+    format_proc = None
     if target_branch:
         format_proc = _run_git(worktree_path, "format-patch", "--stdout", f"{target_branch}..HEAD")
         if format_proc.returncode == 0 and format_proc.stdout.strip():
-            patch_text = format_proc.stdout
-    diff_proc = None
-    if not patch_text:
-        diff_proc = _run_git(worktree_path, "diff", "--binary", "HEAD")
-        if diff_proc.returncode == 0 and diff_proc.stdout.strip():
-            patch_text = diff_proc.stdout
+            patch_chunks.append(format_proc.stdout)
+    diff_proc = _run_git(worktree_path, "diff", "--binary", "HEAD")
+    if diff_proc.returncode == 0 and diff_proc.stdout.strip():
+        patch_chunks.append(diff_proc.stdout)
     untracked_proc = _run_git(worktree_path, "ls-files", "--others", "--exclude-standard")
     untracked_files = [line.strip() for line in untracked_proc.stdout.splitlines() if line.strip()] if untracked_proc.returncode == 0 else []
     if untracked_files:
@@ -159,10 +158,16 @@ def _capture_patch(task: dict[str, Any], payload: dict[str, Any]) -> tuple[bool,
             if untracked_diff.returncode in {0, 1} and untracked_diff.stdout.strip():
                 untracked_chunks.append(untracked_diff.stdout)
         if untracked_chunks:
-            patch_text = patch_text + ("\n" if patch_text and not patch_text.endswith("\n") else "") + "".join(untracked_chunks)
+            patch_chunks.extend(untracked_chunks)
+    patch_text = "".join(
+        chunk if chunk.endswith("\n") else f"{chunk}\n"
+        for chunk in patch_chunks
+    )
     if not patch_text:
         if untracked_files:
             return False, f"patch_missing_untracked:{','.join(untracked_files)}"
+        if target_branch and format_proc and format_proc.returncode != 0 and diff_proc.returncode != 0:
+            return False, f"patch_capture_failed:{target_branch}"
         if target_branch and diff_proc and diff_proc.returncode != 0:
             return False, f"patch_capture_failed:{target_branch}"
         return False, None

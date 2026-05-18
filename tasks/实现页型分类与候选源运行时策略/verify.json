@@ -1,0 +1,48 @@
+{
+  "task_id": "实现页型分类与候选源运行时策略",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-18T00:48:17+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。`hybrid_experimental` runtime 已接通统一的 `source_selection` 事实层：一次 run 内可观测到 `document/page page_type`、`default_source_profile`、`supplemental_source_profile`、`selected_pages_or_crops`，并由同一套策略驱动 `paddleocr_vl` 的定向补充执行。默认边界仍保持 `mineru_full` 默认、`paddleocr_vl` 定向补充、负样例 `baseline_only`、公式 `audit-only / merge-disabled`。",
+  "acceptance_criteria": [
+    {
+      "criterion": "一次 hybrid run 内可观测到 `page_type`、`default_source_profile`、`supplemental_source_profile`、`selected_pages_or_crops`",
+      "result": "pass",
+      "evidence": "测试断言已覆盖 runtime 暴露路径：`test_hybrid_pipeline.py` 验证 `pipeline.last_run.source_selection.document_page_type`、`selected_pages_or_crops`、`default_source_profile` 与 `supplemental_source_profile`；`test_hybrid_backend_resolve.py` 验证 `response['meta']['hybrid_pipeline']['source_selection']` 中同名字段存在并透传。"
+    },
+    {
+      "criterion": "默认规则与 P1 策略文档一致：`mineru_full` 默认、`paddleocr_vl` 定向补充、负样例 baseline-only、公式 audit-only",
+      "result": "pass",
+      "evidence": "`artifacts/pdf2word/p1-source-selection/source_selection_strategy.json` 明确规定：`math_exam_image_dense` 与 `science_or_math_table_heavy` 以 `mineru_full` 为默认源、`paddleocr_vl` 为补充源；`negative_non_exercise_or_question_region_unresolvable` 为 `baseline_only`；`formula_suspected` 为 `audit_only`。测试也覆盖了 `math_exam_image_dense`、`table_heavy`、负样例 `baseline_only` 和 `formula_candidate` 保持不并回正文。"
+    },
+    {
+      "criterion": "指定测试通过，且不回归当前 `hybrid_experimental` 解析/resolve 行为",
+      "result": "pass",
+      "evidence": "本地执行 reviewer 同组 pytest：`test_hybrid_pipeline.py`、`test_hybrid_backend_resolve.py`、`test_pdf_to_word_service.py` 共 `21 passed, 4 warnings in 0.66s`。覆盖了 runtime source selection、parser_client meta 透传与 service 层行为。"
+    },
+    {
+      "criterion": "不放开公式并回，作为下游按源审计与定向执行的运行时基线",
+      "result": "pass",
+      "evidence": "策略 JSON `release_policy` 仍为 `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`；`result.json` 与 `review.json` 都明确当前仅收口 runtime 事实层，per-source accepted/rejected/fallback 明细审计继续留给下游任务。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 instruction、result.json、review.json、review.md 与 task.json 状态",
+    "核对 `artifacts/pdf2word/p1-source-selection/source_selection_strategy.json` 中 page type/source profile 规则与发布边界",
+    "抽查 `test_hybrid_pipeline.py`、`test_hybrid_backend_resolve.py`、`test_pdf_to_word_service.py` 的断言，确认 runtime `source_selection` 事实和 meta 透传路径存在",
+    "本地复跑 reviewer 同组 21 个相关测试"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py -o cache_dir=/private/tmp/chiralium-pytest-source-selection-qa --basetemp=/private/tmp/chiralium-pytest-source-selection-qa-tmp -q -> 21 passed, 4 warnings in 0.66s",
+    "rg -n \"math_exam_image_dense|table_heavy|baseline_only|source_selection|supplemental_source_profile|selected_pages_or_crops|formula_candidate\" /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_backend_resolve.py -> 命中 runtime source_selection、负样例 baseline_only、`math_exam_image_dense`、`table_heavy` 与公式边界断言",
+    "sed -n '1,260p' /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json -> 确认 `release_policy` 与 `source_selection_rules` 口径保持 `mineru_full` 默认、`paddleocr_vl` 定向补充、负样例 baseline_only、公式 audit-only"
+  ],
+  "non_blocking_observations": [
+    "当前实现先收口 runtime `source_selection` 事实层；更细的按源 accepted/rejected/fallback 明细审计仍由下游任务“补齐按源审计与定向Paddle执行闭环”继续补齐。",
+    "页型映射目前对真实五样例含显式 sample override；更泛化的页型扩展属于后续增强，不构成本轮阻塞。",
+    "4 条 warning 均为 FastAPI `on_event` deprecation warning，与本次页型分类与候选源运行时策略验收无直接阻塞关系。"
+  ],
+  "regressions_found": []
+}

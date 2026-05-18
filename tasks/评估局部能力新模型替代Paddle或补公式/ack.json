@@ -1,0 +1,7 @@
+{
+  "task_id": "评估局部能力新模型替代Paddle或补公式",
+  "agent": "arch-1",
+  "status": "working",
+  "summary": "已重新读取 instruction.md 与 task.json，开始补充局部能力模型评估入口、必要测试，并基于现有 model-eval 与 hybrid 审计产物生成 owner 可决策报告。",
+  "acknowledged_at": "2026-05-17T10:36:20+08:00"
+}

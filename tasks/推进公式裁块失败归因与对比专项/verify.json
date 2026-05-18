@@ -1,0 +1,48 @@
+{
+  "task_id": "推进公式裁块失败归因与对比专项",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T22:11:02+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。公式裁块专项已从“只有总成功率”收敛为可复核的失败分桶与 profile 对比产物：P1 摘要正确继承真实 run `20260517-174500` 的关键数字，并把失败拆为 `alignment failed / format failed / empty / blocked / conversion failed`，同时保留下一轮 `crop/materialization`、`cleanup/conversion`、`model capability` 三条 A/B 输入；默认公式策略仍保持 `audit-only / merge-disabled`。",
+  "acceptance_criteria": [
+    {
+      "criterion": "当前公式裁块评测不再只有总成功率，而是能稳定输出失败分桶",
+      "result": "pass",
+      "evidence": "`artifacts/pdf2word/p1-formula-crop/formula_crop_failure_summary.json` 与 `.md` 已输出两层分桶。当前 `selected_profiles` 为 `alignment_failed=26 / format_failed=3 / empty=2 / blocked=51 / conversion_failed=0 / success=3`，`runnable_profiles` 为 `alignment_failed=26 / format_failed=3 / empty=2 / blocked=0 / conversion_failed=0 / success=3`。"
+    },
+    {
+      "criterion": "能区分数据/裁块问题、格式转换问题、模型识别问题",
+      "result": "pass",
+      "evidence": "Markdown 摘要已把下一轮输入拆成 `crop/materialization`、`cleanup/conversion`、`model capability` 三条 lane；其中 `unmaterialized_candidate_count=1` 对应裁块/materialization，`format_failed=3` 对应清洗/转换，`alignment_failed=26` 与 `empty=2` 对应模型识别稳定性。"
+    },
+    {
+      "criterion": "产物能直接支持下一轮公式专项任务拆解",
+      "result": "pass",
+      "evidence": "P1 JSON/Markdown 都给出了分桶规模、代表样例和下一轮 A/B 输入。示例包括 `mineru_full:数学 八年级下册pdf:p3:c2 / p4:c1 / p7:c1` 的 cleanup/conversion 样本，以及 `mineru_full:五下科学:p3:c1 / p3:c2` 的 model capability 对比样本。"
+    },
+    {
+      "criterion": "默认公式策略仍保持 `audit-only / merge-disabled`，没有被偷偷放开",
+      "result": "pass",
+      "evidence": "P1 摘要 `merge_decision.merge_enabled=false`，Markdown 也明确保留 `audit-only / merge-disabled`。最佳 runnable profile `qwen3_vl_8b` 仅 `2/17` exact success，且仍有 `alignment failed=12`、`format failed=3`，不足以支持放开 merge。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 instruction、result.json、review.json、review.md",
+    "核对 `artifacts/pdf2word/p1-formula-crop/formula_crop_failure_summary.json/.md` 的失败分桶、A/B lane 与 merge 结论",
+    "对照上游真实 `phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json`，确认 `unmaterialized_candidate_count`、`status_counts` 与 blocked profile 数一致",
+    "本地复跑 `backend/tests/test_model_eval_runner.py`"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest -o cache_dir=/private/tmp/chiralium-pytest-formula-crop-qa /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q -> 14 passed, 4 warnings in 0.11s",
+    "python3: 读取 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-crop-eval/20260517-174500/formula_crop_eval_report.json` 的 `ocr_experiments.aggregate.status_counts` -> `success=3 / baseline_alignment_failed=26 / format_failed=3 / empty=2 / blocked=51`，与 P1 摘要规范化后的失败分桶一致",
+    "rg -n 'audit-only|merge-disabled|crop/materialization|cleanup/conversion|model capability|alignment failed|format failed|empty|blocked|conversion failed' /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-formula-crop/formula_crop_failure_summary.md -> 命中失败分桶、A/B lane 与 merge-disabled 结论"
+  ],
+  "non_blocking_observations": [
+    "上游真实 `formula_crop_eval_report.json` 的原始命名里仍使用 `baseline_alignment_failed`、`needs_manual_review` 等状态名；P1 摘要已将其统一整理为任务要求的失败桶命名，复核时应以 P1 规范化口径为准。",
+    "本任务没有新增线上 OCR profile 跑批，P1 结论仍基于真实 run `20260517-174500` 的专项诊断结果。",
+    "4 条 warning 均为 FastAPI `on_event` deprecation warning，与本次公式裁块失败归因验收无直接阻塞关系。"
+  ],
+  "regressions_found": []
+}

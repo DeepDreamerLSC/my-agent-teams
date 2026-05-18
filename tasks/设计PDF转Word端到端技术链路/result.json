@@ -1,0 +1,17 @@
+{
+  "task_id": "设计PDF转Word端到端技术链路",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "已基于后续技术路线、横评最终报告和现有实现骨架，输出从 PDF 输入到 DOCX 输出的端到端技术链路设计文档，覆盖 Phase 1 数据流、Phase 2/3 扩展点、模块 JSON 契约、回退链路、性能预算以及 Formula 专项接口预留。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md"
+  ],
+  "tests": [
+    "未运行自动化测试；本任务为 design 文档输出，已对照 instruction.md、后续技术路线、横评最终报告、hybrid 管线设计稿以及现有 conversion_service / PageIR / candidate_filter / review_integrator / ExerciseIR 实现接口完成交叉核对。"
+  ],
+  "risks": [
+    "文档中新增的 page_ir_exporter 与 EnhancementTrigger 属于需实现的新桥接契约，当前仓内尚无落地代码。",
+    "Phase 1 的 image/table 在 ExerciseIR -> DOCX 侧仍需 dev 补齐占位或真实插图输出。"
+  ],
+  "completed_at": "2026-05-16T14:51:30+08:00"
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "实现学生版教师版审校版输出变体",
+  "status": "done",
+  "summary": "已实现 student/teacher/review 输出变体并完成定向测试与样例摘要。",
+  "round": 0,
+  "agent": "dev-2",
+  "finished_at": "2026-05-18T07:46:14+08:00"
+}

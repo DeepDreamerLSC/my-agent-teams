@@ -1,0 +1,7 @@
+{
+  "task_id": "实现页型分类与候选源运行时策略",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T22:47:00+08:00",
+  "summary": "已读取 instruction.md。本轮将在 hybrid runtime 中落地 PageTypeClassifier 与 SourceSelectionPolicy，输出 page_type、default_source_profile、supplemental_source_profile、selected_pages_or_crops，并保持 mineru_full 默认、paddleocr_vl 定向补充、负样例 baseline-only、公式 audit-only。"
+}

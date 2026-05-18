@@ -1,0 +1,4 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-18T13:31:28+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-18T13:32:28+08:00", "reason": "agent qa-1 claimed pooled task: 基于现有 artifacts 执行 Hybrid 收益分布回归与抽检清单整理"}
+{"from": "dispatched", "to": "working", "at": "2026-05-18T15:04:13+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-18T15:04:14+08:00", "reason": "watcher observed result.json status=success"}

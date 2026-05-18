@@ -1,0 +1,8 @@
+{
+  "task_id": "增强答案页与题后解析识别",
+  "status": "acknowledged",
+  "summary": "已恢复执行；按二次驳回意见优先补修 document_fallback 负样例上的 analysis_heading 误判，新增 fallback 守卫与退出条件并补回归测试。",
+  "round": 1,
+  "agent": "dev-2",
+  "acked_at": "2026-05-18T08:48:16+08:00"
+}

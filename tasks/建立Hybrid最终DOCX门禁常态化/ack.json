@@ -1,0 +1,7 @@
+{
+  "task_id": "建立Hybrid最终DOCX门禁常态化",
+  "agent": "arch-1",
+  "status": "working",
+  "summary": "已读取 instruction.md 与 task.json，将在 write_scope 内建立 hybrid_experimental final DOCX release evidence gate，并修正 final-archive manifest / README 的当前元数据口径问题。",
+  "acknowledged_at": "2026-05-17T19:39:40+08:00"
+}

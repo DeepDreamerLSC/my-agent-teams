@@ -1,0 +1,50 @@
+{
+  "task_id": "实现学生版教师版审校版输出变体",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-18T09:27:37+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。`student / teacher / review` 三种输出变体已经接通且职责清晰：`student` 默认保持正文、题号、选项、作答区和公式主链路稳定，不显示答案解析或 warnings；`teacher` 仅在已有 `AnswerSection` 存在时展示答案解析；`review` 在 teacher 基础上追加 unmatched/warning 审校事实。实现没有生成新的答案文本，student 默认输出未回归。",
+  "acceptance_criteria": [
+    {
+      "criterion": "`student / teacher / review` 三种输出可选择且职责清晰",
+      "result": "pass",
+      "evidence": "`artifacts/pdf2word/p2-answer-teacher/variants/summary.json` 明确给出入口 `PDFConversionService.convert(..., output_variant=student|teacher|review)` 与三种策略：student 不显示答案和 warning，teacher 显示已有答案结构，review 再额外显示 warnings。代码侧 `exercise_ir.py` 的 `normalize_output_variant()` 也将未知输入安全回落到 `student`。"
+    },
+    {
+      "criterion": "student 默认输出不回归；teacher/review 能在有答案结构时正确呈现答案解析，在无答案结构时保留 warning/空结果解释",
+      "result": "pass",
+      "evidence": "assembler 测试断言 student 默认 DOCX 中不存在 `参考答案与解析`，但保留 `1. 计算下式`、`A. 选项一`、`作答区：` 等正文主链路；service 测试 `test_pdf_conversion_service_defaults_to_student_variant_without_answer_sections` 进一步断言 `参考答案与解析`、`1. A`、`2. 额外答案`、`Warnings` 均不会进入 student DOCX。teacher/review 测试分别断言 `1. A` 出现在 teacher 中、`Warnings` 与 `answer_item_unmatched_number...` 出现在 review 中。"
+    },
+    {
+      "criterion": "不生成额外幻觉答案文本",
+      "result": "pass",
+      "evidence": "review 结论与静态代码复核都确认 `teacher/review` 只消费已有 `AnswerSection / warnings` 事实。测试 `test_pdf_conversion_service_review_variant_keeps_warning_explanations_without_inventing_answers` 直接验证在无完整匹配时，review 输出的是已有 `2. 额外答案` 与 unmatched warning，而不是新造答案。"
+    },
+    {
+      "criterion": "指定测试通过，且与现有 PDF→Word 主链路兼容",
+      "result": "pass",
+      "evidence": "本地复跑 `tests/test_pdf_exercise_detector.py tests/test_pdf_to_word_exercise_pipeline_integration.py tests/test_pdf_exercise_docx_assembler.py tests/test_pdf_to_word_service.py`，结果 `29 passed, 4 warnings in 1.08s`。其中 `test_conversion_service_integrates_exercise_pipeline_with_formula_and_options` 与 `test_conversion_service_preserves_detected_question_numbers_for_realistic_samples` 持续证明 student 默认主链路的题号/正文顺序没有被输出变体破坏。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 `instruction.md`、`result.json`、`review.json`、`review.md` 与 `task.json`，确认当前为 `ready_for_merge / qa_pending`",
+    "复核 `artifacts/pdf2word/p2-answer-teacher/variants/summary.json`，确认入口、默认 variant 和三种输出策略",
+    "审阅 `exercise_ir.py`、`exercise_docx_assembler.py`、`conversion_service.py`，确认 `output_variant` 透传、未知值回落 student、teacher/review 仅消费已有答案事实",
+    "审阅 `test_pdf_exercise_docx_assembler.py`、`test_pdf_to_word_service.py`、`test_pdf_to_word_exercise_pipeline_integration.py`，确认 student 默认不显示答案解析、teacher 显示答案、review 显示 warnings，且题号/正文主链路未回归",
+    "本地复跑与输出变体强相关的 29 个测试用例"
+  ],
+  "test_commands": [
+    "`PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_pdf_exercise_detector.py tests/test_pdf_to_word_exercise_pipeline_integration.py tests/test_pdf_exercise_docx_assembler.py tests/test_pdf_to_word_service.py -o cache_dir=/private/tmp/chiralium-pytest-answer-p2-qa --basetemp=/private/tmp/chiralium-pytest-answer-p2-qa-tmp -q` -> `29 passed, 4 warnings in 1.08s`",
+    "`sed -n '1,260p' /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/variants/summary.json` -> 确认 variant 入口与三种职责定义",
+    "`sed -n '1,180p' /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py` -> 确认 student 不显示答案、teacher 显示答案、review 显示 warnings",
+    "`sed -n '404,610p' /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py` -> 确认 student 默认不回归、teacher/review 仅展示已有答案与 warning 事实"
+  ],
+  "non_blocking_observations": [
+    "该任务的 `result.json` 仍然过于简略，缺少 instruction 要求的结构化说明；不过代码、测试和 `variants/summary.json` 已提供足够证据，不阻塞本轮 QA 通过。",
+    "当前 teacher/review 的实际价值仍受上游答案识别命中率限制；在真实五样例里，答案展示能力主要集中在 `数学八年级`、`数学试卷` 等已有 `AnswerSection` 的样例。",
+    "4 条 warning 为现有 FastAPI `on_event` deprecation warning，与本次输出变体 QA 结论无直接阻塞关系。"
+  ],
+  "regressions_found": []
+}

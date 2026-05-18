@@ -1,0 +1,53 @@
+{
+  "task_id": "归档Hybrid最终Word五样例",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T19:02:04+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。`final-archive/profiles/hybrid_experimental/` 已形成可追溯的 authoritative 五样例最终 Word 正式归档：5/5 样例目录齐备，5/5 `output.docx` 可打开，5/5 `pages.jsonl` 与源 `hybrid-e2e-validation/*/hybrid-pages.jsonl` 一致，且逐样例 `word/media` / table XML / fallback / answer_area 结论已写入 profile manifest 与专项报告。本次闭合的是“缺 authoritative hybrid 最终 Word 正式归档”这一 evidence blocker，不改变默认发布边界；`apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled` 仍是当前建议。",
+  "acceptance_criteria": [
+    {
+      "criterion": "`final-archive` 中出现可追溯的 `hybrid_experimental` 正式归档，而不是只有中间验证产物",
+      "result": "pass",
+      "evidence": "已核对 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/` 存在 `profile_manifest.json` 与 5 个样例子目录；每样例均含 `output.docx`、`pages.jsonl`、`metrics.json`、`warnings.json`、`validator-report.json`、`source_manifest.json`。`profile_manifest.json` 已诚实写明 `source_dir` 来自 `hybrid-e2e-validation`，以及 `output.docx / metrics.json / warnings.json` 为 archive-generated final files。"
+    },
+    {
+      "criterion": "五样例逐样例都有 authoritative 结论；成功/失败都要落到 manifest 和报告里",
+      "result": "pass",
+      "evidence": "`hybrid_experimental_authoritative_archive_report.json` 对 5 个样例逐一记录了 `authoritative_docx_generated`、`docx_openable`、`word_media_count`、`image_entered_final_word`、`table_entered_final_word`、`fallback_page_indices`、`answer_area_item_count`、`answer_section_count` 与 `residual_limitations`；`语文五年级` 被诚实标记为 `generic_fallback` / `document_fallback=true`，没有被伪装成结构化成功样例。"
+    },
+    {
+      "criterion": "报告能直接回答：当前是否已经补齐“hybrid 最终 Word 正式证据”这条 blocker",
+      "result": "pass",
+      "evidence": "专项报告的 `evidence_gap_status.authoritative_hybrid_final_word_archive_gap_closed=true`，`result.json.archive_result.broader_release_blocker_closed=true`，review 也明确认可“缺 authoritative hybrid 最终 Word 正式归档”这一 evidence blocker 已闭合。"
+    },
+    {
+      "criterion": "不改变默认发布口径；如果 evidence 仍不足，必须明确保留 `apple default + hybrid quality gray` 边界",
+      "result": "pass",
+      "evidence": "`profile_manifest.json`、专项报告、`README.md`、`result.json` 与 `review.json` 全部保持同一口径：当前只是补 authoritative archive 证据，不放宽默认发布范围；继续 `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`。"
+    },
+    {
+      "criterion": "审查与 QA 能仅基于本次归档产物判断是否可作为 owner/PM 后续放宽发布承诺的依据",
+      "result": "pass",
+      "evidence": "本地复核表明：5/5 `pages.jsonl` 与源 `hybrid-pages.jsonl` 完全一致，5/5 `output.docx` 可打开，`word/media` 数分别为 `4 / 0 / 2 / 1 / 20`；`answer_area / answer_section` 仍为 `0/5` 也被如实落到专项报告，因此 owner/PM 可仅基于本次归档产物判断“evidence blocker 已闭合，但默认发布边界暂不放宽”。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 instruction、result.json、review.json、review.md",
+    "静态核对 `final-archive/profiles/hybrid_experimental/` 目录结构、5 个样例文件齐备性与 `profile_manifest.json`",
+    "静态核对 `final-archive/reports/hybrid_experimental_authoritative_archive_report.json` 与 `README.md` 的结论一致性",
+    "本地检查 5/5 `output.docx` 可打开，并统计 `word/media` / table XML / answer_area 标记",
+    "本地核对 5/5 `pages.jsonl` 与源 `hybrid-e2e-validation/*/hybrid-pages.jsonl` 完全一致"
+  ],
+  "test_commands": [
+    "python3: 打开 5 个 `/final-archive/profiles/hybrid_experimental/*/output.docx` 并读取 `word/document.xml` / `word/media/*` -> 5/5 openable，word/media=`4/0/2/1/20`，仅 `五下科学` 与 `数学八年级` 含 table XML，5/5 均无显式 `作答区：` / `参考答案与解析` 标记",
+    "python3: 对比 `/final-archive/profiles/hybrid_experimental/*/pages.jsonl` 与 `/hybrid-e2e-validation/*/hybrid-pages.jsonl` -> 5/5 完全一致"
+  ],
+  "non_blocking_observations": [
+    "`archive_manifest.json` 的 `reports` 索引和 `report_file_count` 语义仍有轻微元数据不一致，review 已标记为非阻塞。",
+    "`README.md` 顶部“仅复制现有产物”的总述对 `hybrid_experimental` 不够精确，因为该 profile 的 `output.docx / metrics.json / warnings.json` 是在 archive 内现算生成；review 已标记为非阻塞说明项。",
+    "显式 `answer_area` 与 `answer_section` 在五样例上仍是 `0/5`；本任务已诚实保留该限制，没有过度宣称。"
+  ],
+  "regressions_found": []
+}

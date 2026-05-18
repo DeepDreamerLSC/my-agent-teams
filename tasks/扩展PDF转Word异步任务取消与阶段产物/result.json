@@ -1,0 +1,47 @@
+{
+  "task_id": "扩展PDF转Word异步任务取消与阶段产物",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已为 PDF→Word 异步 job 补齐取消能力与阶段产物暴露：新增 cancel API，状态机扩展为 queued/running/cancel_requested/cancelled/succeeded/failed；queued 可直接取消，running 为 best-effort cancel_requested，若 worker 真正响应则进入 cancelled，若底层未及时停下则会诚实保留 cancel_requested 历史并最终 succeeded/failed。状态查询现返回 stage/cancellation/history 与更完整的 artifact 路径。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/api/pdf_to_word.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/job_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_async_jobs.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/async_job_api_summary.md"
+  ],
+  "tests": [
+    "PASS: `PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_pdf_to_word_api.py tests/test_pdf_to_word_async_jobs.py -o cache_dir=/private/tmp/chiralium-pytest-pdf-job-cancel-cache --basetemp=/private/tmp/chiralium-pytest-pdf-job-cancel-tmp -q` -> `17 passed, 4 warnings in 0.20s`"
+  ],
+  "cancel_semantics": {
+    "queued": "POST /api/pdf-to-word/jobs/{job_id}/cancel 后直接进入 cancelled，记录 cancel_requested 与 cancelled history。",
+    "running": "先进入 cancel_requested，并向后台 task 发出 best-effort cancel；若任务接受取消则进入 cancelled。",
+    "running_worker_ignores_cancel": "若底层 worker 未在完成前真正停下，job 会最终 succeeded/failed，并在 cancellation.outcome 中记录 cancel 未及时生效，而不会伪装成 cancelled。",
+    "terminal_jobs": "已 completed/failed job 拒绝取消并返回 409；已 cancelled job 再次取消保持幂等返回当前状态。"
+  },
+  "status_machine": [
+    "queued",
+    "running",
+    "cancel_requested",
+    "cancelled",
+    "succeeded",
+    "failed"
+  ],
+  "artifacts_and_history": {
+    "job_manifest": "job.json",
+    "stage_snapshot": "stage.json",
+    "history_log": "history.jsonl",
+    "input_pdf": "artifacts.input_pdf_path",
+    "output_docx": "artifacts.output_docx_path",
+    "summary_doc": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-productization/async_job_api_summary.md"
+  },
+  "known_limitations": [
+    "当前仍是单进程、本地磁盘版 job 实现，后台执行依赖当前 API 进程内的 asyncio.create_task。",
+    "running 阶段取消仍是 best-effort；若底层进入不可中断阶段，可能出现 cancel_requested 后最终 succeeded/failed。",
+    "尚未覆盖复杂超时治理、进程重启恢复、多机调度与统一清理策略。"
+  ],
+  "next_steps": [
+    "后续可在当前状态机基础上继续拆超时治理、任务清理与前端状态透出。",
+    "若要提升 running cancel 的确定性，需要引入更可控的 worker/queue 与协作式取消点。"
+  ],
+  "completed_at": "2026-05-18T13:39:53+08:00"
+}

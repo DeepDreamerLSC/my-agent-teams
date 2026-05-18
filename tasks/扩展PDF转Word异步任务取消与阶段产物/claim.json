@@ -1,0 +1,7 @@
+{
+  "task_id": "扩展PDF转Word异步任务取消与阶段产物",
+  "agent": "dev-1",
+  "claimed_at": "2026-05-18T13:32:15+08:00",
+  "reserved": true,
+  "reason": "用户要求优先认领，准备补 cancel 语义、阶段 artifacts/history，并保持同步 convert 不回归"
+}

@@ -1,0 +1,49 @@
+{
+  "task_id": "建立Hybrid最终DOCX门禁常态化",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-17T20:23:12+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。Hybrid authoritative final DOCX 已从一次性人工核查收敛为可复用的固定 gate：`--final-docx-gate` 可稳定校验 5 样例 `output.docx` openable、`pages.jsonl` provenance、`source_manifest`、`word/media`、table XML、fallback 以及 final-archive 元数据一致性；当前真实 final-archive 回放结果为 `gate_passed=true`，且默认发布边界未改变。",
+  "acceptance_criteria": [
+    {
+      "criterion": "release evidence 不再只靠一次性人工检查，而是有固定 gate",
+      "result": "pass",
+      "evidence": "本地执行 `python -m app.services.pdf_to_word.model_eval_runner --final-docx-gate --archive-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive --output-dir /private/tmp/hybrid-final-docx-gate-qa --run-label 20260517-202500`，生成 `/private/tmp/hybrid-final-docx-gate-qa/20260517-202500/final_docx_gate_report.json`；其中 `report_type=hybrid_final_docx_release_evidence_gate`、`gate_passed=true`、`blocking_failures=[]`。"
+    },
+    {
+      "criterion": "`archive_manifest.json` / `README.md` 与真实归档状态一致",
+      "result": "pass",
+      "evidence": "gate report `metadata_checks` 全部为 true；`report_index.actual_report_file_count=13`、`indexed_report_file_count=13`、`manifest_report_file_count=13`，`missing_from_manifest_reports=[]`；本地 `find .../final-archive/reports -maxdepth 1 -type f | wc -l` 结果也为 13。README 已明确 `hybrid_experimental` 的 `output.docx / metrics.json / warnings.json` 属于 archive-generated，而非 copy-only。"
+    },
+    {
+      "criterion": "测试或检查入口可被 review/QA 复用",
+      "result": "pass",
+      "evidence": "本地复跑 `backend/tests/test_model_eval_runner.py -q -k 'final_docx_gate'` -> `2 passed, 12 deselected, 4 warnings`，`backend/tests/test_hybrid_e2e.py -q -k 'hybrid_final_docx_release_gate'` -> `1 passed, 6 deselected, 4 warnings`。review 也基于同一 CLI gate 与同类测试完成复核。"
+    },
+    {
+      "criterion": "不改变默认发布边界，只固化证据门禁",
+      "result": "pass",
+      "evidence": "gate report 明确 `release_boundary_changed=false`，默认口径仍为 `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`；聚合结果继续如实保留 `explicit_answer_area_materialized_sample_count=0`、`answer_section_materialized_sample_count=0`。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 instruction、result.json、review.json、review.md",
+    "本地回放 `--final-docx-gate`，检查 gate report 的 aggregate、expected_checks、metadata_checks 与逐样例样本结果",
+    "本地复跑 `test_model_eval_runner.py -k final_docx_gate`",
+    "本地复跑 `test_hybrid_e2e.py -k hybrid_final_docx_release_gate`",
+    "静态核对 `archive_manifest.json`、`README.md` 与 `final-archive/reports` 真实文件数一致性"
+  ],
+  "test_commands": [
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-gate-qa1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py -q -k 'final_docx_gate' -> 2 passed, 12 deselected, 4 warnings in 0.14s",
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-gate-qa2 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_hybrid_e2e.py -q -k 'hybrid_final_docx_release_gate' -> 1 passed, 6 deselected, 4 warnings in 0.17s",
+    "PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-gate-qa3 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m app.services.pdf_to_word.model_eval_runner --final-docx-gate --archive-root /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive --output-dir /private/tmp/hybrid-final-docx-gate-qa --run-label 20260517-202500 -> gate_passed=true, blocking_failures=[]",
+    "find /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports -maxdepth 1 -type f | wc -l -> 13"
+  ],
+  "non_blocking_observations": [
+    "当前 `answer_area=0/5`、`answer_section=0/5` 与 `formula audit-only / merge-disabled` 仍是既有发布边界；本任务将其纳入 gate 事实检查，但没有放宽该边界。",
+    "两组 pytest 仍有 4 条 FastAPI `on_event` deprecation warning，与本次 final DOCX gate 验收无直接阻塞关系。"
+  ],
+  "regressions_found": []
+}

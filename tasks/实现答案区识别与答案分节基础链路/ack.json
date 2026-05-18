@@ -1,0 +1,7 @@
+{
+  "task_id": "实现答案区识别与答案分节基础链路",
+  "agent": "dev-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-17T21:39:00+08:00",
+  "summary": "已读取 review 返工要求。本轮不改 detector/assembler 逻辑，改为补充基于真实五样例 pages.jsonl 的可追溯验证产物，并按真实样例口径重写 result.json。"
+}

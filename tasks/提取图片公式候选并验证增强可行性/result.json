@@ -1,0 +1,30 @@
+{
+  "task_id": "提取图片公式候选并验证增强可行性",
+  "agent_id": "dev-2",
+  "status": "done",
+  "completed_at": "2026-05-15T15:56:14+08:00",
+  "summary": "已基于既有 apple_baseline / MinerU / PaddleOCR-VL artifacts 完成离线候选提取、题号归属匹配和增强模拟。结论是：图片/表格候选增强可行，但必须先判定题号区域并做候选过滤；MinerU full 是当前更稳的主候选源；formula_candidate 暂不适合直接并回。",
+  "report_path": "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/图片公式候选增强可行性报告.md",
+  "data_sources": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-144102/apple_baseline/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260514-170529/mineru/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-090642/mineru/",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260515-112748/paddleocr_vl/"
+  ],
+  "output_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/design/pdf2word/图片公式候选增强可行性报告.md"
+  ],
+  "findings": [
+    "MinerU full 总体最好：74 个候选中 48 个 assigned，39 个 good，题号归属率 64.9%，直接可用率 52.7%。",
+    "MinerU 的 image/table 候选整体可用，但 formula_candidate 质量明显不足：18 个公式候选只有 3 个 good，10 个 bad。",
+    "PaddleOCR-VL 在 4 个样例中能提供补充候选，但噪声更高：58 个候选中 24 个 unassigned，12 个 needs_fix。",
+    "语文五年级样例无法稳定推断题号区域，说明 hybrid merge 需要先做 baseline question-region 可判定性检查。"
+  ],
+  "constraints_and_notes": [
+    "本次为离线启发式验证，未重跑任何模型，未修改框架代码。",
+    "PaddleOCR-VL 缺少 数学试卷 样例 artifacts，因此该模型覆盖 4/5 样例。",
+    "task.json.write_scope 为空，但 instruction.md 要求写 design/pdf2word 报告；本次按任务交付要求补齐报告，并在此处记录该配置不一致。"
+  ],
+  "modified_files": [],
+  "report_ready_for_arch_1": true
+}

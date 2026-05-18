@@ -1,0 +1,36 @@
+{
+  "task_id": "MinerU本地Adapter接入PDF转Word",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-14T17:03:41+08:00",
+  "status": "approve",
+  "summary": "复审通过。本轮补修已修复此前两个阻塞问题：1) MinerU 配置改为从 app.core.config.settings / ENV_FILE 透传到 PDFToWordSettings；2) MinerU 输出文件读取统一以实际运行 PDF 的 stem 为准，不再依赖 source_name。对应回归测试与服务级路径均通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "review_scope",
+      "finding": "本次为补修后的复审，重点只复核了 settings.py、mineru_client.py、test_pdf_to_word_mineru_client.py 以及受影响的 service 测试路径；未重新逐项审查 task write_scope 中未改动的其他文件。",
+      "recommendation": "若后续再次改动 conversion_service.py、config.py 或 .env 模板，建议再走一次完整 review。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/MinerU本地Adapter接入PDF转Word/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/MinerU本地Adapter接入PDF转Word/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/settings.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/mineru_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_mineru_client.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc .venv/bin/python -m py_compile app/services/pdf_to_word/settings.py app/services/pdf_to_word/mineru_client.py tests/test_pdf_to_word_mineru_client.py",
+      "result": "passed"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/chiralium/backend && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' .venv/bin/python -m pytest tests/test_pdf_to_word_mineru_client.py tests/test_pdf_to_word_service.py -q",
+      "result": "passed (10 passed, 4 warnings)"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

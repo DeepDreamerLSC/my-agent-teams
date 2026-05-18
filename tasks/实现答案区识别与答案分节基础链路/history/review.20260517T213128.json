@@ -1,0 +1,33 @@
+{
+  "task_id": "实现答案区识别与答案分节基础链路",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-17T21:18:39+08:00",
+  "status": "request_changes",
+  "summary": "存在阻塞项。答案区识别与 AnswerSection 基础链路本身已补上，目标测试复跑也通过，但当前交付的验证产物只覆盖 synthetic fixture，不足以证明 instruction 中要求的“当前 0/5 真实样例现状已被打破”。",
+  "blocking_findings": [
+    "验证产物没有对当前真实样例集给出样例级结论，无法支撑“打破 0/5 现状”的任务目标。[summary.json](/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json:4) 明确写的是 `exercise_detector synthetic validation set`，且 [summary.json](/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json:12) 到 [summary.json](/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json:82) 只列出了 `answer_page_title_single_match`、`inline_answer_and_analysis` 等 synthetic 样本名；同时 [result.json](/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/result.json:26) 到 [result.json](/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/result.json:45) 也据此声称哪些“样例”打破了 `0/5`。但任务要求的是对“当前具有明显答案线索的样例”给出样例级验证，并让当前正式 evidence 不再长期停留在 `answer_area=0/5`、`answer_section=0/5`；现有产物没有把改动映射到真实样例名和真实命中/未命中原因，review/QA 仍无法判断哪些真实输入已改善。"
+  ],
+  "non_blocking_findings": [
+    "目标测试已复跑通过：`test_pdf_exercise_detector.py`、`test_pdf_exercise_docx_assembler.py`、`test_pdf_to_word_service.py`、`test_pdf_to_word_exercise_pipeline_integration.py` 共 `20 passed`。",
+    "`exercise_detector.py` 已补上答案页标题、题后 inline solution、unmatched warning 及视觉块归属的基础逻辑；这一部分实现方向没有明显问题。",
+    "`conversion_service.py` 与 `exercise_ir.py` 在 worktree 中存在既有未提交改动；本次审查按 `result.json` 风险说明，将其视为并行脏改动而非本任务阻塞项。"
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现答案区识别与答案分节基础链路/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/order_resolver.py"
+  ],
+  "verification_evidence": [
+    "复跑 `PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_docx_assembler.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_service.py /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py -o cache_dir=/private/tmp/chiralium-pytest-answer-sections-review --basetemp=/private/tmp/chiralium-pytest-answer-sections-review-tmp`，结果 `20 passed, 4 warnings`。",
+    "`exercise_detector.py` 中已新增 answer page title / inline solution / unmatched warning 基础链路，并把 `quality` 汇总扩展到 `answer_area_count`、`answer_section_count`、`answer_item_count`。",
+    "`summary.json` 当前只基于 synthetic validation set，未给出现有真实样例名、真实命中结果与剩余 miss 原因，因此不足以满足 deliverable 3 和 result.json 的样例级结论要求。"
+  ],
+  "recommended_next_action": "dev-1"
+}

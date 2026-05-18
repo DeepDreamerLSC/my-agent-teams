@@ -1,0 +1,12 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-15T22:17:55+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-15T22:50:48+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-15T22:55:20+08:00", "reason": "watcher observed review fail"}
+{"from": "pending", "to": "ready_for_merge", "at": "2026-05-15T22:58:12+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "pending", "to": "ready_for_merge", "at": "2026-05-16T00:07:31+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-16T13:20:14+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "dispatched", "at": "2026-05-16T13:20:23.252386", "reason": "review_rejected_rework: review-1 驳回，生产管线仍为 skeleton，需基于真实管线重做 e2e 验证"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-16T13:41:25+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "ready_for_merge", "at": "2026-05-16T13:45:26.805833", "reason": "pm rework confirmed: dev-1 completed rework (result.json 13:35), cleared stale review.json, resetting for fresh review cycle"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-16T13:48:18+08:00", "reason": "watcher observed review fail"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-16T13:48:51+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-16T14:05:48+08:00", "reason": "task-watcher auto close after qa verify pass"}

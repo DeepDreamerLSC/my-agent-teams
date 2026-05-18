@@ -1,0 +1,9 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T17:25:38+08:00", "reason": "pm dispatch"}
+{"from": "pending", "to": "dispatched", "at": "2026-05-17T17:35:34+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T18:02:35+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T18:04:41+08:00", "reason": "auto_close failed 3 times"}
+{"from": "blocked", "to": "ready_for_merge", "at": "2026-05-17T18:06:06+08:00", "reason": "pm recover from auto_close_failure; review still required", "actor": "pm-chief"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T18:07:31+08:00", "reason": "auto_close failed 3 times"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-17T18:13:53+08:00", "reason": "resume-task: review 驳回：刷新公式证据、补齐答案/作答区处理、同步更新 blocker 分层", "actor": "pm-chief"}
+{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T18:27:17+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T18:32:46+08:00", "reason": "PM manual close after review approval; no QA required"}

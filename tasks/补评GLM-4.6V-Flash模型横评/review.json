@@ -1,0 +1,42 @@
+{
+  "task_id": "补评GLM-4.6V-Flash模型横评",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-16T13:49:31+08:00",
+  "status": "approve",
+  "summary": "审查通过。上一轮两个阻塞点都已修掉：1) `task.json.write_scope` 已补上 `artifacts/pdf2word/model-eval/20260516-104815/`，不再与历史补评产物冲突；2) `inference_config.yaml` 里的 `glm_46v_flash` profile 已从默认可用改为 `enabled=false`，与 `result.json` 中“这只是一次性评测服务、当前已停用”的新口径一致，避免继续向后续调用方误报该 profile 现成可用。历史 5 样例补评数据仍可用于横评汇总，而当前仓库状态也不再把已停止的 18121 服务伪装成在线能力。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "medium",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/comparison_report.json",
+      "finding": "历史 5/5 样例仍然都带有 `VLM review JSON 解析失败，已返回空结果。` warning。这不影响本轮“作为一次性补评数据归档、且默认 profile 已停用”的收口判断，但说明 GLM-4.6V-Flash 若未来再作为 VLM review 对照重新启用，structured JSON 输出稳定性仍需单独治理。",
+      "recommendation": "后续如要再次启用 `glm_46v_flash`，建议单独立项治理 prompt/schema/normalizer 契约，并重新验证 warnings 是否下降，再考虑把 profile 从 disabled 改回可用。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补评GLM-4.6V-Flash模型横评/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补评GLM-4.6V-Flash模型横评/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补评GLM-4.6V-Flash模型横评/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/comparison_report.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "静态审阅 `tasks/补评GLM-4.6V-Flash模型横评/task.json`",
+      "result": "确认 `write_scope` 已补充 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/`，修复了上一轮的范围越界问题。"
+    },
+    {
+      "command": "静态审阅 `backend/app/services/pdf_to_word/parser_adapters/inference_config.yaml`",
+      "result": "确认 `glm_46v_flash` profile 当前为 `enabled: false`，不再把已停止的一次性评测服务暴露为默认可用能力。"
+    },
+    {
+      "command": "ls -la /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/model-eval/20260516-104815/glm_46v_flash",
+      "result": "确认历史补评产物目录仍在，`comparison_report.json` 与 5 个样例子目录均可读取，可继续供横评汇总使用。"
+    },
+    {
+      "command": "静态审阅 `tasks/补评GLM-4.6V-Flash模型横评/result.json`",
+      "result": "确认本轮 rework 的结果口径已与仓库状态一致：`lifecycle=one_shot_eval_service_stopped`、`profile_enabled_after_rework=false`、`adapter_available_now=false`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

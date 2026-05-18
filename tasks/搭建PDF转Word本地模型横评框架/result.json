@@ -1,0 +1,33 @@
+{
+  "task_id": "搭建PDF转Word本地模型横评框架",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "done",
+  "completed_at": "2026-05-14T12:51:59+08:00",
+  "summary": "已搭建 PDF 转 Word 本地模型横评框架骨架：新增 model_eval_runner、parser_adapters 基础接口与 apple_baseline 适配器，并补齐覆盖注册、CLI、适配器转换与输出目录结构的测试。",
+  "modified_files": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/__init__.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/base_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/parser_adapters/apple_baseline_adapter.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_model_eval_runner.py"
+  ],
+  "test_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/model_eval_runner.py backend/app/services/pdf_to_word/parser_adapters/__init__.py backend/app/services/pdf_to_word/parser_adapters/base_adapter.py backend/app/services/pdf_to_word/parser_adapters/apple_baseline_adapter.py backend/tests/test_model_eval_runner.py",
+      "result": "passed"
+    },
+    {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc PYTEST_ADDOPTS='-p no:cacheprovider' backend/.venv/bin/python -m pytest backend/tests/test_model_eval_runner.py -q",
+      "result": "passed (7 passed, 4 warnings)"
+    }
+  ],
+  "notes": [
+    "实现保持在任务 write_scope 内，未修改 conversion_service.py、parser_client.py 等现有生产链路文件。",
+    "CLI 同时支持 --profiles 与 --profile，--pages 可接受 0-based 或 1-based 页码列表；apple_baseline 适配器内部统一输出 PageIR / PDFSourceBlock 兼容结构。",
+    "横评产物会落到 <output-dir>/<timestamp>/<profile>/<sample>/ 下，包含 pages.jsonl、metrics.json、warnings.json、output.docx。"
+  ],
+  "warnings": [
+    "pytest 的 4 条 warning 为现有 FastAPI on_event 弃用提示，与本次横评框架代码无关。"
+  ]
+}

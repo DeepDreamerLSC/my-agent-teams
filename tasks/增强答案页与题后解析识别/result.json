@@ -1,0 +1,74 @@
+{
+  "task_id": "增强答案页与题后解析识别",
+  "status": "done",
+  "summary": "已按二次驳回意见补修 analysis_heading 守卫与退出条件：仅接受规范 heading，拒绝 OCR 脏文本近似命中，并在切到不同题号时关闭 analysis_heading 上下文。语文五年级 document_fallback 误判已消除；当前真实五样例为 answer_section 2/5、answer_area 1/5，未低于基线但也未再虚增命中。",
+  "round": 1,
+  "agent": "dev-2",
+  "finished_at": "2026-05-18T08:53:46+08:00",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/detection/summary.json"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/pytest /Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py -o cache_dir=/private/tmp/chiralium-pytest-answer-detector --basetemp=/private/tmp/chiralium-pytest-answer-detector-tmp -> 9 passed, 4 warnings",
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python replay final-archive/profiles/hybrid_experimental/*/pages.jsonl through detect_exercise_document -> answer_section 2/5, answer_area 1/5, warning_bucket visual_assignment_unresolved=6"
+  ],
+  "artifacts": {
+    "detection_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/detection/summary.json",
+    "baseline_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-answer-sections/summary.json"
+  },
+  "reviewer_fixes": [
+    {
+      "issue": "document_fallback 负样例语文五年级中的 OCR 脏文本“脣解题慁路”被误判为 analysis_heading，导致 answer_section 虚增为 hit",
+      "fix": "analysis_heading 仅接受规范 heading 白名单，不再接受模糊近似匹配；切到不同题号时显式关闭 analysis_heading 上下文，避免后续正文继续挂到旧答案段",
+      "code_refs": [
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py:108",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_detector.py:526",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py:172",
+        "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_exercise_detector.py:186"
+      ]
+    }
+  ],
+  "cue_additions": [
+    "analysis_heading: 解题思路 / 详解 / 点拨 / 参考解析",
+    "assigned_visual_answer_area: 已分配到题目的 table/image 中出现作答空线或作答区提示时物化为 AnswerArea",
+    "circled_question_number_with_score: ①/②/③... 且带分值标记时可作为题号锚点",
+    "assigned_visual_route_guard: answer_section 仅在视觉块未命中新题 assigned_question / assigned_region 时才接管",
+    "analysis_heading_guard: 仅接受规范 heading，拒绝 OCR 脏文本近似命中；切到不同题号时关闭 analysis_heading 上下文"
+  ],
+  "hit_improvement": {
+    "baseline_answer_section_sample_count": 2,
+    "current_answer_section_sample_count": 2,
+    "baseline_answer_area_sample_count": 0,
+    "current_answer_area_sample_count": 1,
+    "matched_answer_item_count": 2,
+    "unmatched_answer_item_count": 0,
+    "note": "本轮以消除 fallback 误判为主，answer_section 从误判态 3/5 回落到可信 2/5，保持不低于基线。"
+  },
+  "remaining_miss": [
+    {
+      "sample_name": "五下科学",
+      "status": "partial_hit",
+      "reason": "已识别 1 个 assigned visual answer_area，但 authoritative merged pages 仍缺少稳定答案页/解析 cue，未形成 answer_section。"
+    },
+    {
+      "sample_name": "英语八年级",
+      "status": "miss",
+      "reason": "当前 authoritative merged pages 未出现可被规则稳定识别的答案页标题、解析标题或 inline 答案 cue。"
+    },
+    {
+      "sample_name": "语文五年级",
+      "status": "miss",
+      "reason": "validator-report 显示 document_fallback=true；OCR 脏文本“脣解题慁路”已不再触发 analysis_heading，但当前 authoritative pages 仍缺少可题号化的稳定答案 cue。"
+    }
+  ],
+  "warning_bucket": {
+    "visual_assignment_unresolved": 6
+  },
+  "follow_up_suggestions": [
+    "为 analysis_heading 引入版面级辅助信号，例如独立短行、周围留白或字体层级，而不是继续扩字符串白名单。",
+    "对英语八年级补采真实答案页/页底答案区 cue，确认是否存在英文标题、分栏页尾答案或纯表格答案模式。",
+    "对数学试卷的 visual_assignment_unresolved 样例补强 region 邻接和页内题号序列消解，减少残余题图/表格未归属告警。"
+  ]
+}

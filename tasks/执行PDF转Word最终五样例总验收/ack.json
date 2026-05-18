@@ -1,0 +1,7 @@
+{
+  "task_id": "执行PDF转Word最终五样例总验收",
+  "agent": "qa-1",
+  "acknowledged_at": "2026-05-17T18:18:37+08:00",
+  "status": "working",
+  "note": "开始按 review request_changes 返工 final-acceptance 产物：刷新公式真实实验证据、补齐五样例答案/作答区处理结论，并同步下调数学试卷 Paddle 契约问题的 blocker 分层。"
+}
