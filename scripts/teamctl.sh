@@ -67,6 +67,15 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+workspace_python() {
+  local venv_python="$WORKSPACE_ROOT/.venv/bin/python"
+  if [ -x "$venv_python" ]; then
+    printf '%s' "$venv_python"
+    return 0
+  fi
+  printf '%s' "python3"
+}
+
 agent_rows() {
   python3 - "$CONFIG_PATH" "$WORKSPACE_ROOT" "$AGENTS_ROOT" <<'PY'
 import json
@@ -149,9 +158,11 @@ build_agent_files() {
 
 init_dashboard_db() {
   if [ -f "$SCRIPT_DIR/task-board-sync.py" ]; then
+    local python_bin
+    python_bin="$(workspace_python)"
     PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/my-agent-teams-pycache}" \
       TASK_BOARD_DB_PATH="${TASK_BOARD_DB_PATH:-$WORKSPACE_ROOT/.omx/task-board/task-board.sqlite3}" \
-      python3 "$SCRIPT_DIR/task-board-sync.py" backfill --tasks-root "$TASKS_ROOT" --source bootstrap >/dev/null 2>&1 || \
+      "$python_bin" "$SCRIPT_DIR/task-board-sync.py" backfill --tasks-root "$TASKS_ROOT" --source bootstrap >/dev/null 2>&1 || \
       warn "dashboard backfill failed; run doctor for details"
   fi
 }
@@ -362,15 +373,55 @@ start_dashboard() {
   ensure_runtime_dirs
   local pid_file="$STATE_DIR/task-board.pid"
   local pid="$(cat "$pid_file" 2>/dev/null || true)"
+  local python_bin
+  python_bin="$(workspace_python)"
   if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
     log "dashboard already running pid=$pid"
     return 0
   fi
-  (cd "$WORKSPACE_ROOT" && \
-    TASK_BOARD_HOST="$DASHBOARD_HOST" TASK_BOARD_PORT="$DASHBOARD_PORT" \
+  pid="$(
+    WORKSPACE_ROOT="$WORKSPACE_ROOT" \
+    LOG_DIR="$LOG_DIR" \
+    DASHBOARD_PYTHON="$python_bin" \
+    TASK_BOARD_HOST="$DASHBOARD_HOST" \
+    TASK_BOARD_PORT="$DASHBOARD_PORT" \
     TASK_BOARD_DB_PATH="${TASK_BOARD_DB_PATH:-$WORKSPACE_ROOT/.omx/task-board/task-board.sqlite3}" \
-    nohup python3 -m dashboard.app >> "$LOG_DIR/task-board.log" 2>&1 & echo $! > "$pid_file")
-  log "dashboard started pid=$(cat "$pid_file") url=http://$DASHBOARD_HOST:$DASHBOARD_PORT/"
+    python3 - <<'PY'
+import os
+import subprocess
+import sys
+
+workspace_root = os.environ['WORKSPACE_ROOT']
+log_dir = os.environ['LOG_DIR']
+python_bin = os.environ['DASHBOARD_PYTHON']
+env = os.environ.copy()
+log_path = os.path.join(log_dir, 'task-board.log')
+
+with open(log_path, 'ab', buffering=0) as log_fp:
+    proc = subprocess.Popen(
+        [python_bin, '-m', 'dashboard.app'],
+        cwd=workspace_root,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=log_fp,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        close_fds=True,
+    )
+
+print(proc.pid)
+PY
+  )"
+  printf '%s\n' "$pid" > "$pid_file"
+  sleep 1
+  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    log "dashboard started pid=$pid python=$python_bin url=http://$DASHBOARD_HOST:$DASHBOARD_PORT/"
+    return 0
+  fi
+  rm -f "$pid_file"
+  err "dashboard failed to start; see $LOG_DIR/task-board.log"
+  tail -n 40 "$LOG_DIR/task-board.log" >&2 || true
+  return 1
 }
 
 stop_dashboard() {
