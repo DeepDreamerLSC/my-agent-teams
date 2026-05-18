@@ -32,7 +32,7 @@ if [ -z "$AGENT_ID" ]; then
   esac
 fi
 
-python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$TASKS_ROOT" "$CONFIG_PATH" <<'PY'
+python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$TASKS_ROOT" "$CONFIG_PATH" "$WORKSPACE_ROOT" <<'PY'
 import json
 import os
 import sys
@@ -45,6 +45,9 @@ agent_id = sys.argv[2]
 reason = sys.argv[3].strip()
 tasks_root = Path(sys.argv[4])
 config_path = Path(sys.argv[5])
+workspace_root = Path(sys.argv[6])
+sys.path.insert(0, str(workspace_root / 'scripts' / 'lib'))
+from task_pool_rules import pool_gate_blockers  # type: ignore
 
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -62,6 +65,10 @@ status = str(task.get('status') or '')
 if status != 'pooled':
     raise SystemExit(f'task status must be pooled to claim, got {status}')
 
+gate_blockers = pool_gate_blockers(task, task_dir)
+if gate_blockers:
+    raise SystemExit('pool gate not satisfied: ' + ', '.join(gate_blockers))
+
 task_type = str(task.get('task_type') or '').strip().lower()
 execution_mode = str(task.get('execution_mode') or '').strip().lower()
 target_environment = str(task.get('target_environment') or '').strip().lower()
@@ -69,6 +76,19 @@ if task_type in {'deployment', 'integration'} or execution_mode == 'deploy' or t
     raise SystemExit('deployment/integration/prod tasks must not be claimed from the general pool')
 
 claim_scope = [str(item).strip() for item in (task.get('claim_scope') or []) if str(item).strip()]
+if not claim_scope:
+    domain = str(task.get('domain') or '').strip().lower()
+    for candidate_agent_id, payload in (config.get('agents') or {}).items():
+        role = str((payload or {}).get('role') or '').strip().lower()
+        if task_type in {'development', 'investigation'}:
+            if role == 'fullstack_dev' or candidate_agent_id.startswith('dev-'):
+                claim_scope.append(candidate_agent_id)
+        elif task_type == 'verification' or domain == 'quality':
+            if role == 'qa' or candidate_agent_id.startswith('qa-'):
+                claim_scope.append(candidate_agent_id)
+        elif task_type == 'design':
+            if role == 'architect' or candidate_agent_id == 'arch-1':
+                claim_scope.append(candidate_agent_id)
 if claim_scope and agent_id not in claim_scope:
     raise SystemExit(f'agent {agent_id} is not in claim_scope: {claim_scope}')
 
@@ -192,6 +212,10 @@ try:
     current_status = str(task.get('status') or '')
     if current_status != 'pooled':
         raise SystemExit(f'task status changed while claiming: {current_status}')
+
+    gate_blockers = pool_gate_blockers(task, task_dir)
+    if gate_blockers:
+        raise SystemExit('pool gate not satisfied: ' + ', '.join(gate_blockers))
 
     policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
     allowed = {'done', 'cancelled'}

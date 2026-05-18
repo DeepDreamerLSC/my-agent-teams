@@ -248,6 +248,17 @@ class TaskDetailApiTests(unittest.TestCase):
                 'domain': 'development',
                 'write_scope': ['/tmp/pooled-detail'],
             }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            (pooled_dir / 'instruction.md').write_text('\n'.join([
+                '# 任务：池中详情任务',
+                '## 任务类型', 'development',
+                '## 目标', '完成任务',
+                '## 任务边界', '按范围执行',
+                '## 输入事实', '已有上下文',
+                '## 约束', '遵守约束',
+                '## 交付物', 'result.json',
+                '## 验收标准', '满足要求',
+                '## 下游动作', 'review',
+            ]) + '\n', encoding='utf-8')
             upsert_task(conn, {
                 'task_id': 'pooled-detail',
                 'title': '池中详情任务',

@@ -613,11 +613,14 @@ function renderPoolStatusHtml(poolStatus) {
   if (!poolStatus) return ''
   const blockers = poolStatus.blocked_reasons || []
   const eligible = poolStatus.eligible_agents || []
+  const definitionBlockers = poolStatus.definition_blockers || []
   return `
     <section class="detail-section">
       <h3>任务池阻塞</h3>
       <div class="detail-grid">
+        ${detailItem('卡住阶段', poolStatus.gate_stage || '-')}
         ${detailItem('等待时长', `${poolStatus.pool_wait_minutes || 0}m`)}
+        ${detailItem('定义阻塞', definitionBlockers.join(', ') || '-')}
         ${detailItem('可认领 Agent', eligible.join(', ') || '-')}
         ${detailItem('阻塞原因', blockers.join(', ') || '-')}
         ${detailItem('下一步', poolStatus.next_action || '-')}
@@ -740,6 +743,7 @@ function renderPoolView(payload) {
     { label: '池中任务', value: summary.pooled_count ?? items.length },
     { label: '可认领', value: summary.pool_ready_count ?? (items.length - blocked) },
     { label: '空闲Agent', value: summary.idle_agent_count ?? '-' },
+    { label: '定义阻塞', value: summary.definition_blocked_count ?? '-' },
     { label: '产物异常', value: summary.artifact_invalid_count ?? '-' },
   ])
   if (!tbody) return

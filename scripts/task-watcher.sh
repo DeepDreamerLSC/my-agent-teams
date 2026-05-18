@@ -1044,10 +1044,32 @@ claim_dependencies_ready() {
     dependencies_ready "$task_dir" >/dev/null 2>&1
 }
 
+claim_pool_gate_ready() {
+    local task_dir="$1"
+    python3 - "$task_dir" "$WORKSPACE_ROOT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+workspace_root = Path(sys.argv[2])
+sys.path.insert(0, str(workspace_root / 'scripts' / 'lib'))
+from task_pool_rules import pool_gate_blockers  # type: ignore
+
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+blockers = pool_gate_blockers(task, task_dir)
+if blockers:
+    print(','.join(blockers))
+    raise SystemExit(1)
+raise SystemExit(0)
+PY
+}
+
 claim_agent_can_accept_task() {
     local task_dir="$1"
     local agent_id="$2"
 
+    claim_pool_gate_ready "$task_dir" >/dev/null 2>&1 || return 1
     is_agent_in_claim_scope "$task_dir" "$agent_id" || return 1
     claim_dependencies_ready "$task_dir" || return 1
     claim_scope_conflict_free "$task_dir" "$agent_id" >/dev/null 2>&1 || return 1
@@ -2419,7 +2441,7 @@ process_claim_json() {
         return 1
     fi
     if ! claim_agent_can_accept_task "$task_dir" "$claim_agent"; then
-        claim_reject "$task_dir" "$claim_agent" "不满足认领条件（依赖/并发/能力/write_scope 冲突）"
+        claim_reject "$task_dir" "$claim_agent" "不满足认领条件（Pool Gate/依赖/并发/能力/write_scope 冲突）"
         flock -u 9
         return 0
     fi

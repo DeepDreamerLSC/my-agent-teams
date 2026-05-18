@@ -10,6 +10,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import task_artifacts  # type: ignore
+from task_pool_rules import pool_gate_blockers  # type: ignore
 
 PRIORITY_RANK = {"critical": 4, "urgent": 4, "high": 3, "medium": 2, "low": 1}
 TERMINAL_STATUSES = {"done", "merged", "archived", "cancelled"}
@@ -179,8 +180,9 @@ def scope_conflicts(task: dict, agent_id: str, active_by_agent: dict[str, list[d
     return conflicts
 
 
-def agent_acceptance(task: dict, agent_id: str, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path, default_concurrency: int, config: dict) -> tuple[bool, list[str]]:
+def agent_acceptance(task: dict, task_dir: Path, agent_id: str, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path, default_concurrency: int, config: dict) -> tuple[bool, list[str]]:
     reasons: list[str] = []
+    reasons.extend(pool_gate_blockers(task, task_dir))
     claim_scope = default_claim_scope(task, agents)
     if claim_scope and agent_id not in claim_scope:
         reasons.append("not_in_claim_scope")
@@ -196,7 +198,7 @@ def agent_acceptance(task: dict, agent_id: str, agents: dict[str, dict], active_
         reasons.append(f"reserved_limit_reached:{reserved_limit}")
     if len(active) >= active_limit:
         reasons.append(f"active_capacity_reached:{active_limit}")
-    return not reasons, reasons
+    return not reasons, sorted(set(reasons))
 
 
 def pooled_tasks(tasks_root: Path) -> list[tuple[Path, dict]]:
@@ -287,6 +289,7 @@ def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: di
         "pool_ready_count": ready_count,
         "pool_waiting_dependency_count": waiting_dependency_count,
         "pool_blocked_count": len(rows) - ready_count,
+        "definition_blocked_count": sum(1 for row in rows if row.get("definition_blockers")),
         "idle_agents": idle_agents,
         "idle_agent_count": len(idle_agents),
         "reserved_count": reserved_count,
@@ -302,8 +305,9 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
     by_agent = []
     eligible = []
     blocked_reasons: set[str] = set()
+    definition_blockers = pool_gate_blockers(task, task_dir)
     for agent_id in scope:
-        can_claim, reasons = agent_acceptance(task, agent_id, agents, active_by_agent, tasks_root, default_concurrency, config)
+        can_claim, reasons = agent_acceptance(task, task_dir, agent_id, agents, active_by_agent, tasks_root, default_concurrency, config)
         by_agent.append({"agent_id": agent_id, "can_claim": can_claim, "reasons": reasons})
         if can_claim:
             eligible.append(agent_id)
@@ -311,15 +315,26 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
             blocked_reasons.update(reasons)
     wait = age_minutes(str(task.get("pool_entered_at") or task.get("created_at") or ""), now)
     priority = str(task.get("priority") or "medium").strip().lower()
-    if eligible:
+    if definition_blockers:
+        next_action = "定义未完成，需 PM 补齐 Pool Gate"
+        gate_stage = "definition"
+    elif eligible:
         active = active_by_agent.get(eligible[0], [])
         has_working = any(str(item["task"].get("status") or "") == "working" for item in active)
         action = "可预留" if has_working else "可认领"
         next_action = f"{eligible[0]} {action}，等待自动续推或手动 claim"
+        gate_stage = "claim_ready"
     elif blocked_reasons:
         next_action = "不可认领，需处理：" + ",".join(sorted(blocked_reasons))
+        if any(str(reason).startswith("dependency_") for reason in blocked_reasons):
+            gate_stage = "dependency"
+        elif any("write_scope_conflict" in str(reason) for reason in blocked_reasons):
+            gate_stage = "scope_conflict"
+        else:
+            gate_stage = "capacity_or_scope"
     else:
         next_action = "无 claim_scope，需 PM 补齐"
+        gate_stage = "definition"
     return {
         "task_id": str(task.get("id") or task_dir.name),
         "title": str(task.get("title") or task_dir.name),
@@ -329,7 +344,9 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
         "claim_scope": scope,
         "eligible_agents": eligible,
         "by_agent": by_agent,
+        "definition_blockers": definition_blockers,
         "blocked_reasons": sorted(blocked_reasons),
+        "gate_stage": gate_stage,
         "next_action": next_action,
         "task_dir": str(task_dir),
     }
@@ -348,6 +365,7 @@ def human_print(rows: list[dict], agent_filter: str | None, summary: dict | None
         print(
             f"池健康 | idle {summary.get('idle_agent_count', 0)} | reserved {summary.get('reserved_count', 0)} | "
             f"working {summary.get('working_count', 0)} | dependency_wait {summary.get('pool_waiting_dependency_count', 0)} | "
+            f"definition_blocked {summary.get('definition_blocked_count', 0)} | "
             f"artifact_invalid {summary.get('artifact_invalid_count', 0)}"
         )
     print()

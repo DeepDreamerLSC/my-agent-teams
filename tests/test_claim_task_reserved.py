@@ -46,7 +46,7 @@ class ClaimTaskReservedTests(unittest.TestCase):
     def _write_task(self, name: str, payload: dict) -> Path:
         task_dir = self.tasks_root / name
         task_dir.mkdir(parents=True, exist_ok=True)
-        (task_dir / "task.json").write_text(json.dumps({
+        task = {
             "id": name,
             "title": name,
             "project": "demo",
@@ -57,7 +57,19 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "claim_scope": ["dev-1"],
             "pool_entered_at": "2026-05-09T10:00:00+08:00",
             **payload,
-        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        }
+        (task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (task_dir / "instruction.md").write_text("\n".join([
+            f"# 任务：{task['title']}",
+            "## 任务类型", str(task.get("task_type") or "development"),
+            "## 目标", "完成任务",
+            "## 任务边界", "按 scope 执行",
+            "## 输入事实", "已有上下文",
+            "## 约束", "遵守 write_scope",
+            "## 交付物", "result.json",
+            "## 验收标准", "任务完成",
+            "## 下游动作", "review",
+        ]) + "\n", encoding="utf-8")
         (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
         return task_dir
 
@@ -137,6 +149,25 @@ class ClaimTaskReservedTests(unittest.TestCase):
 
         task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
         self.assertIn("dependencies_ready_at", task)
+
+    def test_claim_rejects_owner_approval_pending_task(self):
+        self._write_task("owner-pending-task", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "write_scope": ["src/pending"],
+            "owner_approval_required": True,
+        })
+
+        completed = subprocess.run(
+            [str(CLAIM_SCRIPT), "owner-pending-task"],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("owner_approval_pending", completed.stderr)
 
 
 if __name__ == "__main__":

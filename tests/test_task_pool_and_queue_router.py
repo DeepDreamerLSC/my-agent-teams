@@ -57,6 +57,18 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         task_dir = self.tasks_root / name
         task_dir.mkdir(parents=True, exist_ok=True)
         (task_dir / 'task.json').write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+        task_type = payload.get('task_type') or 'development'
+        (task_dir / 'instruction.md').write_text('\n'.join([
+            f'# 任务：{payload.get("title") or name}',
+            '## 任务类型', str(task_type),
+            '## 目标', '完成任务',
+            '## 任务边界', '按指令执行',
+            '## 输入事实', '已有上下文',
+            '## 约束', '仅在允许范围内修改',
+            '## 交付物', 'result.json',
+            '## 验收标准', '满足任务要求',
+            '## 下游动作', 'review',
+        ]) + '\n', encoding='utf-8')
 
     def test_pool_router_selects_next_task_for_agent(self):
         completed = subprocess.run(
@@ -235,6 +247,38 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
             cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
         )
         self.assertIn('超时 1', completed.stdout)
+
+    def test_pool_view_marks_definition_blockers_for_missing_write_scope(self):
+        self._write_task('pooled-invalid-scope', {
+            'id': 'pooled-invalid-scope', 'title': '缺写范围', 'status': 'pooled', 'priority': 'medium',
+            'claim_scope': ['dev-1'], 'pool_entered_at': '2026-05-09T10:00:00+08:00',
+            'task_type': 'development', 'domain': 'development', 'write_scope': [],
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_VIEW), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        row = next(item for item in payload if item['task_id'] == 'pooled-invalid-scope')
+        self.assertEqual(row['definition_blockers'], ['write_scope_missing'])
+        self.assertEqual(row['eligible_agents'], [])
+        self.assertEqual(row['gate_stage'], 'definition')
+
+    def test_pool_router_skips_owner_approval_pending_task(self):
+        self._write_task('owner-approval-pending', {
+            'id': 'owner-approval-pending', 'title': '待 Owner 批准', 'status': 'pooled', 'priority': 'critical',
+            'claim_scope': ['dev-1'], 'pool_entered_at': '2026-05-09T11:00:00+08:00',
+            'task_type': 'development', 'domain': 'development', 'write_scope': ['/tmp/owner-pending'],
+            'owner_approval_required': True,
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--agent', 'dev-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        blocked_row = next(item for item in payload['rows'] if item['task_id'] == 'owner-approval-pending')
+        self.assertIn('owner_approval_pending', blocked_row['blocked_reasons'])
+        self.assertNotEqual(payload['next_task_id'], 'owner-approval-pending')
 
 
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ if [ -z "$TASK_FILE" ]; then
   exit 2
 fi
 
-POOL_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$FORCE_RESET_ACTIVE" <<'PY'
+POOL_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$FORCE_RESET_ACTIVE" "$WORKSPACE_ROOT" <<'PY'
 import json
 import os
 import sys
@@ -22,6 +22,8 @@ from datetime import datetime
 from pathlib import Path
 
 AUTO_ASSIGNED = {'auto', 'auto-dev', 'unassigned'}
+sys.path.insert(0, str(Path(sys.argv[4]).resolve() / 'scripts' / 'lib'))
+from task_pool_rules import pool_gate_blockers  # type: ignore
 
 task_path = Path(sys.argv[1]).resolve()
 config_path = Path(sys.argv[2]).resolve()
@@ -81,6 +83,12 @@ if not task.get('claim_scope'):
         task['claim_scope'] = ['arch-1']
     else:
         task['claim_scope'] = ['dev-1', 'dev-2']
+
+blockers = pool_gate_blockers(task, task_dir)
+if not task.get('claim_scope'):
+    blockers.append('claim_scope_missing')
+if blockers:
+    raise SystemExit('pool gate failed: ' + ', '.join(sorted(set(blockers))))
 
 task['claim_policy'] = 'pull'
 task['claim_max_concurrency'] = int(task.get('claim_max_concurrency') or config.get('task_pool', {}).get('default_claim_max_concurrency', 1))
