@@ -57,7 +57,7 @@
   "result_summary": null,
   "last_error": null,
   "created_at": "2026-05-04T00:55:43+08:00",
-  "updated_at": "2026-05-18T18:52:10+08:00",
+  "updated_at": "2026-05-18T18:52:59+08:00",
   "claim_scope": [
     "dev-1"
   ],
@@ -70,5 +70,5 @@
   "claimed_at": null,
   "claim_reason": null,
   "merge_gate_state": "closed",
-  "state_invariant_checked_at": "2026-05-18T18:52:10+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:52:59+08:00"
 }

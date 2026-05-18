@@ -45,10 +45,10 @@
   "result_summary": "DeepSeek domain 方案已输出并被后续后端、前端、QA 与集成链路采用，现予收口。",
   "last_error": null,
   "created_at": "2026-04-25T10:36:46+08:00",
-  "updated_at": "2026-05-18T18:52:02+08:00",
+  "updated_at": "2026-05-18T18:52:39+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:52:02+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:39+08:00",
   "state_invariant_violation_count": 0
 }

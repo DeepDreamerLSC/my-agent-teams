@@ -52,11 +52,11 @@
   "result_summary": "DeepSeek 聊天链路 thinking 与 web_search tool-call 支持已通过双审、QA，并进入集成提交。",
   "last_error": null,
   "created_at": "2026-04-25T10:54:16+08:00",
-  "updated_at": "2026-05-18T18:52:07+08:00",
+  "updated_at": "2026-05-18T18:52:56+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:52:07+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:56+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

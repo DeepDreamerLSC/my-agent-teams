@@ -50,10 +50,10 @@
   "result_summary": "QA PASS。后端统计口径与 task.json 事实源一致；终态任务同步修复仍有效，10 个后端测试通过。PM 已确认自动收口失败原因是 close-task.sh 在 verify pass 后仍拒绝 qa_pending gate，先清 gate 后手动收口。",
   "last_error": null,
   "created_at": "2026-04-25T15:02:31+08:00",
-  "updated_at": "2026-05-18T18:51:54+08:00",
+  "updated_at": "2026-05-18T18:53:07+08:00",
   "merge_gate_state": "closed",
   "last_gate_actor": "pm-chief",
   "last_gate_decision_at": "2026-05-06T11:48:37+08:00",
   "rework_reason": null,
-  "state_invariant_checked_at": "2026-05-18T18:51:54+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:53:07+08:00"
 }

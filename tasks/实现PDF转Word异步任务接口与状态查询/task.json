@@ -63,7 +63,7 @@
   "last_gate_actor": "watcher",
   "last_gate_decision_at": "2026-05-18T09:14:35+08:00",
   "created_at": "2026-05-18T08:40:55+08:00",
-  "updated_at": "2026-05-18T18:52:08+08:00",
+  "updated_at": "2026-05-18T18:52:57+08:00",
   "claim_policy": "push",
   "claim_scope": [],
   "claim_max_concurrency": null,
@@ -74,5 +74,5 @@
   "claimed_at": null,
   "claim_reason": null,
   "execution_round": 0,
-  "state_invariant_checked_at": "2026-05-18T18:52:08+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:52:57+08:00"
 }
