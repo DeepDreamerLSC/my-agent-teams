@@ -48,7 +48,7 @@
   "result_summary": "已在 chiralium 现有 skill 体系中新增 `ppt_generator` 主链路：可基于用户提示词与已解析的 PDF/文档文本生成可下载的 `.pptx` 文件，并复用现有 `display_type=file` 文件回传契约。（QA 已通过自动收口） QA 结论：QA 验证通过。ppt_generator skill 主链路已按现有 skill 体系落地，能基于解析文本生成结构化 .pptx 文件，返回 display_type=file 契约正确，测试 4 passed，review 已通过，不引入新依赖。",
   "last_error": null,
   "created_at": "2026-04-30T12:34:49+08:00",
-  "updated_at": "2026-05-18T18:51:07+08:00",
+  "updated_at": "2026-05-18T18:51:44+08:00",
   "depends_on": [],
   "blocks": [],
   "owner_approval_required": false,
@@ -59,7 +59,7 @@
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:07+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:44+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

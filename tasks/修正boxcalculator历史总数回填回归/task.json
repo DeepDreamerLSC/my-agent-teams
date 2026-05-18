@@ -46,11 +46,11 @@
   "result_summary": "已做最小补修，阻断 recent_messages 路径把历史错误 total_quantity 回填到当前混装 forward 的问题；同时补了多轮上下文下的 forward / direct_dimension / reverse 回归测试，确保历史内容不再污染当前轮意图。（QA 已通过自动收口） QA 结论：QA 验证通过。已阻断 recent_messages 路径把历史错误 total_quantity 回填到当前混装 forward 的问题：当前轮有 style_quantities 且无显式总数时，合并后强制清空 total_quantity；direct_dimension 和 reverse 模式也有独立的当前轮意图保护。测试 15 passed，覆盖 forward/direct_dimension/reverse 三条 recent_messages 回归场景。",
   "last_error": null,
   "created_at": "2026-04-28T19:20:55+08:00",
-  "updated_at": "2026-05-18T18:51:01+08:00",
+  "updated_at": "2026-05-18T18:51:37+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:01+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:37+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

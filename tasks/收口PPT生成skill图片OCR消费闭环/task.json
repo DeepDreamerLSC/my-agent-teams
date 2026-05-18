@@ -62,10 +62,10 @@
   "result_summary": "已补齐 PPT 生成 skill 的图片 OCR 消费闭环：图片附件现在会在现有文件解析主链路中进入 `parsed_files`，`ppt_generator` 可直接消费 OCR 文本生成 PPT；同时把 manifest / skill 输入能力与实际实现对齐，并补了证明闭环的测试。（QA 已通过自动收口） QA 结论：QA 验证通过。图片 OCR 结果已通过 ContextAssembler.ensure_parsed_files() 进入 parsed_files，ppt_generator 主链路直接消费；manifest 输入能力已扩展 document+image 且与实际一致；文档/PDF 主链路无回归，9 测试全部通过，review 已 APPROVE。",
   "last_error": null,
   "created_at": "2026-04-30T13:31:41+08:00",
-  "updated_at": "2026-05-18T18:50:54+08:00",
+  "updated_at": "2026-05-18T18:51:37+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:50:54+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:37+08:00",
   "state_invariant_violation_count": 0
 }

@@ -50,10 +50,10 @@
   "result_summary": "已按 PM 裁决完成收束：反馈问题/需求详情页本轮不再保留误导性的‘打开’入口，只保留可靠的‘下载’入口；受保护下载链路继续沿用签名链接优先、blob fallback 兜底的实现。（QA 已通过自动收口） QA 结论：QA 验证通过。反馈详情页已按 PM 裁决移除误导性的'打开'入口，只保留可靠的'下载'按钮；受保护下载链路保持签名链接优先+blob fallback 兜底；无附件时安全不渲染附件区。测试 2 文件 7 passed。",
   "last_error": null,
   "created_at": "2026-04-28T12:24:14+08:00",
-  "updated_at": "2026-05-18T18:50:54+08:00",
+  "updated_at": "2026-05-18T18:51:38+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:50:54+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:38+08:00",
   "state_invariant_violation_count": 0
 }

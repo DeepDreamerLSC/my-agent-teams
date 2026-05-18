@@ -48,10 +48,10 @@
   "result_summary": "已为反馈 AI 链路补齐最小附件元数据透传：issue/request 的 AI input_json 现在都会带 attachments[]，至少包含 file_id、file_name、mime_type；若 uploaded_files 上已有 extracted_text，则再附带最小 extracted_text_summary。无附件场景保持兼容，attachments 会稳定为 []。（QA 已通过自动收口） QA 结论：QA 验证通过。反馈 AI 链路已补齐附件元数据透传：issue/request 的 AI input_json 现在带 attachments[]，包含 file_id/file_name/mime_type/file_size/parse_status + 可选 extracted_text_summary（600字截断）；无附件场景 attachments=[] 保持兼容。start_* 落库 input_json 和 finish_* 模型调用两条链路均已覆盖。测试 17 passed。",
   "last_error": null,
   "created_at": "2026-04-28T11:33:55+08:00",
-  "updated_at": "2026-05-18T18:50:59+08:00",
+  "updated_at": "2026-05-18T18:51:43+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:50:59+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:43+08:00",
   "state_invariant_violation_count": 0
 }
