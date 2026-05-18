@@ -52,11 +52,11 @@
   "result_summary": "已按林总工最新方向完成前端最小调整：当前模型为 DeepSeek 时，联网搜索按钮直接置灰并提示用户改为普通对话；DeepSeek 普通对话与深度思考能力不受误伤；GLM/Zhipu 继续沿用现有 provider-native unavailable 提示逻辑，其他 provider 的联网搜索也不受影响。（QA 已通过自动收口） QA 结论：QA 验证通过。选中 DeepSeek 时联网搜索按钮前端强制置灰（effectiveWebSearchRuntimeStatus='unavailable'），提示“当前 DeepSeek 联网搜索已禁用，请直接进行普通对话”；DeepSeek 普通对话与深度思考能力不受误伤（supportsThinking 不受影响）；GLM/Zhipu 继续用 zhipu_web_search_runtime_status 独立链路；其他 provider 不受 DeepSeek 特判影响。测试 4 文件 51 passed。",
   "last_error": null,
   "created_at": "2026-04-27T13:15:50+08:00",
-  "updated_at": "2026-05-18T18:51:39+08:00",
+  "updated_at": "2026-05-18T18:52:03+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:39+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:03+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

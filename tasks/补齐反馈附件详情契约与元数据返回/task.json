@@ -51,10 +51,10 @@
   "result_summary": "已完成后端 feedback detail / admin detail 的附件契约补齐：在保留 attachment_ids 兼容的同时，新增可直接消费的 attachments[]，返回 file_id、file_name、file_size、mime_type、download_url；并补了详情接口输出测试。（QA 已通过自动收口） QA 结论：QA 验证通过。后端 feedback detail / admin detail 已在保留 attachment_ids 兼容的同时新增 attachments[]，包含 file_id/file_name/file_size/mime_type/download_url 五个字段；file_service.get_uploaded_file_summaries() 按 attachment_ids 顺序展开；测试 25 passed，覆盖用户侧与管理员侧两条 detail 路径。",
   "last_error": null,
   "created_at": "2026-04-28T11:33:55+08:00",
-  "updated_at": "2026-05-18T18:51:43+08:00",
+  "updated_at": "2026-05-18T18:52:00+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:43+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:00+08:00",
   "state_invariant_violation_count": 0
 }

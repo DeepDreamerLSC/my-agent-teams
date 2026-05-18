@@ -45,11 +45,11 @@
   "result_summary": "批量收口任务已完成，原先保留的两个任务现均通过 review，整批收口链路结束。",
   "last_error": null,
   "created_at": "2026-04-25T08:37:41+08:00",
-  "updated_at": "2026-05-18T18:51:33+08:00",
+  "updated_at": "2026-05-18T18:51:52+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:33+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:52+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

@@ -58,7 +58,7 @@
   "result_summary": "已在现有 `/api/tasks/<id>/detail` 基础上补齐独立的 timeline / communications 只读接口，并新增后端自动化测试，确保时间线与沟通口径可单独拉取且与 detail 保持一致。（QA 已通过自动收口） QA 结论：QA 验证通过。独立的 /api/tasks/<id>/timeline 与 /api/tasks/<id>/communications 接口已补齐，复用 detail 查询逻辑保证口径一致。缺失任务返回 404。4 个 unittest 全部通过（query 2 + API 2）。",
   "last_error": null,
   "created_at": "2026-05-04T00:55:42+08:00",
-  "updated_at": "2026-05-18T18:51:45+08:00",
+  "updated_at": "2026-05-18T18:52:01+08:00",
   "claim_scope": [
     "dev-2"
   ],
@@ -66,6 +66,6 @@
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:45+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:01+08:00",
   "state_invariant_violation_count": 0
 }

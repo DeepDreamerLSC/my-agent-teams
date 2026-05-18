@@ -47,11 +47,11 @@
   "result_summary": "已为 box-calculator skill 增加‘用户直接输入鞋盒实际尺寸 + 数量’模式，并明确 exact-match / mismatch 提示：匹配成功才继续按 A-G 规则计算外箱，不匹配则列出 A-G 标准尺寸并停止计算。（QA 已通过自动收口） QA 结论：QA 验证通过。box-calculator SKILL.md 已新增鞋盒实际尺寸输入模式：用户输入长×宽×高+数量时先与 A-G 标准数据库做完全一致匹配，匹配成功明确输出款号后续按现有规则计算外箱，不匹配则停止计算并列出 A-G 标准尺寸供参考。原有款号输入、混装两列优化、长宽交换、反向验算等规则均保留。",
   "last_error": null,
   "created_at": "2026-04-28T10:45:25+08:00",
-  "updated_at": "2026-05-18T18:51:41+08:00",
+  "updated_at": "2026-05-18T18:52:05+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:41+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:52:05+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

@@ -65,7 +65,7 @@
   "last_gate_actor": "watcher",
   "last_gate_decision_at": "2026-05-17T18:07:43+08:00",
   "created_at": "2026-05-17T12:06:35+08:00",
-  "updated_at": "2026-05-18T18:51:44+08:00",
+  "updated_at": "2026-05-18T18:52:00+08:00",
   "claim_policy": "push",
   "claim_scope": [],
   "claim_max_concurrency": null,
@@ -79,5 +79,5 @@
   "last_resumed_at": "2026-05-17T17:25:27+08:00",
   "last_resumed_by": "pm-chief",
   "execution_round": 1,
-  "state_invariant_checked_at": "2026-05-18T18:51:44+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:52:00+08:00"
 }

@@ -41,11 +41,11 @@
   "result_summary": "只读排查已完成并被 PM 验收：DeepSeek 主因确认为代码回退 + 生产配置缺失，已拆出高优先级修复链路；GLM 判断为上游退化，已按简化方案拆为健康探针与前端提示任务。",
   "last_error": null,
   "created_at": "2026-04-26T08:39:55+08:00",
-  "updated_at": "2026-05-18T18:51:33+08:00",
+  "updated_at": "2026-05-18T18:51:53+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:33+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:53+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

@@ -45,11 +45,11 @@
   "result_summary": "feature 级共享上下文已建立并完成 execution 拆分：进程级可靠性、日志持久化、超时检测优化三条任务已按顺序创建，其中第 1 条已派发实施。",
   "last_error": null,
   "created_at": "2026-04-26T13:03:10+08:00",
-  "updated_at": "2026-05-18T18:51:30+08:00",
+  "updated_at": "2026-05-18T18:51:49+08:00",
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:51:30+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:49+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

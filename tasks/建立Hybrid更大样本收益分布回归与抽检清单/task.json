@@ -70,7 +70,7 @@
   "last_gate_actor": "qa",
   "last_gate_decision_at": "2026-05-18T15:04:16+08:00",
   "created_at": "2026-05-18T13:31:28+08:00",
-  "updated_at": "2026-05-18T18:51:28+08:00",
+  "updated_at": "2026-05-18T18:51:48+08:00",
   "claim_policy": "pull",
   "claim_scope": [
     "qa-1"
@@ -86,7 +86,7 @@
   "reserved_by": "qa-1",
   "reserved_at": "2026-05-18T13:32:28+08:00",
   "reserved_reason": "基于现有 artifacts 执行 Hybrid 收益分布回归与抽检清单整理",
-  "state_invariant_checked_at": "2026-05-18T18:51:28+08:00",
+  "state_invariant_checked_at": "2026-05-18T18:51:48+08:00",
   "dispatch_delivery_consecutive_failures": 0,
   "execution_round": 0
 }

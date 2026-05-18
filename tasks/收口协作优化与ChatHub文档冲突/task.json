@@ -43,10 +43,10 @@
   "result_summary": "已对协作优化主文档与 Chat-Hub 落地清单做最小范围收口：统一版本头与 A-Lite 表述，删除私聊误导示例，并进一步明确验证期不过则不进入 B/C 阶段。",
   "last_error": null,
   "created_at": "2026-04-30T08:00:49+08:00",
-  "updated_at": "2026-05-18T18:51:38+08:00",
+  "updated_at": "2026-05-18T18:51:56+08:00",
   "merge_gate_state": "closed",
   "rework_reason": null,
   "last_gate_actor": "pm-chief",
   "last_gate_decision_at": "2026-05-06T06:48:40+08:00",
-  "state_invariant_checked_at": "2026-05-18T18:51:38+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:51:56+08:00"
 }

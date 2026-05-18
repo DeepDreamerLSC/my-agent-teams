@@ -28,7 +28,7 @@
   "result_summary": "后续补修任务“修正DeepSeek联网搜索前端可视化误报与测试补齐”已通过审查并进入集成，原任务作为被补修吸收的 blocked 基线由 PM 取消。",
   "last_error": null,
   "created_at": "2026-04-25T18:28:15+08:00",
-  "updated_at": "2026-05-18T18:51:40+08:00",
+  "updated_at": "2026-05-18T18:51:57+08:00",
   "id": "补充DeepSeek联网搜索前端提示与能力可视化",
   "title": "补充 DeepSeek 联网搜索前端提示与能力可视化",
   "assigned_agent": "dev-1",
@@ -52,5 +52,5 @@
   "root_request_id": "DeepSeek联网搜索生产异常",
   "parent_task_id": "定位DeepSeek联网搜索生产异常",
   "priority": "high",
-  "state_invariant_checked_at": "2026-05-18T18:51:40+08:00"
+  "state_invariant_checked_at": "2026-05-18T18:51:57+08:00"
 }
