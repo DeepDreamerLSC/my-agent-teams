@@ -56,7 +56,7 @@
   "result_summary": "已补齐看板只读聚合视图后端闭环：新增 `/api/tasks/aggregate` 与 `scripts/task-aggregate.py`，按 owner_pm/domain/task_level/parent_task_id/root_request_id 输出只读聚合摘要、task tree drill-down 与拥塞分布；同时在 query 层对 `task_level` 做 task.json 回退读取，避免当前 SQLite 快照未持久化该字段时聚合失真。（QA 已通过自动收口） QA 结论：QA 验证通过。API /api/tasks/aggregate 与 CLI task-aggregate.py 已补齐，支持按 owner_pm/domain/task_level/parent_task_id/root_request_id 五维度只读聚合、request_tree drill-down 与拥塞分布。8 个 dashboard 测试全部通过，aggregate CLI JSON 输出可解析、维度完整。",
   "last_error": null,
   "created_at": "2026-05-04T00:55:42+08:00",
-  "updated_at": "2026-05-05T20:26:07+08:00",
+  "updated_at": "2026-05-18T15:04:12+08:00",
   "claim_scope": [
     "dev-2"
   ],
@@ -67,5 +67,12 @@
   "pool_entered_at": "2026-05-04T11:10:26+08:00",
   "claimed_by": "dev-2",
   "claimed_at": "2026-05-04T23:13:34+08:00",
-  "claim_reason": "上一条后端主线已完成，继续执行下一条后端聚合任务"
+  "claim_reason": "上一条后端主线已完成，继续执行下一条后端聚合任务",
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
+  "merge_gate_state": "closed"
 }

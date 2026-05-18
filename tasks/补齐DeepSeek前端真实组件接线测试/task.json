@@ -50,5 +50,10 @@
   "result_summary": "DeepSeek 前端真实组件级接线测试补齐已通过审查，并支撑整条链路完成 QA 与集成。",
   "last_error": null,
   "created_at": "2026-04-25T12:59:00+08:00",
-  "updated_at": "2026-04-25T15:21:04+08:00"
+  "updated_at": "2026-04-25T15:21:04+08:00",
+  "merge_gate_state": "closed",
+  "state_invariant_violations": [],
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_violation_count": 0
 }

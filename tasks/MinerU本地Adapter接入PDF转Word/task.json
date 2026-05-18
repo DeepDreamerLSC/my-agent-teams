@@ -4,7 +4,7 @@
   "project": "chiralium",
   "execution_mode": "dev",
   "target_environment": "dev",
-  "assigned_agent": "dev-1",
+  "assigned_agent": "dev-2",
   "review_required": true,
   "review_authority": "reviewer",
   "reviewer": "review-1",
@@ -13,10 +13,10 @@
     "review-1"
   ],
   "review_deadline": null,
-  "review_round": 0,
+  "review_round": 1,
   "max_review_rounds": 3,
   "test_required": true,
-  "status": "dispatched",
+  "status": "done",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "development",
@@ -59,12 +59,12 @@
   "target_branch": "integration",
   "result_summary": null,
   "last_error": null,
-  "merge_gate_state": null,
-  "rework_reason": null,
-  "last_gate_actor": null,
-  "last_gate_decision_at": null,
+  "merge_gate_state": "closed",
+  "rework_reason": "review-1 发现两个阻塞问题：1) MinerU 配置未从 BaseSettings 正确透传；2) 临时文件名与 source_name 不一致导致输出读取失败。详见 review.md。",
+  "last_gate_actor": "watcher",
+  "last_gate_decision_at": "2026-05-14T16:31:11+08:00",
   "created_at": "2026-05-14T08:59:57+08:00",
-  "updated_at": "2026-05-14T08:59:57+08:00",
+  "updated_at": "2026-05-18T15:04:05+08:00",
   "claim_policy": "push",
   "claim_scope": [
     "dev-1"
@@ -75,5 +75,11 @@
   "pool_entered_at": null,
   "claimed_by": null,
   "claimed_at": null,
-  "claim_reason": null
+  "claim_reason": null,
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00"
 }

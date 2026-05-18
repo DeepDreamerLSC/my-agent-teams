@@ -29,7 +29,7 @@
   "result_summary": "已在现有 shell watcher 架构上完成最小进程级可靠性增强：task-watcher 主循环会持续写 heartbeat 与 pid，新增 watchdog 脚本可检测 watcher 退出或 heartbeat 超时并自动重启，同时不把 heartbeat/pid/restart-cause 文件纳入任务看板同步链。（QA 已通过自动收口） QA 结论：QA 验证通过。heartbeat 文件周期更新正常（phase=running）；watchdog 能检测 watcher 进程退出并自动重启（restart-cause=process_exit）；能检测 heartbeat 超时并重启（restart-cause=heartbeat_timeout）；heartbeat/pid/restart-cause 未纳入任务看板同步链；shell 语法检查通过。验收标准 4/4 满足。",
   "last_error": null,
   "created_at": "2026-04-26T16:28:08+08:00",
-  "updated_at": "2026-04-26T17:00:57+08:00",
+  "updated_at": "2026-05-18T15:04:11+08:00",
   "root_request_id": "task-watcher可靠性优化第一批",
   "parent_task_id": "建立taskwatcher可靠性优化上下文",
   "id": "实现taskwatcher进程级可靠性",
@@ -46,5 +46,12 @@
       "path": "tasks/实现taskwatcher进程级可靠性/instruction.md",
       "description": "PM 生成的任务指令"
     }
-  ]
+  ],
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
+  "merge_gate_state": "closed"
 }

@@ -47,5 +47,12 @@
   "result_summary": "close-task.sh 已通过审查，可作为 my-agent-teams 的正式收口工具使用。",
   "last_error": null,
   "created_at": "2026-04-25T08:37:41+08:00",
-  "updated_at": "2026-04-25T09:18:43+08:00"
+  "updated_at": "2026-05-18T15:04:11+08:00",
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
+  "merge_gate_state": "closed"
 }

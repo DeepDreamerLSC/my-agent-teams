@@ -327,16 +327,25 @@ stop_agents() {
 
 start_watcher() {
   ensure_runtime_dirs
-  if [ -f "$STATE_DIR/task-watcher/task-watcher.pid" ]; then
-    pid="$(cat "$STATE_DIR/task-watcher/task-watcher.pid" 2>/dev/null || true)"
+  local watcher_pid_file="$STATE_DIR/task-watcher/task-watcher.pid"
+  local watchdog_pid_file="$STATE_DIR/task-watcher/task-watcher-watchdog.pid"
+  if [ -f "$watchdog_pid_file" ]; then
+    pid="$(cat "$watchdog_pid_file" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      log "task-watcher watchdog already running pid=$pid"
+      return 0
+    fi
+  fi
+  if [ -f "$watcher_pid_file" ]; then
+    pid="$(cat "$watcher_pid_file" 2>/dev/null || true)"
     if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
       log "task-watcher already running pid=$pid"
       return 0
     fi
   fi
   WORKSPACE_ROOT="$WORKSPACE_ROOT" CONFIG_PATH="$CONFIG_PATH" TASKS_ROOT="$TASKS_ROOT" INTERVAL="$WATCHER_INTERVAL" \
-    nohup "$SCRIPT_DIR/task-watcher.sh" >> "$LOG_DIR/task-watcher.nohup.log" 2>&1 &
-  log "task-watcher started pid=$! log=$LOG_DIR/task-watcher.nohup.log"
+    nohup "$SCRIPT_DIR/task-watcher-watchdog.sh" >> "$LOG_DIR/task-watcher.nohup.log" 2>&1 &
+  log "task-watcher watchdog started pid=$! log=$LOG_DIR/task-watcher.nohup.log"
 }
 
 stop_pid_file() {
@@ -366,7 +375,8 @@ stop_pid_file() {
 }
 
 stop_watcher() {
-  stop_pid_file "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher
+  stop_pid_file "$STATE_DIR/task-watcher/task-watcher-watchdog.pid" task-watcher-watchdog || true
+  stop_pid_file "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher || true
 }
 
 start_dashboard() {

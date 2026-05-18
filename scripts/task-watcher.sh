@@ -876,7 +876,11 @@ from datetime import datetime
 from pathlib import Path
 
 task_dir = Path(sys.argv[1])
-report = json.loads(sys.argv[2] or '{}')
+raw_report = sys.argv[2] or '{}'
+try:
+    report = json.loads(raw_report)
+except Exception:
+    report = {}
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
 now = datetime.now().astimezone().isoformat(timespec='seconds')
@@ -1719,7 +1723,10 @@ transitions_path = task_dir / 'transitions.jsonl'
 task = json.loads(task_path.read_text(encoding='utf-8'))
 old_status = task.get('status', '')
 now = datetime.now().astimezone().isoformat(timespec='seconds')
-patch = json.loads(patch_json)
+try:
+    patch = json.loads(patch_json)
+except Exception:
+    patch = {}
 
 status_changed = bool(new_status) and old_status != new_status
 fields_changed = False

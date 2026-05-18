@@ -16,6 +16,7 @@ HEARTBEAT_TIMEOUT_SECONDS="${HEARTBEAT_TIMEOUT_SECONDS:-300}"
 WATCHDOG_RUN_ONCE="${WATCHDOG_RUN_ONCE:-0}"
 PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
+WATCHDOG_PID_FILE="${WATCHDOG_PID_FILE:-$STATE_DIR/task-watcher-watchdog.pid}"
 RESTART_CAUSE_FILE="${RESTART_CAUSE_FILE:-$STATE_DIR/task-watcher-restart-cause.txt}"
 MIGRATION_SENTINEL_FILE="${MIGRATION_SENTINEL_FILE:-$STATE_DIR/migration-complete.json}"
 LOG_DIR="${LOG_DIR:-$WORKSPACE_ROOT/.runtime/logs}"
@@ -26,6 +27,31 @@ LOG_RETENTION_DAYS="${LOG_RETENTION_DAYS:-7}"
 LAST_LOG_ROTATE_DAY=""
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
+
+ensure_watchdog_single_instance() {
+  local existing_pid=""
+  existing_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null || true)
+  if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && kill -0 "$existing_pid" 2>/dev/null; then
+    printf "%s\n" "$(date '+%Y-%m-%d %H:%M:%S') task-watcher-watchdog 已在运行（pid=$existing_pid），当前实例退出" >&2
+    exit 0
+  fi
+}
+
+write_watchdog_pid() {
+  printf '%s\n' "$$" > "$WATCHDOG_PID_FILE"
+}
+
+cleanup_watchdog_runtime() {
+  local existing_pid=""
+  existing_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null || true)
+  if [ "$existing_pid" = "$$" ]; then
+    rm -f "$WATCHDOG_PID_FILE"
+  fi
+}
+
+trap cleanup_watchdog_runtime EXIT INT TERM
+ensure_watchdog_single_instance
+write_watchdog_pid
 
 ensure_stdout_log_compat() {
   local compat_stdout_log="$STATE_DIR/task-watcher.stdout.log"

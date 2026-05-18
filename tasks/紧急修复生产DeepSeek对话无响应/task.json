@@ -51,5 +51,10 @@
   "result_summary": "已完成最小代码修复：当 DeepSeek 处于 tool_call 联网搜索链路且 runtime 配置不可用时，后端会在进入模型流式调用前直接短路返回明确失败文案，避免用户感知为“点击后无响应/长时间没结果”。同时确认生产仍需补齐 CHAT_WEB_SEARCH_BASE_URL 才能恢复真实联网搜索。（QA 已通过自动收口） QA 结论：QA 验证通过。DeepSeek tool_call 联网搜索链路已增加 runtime preflight 短路：当 web_search runtime 不可用时（ready=false），在进入模型流式调用前直接返回固定失败文案，用户不再感知为“无响应”。测试 72 passed，关键测试断言 tool_runtime.assert_not_awaited() 确认不会继续进入无效调用路径。修复范围仅 chat.py + test_chat.py，无扩散。",
   "last_error": null,
   "created_at": "2026-04-27T11:42:34+08:00",
-  "updated_at": "2026-04-27T12:19:33+08:00"
+  "updated_at": "2026-04-27T12:19:33+08:00",
+  "merge_gate_state": "closed",
+  "state_invariant_violations": [],
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_violation_count": 0
 }

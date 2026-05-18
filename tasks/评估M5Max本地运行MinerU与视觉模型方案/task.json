@@ -47,7 +47,7 @@
   "target_branch": "integration",
   "result_summary": "arch-1 评估结论：本地方案优于 sidecar，推荐 MinerU 本地 CLI adapter + MLX/Ollama 视觉增强。PM 已据此创建 MinerU 本地接入任务。",
   "last_error": null,
-  "merge_gate_state": "pm_acceptance_pending",
+  "merge_gate_state": "closed",
   "rework_reason": null,
   "last_gate_actor": "watcher",
   "last_gate_decision_at": "2026-05-13T23:51:38+08:00",
@@ -61,5 +61,9 @@
   "pool_entered_at": null,
   "claimed_by": null,
   "claimed_at": null,
-  "claim_reason": null
+  "claim_reason": null,
+  "state_invariant_violations": [],
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_violation_count": 0
 }

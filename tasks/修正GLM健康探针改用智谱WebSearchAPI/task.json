@@ -50,5 +50,12 @@
   "result_summary": "已按最小范围把 GLM/Zhipu provider-native 健康探针从“chat completion + 模型自然语言回答”改为直接调用智谱 Web Search API 的结构化探测；同时把 429 / request_failed 这类瞬时故障校准为 degraded，避免单次抖动直接把整个 provider 长时间判成 unavailable。（QA 已通过自动收口） QA 结论：QA 验证通过。GLM/Zhipu provider-native 健康探针已从 chat completion + 模型自然语言回答改为直接调用智谱 POST /api/paas/v4/web_search Tool API 的结构化探测；429/request_failed 等瞬时故障校准为 degraded 而非 unavailable；前端消费字段 provider_web_search_runtime.zhipu 与 zhipu_web_search_runtime_status 保持兼容；DeepSeek tool_call 链路未受影响。测试 50 passed。",
   "last_error": null,
   "created_at": "2026-04-27T08:19:03+08:00",
-  "updated_at": "2026-04-27T08:38:21+08:00"
+  "updated_at": "2026-05-18T15:04:06+08:00",
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
+  "merge_gate_state": "closed"
 }

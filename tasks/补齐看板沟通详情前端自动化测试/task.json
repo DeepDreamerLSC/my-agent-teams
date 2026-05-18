@@ -67,5 +67,10 @@
   "pool_entered_at": "2026-05-04T11:10:24+08:00",
   "claimed_by": "dev-1",
   "claimed_at": "2026-05-04T23:13:33+08:00",
-  "claim_reason": "上一条前端主线已完成，继续执行下一条前端测试任务"
+  "claim_reason": "上一条前端主线已完成，继续执行下一条前端测试任务",
+  "merge_gate_state": "closed",
+  "state_invariant_violations": [],
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_violation_count": 0
 }

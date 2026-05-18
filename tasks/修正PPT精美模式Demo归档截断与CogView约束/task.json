@@ -56,5 +56,12 @@
   "result_summary": "已按 review 驳回意见完成最小补修：1) polished demo zip 包中的 `presentation_plan.json` 不再做按字节硬截断，现始终完整写入、可合法 UTF-8 解码并可被 JSON 解析；2) polished demo 的 `image_model_id` 不再允许绕过 CogView 约束，若显式传入非 CogView-3-Flash / cogview-3 的图片模型会直接拒绝。（QA 已通过自动收口） QA 结论：QA 验证通过。review.md 原文为 APPROVE（task-watcher 误报以 review.md 为准）。两个阻塞点已修复：1) presentation_plan.json 完整 UTF-8 写入、可 JSON 解析、长字段不截断；2) 非 CogView image_model_id 被 RuntimeError 拒绝；simple 模式与 polished demo 主链路无回归，9 测试全部通过。",
   "last_error": null,
   "created_at": "2026-05-01T03:04:55+08:00",
-  "updated_at": "2026-05-01T03:21:02+08:00"
+  "updated_at": "2026-05-18T15:04:06+08:00",
+  "state_invariant_violations": [],
+  "state_invariant_violation_count": 0,
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "control_plane_state": null,
+  "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
+  "merge_gate_state": "closed"
 }

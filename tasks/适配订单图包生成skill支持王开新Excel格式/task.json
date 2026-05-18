@@ -61,5 +61,10 @@
   "pool_entered_at": null,
   "claimed_by": null,
   "claimed_at": null,
-  "claim_reason": null
+  "claim_reason": null,
+  "merge_gate_state": "closed",
+  "state_invariant_violations": [],
+  "state_invariant_signature": "",
+  "state_invariant_checked_at": "2026-05-18T15:11:37+08:00",
+  "state_invariant_violation_count": 0
 }
