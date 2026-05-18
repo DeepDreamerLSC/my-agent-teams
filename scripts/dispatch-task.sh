@@ -16,7 +16,7 @@ if [ -z "$TASK_FILE" ]; then
   exit 2
 fi
 
-DISPATCH_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$ALLOW_WRITE_SCOPE_CONFLICT" "$FORCE_DIRECT_DISPATCH" "$DIRECT_DISPATCH_REASON" <<'PY'
+DISPATCH_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$ALLOW_WRITE_SCOPE_CONFLICT" "$FORCE_DIRECT_DISPATCH" "$DIRECT_DISPATCH_REASON" "$WORKSPACE_ROOT" <<'PY'
 import json
 import os
 import sys
@@ -24,6 +24,9 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+sys.path.insert(0, str(Path(sys.argv[6]).resolve() / "scripts" / "lib"))
+from task_quality_rules import derive_quality_gate_mode, validate_task_type_gate_template  # type: ignore
 
 ACTIVE_DISPATCH_STATUSES = {'dispatched', 'working', 'ready_for_merge', 'blocked'}
 AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
@@ -82,17 +85,6 @@ def dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         output.append(value)
     return output
-
-
-def derive_quality_gate_mode(*, task_type: str, execution_mode: str, target_environment: str, task_level: str, review_required: bool, test_required: bool) -> str:
-    if not (review_required and test_required):
-        return 'single'
-    if target_environment == 'prod' or execution_mode == 'deploy':
-        return 'serial'
-    if task_type in {'deployment', 'integration'} or task_level == 'integration':
-        return 'serial'
-    return 'parallel'
-
 
 def normalize_task_type(raw: str) -> Optional[str]:
     stripped = str(raw).strip().lower()
@@ -335,6 +327,13 @@ else:
         task['reviewer'] = reviewers[0]
 
 task['review_deadline'] = normalize_iso(task.get('review_deadline')) if task.get('review_deadline') else None
+template_errors = validate_task_type_gate_template(
+    task_type=task_type or '',
+    review_required=bool(task.get('review_required')),
+    test_required=bool(task.get('test_required')),
+)
+if template_errors:
+    raise SystemExit('; '.join(template_errors))
 task['quality_gate_mode'] = derive_quality_gate_mode(
     task_type=task_type,
     execution_mode=execution_mode,

@@ -10,8 +10,8 @@ ASSIGNED_AGENT="${3:-}"
 DOMAIN="${4:-}"
 PROJECT="${5:-}"
 WRITE_SCOPE_CSV="${6:-}"
-REVIEW_REQUIRED="${7:-false}"
-TEST_REQUIRED="${8:-false}"
+REVIEW_REQUIRED="${7:-}"
+TEST_REQUIRED="${8:-}"
 REVIEW_AUTHORITY="${9:-reviewer}"
 EXECUTION_MODE="${10:-dev}"
 TARGET_ENVIRONMENT="${11:-dev}"
@@ -37,7 +37,7 @@ fi
 TASK_DIR="$TASKS_DIR/$TASK_ID"
 mkdir -p "$TASK_DIR"
 
-python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" "$REVIEW_LEVEL" "$TASK_LEVEL" "$REVIEWERS_CSV" "$REVIEW_DEADLINE" "$STRICT_WRITE_SCOPE_CONFLICT" "$TASK_TYPE_RAW" "$READ_ONLY_RAW" "$DOWNSTREAM_ACTION_RAW" "$OWNER_APPROVAL_REQUIRED_RAW" "$OWNER_APPROVED_BY_RAW" "$OWNER_APPROVED_AT_RAW" <<'PY'
+python3 - "$CONFIG_PATH" "$TASK_ID" "$TITLE" "$ASSIGNED_AGENT" "$DOMAIN" "$PROJECT" "$WRITE_SCOPE_CSV" "$REVIEW_REQUIRED" "$TEST_REQUIRED" "$REVIEW_AUTHORITY" "$EXECUTION_MODE" "$TARGET_ENVIRONMENT" "$TASK_DIR" "$REVIEW_LEVEL" "$TASK_LEVEL" "$REVIEWERS_CSV" "$REVIEW_DEADLINE" "$STRICT_WRITE_SCOPE_CONFLICT" "$TASK_TYPE_RAW" "$READ_ONLY_RAW" "$DOWNSTREAM_ACTION_RAW" "$OWNER_APPROVAL_REQUIRED_RAW" "$OWNER_APPROVED_BY_RAW" "$OWNER_APPROVED_AT_RAW" "$WORKSPACE_ROOT" <<'PY'
 import json
 import os
 import re
@@ -46,6 +46,13 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+sys.path.insert(0, str(Path(sys.argv[25]).resolve() / "scripts" / "lib"))
+from task_quality_rules import (  # type: ignore
+    derive_quality_gate_mode,
+    resolve_gate_flags_for_create,
+    validate_task_type_gate_template,
+)
 
 cfg_path = Path(sys.argv[1])
 (
@@ -127,17 +134,6 @@ def dedupe(values: list[str]) -> list[str]:
         seen.add(value)
         output.append(value)
     return output
-
-
-def derive_quality_gate_mode(*, task_type: str, execution_mode: str, target_environment: str, task_level: str, review_required: bool, test_required: bool) -> str:
-    if not (review_required and test_required):
-        return 'single'
-    if target_environment == 'prod' or execution_mode == 'deploy':
-        return 'serial'
-    if task_type in {'deployment', 'integration'} or task_level == 'integration':
-        return 'serial'
-    return 'parallel'
-
 
 def normalize_task_type(raw: str, *, execution_mode: str, target_environment: str, task_level: str) -> Optional[str]:
     stripped = raw.strip().lower()
@@ -249,8 +245,6 @@ if not re.search(r'[\u4e00-\u9fff]', task_id):
     )
 
 cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
-legacy_review_required = parse_bool(review_required_raw)
-test_required = parse_bool(test_required_raw)
 review_authority = review_authority if review_authority in {'reviewer', 'owner'} else 'reviewer'
 execution_mode = execution_mode if execution_mode in {'dev', 'deploy'} else 'dev'
 target_environment = target_environment if target_environment in {'dev', 'prod'} else 'dev'
@@ -293,9 +287,26 @@ resolved_scope = validate_and_resolve_scope(
     assigned_agent=assigned_agent,
 )
 
+task_type = normalize_task_type(
+    task_type_raw,
+    execution_mode=execution_mode,
+    target_environment=target_environment,
+    task_level=normalized_task_level,
+)
+if task_type == 'deployment':
+    owner_approval_required = True
+try:
+    review_required, test_required = resolve_gate_flags_for_create(
+        task_type=task_type or '',
+        review_required_raw=review_required_raw,
+        test_required_raw=test_required_raw,
+    )
+except ValueError as exc:
+    raise SystemExit(str(exc)) from exc
+
 review_level = review_level_raw.strip().lower() if review_level_raw.strip() else ''
 if review_level not in {'skip', 'standard', 'complex'}:
-    review_level = 'standard' if legacy_review_required else 'skip'
+    review_level = 'standard' if review_required else 'skip'
 review_required = review_level != 'skip'
 domain_policies = cfg.get('domain_policies', {})
 reviewer = (
@@ -327,14 +338,6 @@ elif review_level == 'complex' and len(reviewers) < 2:
 
 review_deadline = normalize_iso(review_deadline_raw)
 owner_approved_at = normalize_iso(owner_approved_at_raw) if owner_approved_at_raw.strip() else None
-task_type = normalize_task_type(
-    task_type_raw,
-    execution_mode=execution_mode,
-    target_environment=target_environment,
-    task_level=normalized_task_level,
-)
-if task_type == 'deployment':
-    owner_approval_required = True
 auto_close_policy = 'review_pass_only' if (read_only or task_type == 'design') and not test_required else 'manual_after_review'
 quality_gate_mode = derive_quality_gate_mode(
     task_type=task_type,
@@ -344,6 +347,13 @@ quality_gate_mode = derive_quality_gate_mode(
     review_required=review_required,
     test_required=test_required,
 )
+template_errors = validate_task_type_gate_template(
+    task_type=task_type or '',
+    review_required=review_required,
+    test_required=test_required,
+)
+if template_errors:
+    raise SystemExit('; '.join(template_errors))
 claim_scope = derive_claim_scope(
     agents=agents,
     task_type=task_type,

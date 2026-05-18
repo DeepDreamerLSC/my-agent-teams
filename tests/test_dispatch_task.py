@@ -47,6 +47,7 @@ class DispatchTaskTests(unittest.TestCase):
         self.config_path.write_text(json.dumps({
             "agents": {
                 "dev-1": {"role": "fullstack_dev"},
+                "qa-1": {"role": "qa"},
                 "review-1": {"role": "reviewer"},
                 "arch-1": {"role": "architect"},
             },
@@ -83,8 +84,9 @@ class DispatchTaskTests(unittest.TestCase):
             "write_scope": [],
             "claim_policy": "pull",
             "priority": "medium",
-            "review_required": False,
-            "review_level": "skip",
+            "review_required": True,
+            "review_level": "standard",
+            "reviewer": "review-1",
             "downstream_action": "PM 决策",
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
@@ -133,6 +135,58 @@ class DispatchTaskTests(unittest.TestCase):
         self.assertEqual(transitions[-1]["to"], "dispatched")
         self.assertIn("FORCE_DIRECT_DISPATCH", transitions[-1]["reason"])
         self.assertIn("PM 确认紧急直派", transitions[-1]["reason"])
+
+    def test_dispatch_rejects_verification_task_with_both_review_and_test(self):
+        self.task_path.write_text(json.dumps({
+            "id": "verification-task",
+            "title": "验证任务",
+            "status": "pending",
+            "project": "demo",
+            "domain": "quality",
+            "assigned_agent": "qa-1",
+            "execution_mode": "dev",
+            "target_environment": "dev",
+            "task_type": "verification",
+            "read_only": True,
+            "write_scope": [],
+            "claim_policy": "push",
+            "priority": "medium",
+            "review_required": True,
+            "test_required": True,
+            "review_level": "standard",
+            "reviewer": "review-1",
+            "downstream_action": "PM 收口",
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        (self.task_dir / "instruction.md").write_text("\n".join([
+            "# 任务：验证任务",
+            "## 任务类型",
+            "verification",
+            "## 目标",
+            "完成验证",
+            "## 任务边界",
+            "只输出验证工件",
+            "## 输入事实",
+            "已有上下文",
+            "## 约束",
+            "不改业务代码",
+            "## 交付物",
+            "verify.json",
+            "## 验收标准",
+            "输出验证结论",
+            "## 下游动作",
+            "PM 收口",
+        ]), encoding="utf-8")
+
+        completed = subprocess.run(
+            [str(DISPATCH_SCRIPT), str(self.task_path)],
+            cwd=str(REPO_ROOT),
+            env=self._env(FORCE_DIRECT_DISPATCH="1", DIRECT_DISPATCH_REASON="验证测试"),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("verification tasks require exactly one", completed.stderr)
 
 
 if __name__ == "__main__":
