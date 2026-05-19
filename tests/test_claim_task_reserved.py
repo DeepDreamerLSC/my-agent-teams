@@ -50,7 +50,7 @@ class ClaimTaskReservedTests(unittest.TestCase):
             },
             "wip_limits": {"dev": 1},
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        for name in ("claim-task.sh", "ensure-task-workspace.py", "task-pool-router.py"):
+        for name in ("claim-task.sh", "ensure-task-workspace.py", "task-pool-router.py", "dispatch-task.sh"):
             (self.scripts_root / name).symlink_to(REPO_ROOT / "scripts" / name)
         (self.scripts_root / "lib").symlink_to(REPO_ROOT / "scripts" / "lib")
 
@@ -75,6 +75,9 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "LOG_FILE": str(self.root / ".runtime" / "logs" / "task-watcher.log"),
             "WATCHER_STDOUT_LOG": str(self.root / ".runtime" / "logs" / "task-watcher.log"),
             "ENSURE_TASK_WORKSPACE_PY": str(ENSURE_TASK_WORKSPACE),
+            "DISPATCH_TASK_SCRIPT": str(REPO_ROOT / "scripts" / "dispatch-task.sh"),
+            "BOARD_SYNC_SCRIPT": str(self.root / "missing-board-sync.py"),
+            "SEND_CHAT_SCRIPT": str(self.root / "missing-send-chat.sh"),
         }
 
     def _write_task(self, name: str, payload: dict) -> Path:
@@ -125,6 +128,84 @@ class ClaimTaskReservedTests(unittest.TestCase):
             check=True,
         )
         return json.loads(completed.stdout)
+
+    def test_watcher_auto_pools_pending_pull_task(self):
+        target_dir = self._write_task("pending-pull-task", {
+            "status": "pending",
+            "assigned_agent": "auto",
+            "claim_policy": "pull",
+            "claim_scope": [],
+            "pool_entered_at": None,
+            "write_scope": ["src/pending-pull.txt"],
+        })
+
+        subprocess.run(
+            [
+                "bash",
+                "-lc",
+                f"source '{TASK_WATCHER}' && auto_pool_pending_task_if_needed '{target_dir}' 'pending-pull-task'",
+            ],
+            cwd=str(REPO_ROOT),
+            env=self._watcher_env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
+        transitions = (target_dir / "transitions.jsonl").read_text(encoding="utf-8")
+        self.assertEqual(task["status"], "pooled")
+        self.assertEqual(task["assigned_agent"], "auto")
+        self.assertEqual(task["claim_policy"], "pull")
+        self.assertEqual(task["claim_scope"], ["dev-1"])
+        self.assertTrue(task.get("pool_entered_at"))
+        self.assertIn("watcher auto queued pending pull/auto task into claim pool", transitions)
+
+    def test_watcher_auto_dispatches_dependency_ready_pending_push_task(self):
+        self._write_task("done-dep", {
+            "status": "done",
+            "assigned_agent": "dev-1",
+            "write_scope": ["src/done-dep.txt"],
+        })
+        target_dir = self._write_task("pending-push-task", {
+            "status": "pending",
+            "assigned_agent": "dev-1",
+            "claim_policy": "push",
+            "depends_on": ["done-dep"],
+            "write_scope": ["src/pending-push.txt"],
+        })
+        send_log = self.root / "direct-send.log"
+        send_script = self.scripts_root / "send-to-agent.sh"
+        send_script.write_text(
+            "#!/bin/bash\n"
+            f"printf '%s' \"$2\" > '{send_log}'\n"
+            "echo \"delivered to $1 (runtime=codex, attempt=1)\"\n",
+            encoding="utf-8",
+        )
+        send_script.chmod(0o755)
+
+        subprocess.run(
+            [
+                "bash",
+                "-lc",
+                f"source '{TASK_WATCHER}' && auto_dispatch_next_pending_push_for_agent dev-1 'idle sweep'",
+            ],
+            cwd=str(REPO_ROOT),
+            env={
+                **self._watcher_env(),
+                "SEND_SCRIPT": str(send_script),
+            },
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
+        message = send_log.read_text(encoding="utf-8")
+        self.assertEqual(task["status"], "dispatched")
+        self.assertEqual(task["assigned_agent"], "dev-1")
+        self.assertEqual(task["last_delivery_state"], "delivered")
+        self.assertIn("请读取", message)
 
     def test_claim_writes_request_without_dispatching_task(self):
         target_dir = self._write_task("request-only-task", {

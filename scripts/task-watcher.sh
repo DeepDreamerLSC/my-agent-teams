@@ -23,6 +23,7 @@ STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
 BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-$WORKSPACE_ROOT/scripts/task-board-sync.py}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
+DISPATCH_TASK_SCRIPT="${DISPATCH_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/dispatch-task.sh}"
 CLOSE_TASK_SCRIPT="${CLOSE_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/close-task.sh}"
 ARTIFACTS_PY="${ARTIFACTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_artifacts.py}"
 STATE_INVARIANTS_PY="${STATE_INVARIANTS_PY:-$WORKSPACE_ROOT/scripts/lib/task_state_invariants.py}"
@@ -2877,6 +2878,224 @@ auto_claim_pending_dev() {
     return 0
 }
 
+auto_pool_pending_task_if_needed() {
+    local task_dir="$1"
+    local task_id="$2"
+    [ "$(task_pool_bool enabled true 2>/dev/null || echo 1)" = "1" ] || return 1
+    [ "$(get_task_status "$task_dir")" = "pending" ] || return 1
+
+    local output rc
+    output=$(python3 - "$task_dir" "$task_id" "$CONFIG_PATH" "$WORKSPACE_ROOT" "$AUTO_ASSIGN_MARKERS" <<'PY_POOL_PENDING' 2>&1
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+
+def int_value(value, default):
+    try:
+        if value in (None, ''):
+            return default
+        return int(value)
+    except Exception:
+        return default
+
+
+def default_claim_scope(task, agents):
+    task_type = str(task.get('task_type') or '').strip().lower()
+    domain = str(task.get('domain') or '').strip().lower()
+    output = []
+    for agent_id, payload in (agents or {}).items():
+        role = str((payload or {}).get('role') or '').strip().lower()
+        if task_type in {'development', 'investigation'}:
+            if role == 'fullstack_dev' or agent_id.startswith('dev-'):
+                output.append(agent_id)
+        elif task_type == 'verification' or domain == 'quality':
+            if role == 'qa' or agent_id.startswith('qa-'):
+                output.append(agent_id)
+        elif task_type == 'design':
+            if role == 'architect' or agent_id.startswith('arch-'):
+                output.append(agent_id)
+    return output
+
+
+task_dir = Path(sys.argv[1])
+task_id = sys.argv[2]
+config_path = Path(sys.argv[3])
+workspace_root = Path(sys.argv[4])
+auto_markers = {item.strip().lower() for item in sys.argv[5].split(',') if item.strip()}
+sys.path.insert(0, str(workspace_root / 'scripts' / 'lib'))
+from task_pool_rules import pool_gate_blockers  # type: ignore
+
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+config = json.loads(config_path.read_text(encoding='utf-8'))
+if str(task.get('status') or '') != 'pending':
+    raise SystemExit(1)
+assigned_agent = str(task.get('assigned_agent') or '').strip()
+claim_policy = str(task.get('claim_policy') or '').strip().lower()
+if claim_policy != 'pull' and assigned_agent.lower() not in auto_markers:
+    raise SystemExit(1)
+
+pool_config = config.get('task_pool') or {}
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+previous = str(task.get('status') or 'pending')
+original_assigned = assigned_agent
+
+if assigned_agent.lower() not in auto_markers:
+    task['pre_pool_assigned_agent'] = task.get('pre_pool_assigned_agent') or assigned_agent
+task['assigned_agent'] = 'auto'
+claim_scope = task.get('claim_scope') if isinstance(task.get('claim_scope'), list) else []
+claim_scope = [str(item).strip() for item in claim_scope if str(item).strip()]
+if not claim_scope:
+    claim_scope = default_claim_scope(task, config.get('agents') or {})
+task['claim_scope'] = claim_scope
+task['claim_policy'] = 'pull'
+task['claim_max_concurrency'] = int_value(task.get('claim_max_concurrency'), int_value(pool_config.get('default_claim_max_concurrency'), 1))
+task['dependency_policy'] = str(task.get('dependency_policy') or 'done_only')
+task['pool_timeout_minutes'] = int_value(task.get('pool_timeout_minutes'), int_value(pool_config.get('default_pool_timeout_minutes'), 120))
+blockers = pool_gate_blockers(task, task_dir)
+if not claim_scope:
+    blockers.append('claim_scope_missing')
+if blockers:
+    print(json.dumps({'task_id': task_id, 'pooled': False, 'blockers': sorted(set(blockers))}, ensure_ascii=False))
+    raise SystemExit(2)
+
+task['pool_entered_at'] = task.get('pool_entered_at') or now
+task['claimed_by'] = None
+task['claimed_at'] = None
+task['claim_reason'] = None
+task['status'] = 'pooled'
+task['updated_at'] = now
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, task_path)
+with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': previous,
+        'to': 'pooled',
+        'at': now,
+        'reason': 'watcher auto queued pending pull/auto task into claim pool',
+        'original_assigned_agent': original_assigned or None,
+    }, ensure_ascii=False) + '\n')
+print(json.dumps({'task_id': task_id, 'pooled': True, 'claim_scope': claim_scope}, ensure_ascii=False))
+PY_POOL_PENDING
+)
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        log "$task_id: pending pull/auto 任务已自动入池"
+        emit_system_chat_event watcher "$task_id" "pending pull/auto 任务已由 watcher 自动进入 pooled，等待认领/自动续推。" "$PM_SESSION" info task-pool >/dev/null 2>&1 || true
+        sync_task_board "$task_dir" "auto-pool-pending"
+        return 0
+    fi
+    if [ "$rc" -eq 2 ]; then
+        log "$task_id: pending pull/auto 自动入池被 Pool Gate 阻塞：$(truncate_utf8 "$output" 240)"
+        return 1
+    fi
+    return 1
+}
+
+pending_push_candidate_for_agent() {
+    local agent_id="$1"
+    python3 - "$TASKS_ROOT" "$CONFIG_PATH" "$agent_id" "$AUTO_ASSIGN_MARKERS" <<'PY_PENDING_PUSH'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[3]
+auto_markers = {item.strip().lower() for item in sys.argv[4].split(',') if item.strip()}
+priority_rank = {'critical': 4, 'urgent': 4, 'high': 3, 'medium': 2, 'low': 1}
+allowed_done = {'done', 'cancelled'}
+
+def deps_ready(task):
+    policy = str(task.get('dependency_policy') or 'done_only').strip().lower()
+    allowed = set(allowed_done)
+    if policy == 'ready_for_merge_ok':
+        allowed.add('ready_for_merge')
+    for dep in task.get('depends_on') or []:
+        dep_path = tasks_root / dep / 'task.json'
+        if not dep_path.exists():
+            return False
+        try:
+            dep_task = json.loads(dep_path.read_text(encoding='utf-8'))
+        except Exception:
+            return False
+        if str(dep_task.get('status') or '') not in allowed:
+            return False
+    return True
+
+rows = []
+for task_path in tasks_root.glob('*/task.json'):
+    try:
+        task = json.loads(task_path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    if str(task.get('status') or '') != 'pending':
+        continue
+    assigned = str(task.get('assigned_agent') or '').strip()
+    if assigned != agent_id:
+        continue
+    if assigned.lower() in auto_markers:
+        continue
+    if str(task.get('claim_policy') or '').strip().lower() == 'pull':
+        continue
+    if not deps_ready(task):
+        continue
+    queued_at = str(task.get('created_at') or task.get('updated_at') or '')
+    rows.append({
+        'task_id': str(task.get('id') or task_path.parent.name),
+        'priority_rank': priority_rank.get(str(task.get('priority') or '').strip().lower(), 0),
+        'queued_at': queued_at,
+    })
+
+def sort_key(item):
+    try:
+        ts = datetime.fromisoformat(item['queued_at'].replace('Z', '+00:00'))
+    except Exception:
+        ts = datetime.max
+    return (-item['priority_rank'], ts, item['task_id'])
+
+for item in sorted(rows, key=sort_key):
+    print(item['task_id'])
+    break
+PY_PENDING_PUSH
+}
+
+auto_dispatch_next_pending_push_for_agent() {
+    local agent_id="$1"
+    local trigger_task_id="${2:-}"
+    [ -n "$agent_id" ] || return 1
+    [ "$(task_pool_bool auto_dispatch_pending_push true 2>/dev/null || echo 1)" = "1" ] || return 1
+    matches_auto_assign_marker "$agent_id" && return 1
+
+    local active_count
+    active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
+    [ "${active_count:-0}" -eq 0 ] || return 1
+
+    local next_task task_dir output rc
+    next_task=$(pending_push_candidate_for_agent "$agent_id" 2>/dev/null || true)
+    [ -n "$next_task" ] || return 1
+    task_dir="$TASKS_ROOT/$next_task"
+    [ -x "$DISPATCH_TASK_SCRIPT" ] || return 1
+
+    rc=0
+    output=$(TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" WORKSPACE_ROOT="$WORKSPACE_ROOT" SEND_SCRIPT="$SEND_SCRIPT" SEND_CHAT_SCRIPT="$SEND_CHAT_SCRIPT" ENSURE_TASK_WORKSPACE_SCRIPT="$ENSURE_TASK_WORKSPACE_PY" "$DISPATCH_TASK_SCRIPT" "$task_dir/task.json" 2>&1) || rc=$?
+    if [ "${rc:-0}" -eq 0 ]; then
+        sync_task_board "$task_dir" "auto-dispatch-pending-push"
+        log "$next_task: pending push 任务已在 ${trigger_task_id:-idle sweep} 后自动派发给 $agent_id"
+        return 0
+    fi
+
+    log "$next_task: pending push 自动派发失败（agent=$agent_id）：$(truncate_utf8 "$output" 240)"
+    return 1
+}
+
 claim_reject() {
     local task_dir="$1"
     local agent_id="$2"
@@ -3377,7 +3596,7 @@ run_task_watcher_loop() {
             assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
             claim_policy=$(task_json_pick "$task_dir" claim_policy)
             if [ "$claim_policy" = "pull" ] || matches_auto_assign_marker "$assigned_agent"; then
-                :
+                auto_pool_pending_task_if_needed "$task_dir" "$task_id" || true
             else
                 auto_dispatch_pending_arch "$task_dir" "$task_id" "$assigned_agent" "$task_level" || true
             fi
@@ -3882,6 +4101,7 @@ run_task_watcher_loop() {
         [ -n "$pool_agent" ] || continue
         auto_push_next_task_for_agent "$pool_agent" "idle sweep" || true
         auto_reserve_next_task_for_agent "$pool_agent" "working sweep" || true
+        auto_dispatch_next_pending_push_for_agent "$pool_agent" "idle sweep" || true
     done <<< "$(list_pool_agents)"
 
     while IFS= read -r reviewer_agent; do
