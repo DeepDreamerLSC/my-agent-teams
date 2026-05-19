@@ -83,7 +83,66 @@ def test_main_event_routes_use_retry_helpers():
     assert 'push_task_event_with_retry "$result_push_key"' in content
     assert 'push_task_event_with_signature_retry "$review_push_key"' in content
     assert 'push_task_event_with_retry "$verify_push_key"' in content
-    assert 'push_task_event_with_retry "$done_push_key"' in content
+    assert 'push_task_event_with_signature_retry "$done_push_key"' in content
+
+
+def test_push_feishu_passes_deterministic_uuid_to_push_script(tmp_path: Path):
+    env = _base_env(tmp_path)
+    push_script = tmp_path / "push.sh"
+    uuid_log = tmp_path / "uuid.log"
+    _write_exec(
+        push_script,
+        f'''#!/bin/bash
+printf '%s\n' "$FEISHU_MESSAGE_UUID" >> '{uuid_log}'
+echo ok
+''',
+    )
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+PUSH_SCRIPT='{push_script}'
+USER_ID='user-1'
+push_feishu 'hello' '【任务完成】' 'task-1'
+push_feishu 'hello' '【任务完成】' 'task-1'
+push_feishu 'hello changed' '【任务完成】' 'task-1'
+python3 - <<'PY'
+from pathlib import Path
+import re
+values = Path(r'{uuid_log}').read_text(encoding='utf-8').splitlines()
+assert len(values) == 3, values
+assert values[0] == values[1], values
+assert values[0] != values[2], values
+assert all(re.fullmatch(r'[0-9a-f]{{64}}', item) for item in values), values
+PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_reconcile_clean_task_invariants_does_not_rewrite_task_json(tmp_path: Path):
+    env = _base_env(tmp_path)
+    env["STATE_INVARIANTS_PY"] = str(REPO_ROOT / "scripts" / "lib" / "task_state_invariants.py")
+    task_dir = tmp_path / "task-1"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    task_json = task_dir / "task.json"
+    task_json.write_text(
+        '{\n'
+        '  "id": "task-1",\n'
+        '  "status": "done",\n'
+        '  "merge_gate_state": "closed"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+before="$(cat '{task_json}')"
+reconcile_task_state_invariants '{task_dir}' 'task-1' >/tmp/reconcile.out
+after="$(cat '{task_json}')"
+test "$before" = "$after"
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
 
 
 def test_final_done_notification_respects_retry_cooldown(tmp_path: Path):
@@ -135,6 +194,19 @@ notify_final_done_if_needed '{task_dir}' 'task-1'
 test -f "$STATE_DIR/task-1_done_notice"
 test -f "$STATE_DIR/task-1_done_push"
 test ! -f "$STATE_DIR/task-1_done_push.retry"
+test "$(cat "$STATE_DIR/task-1_done_push")" = "task-1:done:4070880000"
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+path = Path(r'{task_dir}') / 'task.json'
+payload = json.loads(path.read_text(encoding='utf-8'))
+payload['updated_at'] = '2099-01-01T00:00:01+08:00'
+payload['state_invariant_checked_at'] = '2099-01-01T00:00:01+08:00'
+path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\\n', encoding='utf-8')
+PY
+notify_final_done_if_needed '{task_dir}' 'task-1'
+test "$push_attempts" -eq 2
 """
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 
@@ -215,6 +287,10 @@ test ! -f "$STATE_DIR/review-queue-review-1.json"
 def test_qa_queue_clear_only_removes_matching_task(tmp_path: Path):
     env = _base_env(tmp_path)
     workspace_root = Path(env["WORKSPACE_ROOT"])
+    Path(env["CONFIG_PATH"]).write_text(
+        '{\n  "agents": {"qa-1": {"role": "qa"}}\n}\n',
+        encoding="utf-8",
+    )
     tasks_root = workspace_root / "tasks"
     task_a = tasks_root / "task-a"
     task_a.mkdir(parents=True)

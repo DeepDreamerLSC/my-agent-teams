@@ -113,6 +113,7 @@ msg = os.environ.get('FEISHU_MESSAGE', '').strip()
 receive_id = os.environ['FEISHU_RECEIVE_ID_EFFECTIVE']
 token = os.environ['FEISHU_TENANT_TOKEN']
 image_file = os.environ.get('FEISHU_IMAGE_FILE', '')
+message_uuid = os.environ.get('FEISHU_MESSAGE_UUID', '').strip()
 
 if not msg and not image_file:
     print('ERROR: empty message and no image', file=sys.stderr)
@@ -166,6 +167,9 @@ else:
         'msg_type': 'text',
         'content': json.dumps({'text': msg}),
     }
+
+if message_uuid:
+    payload['uuid'] = message_uuid
 
 req = urllib.request.Request(
     'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id',

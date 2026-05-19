@@ -460,10 +460,22 @@ push_feishu() {
         return 1
     fi
 
-    local tmpfile output rc
+    local tmpfile output rc message_uuid
     tmpfile=$(mktemp)
     printf '%s\n' "$msg" > "$tmpfile"
-    output="$(FEISHU_RECEIVE_ID="$USER_ID" "$PUSH_SCRIPT" < "$tmpfile" 2>&1)"
+    message_uuid=$(python3 - "$event_label" "$task_id" "$tmpfile" <<'PY_UUID' 2>/dev/null || true
+import hashlib
+import sys
+from pathlib import Path
+
+seed = "my-agent-teams/task-watcher/feishu/v1\0"
+seed += sys.argv[1] + "\0" + sys.argv[2] + "\0"
+message = Path(sys.argv[3]).read_bytes()
+digest = hashlib.sha256(seed.encode('utf-8') + message).hexdigest()
+print(digest)
+PY_UUID
+)
+    output="$(FEISHU_RECEIVE_ID="$USER_ID" FEISHU_MESSAGE_UUID="$message_uuid" "$PUSH_SCRIPT" < "$tmpfile" 2>&1)"
     rc=$?
     rm -f "$tmpfile"
 
@@ -1009,9 +1021,9 @@ else:
         task['control_plane_state'] = None
         task['control_plane_updated_at'] = now
         changed = True
-    if task.get('state_invariant_checked_at') != now:
-        task['state_invariant_checked_at'] = now
-        changed = True
+    # Clean tasks should not be rewritten on every watcher scan.  Rewriting
+    # task.json refreshes its mtime and can make file-mtime based notification
+    # gates think that a terminal event changed again.
 
 if changed:
     task['updated_at'] = now
@@ -3226,6 +3238,10 @@ notify_final_done_if_needed() {
     local done_key="${task_id}_done_notice"
     local done_push_key="${task_id}_done_push"
 
+    if is_notified "$done_key"; then
+        return 0
+    fi
+
     local done_transition_epoch
     done_transition_epoch=$(final_done_transition_epoch "$task_dir" 2>/dev/null || echo 0)
     if [ -z "$done_transition_epoch" ] || [ "$done_transition_epoch" -le 0 ] 2>/dev/null; then
@@ -3239,7 +3255,8 @@ notify_final_done_if_needed() {
         return 0
     fi
 
-    local result_summary task_type execution_mode target_environment downstream_action
+    local result_summary task_type execution_mode target_environment downstream_action done_signature
+    done_signature="${task_id}:done:${done_transition_epoch}"
     result_summary=$(task_json_pick "$task_dir" result_summary)
     [ -n "$result_summary" ] || result_summary=$(json_pick "$task_dir/result.json" summary)
     [ -n "$result_summary" ] || result_summary="${task_id} 已进入 done 终态。"
@@ -3249,12 +3266,12 @@ notify_final_done_if_needed() {
     downstream_action=$(task_json_pick "$task_dir" downstream_action)
 
     if [ "$task_type" = "deployment" ] || [ "$execution_mode" = "deploy" ] || [ "$target_environment" = "prod" ]; then
-        push_task_event_with_retry "$done_push_key" "$task_dir/task.json" "【部署完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "请关注生产验证结果与后续用户反馈" || {
+        push_task_event_with_signature_retry "$done_push_key" "$done_signature" "【部署完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "请关注生产验证结果与后续用户反馈" || {
             log "$task_id: 最终完成飞书推送失败，等待 cooldown 后自动补推"
             return 1
         }
     else
-        push_task_event_with_retry "$done_push_key" "$task_dir/task.json" "【任务完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "${downstream_action:-生命周期已结束}" || {
+        push_task_event_with_signature_retry "$done_push_key" "$done_signature" "【任务完成】" "$task_id" "$(truncate_utf8 "$result_summary" 300)" "${downstream_action:-生命周期已结束}" || {
             log "$task_id: 最终完成飞书推送失败，等待 cooldown 后自动补推"
             return 1
         }
