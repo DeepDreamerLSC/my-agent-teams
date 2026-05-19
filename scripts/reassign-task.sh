@@ -124,6 +124,9 @@ clear_keys = {
     f'{prefix}review_route',
     f'{prefix}verify_route',
     f'{prefix}working_timeout_notice',
+    f'{prefix}working_timeout_push',
+    f'{prefix}review_queue_waiting_notice',
+    f'{prefix}qa_queue_waiting_notice',
     f'{prefix}done_notice',
     f'{prefix}resend',
     f'{prefix}control_plane_notice',
@@ -132,7 +135,8 @@ clear_keys = {
 }
 if state_dir.exists():
     for path in state_dir.iterdir():
-        if path.name in clear_keys:
+        base_name = path.name[:-6] if path.name.endswith('.retry') else path.name
+        if base_name in clear_keys:
             path.unlink(missing_ok=True)
             continue
         if path.name.startswith(('review-queue-', 'qa-queue-')):

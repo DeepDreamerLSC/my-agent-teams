@@ -28,12 +28,40 @@ LAST_LOG_ROTATE_DAY=""
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
+pid_command() {
+  local pid="$1"
+  ps -p "$pid" -o command= 2>/dev/null || true
+}
+
+is_pid_for_script() {
+  local pid="$1" script_name="$2" cmd=""
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  cmd="$(pid_command "$pid")"
+  [ -n "$cmd" ] || return 0
+  case "$cmd" in
+    *"$script_name"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_watchdog_pid() {
+  is_pid_for_script "$1" "task-watcher-watchdog.sh"
+}
+
+is_watcher_pid() {
+  is_pid_for_script "$1" "task-watcher.sh"
+}
+
 ensure_watchdog_single_instance() {
   local existing_pid=""
   existing_pid=$(cat "$WATCHDOG_PID_FILE" 2>/dev/null || true)
-  if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && kill -0 "$existing_pid" 2>/dev/null; then
-    printf "%s\n" "$(date '+%Y-%m-%d %H:%M:%S') task-watcher-watchdog 已在运行（pid=$existing_pid），当前实例退出" >&2
-    exit 0
+  if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ]; then
+    if is_watchdog_pid "$existing_pid"; then
+      printf "%s\n" "$(date '+%Y-%m-%d %H:%M:%S') task-watcher-watchdog 已在运行（pid=$existing_pid），当前实例退出" >&2
+      exit 0
+    fi
+    rm -f "$WATCHDOG_PID_FILE"
   fi
 }
 
@@ -229,8 +257,47 @@ is_pid_alive() {
     [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
+heartbeat_pid_matches() {
+    local expected_pid="$1"
+    python3 - "$HEARTBEAT_FILE" "$expected_pid" <<'PYHEARTBEAT'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+expected = str(sys.argv[2])
+if not path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+actual = payload.get('pid')
+if actual is None or str(actual) == expected:
+    raise SystemExit(0)
+raise SystemExit(1)
+PYHEARTBEAT
+}
+
 read_pid() {
     cat "$PID_FILE" 2>/dev/null || true
+}
+
+read_heartbeat_pid() {
+    python3 - "$HEARTBEAT_FILE" <<'PY_HEARTBEAT_PID'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+if not path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+pid = payload.get('pid')
+if pid:
+    print(pid)
+PY_HEARTBEAT_PID
 }
 
 read_heartbeat_ts() {
@@ -266,7 +333,7 @@ start_watcher() {
         return 1
     fi
     record_restart_cause "$reason"
-  TASK_WATCHER_STDOUT_REDIRECTED=1 WATCHER_STDOUT_LOG="$WATCHER_STDOUT_LOG" nohup "$TASK_WATCHER_SCRIPT" >> "$WATCHER_STDOUT_LOG" 2>&1 &
+    TASK_WATCHER_STDOUT_REDIRECTED=1 WATCHER_STDOUT_LOG="$WATCHER_STDOUT_LOG" nohup "$TASK_WATCHER_SCRIPT" >> "$WATCHER_STDOUT_LOG" 2>&1 &
     local child_pid=$!
     sleep 1
     log "watchdog 已启动 task-watcher（child pid=$child_pid，reason=$reason）"
@@ -296,9 +363,26 @@ stop_watcher() {
 check_once() {
     local pid
     pid=$(read_pid)
-    if [ -z "$pid" ] || ! is_pid_alive "$pid"; then
-        log "watchdog 检测到 task-watcher 未运行"
-        start_watcher "process_exit"
+    if [ -z "$pid" ] || ! is_watcher_pid "$pid"; then
+        [ -n "$pid" ] && rm -f "$PID_FILE"
+        local heartbeat_pid=""
+        heartbeat_pid="$(read_heartbeat_pid 2>/dev/null || true)"
+        if [ -n "$heartbeat_pid" ] && is_watcher_pid "$heartbeat_pid"; then
+            printf '%s
+' "$heartbeat_pid" > "$PID_FILE"
+            pid="$heartbeat_pid"
+            log "watchdog 已采用 heartbeat 中的 task-watcher pid=$pid"
+        else
+            log "watchdog 检测到 task-watcher 未运行或 pid 失效"
+            start_watcher "process_exit"
+            return
+        fi
+    fi
+
+    if ! heartbeat_pid_matches "$pid"; then
+        log "watchdog 检测到 heartbeat pid 与 pid 文件不一致"
+        stop_watcher "$pid" "heartbeat_pid_mismatch"
+        start_watcher "heartbeat_pid_mismatch"
         return
     fi
 

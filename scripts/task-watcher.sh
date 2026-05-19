@@ -115,7 +115,7 @@ if [ -z "$PUSH_SCRIPT" ] || [ -z "$USER_ID" ]; then
         fi
     fi
 fi
-PUSH_SCRIPT="${PUSH_SCRIPT:-$LEGACY_OPENCLAW_ROOT/scripts/feishu-push.sh}"
+PUSH_SCRIPT="${PUSH_SCRIPT:-$WORKSPACE_ROOT/scripts/feishu-push.sh}"
 USER_ID="${USER_ID:-}"
 
 migrate_legacy_task_watcher_runtime() {
@@ -274,11 +274,59 @@ log() {
     printf '%s\n' "$line" >> "$LOG_FILE" 2>/dev/null || true
 }
 
+pid_command() {
+    local pid="$1"
+    ps -p "$pid" -o command= 2>/dev/null || true
+}
+
+is_task_watcher_pid() {
+    local pid="$1" cmd=""
+    [ -n "$pid" ] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    cmd="$(pid_command "$pid")"
+    [ -n "$cmd" ] || return 0
+    case "$cmd" in
+        *"$SCRIPT_DIR/task-watcher.sh"*|*"task-watcher.sh"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+read_heartbeat_pid() {
+    python3 - "$HEARTBEAT_FILE" <<'PY_HEARTBEAT_PID'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+if not path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+pid = payload.get('pid')
+if pid:
+    print(pid)
+PY_HEARTBEAT_PID
+}
+
 ensure_single_instance() {
     local existing_pid=""
     existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
-    if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ] && kill -0 "$existing_pid" 2>/dev/null; then
-        log "task-watcher 已在运行（pid=$existing_pid），当前实例退出"
+    if [ -n "$existing_pid" ] && [ "$existing_pid" != "$$" ]; then
+        if is_task_watcher_pid "$existing_pid"; then
+            log "task-watcher 已在运行（pid=$existing_pid），当前实例退出"
+            exit 0
+        fi
+        log "清理失效 task-watcher pid 文件（pid=$existing_pid）"
+        rm -f "$PID_FILE"
+    fi
+
+    local heartbeat_pid=""
+    heartbeat_pid="$(read_heartbeat_pid 2>/dev/null || true)"
+    if [ -n "$heartbeat_pid" ] && [ "$heartbeat_pid" != "$$" ] && is_task_watcher_pid "$heartbeat_pid"; then
+        log "task-watcher 已在运行（heartbeat pid=$heartbeat_pid），修正 pid 文件并退出当前实例"
+        printf '%s
+' "$heartbeat_pid" > "$PID_FILE"
         exit 0
     fi
 }
@@ -469,7 +517,30 @@ emit_system_chat_event() {
         --type "$event_type" \
         --severity "$severity" \
         --source-type system \
-        --source-name "$source_name" >/dev/null 2>&1 || true
+        --source-name "$source_name" >/dev/null 2>&1 || return 1
+
+    if [ "$channel" = "watcher" ] && [ "$to_actor" = "$PM_SESSION" ] && [ "$severity" != "info" ]; then
+        TASKS_ROOT="$TASKS_ROOT" "$SEND_CHAT_SCRIPT" task "$task_id" "$msg" \
+            --to "$to_actor" \
+            --type "$event_type" \
+            --severity "$severity" \
+            --source-type system \
+            --event-class system_notice \
+            --source-name "$source_name" >/dev/null 2>&1 || true
+    fi
+}
+
+emit_system_chat_event_once() {
+    local notice_key="$1"
+    shift
+    if is_notified "$notice_key"; then
+        return 0
+    fi
+    if emit_system_chat_event "$@"; then
+        mark_notified "$notice_key"
+        return 0
+    fi
+    return 1
 }
 
 # 检查 task.json 中的 status
@@ -1594,6 +1665,7 @@ auto_push_next_review_for_agent() {
         return 1
     fi
 
+    rm -f "$STATE_DIR/${next_task}_review_queue_waiting_notice" "$STATE_DIR/${next_task}_review_queue_waiting_notice.retry"
     queue_state_set "review" "$agent_id" "$next_task"
     notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md 与 result.json，并输出 review.json（必需）与 review.md（人读说明，可选但推荐）。"
     emit_system_chat_event nudge "$next_task" "review 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
@@ -1613,6 +1685,7 @@ auto_push_next_qa_for_agent() {
     next_task=$(python3 "$TASK_QUEUE_ROUTER" --tasks-root "$TASKS_ROOT" --queue qa --agent "$agent_id" --next 2>/dev/null || true)
     [ -n "$next_task" ] || return 1
 
+    rm -f "$STATE_DIR/${next_task}_qa_queue_waiting_notice" "$STATE_DIR/${next_task}_qa_queue_waiting_notice.retry"
     queue_state_set "qa" "$agent_id" "$next_task"
     notify_agent "$agent_id" "请读取 ${TASKS_ROOT}/${next_task}/instruction.md、result/review artifacts，并输出 verify.json。"
     emit_system_chat_event nudge "$next_task" "QA 队列已在 ${trigger_task_id:-idle sweep} 后自动续推给 ${agent_id}。" "$agent_id" info nudge
@@ -2533,10 +2606,13 @@ PY
 
 clear_review_queue_state_for_task() {
     local task_dir="$1"
+    local task_id
+    task_id="$(basename "$task_dir")"
     while IFS= read -r reviewer; do
         [ -n "$reviewer" ] || continue
-        queue_state_clear_for_task "review" "$reviewer" "$(basename "$task_dir")"
+        queue_state_clear_for_task "review" "$reviewer" "$task_id"
     done <<< "$(task_reviewers "$task_dir")"
+    rm -f "$STATE_DIR/${task_id}_review_queue_waiting_notice" "$STATE_DIR/${task_id}_review_queue_waiting_notice.retry"
 }
 
 clear_qa_queue_state() {
@@ -2552,6 +2628,7 @@ clear_qa_queue_state_for_task() {
         [ -n "$qa_agent" ] || continue
         queue_state_clear_for_task "qa" "$qa_agent" "$task_id"
     done <<< "$(list_qa_agents)"
+    rm -f "$STATE_DIR/${task_id}_qa_queue_waiting_notice" "$STATE_DIR/${task_id}_qa_queue_waiting_notice.retry"
 }
 
 list_review_candidates_for_agent() {
@@ -3105,7 +3182,7 @@ auto_dispatch_review() {
     done <<< "$(task_reviewers "$task_dir")"
 
     if [ "$pushed" -eq 0 ]; then
-        emit_system_chat_event watcher "$task_id" "任务已进入 review 队列，等待 reviewer 空闲后自动续推。" "$PM_SESSION" info notify
+        emit_system_chat_event_once "${task_id}_review_queue_waiting_notice" watcher "$task_id" "任务已进入 review 队列，等待 reviewer 空闲后自动续推。" "$PM_SESSION" info notify
     fi
 }
 
@@ -3119,7 +3196,7 @@ auto_dispatch_qa() {
         fi
     done <<< "$(list_qa_agents)"
     if [ "$pushed" -eq 0 ]; then
-        emit_system_chat_event watcher "$task_id" "任务已进入 QA 队列，等待 QA 空闲后自动续推。" "$PM_SESSION" info notify
+        emit_system_chat_event_once "${task_id}_qa_queue_waiting_notice" watcher "$task_id" "任务已进入 QA 队列，等待 QA 空闲后自动续推。" "$PM_SESSION" info notify
     fi
 }
 
@@ -3572,14 +3649,14 @@ run_task_watcher_loop() {
             if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
                 working_timeout_key="${task_id}_working_timeout_notice"
                 working_timeout_push_key="${task_id}_working_timeout_push"
-                if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key" || is_file_newer_than_notified "$working_timeout_push_key" "$task_dir/task.json"; then
+                if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key"; then
                     if ! is_notified "$working_timeout_key"; then
                         notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
                         emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
                         log "$task_id: working 超时已通知 PM 介入，等待飞书送达"
                         mark_notified "$working_timeout_key"
                     fi
-                    push_task_event_with_retry "$working_timeout_push_key" "$task_dir/task.json" "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查" || true
+                    push_task_event_with_retry "$working_timeout_push_key" "" "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查" || true
                 fi
             fi
         fi

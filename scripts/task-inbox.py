@@ -37,6 +37,15 @@ def age_minutes(from_dt: datetime | None, now: datetime) -> int:
     return max(0, int((now - from_dt).total_seconds() // 60))
 
 
+def epoch_to_local_dt(value: int | float | None, now: datetime) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromtimestamp(float(value), tz=now.tzinfo)
+    except Exception:
+        return None
+
+
 def recommended_action(reason_type: str, gate: str, status: str) -> str:
     if reason_type == 'blocked':
         if gate == 'review_rejected':
@@ -96,13 +105,14 @@ def make_global_item(reason_type: str, severity: str, summary: str, now: datetim
     }
 
 
-def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now: datetime) -> dict:
+def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now: datetime, *, anchor_dt: datetime | None = None) -> dict:
     task = task_artifacts.parse_task(task_dir)['task']
     task_id = str(task.get('id') or task_dir.name)
     title = str(task.get('title') or task_id)
     status = str(task.get('status') or '')
     gate = str(task.get('merge_gate_state') or '')
     updated_at = parse_iso(str(task.get('updated_at') or ''))
+    effective_anchor = anchor_dt or updated_at
     resume_round = int(task.get('resume_round') or 0)
     return {
         'item_id': f"{task_id}:{reason_type}:{status or gate}:{resume_round}",
@@ -116,9 +126,9 @@ def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now
         'summary': summary,
         'recommended_action': recommended_action(reason_type, gate, status),
         'owner': str(task.get('owner_pm') or 'pm-chief'),
-        'first_seen_at': updated_at.isoformat(timespec='seconds') if updated_at else '',
-        'last_seen_at': updated_at.isoformat(timespec='seconds') if updated_at else '',
-        'age_minutes': age_minutes(updated_at, now),
+        'first_seen_at': effective_anchor.isoformat(timespec='seconds') if effective_anchor else '',
+        'last_seen_at': effective_anchor.isoformat(timespec='seconds') if effective_anchor else '',
+        'age_minutes': age_minutes(effective_anchor, now),
         'links': {
             'task_dir': str(task_dir),
             'timeline': str(Path('chat/tasks') / f'{task_id}.jsonl'),
@@ -171,8 +181,9 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         summary = '；'.join([item for item in messages if item][:2]) or '任务状态一致性异常，请检查 state_invariant_violations'
         items.append(make_item(task_dir, 'state_invariant_violation', 'L3', summary, now))
 
+    acceptance_anchor = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
     if gate == 'pm_acceptance_pending':
-        items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now))
+        items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now, anchor_dt=acceptance_anchor))
 
     for kind, info in [('result', result_info), ('review', review_info), ('verify', verify_info), ('ack', ack_info)]:
         if info.get('valid') is False and info.get('errors'):
@@ -187,18 +198,17 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
 
     now_epoch = int(now.timestamp())
     dispatch_ref = task_artifacts.iso_to_epoch(task_payload.get('lease_acquired_at') or task_payload.get('updated_at'))
-    ack_ref = result_info.get('mtime_epoch') or 0
     if status == 'dispatched' and not ack_info.get('exists') and dispatch_ref and now_epoch - dispatch_ref > dispatch_timeout_s:
-        items.append(make_item(task_dir, 'timeout', 'L2', f'dispatched 超过 {dispatch_timeout_s // 60 or 1} 分钟仍无 ack', now))
+        items.append(make_item(task_dir, 'timeout', 'L2', f'dispatched 超过 {dispatch_timeout_s // 60 or 1} 分钟仍无 ack', now, anchor_dt=epoch_to_local_dt(dispatch_ref, now)))
     if status == 'working':
         working_ref = ack_info.get('mtime_epoch') or task_artifacts.iso_to_epoch(task_payload.get('updated_at'))
         if working_ref and now_epoch - working_ref > working_timeout_s:
-            items.append(make_item(task_dir, 'timeout', 'L3', f'working 超过 {working_timeout_s // 60} 分钟仍无新结果', now))
+            items.append(make_item(task_dir, 'timeout', 'L3', f'working 超过 {working_timeout_s // 60} 分钟仍无新结果', now, anchor_dt=epoch_to_local_dt(working_ref, now)))
     if status == 'pooled':
         pool_entered_at = parse_iso(str(task_payload.get('pool_entered_at') or ''))
         timeout_minutes = int(task_payload.get('pool_timeout_minutes') or 0)
         if pool_entered_at and timeout_minutes > 0 and age_minutes(pool_entered_at, now) > timeout_minutes:
-            items.append(make_item(task_dir, 'timeout', 'L2', f'pooled 超过 {timeout_minutes} 分钟仍未认领', now))
+            items.append(make_item(task_dir, 'timeout', 'L2', f'pooled 超过 {timeout_minutes} 分钟仍未认领', now, anchor_dt=pool_entered_at))
     if status == 'ready_for_merge':
         gate_changed_at = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
         gate_wait_minutes = age_minutes(gate_changed_at, now)
@@ -208,11 +218,11 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         has_artifact_invalid = any(item['reason_type'] == 'artifact_invalid' for item in items)
         if gate == 'review_pending' and not has_artifact_invalid:
             if review_deadline and now > review_deadline:
-                items.append(make_item(task_dir, 'timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', now))
+                items.append(make_item(task_dir, 'timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', now, anchor_dt=review_deadline))
             elif gate_wait_minutes > review_timeout_minutes:
-                items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now))
+                items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now, anchor_dt=gate_changed_at))
         if gate == 'qa_pending' and not has_artifact_invalid and gate_wait_minutes > qa_timeout_minutes:
-            items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now))
+            items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now, anchor_dt=gate_changed_at))
 
     return items
 

@@ -34,11 +34,13 @@ Commands:
   bootstrap       初始化本机目录、config.local、agent 文件、tasks symlink、看板库
   doctor          检查迁移就绪度和运行依赖
   start-agents    按 config 创建 tmux session 并进入 agent workdir 启动 CLI
-  stop-agents     停止 config 中声明的 agent tmux session
+  stop-agents     停止 config 中声明的 agent tmux session（危险操作：需要人工确认）
+  restart-agents  重启所有 agent tmux session（危险操作：需要人工确认）
   start-watcher   后台启动 task-watcher
   stop-watcher    停止 task-watcher
   start-dashboard 后台启动任务看板
   stop-dashboard  停止任务看板
+  restart-services 仅重启当前正在运行的 watcher / dashboard / codex-gateway，不触碰 agent tmux
   init-codex-gateway-config  从示例生成本机 Codex Responses Gateway 配置
   start-codex-gateway        后台启动 Codex Responses Gateway
   stop-codex-gateway         停止 Codex Responses Gateway
@@ -48,7 +50,7 @@ Commands:
 
 Options:
   --attach        start-agents 创建后自动 attach 第一个 session
-  --force         start-agents/stop-agents 跳过部分保护或重建已有 session
+  --force         restart-services 在服务当前未运行时也尝试重新拉起
   --render-config bootstrap 时按当前 checkout 重写 config.json 本机路径
   -h, --help      显示帮助
 
@@ -287,17 +289,109 @@ runtime_command() {
   esac
 }
 
+pid_command() {
+  local pid="$1"
+  ps -p "$pid" -o command= 2>/dev/null || true
+}
+
+pid_matches_label() {
+  local pid="$1" label="$2" cmd=""
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  cmd="$(pid_command "$pid")"
+  [ -n "$cmd" ] || return 0
+  case "$label:$cmd" in
+    task-watcher-watchdog:*task-watcher-watchdog.sh*) return 0 ;;
+    task-watcher:*task-watcher.sh*) return 0 ;;
+    dashboard:*dashboard.app*) return 0 ;;
+    codex-responses-gateway:*codex-responses-gateway.py*) return 0 ;;
+    *:*) return 1 ;;
+  esac
+}
+
+pid_file_running() {
+  local pid_file="$1" label="${2:-}" pid=""
+  pid="$(cat "$pid_file" 2>/dev/null || true)"
+  [ -n "$pid" ] || return 1
+  if [ -n "$label" ]; then
+    pid_matches_label "$pid" "$label"
+  else
+    kill -0 "$pid" 2>/dev/null
+  fi
+}
+
+read_task_watcher_heartbeat_pid() {
+  python3 - "$STATE_DIR/task-watcher/task-watcher-heartbeat.json" <<'PY_HEARTBEAT_PID'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+if not path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+pid = payload.get('pid')
+if pid:
+    print(pid)
+PY_HEARTBEAT_PID
+}
+
+watcher_running() {
+  local heartbeat_pid=""
+  heartbeat_pid="$(read_task_watcher_heartbeat_pid 2>/dev/null || true)"
+  pid_file_running "$STATE_DIR/task-watcher/task-watcher-watchdog.pid" task-watcher-watchdog ||     pid_file_running "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher ||     { [ -n "$heartbeat_pid" ] && pid_matches_label "$heartbeat_pid" task-watcher; }
+}
+
+dashboard_running() {
+  pid_file_running "$STATE_DIR/task-board.pid"
+}
+
+codex_gateway_running() {
+  pid_file_running "$STATE_DIR/codex-responses-gateway.pid"
+}
+
+confirm_agent_tmux_action() {
+  local action_label="$1" phrase="$2"
+  if [ ! -t 0 ] || [ ! -t 1 ]; then
+    err "$action_label 只能在交互式终端中执行，并需要人工输入确认短语：$phrase"
+    return 1
+  fi
+  printf '%s\n' "危险操作：即将对 config 中声明的全部 agent tmux session 执行：$action_label"
+  printf '%s\n' "当前会受影响的 session："
+  agent_rows | while IFS=$'\t' read -r agent_id session runtime workdir guidance; do
+    [ -n "$agent_id" ] || continue
+    printf '  - %-10s session=%s runtime=%s\n' "$agent_id" "$session" "$runtime"
+  done
+  printf '%s ' "这会中断所有 agent 当前会话。输入 $phrase 后回车继续："
+  local answer=""
+  read -r answer
+  if [ "$answer" != "$phrase" ]; then
+    err "确认短语不匹配，已取消操作"
+    return 1
+  fi
+}
+
+confirm_stop_agents() {
+  confirm_agent_tmux_action "stop-agents" "STOP-ALL-TMUX-AGENTS"
+}
+
+confirm_restart_agents() {
+  confirm_agent_tmux_action "restart-agents" "RESTART-ALL-TMUX-AGENTS"
+}
+
 start_agents() {
+  if [ "$START_FORCE" = "1" ]; then
+    err "start-agents --force 会重建全部 tmux agent session；请改用 scripts/teamctl.sh restart-agents，并在交互式终端完成人工确认"
+    return 1
+  fi
   agent_rows | while IFS=$'\t' read -r agent_id session runtime workdir guidance; do
     [ -n "$agent_id" ] || continue
     mkdir -p "$workdir"
     if tmux has-session -t "$session" 2>/dev/null; then
-      if [ "$START_FORCE" = "1" ]; then
-        tmux kill-session -t "$session"
-      else
-        log "session exists, skip: $session"
-        continue
-      fi
+      log "session exists, skip: $session"
+      continue
     fi
     cmd="$(runtime_command "$runtime")"
     if ! need_cmd "$cmd"; then
@@ -315,7 +409,7 @@ start_agents() {
   fi
 }
 
-stop_agents() {
+stop_agents_internal() {
   agent_rows | while IFS=$'\t' read -r agent_id session runtime workdir guidance; do
     [ -n "$agent_id" ] || continue
     if tmux has-session -t "$session" 2>/dev/null; then
@@ -325,6 +419,17 @@ stop_agents() {
   done
 }
 
+stop_agents() {
+  confirm_stop_agents || return 1
+  stop_agents_internal
+}
+
+restart_agents() {
+  confirm_restart_agents || return 1
+  stop_agents_internal
+  start_agents
+}
+
 start_watcher() {
   ensure_runtime_dirs
   local watcher_pid_file="$STATE_DIR/task-watcher/task-watcher.pid"
@@ -332,14 +437,16 @@ start_watcher() {
   local standalone_pid=""
   if [ -f "$watchdog_pid_file" ]; then
     pid="$(cat "$watchdog_pid_file" 2>/dev/null || true)"
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    if [ -n "$pid" ] && pid_matches_label "$pid" task-watcher-watchdog; then
       log "task-watcher watchdog already running pid=$pid"
       return 0
+    elif [ -n "$pid" ]; then
+      rm -f "$watchdog_pid_file"
     fi
   fi
   if [ -f "$watcher_pid_file" ]; then
     pid="$(cat "$watcher_pid_file" 2>/dev/null || true)"
-    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+    if [ -n "$pid" ] && pid_matches_label "$pid" task-watcher; then
       standalone_pid="$pid"
       log "detected standalone task-watcher pid=$pid; starting watchdog to take over supervision"
     elif [ -n "$pid" ]; then
@@ -359,7 +466,7 @@ stop_pid_file() {
   local pid_file="$1" label="$2"
   local pid=""
   pid="$(cat "$pid_file" 2>/dev/null || true)"
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  if [ -n "$pid" ] && pid_matches_label "$pid" "$label"; then
     kill "$pid" 2>/dev/null || true
     for _ in {1..20}; do
       kill -0 "$pid" 2>/dev/null || break
@@ -382,10 +489,32 @@ stop_pid_file() {
 }
 
 stop_watcher() {
-  local rc=0
+  local rc=0 heartbeat_pid=""
   stop_pid_file "$STATE_DIR/task-watcher/task-watcher-watchdog.pid" task-watcher-watchdog || rc=1
   stop_pid_file "$STATE_DIR/task-watcher/task-watcher.pid" task-watcher || rc=1
+  heartbeat_pid="$(read_task_watcher_heartbeat_pid 2>/dev/null || true)"
+  if [ -n "$heartbeat_pid" ] && pid_matches_label "$heartbeat_pid" task-watcher; then
+    kill "$heartbeat_pid" 2>/dev/null || true
+    log "stopped task-watcher heartbeat pid=$heartbeat_pid"
+  fi
   return "$rc"
+}
+
+restart_managed_service() {
+  local label="$1" running_fn="$2" stop_fn="$3" start_fn="$4"
+  if "$running_fn"; then
+    log "restarting $label"
+    "$stop_fn" || warn "$label stop returned non-zero; will still attempt start"
+    "$start_fn"
+    return $?
+  fi
+  if [ "$START_FORCE" = "1" ]; then
+    log "$label not running; starting because --force was provided"
+    "$start_fn"
+    return $?
+  fi
+  log "$label not running; skip（如需拉起未运行服务，请单独执行 start-* 或加 --force）"
+  return 0
 }
 
 start_dashboard() {
@@ -489,6 +618,13 @@ stop_codex_gateway() {
   stop_pid_file "$STATE_DIR/codex-responses-gateway.pid" codex-responses-gateway
 }
 
+restart_services() {
+  ensure_runtime_dirs
+  restart_managed_service task-watcher watcher_running stop_watcher start_watcher
+  restart_managed_service dashboard dashboard_running stop_dashboard start_dashboard
+  restart_managed_service codex-responses-gateway codex_gateway_running stop_codex_gateway start_codex_gateway
+}
+
 install_codex_profile() {
   python3 "$SCRIPT_DIR/install-codex-gateway-profile.py" \
     --gateway-base-url "$CODEX_GATEWAY_PROFILE_BASE_URL" \
@@ -549,10 +685,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     doctor) doctor ;;
     start-agents) start_agents ;;
     stop-agents) stop_agents ;;
+    restart-agents) restart_agents ;;
     start-watcher) start_watcher ;;
     stop-watcher) stop_watcher ;;
     start-dashboard) start_dashboard ;;
     stop-dashboard) stop_dashboard ;;
+    restart-services) restart_services ;;
     init-codex-gateway-config) init_codex_gateway_config ;;
     start-codex-gateway) start_codex_gateway ;;
     stop-codex-gateway) stop_codex_gateway ;;
