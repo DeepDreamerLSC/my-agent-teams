@@ -228,7 +228,7 @@
   },
   "notifications": {
     "enabled": true,
-    "push_script": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/feishu-push.sh"
+    "push_script": "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/alert-card.sh"
   },
   "projects": {
     "chiralium": {

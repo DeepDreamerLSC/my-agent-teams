@@ -69,6 +69,9 @@ scripts/teamctl.sh start-dashboard
 
 # 6) 查看状态
 scripts/teamctl.sh status
+
+# 7) 同步人力数据到飞书甘特图（需先完成飞书 CLI 配置）
+scripts/sync-gantt-to-feishu.sh
 ```
 
 说明：
@@ -114,10 +117,11 @@ scripts/teamctl.sh smoke
 
 ```bash
 cd /path/to/my-agent-teams
-scripts/teamctl.sh stop-watcher
-scripts/teamctl.sh start-watcher
+scripts/teamctl.sh restart-services
 scripts/teamctl.sh status
 ```
+
+`restart-services` 只会重启**当前正在运行**的 watcher / dashboard / codex-gateway，**不会触碰任何 agent tmux session**。如果某个服务当前没跑，默认跳过；如需顺手拉起未运行服务，可改用单独的 `start-*` 命令，或显式加 `--force`。
 
 如果同一批更新还改了 dashboard / 甘特图 / API 查询，再额外重启看板：
 
@@ -132,6 +136,15 @@ scripts/teamctl.sh start-dashboard
 - agent 角色模板（`agents/<agent-id>/AGENT.md` / `CLAUDE.md`）刚被重生成并要求重新加载
 - 运行时命令变了（例如 `CODEX_CMD` / `CLAUDE_CMD` 调整）
 - tmux session 本身已经不健康，正好借切换窗口一起恢复
+
+如确实需要重启全部 agent，会话重启已被单独收口为危险命令，且**必须人工确认**：
+
+```bash
+cd /path/to/my-agent-teams
+scripts/teamctl.sh restart-agents
+```
+
+执行时会列出受影响的 tmux session，并要求在交互式终端手工输入确认短语。
 
 ### 4. 一线 PM 切换后的新操作约定
 
@@ -539,6 +552,72 @@ http://<你的机器IP>:5001/
 - `GET /api/tasks/gantt`
 - `GET /api/agents/stats`
 
+## 同步到飞书甘特图
+
+`scripts/sync-gantt-to-feishu.sh` 将看板的 agent 人力数据聚合后推送到飞书多维表格（Base）的甘特图视图中。
+
+### 前置条件
+
+1. 安装飞书 CLI 并完成认证：
+
+```bash
+npm install -g @larksuite/cli
+npx -y skills add https://open.feishu.cn --skill -y
+lark-cli config bind
+lark-cli auth login --recommend
+```
+
+2. 在飞书中创建 Base 并建好人力表，或者让 AI 帮你创建（参考 "研发人力甘特图" Base）。
+
+3. dashboard 在运行：
+
+```bash
+scripts/teamctl.sh start-dashboard
+```
+
+### 用法
+
+```bash
+# 手动同步一次
+./scripts/sync-gantt-to-feishu.sh
+
+# 每 10 分钟自动同步（需启动 dashboard 后再跑）
+watch -n 600 ./scripts/sync-gantt-to-feishu.sh
+```
+
+### 工作原理
+
+```
+dashboard :5001/api/gantt → 按 agent 聚合 → lark-cli base upsert → 飞书 Base
+```
+
+脚本读取 dashboard 的甘特图 API，按 pm-chief / arch-1 / dev-1 / dev-2 / qa-1 / review-1 六个角色聚合任务数、完成数、阻塞数、待合入数和负载率，通过 `lark-cli base +record-upsert` 逐条更新飞书 Base 中的记录。
+
+也可以把飞书对象 ID 放在本机未入库的 `config.local.json`：
+
+```json
+{
+  "notifications": {
+    "gantt": {
+      "base_token": "...",
+      "table_id": "...",
+      "trend_table_id": "...",
+      "record_ids": "rec1,rec2,rec3,rec4,rec5,rec6"
+    }
+  }
+}
+```
+
+### 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `GANTT_FEISHU_BASE_TOKEN` | （必填） | 飞书 Base Token |
+| `GANTT_FEISHU_TABLE_ID` | （必填） | 飞书人力总览表 ID |
+| `GANTT_FEISHU_RECORD_IDS` | （必填） | 与 agent 列表一一对应的 record_id，逗号分隔 |
+| `GANTT_FEISHU_TREND_TABLE_ID` | （可选） | 飞书完成趋势表 ID，空则跳过趋势同步 |
+| `GANTT_DASHBOARD_URL` | `http://127.0.0.1:5001/api/gantt` | dashboard API 地址 |
+
 ### 故障排查
 
 #### 页面打开但没有数据
@@ -637,6 +716,7 @@ my-agent-teams/
 │   ├── tmux-watcher.sh              # 确认提示自动处理 + scratchpad 空闲提醒
 │   ├── task-watcher-watchdog.sh     # task-watcher 守护进程
 │   ├── task-board-sync.py           # 看板数据同步
+│   └── sync-gantt-to-feishu.sh      # 看板→飞书甘特图同步
 │   └── build-agent-files.sh         # 从模板生成所有 agent 角色文件
 ├── prompts/                         # 旧角色 Prompt 兼容目录；当前内容已归档到 design/archive/prompts/
 └── design/                          # 设计文档
@@ -750,7 +830,7 @@ design/agent-templates/
 1. 编辑 `design/agent-templates/` 下对应的模板文件
 2. 运行构建脚本：`bash scripts/build-agent-files.sh`
 3. 所有 agent 的 AGENT.md / CLAUDE.md 自动更新
-4. 重启需要生效的 agent session
+4. 如确需让所有 agent 重新加载，再单独执行 `scripts/teamctl.sh restart-agents`（会要求人工确认）
 
 ### 查看变更（不写入）
 
