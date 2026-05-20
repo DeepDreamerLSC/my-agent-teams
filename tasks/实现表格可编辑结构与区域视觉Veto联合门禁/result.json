@@ -1,0 +1,49 @@
+{
+  "task_id": "实现表格可编辑结构与区域视觉Veto联合门禁",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已按 review/PM 最小返修两点收口：1）把五下科学/数学八年级两份 table_gate canonical 产物真正写到 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/；2）把联合 gate 接入实际 DOCX 运行链，docx_assembler 现在会先把 table payload 归一成 NormalizedTableIR，再执行“结构 + 区域视觉 veto”判定，只有 gate_passed 时才渲染可编辑 Word table，否则回落到图片/审计文本；exercise_docx_assembler 经 build_docx_package 同步生效。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/table_ir.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_table_ir_contract.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/五下科学_table_gate_ready.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/数学八年级_table_gate_failed.json"
+  ],
+  "tests": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-table-gate-rework /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/table_ir.py backend/app/services/pdf_to_word/docx_assembler.py backend/app/services/pdf_to_word/exercise_docx_assembler.py backend/tests/test_pdf_to_word_table_ir_contract.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/private/tmp /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_table_ir_contract.py backend/tests/test_pdf_exercise_docx_assembler.py -p no:cacheprovider",
+      "result": "passed (14 passed, 4 warnings)"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32 diff --check -- backend/app/services/pdf_to_word/table_ir.py backend/app/services/pdf_to_word/docx_assembler.py backend/tests/test_pdf_to_word_table_ir_contract.py",
+      "result": "passed"
+    },
+    {
+      "command": "ls /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate",
+      "result": "passed (五下科学_table_gate_ready.json, 数学八年级_table_gate_failed.json present)"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/private/tmp /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_model_eval_runner.py -k writes_output_structure -p no:cacheprovider",
+      "result": "passed (1 passed, 15 deselected, 4 warnings)"
+    }
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/artifacts/Veto-96a0ce32.patch",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/五下科学_table_gate_ready.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/数学八年级_table_gate_failed.json"
+  ],
+  "notes": [
+    "word_paragraph_xml/raw <table> 与 DOCX_VISUAL table payload 现在都会走同一条 runtime gate；不再只凭 table HTML/table_rows 存在就直接落可编辑 Word table。",
+    "为便于后续上游接线，table_ir.py 新增了 build_normalized_table_ir_from_payload()：优先消费 normalized_table_ir/cells，其次回退 table_rows/table_html，并保持 image/html/markdown 仅作为 trace/evidence。"
+  ],
+  "risks": [
+    "当前 runtime gate 是严格门禁：若上游 payload 还没补 table_visual_regions/visual_vetoes 等视觉证据，DOCX 侧会降级为图片或审计文本，而不会继续宣称 editable table 已达标。",
+    "本轮仍未实现 merged cells 的真实 Word table XML 渲染；该能力留给后续“实现可编辑Word表格渲染”任务收口。"
+  ],
+  "completed_at": "2026-05-20T10:35:05+08:00"
+}

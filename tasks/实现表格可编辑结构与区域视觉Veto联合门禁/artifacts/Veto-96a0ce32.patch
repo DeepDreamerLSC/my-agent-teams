@@ -1,5 +1,188 @@
+diff --git a/backend/app/services/pdf_to_word/docx_assembler.py b/backend/app/services/pdf_to_word/docx_assembler.py
+index 39c36fa..db5d9c4 100644
+--- a/backend/app/services/pdf_to_word/docx_assembler.py
++++ b/backend/app/services/pdf_to_word/docx_assembler.py
+@@ -22,6 +22,13 @@ from app.services.office_export_service import (
+ 
+ from .exercise_ir import iter_docx_visual_payloads
+ from .models import PDFConversionDocument, PDFDocumentBlock
++from .table_ir import (
++    DEFAULT_TABLE_REGION_SIMILARITY_MIN,
++    NormalizedTableIR,
++    build_normalized_table_ir_from_payload,
++    build_table_editable_visual_gate_result,
++    write_table_editable_visual_gate_result,
++)
+ 
+ _DOCX_MATH_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/math'
+ _WORD_REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+@@ -57,13 +64,20 @@ class _DocxAssetBuilder:
+         )
+ 
+     def add_table_xml(self, payload: dict[str, object]) -> str:
+-        table_html = str(payload.get('table_html') or '').strip()
+-        if table_html:
+-            rows = _parse_html_table_rows(table_html)
+-            if rows:
+-                return _word_table_xml(rows)
+-        rows = _coerce_visual_rows(payload.get('table_rows'))
+-        if rows:
++        table_ir = build_normalized_table_ir_from_payload(payload)
++        gate_result = build_table_editable_visual_gate_result(
++            table_ir,
++            sample_name=_optional_payload_str(payload.get('sample_name')),
++            subject=_optional_payload_str(payload.get('subject')),
++            document_page_type=_optional_payload_str(payload.get('document_page_type') or payload.get('page_type')),
++            visual_regions=_coerce_table_visual_regions(payload),
++            visual_vetoes=_coerce_table_visual_vetoes(payload),
++            evidence_paths=_coerce_table_evidence_paths(payload),
++            region_similarity_min=_coerce_table_region_similarity_min(payload),
++        )
++        _maybe_write_table_gate_artifact(gate_result, payload)
++        rows = _rows_from_table_ir(table_ir)
++        if gate_result.gate_passed and rows:
+             return _word_table_xml(rows)
+         image_fallback = self.add_image_paragraph(payload)
+         if image_fallback:
+@@ -187,11 +201,7 @@ def build_docx_package(body_parts: list[str], *, title: str | None = None) -> by
+ def word_paragraph_xml(text: str) -> str:
+     raw = str(text or '')
+     if raw.strip().lower().startswith('<table'):
+-        rows = _parse_html_table_rows(raw)
+-        if rows:
+-            return _word_table_xml(rows)
+-        stripped = _normalize_text(_strip_markup_text(raw))
+-        return _docx_paragraph_xml(stripped or '表格区域')
++        return raw
+     payloads = iter_docx_visual_payloads(raw)
+     if not payloads:
+         return _docx_paragraph_xml(_normalize_text(text))
+@@ -234,6 +244,9 @@ def _render_paragraphs(document: PDFConversionDocument) -> list[str]:
+ def _render_block(block: PDFDocumentBlock) -> str:
+     prefix = f"第{block.page}页"
+     if block.kind == "table":
++        raw_text = str(block.text or '')
++        if raw_text.strip().lower().startswith('<table') or iter_docx_visual_payloads(raw_text):
++            return raw_text
+         return f"[表格占位] {prefix}：{block.text}"
+     if block.kind == "image":
+         return f"[图片/公式占位] {prefix}：{block.text}"
+@@ -245,11 +258,13 @@ def _render_block(block: PDFDocumentBlock) -> str:
+ def _render_body_part(part: str, *, asset_builder: _DocxAssetBuilder) -> str:
+     raw_part = str(part or '')
+     if raw_part.strip().lower().startswith('<table'):
+-        rows = _parse_html_table_rows(raw_part)
+-        if rows:
+-            return _word_table_xml(rows)
+-        stripped = _normalize_text(_strip_markup_text(raw_part))
+-        return _docx_paragraph_xml(stripped or '表格区域')
++        return asset_builder.add_table_xml(
++            {
++                'kind': 'table',
++                'table_html': raw_part,
++                'fallback_text': _normalize_text(_strip_markup_text(raw_part)),
++            }
++        )
+ 
+     payloads = iter_docx_visual_payloads(raw_part)
+     if not payloads:
+@@ -406,6 +421,94 @@ def _coerce_visual_rows(value: object) -> list[list[str]] | None:
+     return rows or None
+ 
+ 
++def _rows_from_table_ir(table: NormalizedTableIR) -> list[list[str]] | None:
++    if table.row_count <= 0 or table.column_count <= 0:
++        return None
++    rows = [["" for _ in range(table.column_count)] for _ in range(table.row_count)]
++    for cell in table.cells:
++        if cell.row_index < 0 or cell.column_index < 0:
++            continue
++        if cell.row_index >= table.row_count or cell.column_index >= table.column_count:
++            continue
++        rows[cell.row_index][cell.column_index] = _normalize_text(cell.text)
++    return rows
++
++
++def _coerce_table_visual_regions(payload: dict[str, object]) -> list[dict[str, object]] | None:
++    for key in ('table_visual_regions', 'visual_regions', 'key_regions'):
++        value = payload.get(key)
++        if not isinstance(value, list):
++            continue
++        items = [dict(item) for item in value if isinstance(item, dict)]
++        if items:
++            return items
++    return None
++
++
++def _coerce_table_visual_vetoes(payload: dict[str, object]) -> list[dict[str, object]] | None:
++    for key in ('table_visual_vetoes', 'visual_vetoes', 'vetoes'):
++        value = payload.get(key)
++        if not isinstance(value, list):
++            continue
++        items = [dict(item) for item in value if isinstance(item, dict)]
++        if items:
++            return items
++    return None
++
++
++def _coerce_table_evidence_paths(payload: dict[str, object]) -> dict[str, object]:
++    evidence: dict[str, object] = {}
++    raw = payload.get('evidence_paths')
++    if isinstance(raw, dict):
++        evidence.update({str(key): value for key, value in raw.items()})
++    for key in ('visual_similarity_path', 'render_pair_path', 'human_review_report_path'):
++        value = _optional_payload_str(payload.get(key))
++        if value:
++            evidence[key] = value
++    image_path = _optional_payload_str(payload.get('image_path'))
++    if image_path and 'table_image_path' not in evidence:
++        evidence['table_image_path'] = image_path
++    return evidence
++
++
++def _coerce_table_region_similarity_min(payload: dict[str, object]) -> float:
++    value = payload.get('table_region_similarity_min')
++    if value in (None, ''):
++        value = payload.get('region_similarity_min')
++    try:
++        return float(value) if value not in (None, '') else DEFAULT_TABLE_REGION_SIMILARITY_MIN
++    except (TypeError, ValueError):
++        return DEFAULT_TABLE_REGION_SIMILARITY_MIN
++
++
++def _maybe_write_table_gate_artifact(report: object, payload: dict[str, object]) -> Path | None:
++    artifact_path = _optional_payload_str(payload.get('table_gate_artifact_path'))
++    if artifact_path:
++        return write_table_editable_visual_gate_result(report, artifact_path)
++    sample_name = _optional_payload_str(payload.get('sample_name'))
++    artifact_name = _optional_payload_str(payload.get('table_gate_artifact_name'))
++    if not sample_name and not artifact_name:
++        return None
++    root = Path(
++        _optional_payload_str(payload.get('table_gate_artifact_root'))
++        or os.getenv('PDF_TO_WORD_TABLE_GATE_ARTIFACT_ROOT')
++        or Path(PROJECT_ROOT) / 'artifacts' / 'pdf2word' / 'table_gate'
++    )
++    base_name = artifact_name or f'{_sanitize_artifact_component(sample_name or "table_gate")}_table_gate_{getattr(report, "status", "unknown")}.json'
++    return write_table_editable_visual_gate_result(report, root / base_name)
++
++
++def _optional_payload_str(value: object) -> str | None:
++    if value is None:
++        return None
++    normalized = str(value).strip()
++    return normalized or None
++
++
++def _sanitize_artifact_component(value: str) -> str:
++    return str(value or 'table_gate').replace('/', '_').replace('\\', '_').strip() or 'table_gate'
++
++
+ def _parse_html_table_rows(table_html: str) -> list[list[str]]:
+     import re
+ 
 diff --git a/backend/app/services/pdf_to_word/table_ir.py b/backend/app/services/pdf_to_word/table_ir.py
-index 9e49c5f..795cf89 100644
+index 9e49c5f..2a81ab9 100644
 --- a/backend/app/services/pdf_to_word/table_ir.py
 +++ b/backend/app/services/pdf_to_word/table_ir.py
 @@ -9,6 +9,9 @@ from .models import PageBox
@@ -71,7 +254,91 @@ index 9e49c5f..795cf89 100644
  def load_normalized_table_ir(path: str | Path) -> NormalizedTableIR:
      import json
  
-@@ -396,6 +444,204 @@ def validate_normalized_table_ir(table: NormalizedTableIR) -> TableIRValidationR
+@@ -327,6 +375,83 @@ def load_normalized_table_ir(path: str | Path) -> NormalizedTableIR:
+     return NormalizedTableIR.from_dict(payload)
+ 
+ 
++def build_normalized_table_ir_from_payload(
++    payload: Mapping[str, Any],
++    *,
++    default_table_id: str | None = None,
++    default_source_candidate_id: str = "docx_visual_payload",
++) -> NormalizedTableIR:
++    _require_mapping(payload, "table payload")
++
++    normalized_table = payload.get("normalized_table_ir")
++    if isinstance(normalized_table, Mapping):
++        return NormalizedTableIR.from_dict(normalized_table)
++
++    bbox = _page_box_from_dict(payload.get("bbox"))
++    table_html = _optional_str(payload.get("table_html") or payload.get("html"))
++    table_markdown = _optional_str(payload.get("table_markdown") or payload.get("markdown"))
++
++    cells = _coerce_payload_table_cells(payload.get("cells"), bbox=bbox)
++    if cells is None:
++        rows = _coerce_payload_table_rows(payload.get("table_rows"))
++        if rows is None and table_html:
++            rows = _parse_html_table_rows(table_html)
++        cells = _cells_from_payload_rows(rows, bbox=bbox)
++
++    inferred_row_count = max((cell.row_index + max(cell.row_span, 0) for cell in cells), default=0)
++    inferred_column_count = max((cell.column_index + max(cell.column_span, 0) for cell in cells), default=0)
++    row_count = _optional_int(payload.get("row_count")) or inferred_row_count
++    column_count = _optional_int(payload.get("column_count")) or inferred_column_count
++
++    warnings = (
++        [str(item) for item in _sequence(payload.get("warnings"), "table payload.warnings")]
++        if payload.get("warnings") is not None
++        else []
++    )
++    if not cells:
++        _append_unique(warnings, WARN_TABLE_STRUCTURE_MISSING)
++
++    metrics_payload = payload.get("metrics") if isinstance(payload.get("metrics"), Mapping) else None
++    metrics = TableMetrics.from_dict(metrics_payload)
++    structure_confidence = _optional_float(payload.get("structure_confidence"))
++    source = _optional_str(payload.get("source")) or _optional_str(payload.get("source_profile")) or metrics.source
++    metrics = TableMetrics(
++        structure_confidence=structure_confidence if structure_confidence is not None else metrics.structure_confidence,
++        text_coverage=metrics.text_coverage,
++        cell_count=metrics.cell_count if metrics.cell_count is not None else len(cells),
++        source=source,
++        extra=dict(metrics.extra),
++    )
++
++    table_id = (
++        _optional_str(payload.get("table_id"))
++        or default_table_id
++        or f"table:p{bbox.page if bbox is not None else 0}:docx-payload"
++    )
++    source_candidate_id = (
++        _optional_str(payload.get("source_candidate_id"))
++        or _optional_str(payload.get("candidate_id"))
++        or default_source_candidate_id
++    )
++    return NormalizedTableIR(
++        table_id=table_id,
++        source_candidate_id=source_candidate_id,
++        assigned_question_id=_optional_str(payload.get("assigned_question_id")),
++        assigned_region_id=_optional_str(payload.get("assigned_region_id")),
++        row_count=row_count,
++        column_count=column_count,
++        cells=tuple(cells),
++        bbox=bbox,
++        metrics=metrics,
++        warnings=tuple(_unique(warnings)),
++        raw=TableRawInput(
++            image_path=_optional_str(payload.get("image_path")),
++            html=table_html,
++            markdown=table_markdown,
++        ),
++    )
++
++
+ def validate_normalized_table_ir(table: NormalizedTableIR) -> TableIRValidationResult:
+     """Validate the structural contract without normalizing or rendering a table."""
+ 
+@@ -396,6 +521,320 @@ def validate_normalized_table_ir(table: NormalizedTableIR) -> TableIRValidationR
      )
  
  
@@ -273,10 +540,126 @@ index 9e49c5f..795cf89 100644
 +    return page_box.to_dict() if page_box is not None else None
 +
 +
++def _coerce_payload_table_cells(value: Any, *, bbox: PageBox | None) -> tuple[TableCellIR, ...] | None:
++    if value is None:
++        return None
++    sequence = _sequence(value, "table payload.cells")
++    cells: list[TableCellIR] = []
++    for index, item in enumerate(sequence):
++        if not isinstance(item, Mapping):
++            return None
++        if REQUIRED_CELL_FIELDS <= set(item):
++            cells.append(TableCellIR.from_dict(item))
++            continue
++        cells.append(
++            TableCellIR(
++                row_index=_int_value(item.get("row_index")),
++                column_index=_int_value(item.get("column_index")),
++                row_span=_int_value(item.get("row_span"), default=1),
++                column_span=_int_value(item.get("column_span"), default=1),
++                text=str(item.get("text") or item.get("content") or ""),
++                runs=_coerce_payload_runs(item.get("runs"), context=f"table payload.cells[{index}].runs", text_fallback=item.get("text") or item.get("content")),
++                bbox=_page_box_from_dict(item.get("bbox")) or bbox,
++                confidence=_float_value(item.get("confidence", 1.0), default=1.0),
++                warnings=tuple(
++                    str(entry)
++                    for entry in (
++                        _sequence(item.get("warnings"), f"table payload.cells[{index}].warnings")
++                        if item.get("warnings") is not None
++                        else ()
++                    )
++                ),
++            )
++        )
++    return tuple(cells)
++
++
++def _coerce_payload_table_rows(value: Any) -> list[list[Any]] | None:
++    if not isinstance(value, list) or not value:
++        return None
++    rows: list[list[Any]] = []
++    for row in value:
++        if not isinstance(row, list):
++            return None
++        rows.append(list(row))
++    return rows or None
++
++
++def _cells_from_payload_rows(rows: Sequence[Sequence[Any]] | None, *, bbox: PageBox | None) -> tuple[TableCellIR, ...]:
++    if not rows:
++        return ()
++    cells: list[TableCellIR] = []
++    for row_index, row in enumerate(rows):
++        for column_index, raw_cell in enumerate(row):
++            if isinstance(raw_cell, Mapping):
++                text = str(raw_cell.get("text") or raw_cell.get("content") or "")
++                runs = _coerce_payload_runs(
++                    raw_cell.get("runs"),
++                    context=f"table payload.table_rows[{row_index}][{column_index}].runs",
++                    text_fallback=text,
++                )
++                cells.append(
++                    TableCellIR(
++                        row_index=row_index,
++                        column_index=column_index,
++                        row_span=_int_value(raw_cell.get("row_span"), default=1),
++                        column_span=_int_value(raw_cell.get("column_span"), default=1),
++                        text=text,
++                        runs=runs,
++                        bbox=_page_box_from_dict(raw_cell.get("bbox")) or bbox,
++                        confidence=_float_value(raw_cell.get("confidence", 1.0), default=1.0),
++                        warnings=tuple(
++                            str(entry)
++                            for entry in (
++                                _sequence(
++                                    raw_cell.get("warnings"),
++                                    f"table payload.table_rows[{row_index}][{column_index}].warnings",
++                                )
++                                if raw_cell.get("warnings") is not None
++                                else ()
++                            )
++                        ),
++                    )
++                )
++                continue
++            text = str(raw_cell or "")
++            cells.append(
++                TableCellIR(
++                    row_index=row_index,
++                    column_index=column_index,
++                    text=text,
++                    runs=_coerce_payload_runs(None, context="", text_fallback=text),
++                    bbox=bbox,
++                )
++            )
++    return tuple(cells)
++
++
++def _coerce_payload_runs(value: Any, *, context: str, text_fallback: Any) -> tuple[TableTextRun, ...]:
++    if value is None:
++        text = str(text_fallback or "")
++        return (TableTextRun(text=text),) if text else ()
++    return tuple(TableTextRun.from_dict(item) for item in _sequence(value, context))
++
++
++def _parse_html_table_rows(table_html: str) -> list[list[str]]:
++    import re
++
++    rows: list[list[str]] = []
++    for row_match in re.finditer(r"<tr\\b[^>]*>(.*?)</tr>", table_html, flags=re.IGNORECASE | re.DOTALL):
++        cells: list[str] = []
++        for cell_match in re.finditer(r"<t[dh]\\b[^>]*>(.*?)</t[dh]>", row_match.group(1), flags=re.IGNORECASE | re.DOTALL):
++            cell_text = re.sub(r"<[^>]+>", "", cell_match.group(1))
++            cells.append(" ".join(cell_text.split()))
++        if cells:
++            rows.append(cells)
++    return rows
++
++
  def _append_unique(items: list[str], value: str) -> None:
      if value not in items:
          items.append(value)
-@@ -472,12 +718,16 @@ def _optional_str(value: Any) -> str | None:
+@@ -472,12 +911,16 @@ def _optional_str(value: Any) -> str | None:
  
  
  __all__ = [
@@ -293,7 +676,7 @@ index 9e49c5f..795cf89 100644
      "TableIRContractStatus",
      "TableIRValidationResult",
      "TableMetrics",
-@@ -489,8 +739,13 @@ __all__ = [
+@@ -489,8 +932,14 @@ __all__ = [
      "WARN_TABLE_CELL_OVERLAP",
      "WARN_TABLE_DIMENSION_MISMATCH",
      "WARN_TABLE_GRID_INCOMPLETE",
@@ -302,18 +685,29 @@ index 9e49c5f..795cf89 100644
      "WARN_TABLE_SPAN_OUT_OF_BOUNDS",
      "WARN_TABLE_STRUCTURE_MISSING",
 +    "WARN_TABLE_VISUAL_REGIONS_MISSING",
++    "build_normalized_table_ir_from_payload",
 +    "build_table_editable_visual_gate_result",
      "load_normalized_table_ir",
      "validate_normalized_table_ir",
 +    "write_table_editable_visual_gate_result",
  ]
 diff --git a/backend/tests/test_pdf_to_word_table_ir_contract.py b/backend/tests/test_pdf_to_word_table_ir_contract.py
-index 9553711..6305f7a 100644
+index 9553711..60dffa2 100644
 --- a/backend/tests/test_pdf_to_word_table_ir_contract.py
 +++ b/backend/tests/test_pdf_to_word_table_ir_contract.py
-@@ -7,18 +7,24 @@ from pathlib import Path
+@@ -1,24 +1,35 @@
+ from __future__ import annotations
+ 
+ import copy
++from io import BytesIO
+ import json
+ from pathlib import Path
++import zipfile
+ 
  import pytest
  
++from app.services.pdf_to_word.docx_assembler import build_docx_package
++from app.services.pdf_to_word.exercise_ir import encode_docx_visual_payload
  from app.services.pdf_to_word.table_ir import (
 +    DEFAULT_TABLE_REGION_SIMILARITY_MIN,
      NORMALIZED_TABLE_IR_VERSION,
@@ -329,6 +723,7 @@ index 9553711..6305f7a 100644
      WARN_TABLE_SPAN_OUT_OF_BOUNDS,
      WARN_TABLE_STRUCTURE_MISSING,
 +    WARN_TABLE_VISUAL_REGIONS_MISSING,
++    build_normalized_table_ir_from_payload,
 +    build_table_editable_visual_gate_result,
      load_normalized_table_ir,
      validate_normalized_table_ir,
@@ -336,7 +731,7 @@ index 9553711..6305f7a 100644
  )
  
  FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "table_ir"
-@@ -146,3 +152,121 @@ def test_missing_required_contract_fields_fail_fast():
+@@ -146,3 +157,188 @@ def test_missing_required_contract_fields_fail_fast():
  
      with pytest.raises(ValueError, match="source_candidate_id"):
          NormalizedTableIR.from_dict(payload)
@@ -458,11 +853,78 @@ index 9553711..6305f7a 100644
 +    assert any(item.startswith(f"{WARN_TABLE_REGION_SIMILARITY_MISSING}:") for item in report_with_missing_region.blocking_failures)
 +    assert any(item.startswith(f"{WARN_TABLE_REGION_EVIDENCE_MISSING}:") for item in report_with_missing_region.blocking_failures)
 +    assert report_with_missing_region.visual_regions[0]["similarity_min"] == DEFAULT_TABLE_REGION_SIMILARITY_MIN
-diff --git "a/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json" "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
++
++
++def test_build_normalized_table_ir_from_payload_promotes_table_rows_into_structured_cells():
++    table = build_normalized_table_ir_from_payload(
++        {
++            "table_id": "table:p3:runtime-001",
++            "source_candidate_id": "runtime:p3:b1",
++            "assigned_question_id": "q-1",
++            "assigned_region_id": "region:p3:q1",
++            "bbox": {"page": 3, "x0": 96.0, "y0": 300.0, "x1": 480.0, "y1": 420.0},
++            "table_rows": [
++                [{"text": "实验组", "column_span": 2}, "结论"],
++                ["光照", "是", "发芽"],
++            ],
++            "image_path": "crops/p3-table.png",
++            "warnings": [],
++        }
++    )
++
++    assert table.table_id == "table:p3:runtime-001"
++    assert table.source_candidate_id == "runtime:p3:b1"
++    assert table.row_count == 2
++    assert table.column_count == 3
++    assert table.has_structured_cells is True
++    assert table.cells[0].column_span == 2
++    assert table.raw.image_path == "crops/p3-table.png"
++
++
++def test_docx_runtime_table_gate_only_renders_editable_table_when_visual_regions_ready():
++    ready_payload = encode_docx_visual_payload(
++        {
++            "kind": "table",
++            "table_rows": [["姓名", "数学"], ["小明", "98"]],
++            "bbox": {"page": 1, "x0": 112.0, "y0": 220.0, "x1": 352.0, "y1": 280.0},
++            "visual_regions": [
++                {
++                    "region_id": "table-grid",
++                    "page_index": 1,
++                    "role": "table_grid",
++                    "bbox": {"page": 1, "x0": 112.0, "y0": 220.0, "x1": 352.0, "y1": 280.0},
++                    "similarity": 0.96,
++                    "source_crop_path": "regions/source.png",
++                    "docx_crop_path": "regions/docx.png",
++                    "diff_image_path": "regions/diff.png",
++                }
++            ],
++        }
++    )
++    blocked_payload = encode_docx_visual_payload(
++        {
++            "kind": "table",
++            "table_rows": [["姓名", "数学"], ["小明", "98"]],
++            "fallback_text": "表格待视觉证据，先降级为审计文本",
++        }
++    )
++
++    ready_docx = build_docx_package([ready_payload], title="ready")
++    blocked_docx = build_docx_package([blocked_payload], title="blocked")
++    with zipfile.ZipFile(BytesIO(ready_docx)) as zf:
++        ready_document_xml = zf.read("word/document.xml").decode("utf-8")
++    with zipfile.ZipFile(BytesIO(blocked_docx)) as zf:
++        blocked_document_xml = zf.read("word/document.xml").decode("utf-8")
++
++    assert "<w:tbl>" in ready_document_xml
++    assert "小明" in ready_document_xml
++    assert "<w:tbl>" not in blocked_document_xml
++    assert "表格待视觉证据，先降级为审计文本" in blocked_document_xml
+diff --git "a/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json" "b/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
 new file mode 100644
 index 0000000..1d6e2ca
 --- /dev/null
-+++ "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
++++ "b/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
 @@ -0,0 +1,82 @@
 +{
 +  "report_type": "pdf_to_word_table_editable_visual_gate",
@@ -546,11 +1008,11 @@ index 0000000..1d6e2ca
 +    "table_image_path": "crops/page-1/table-0007.png"
 +  }
 +}
-diff --git "a/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json" "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
+diff --git "a/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json" "b/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
 new file mode 100644
 index 0000000..7ea6c7f
 --- /dev/null
-+++ "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
++++ "b/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
 @@ -0,0 +1,93 @@
 +{
 +  "report_type": "pdf_to_word_table_editable_visual_gate",

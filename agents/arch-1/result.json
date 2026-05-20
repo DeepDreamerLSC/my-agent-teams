@@ -1,43 +1,51 @@
 {
-  "task": "提交推送当前 agent 团队代码并优化 scripts 结构",
+  "task": "提交推送当前 agent 团队代码并按模块拆分优化 scripts",
   "agent": "arch-1",
   "status": "done",
-  "completed_at": "2026-05-20T10:09:39+08:00",
+  "completed_at": "2026-05-20T10:42:42+08:00",
   "summary": [
-    "已提交并推送当前 my-agent-teams 状态到 origin/main。",
-    "已审视 scripts 目录，识别 task-watcher.sh、teamctl.sh、task_artifacts.py、create-task.sh 等超过或接近 500 行的维护热点。",
-    "已保留顶层入口兼容路径，新增 scripts/README.md 与 scripts/lib/README.md，按任务生命周期、watcher 控制面、通知沟通、配置工作区、报告诊断分组说明维护边界。",
-    "已将 task-watcher.sh 的通知、飞书推送、系统 chat 事件函数抽离到 scripts/lib/task_watcher_notifications.sh，降低主 watcher 文件耦合度且不改变对外入口。"
+    "已先提交并推送当前 my-agent-teams task/runtime 状态，满足 15 分钟内推送要求。",
+    "已继续 scripts 模块化：task-watcher 通知模块之外，又拆出 runtime/logging/singleton 模块；teamctl 拆出 watcher/dashboard/Codex gateway 服务管理模块。",
+    "已更新 scripts/README.md 与 scripts/lib/README.md，按功能分区记录入口脚本与 lib 模块维护边界。",
+    "仍保留顶层入口脚本路径兼容，未移动已有外部调用入口。"
   ],
   "commits_pushed": [
     {
-      "sha": "0797a18",
-      "message": "chore: checkpoint agent team state"
+      "sha": "77f0f56",
+      "message": "chore: checkpoint task runtime updates"
     },
     {
-      "sha": "87630a5",
-      "message": "chore: checkpoint task invariant timestamps"
-    },
-    {
-      "sha": "2a7f125",
-      "message": "refactor(scripts): modularize watcher notifications"
+      "sha": "b277f10",
+      "message": "refactor(scripts): split watcher runtime and team services"
     }
   ],
-  "remote": "origin/main",
-  "files_changed_for_structure": [
+  "script_modules_changed": [
     "scripts/task-watcher.sh",
+    "scripts/lib/task_watcher_runtime.sh",
     "scripts/lib/task_watcher_notifications.sh",
+    "scripts/teamctl.sh",
+    "scripts/lib/teamctl_services.sh",
     "scripts/README.md",
     "scripts/lib/README.md"
   ],
+  "line_count_after": {
+    "scripts/task-watcher.sh": 3758,
+    "scripts/lib/task_watcher_runtime.sh": 281,
+    "scripts/lib/task_watcher_notifications.sh": 124,
+    "scripts/teamctl.sh": 362,
+    "scripts/lib/teamctl_services.sh": 359,
+    "scripts/create-task.sh": 502,
+    "scripts/lib/task_artifacts.py": 628
+  },
   "verification": [
-    "find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n",
-    "python3 -m py_compile scripts/*.py scripts/lib/*.py",
-    ".venv/bin/python -m pytest tests/test_task_watcher_push_reliability.py tests/test_claim_task_reserved.py tests/test_task_pool_and_queue_router.py tests/test_pool_task_gate.py tests/test_dispatch_task.py -q (49 passed)",
-    ".venv/bin/python -m pytest -q (123 passed)"
+    "find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n -> passed",
+    "python3 -m py_compile scripts/*.py scripts/lib/*.py -> passed",
+    "TASK_WATCHER_TEST_MODE=1 ... source scripts/task-watcher.sh; declare -F log write_heartbeat notify_pm push_task_event -> passed",
+    ".venv/bin/python -m pytest -q -> 123 passed (rerun with escalation because local 127.0.0.1 stub bind is blocked in sandbox)"
   ],
-  "notes": [
-    "task-watcher.sh 仍是最大脚本，本次采取低风险增量拆分；README 中记录了后续按 runtime/routing/gate/queue 继续拆分的边界。",
-    "执行期间 task-watcher 持续更新 tasks 下部分运行态 task.json / transitions / artifacts；最终会随反馈 checkpoint 一并提交推送，避免仓库长期残留未提交状态。"
+  "remaining_notes": [
+    "task-watcher.sh 仍是最大脚本；后续建议继续按 routing/gate/queue/claim 分层拆分，避免一次性高风险大搬迁。",
+    "create-task.sh 当前 502 行，已在 README 标记后续将内嵌 Python task schema 构造迁入 scripts/lib/create_task_impl.py。",
+    "scripts/lib/task_artifacts.py 是共享库但仍 628 行，后续建议按 schema 读写、摘要提取、原子写入拆分。"
   ]
 }

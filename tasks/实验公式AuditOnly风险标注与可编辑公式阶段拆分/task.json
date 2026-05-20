@@ -86,7 +86,7 @@
   ],
   "claim_max_concurrency": 1,
   "dependency_policy": "done_only",
-  "pool_timeout_minutes": 120,
+  "pool_timeout_minutes": 1440,
   "pool_entered_at": "2026-05-20T08:33:58+08:00",
   "pre_claim_assigned_agent": "auto",
   "dependencies_ready_at": "2026-05-20T08:20:58+08:00",
@@ -110,5 +110,8 @@
   "claimed_at": null,
   "reserved_at": "2026-05-20T08:32:55+08:00",
   "claim_reason": null,
-  "reserved_reason": "watcher auto-reserved while dev-1 is working"
+  "reserved_reason": "watcher auto-reserved while dev-1 is working",
+  "pm_notes": [
+    "2026-05-20 PM判定：该任务属于公式专项 P2，且显式依赖“重跑全学科人工视觉95并更新阶段结论”；当前不转派、不拆分、不提优先级，继续延后到主线收口后再认领。为避免依赖未满足时反复 pooled 超时告警，已将 pool_timeout_minutes 调整为 1440。"
+  ]
 }
