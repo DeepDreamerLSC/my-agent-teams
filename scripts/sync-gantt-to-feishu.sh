@@ -300,4 +300,92 @@ print(f"[trend] 同步完成: {len(sorted_dates)} 天", file=sys.stderr)
 PYEOF
 
 log "趋势同步完成"
+
+
+# --------------- 任务详情同步（甘特图数据）---------------
+echo ""
+log "同步任务详情（甘特图）..."
+
+python3 << 'TDEOF'
+import json, urllib.request, subprocess, sys, os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+BASE_TOKEN = os.environ.get("GANTT_FEISHU_BASE_TOKEN", "E77KbiM18aIhvlsKnTTcYI4dnQF")
+TASK_TABLE = os.environ.get("GANTT_FEISHU_TASK_TABLE", "tbl1TLcoNzlgzTve")
+DASHBOARD_URL = os.environ.get("GANTT_DASHBOARD_URL", "http://127.0.0.1:5001/api/gantt")
+TMP_DIR = Path(os.environ.get("GANTT_TMP_DIR", "/tmp/osrt-gantt"))
+
+def run_lark(cmd_list, cwd=None):
+    try:
+        r = subprocess.run(cmd_list, capture_output=True, text=True, timeout=30, cwd=cwd)
+        idx = r.stdout.find("{")
+        return json.loads(r.stdout[idx:]) if idx >= 0 else None
+    except:
+        return None
+
+# Step 1: Delete all existing records in task detail table
+result = run_lark(["lark-cli", "base", "+record-list",
+    "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+    "--as", "user", "--limit", "500", "--format", "json"])
+
+if result and result.get("ok"):
+    rids = result["data"]["record_id_list"]
+    if rids:
+        for i in range(0, len(rids), 200):
+            batch = rids[i:i+200]
+            payload = {"record_id_list": batch}
+            tmp = TMP_DIR / f"task_del_{i}.json"
+            TMP_DIR.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            run_lark(["lark-cli", "base", "+record-delete",
+                "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+                "--as", "user", "--yes", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
+            tmp.unlink()
+        print(f"[task-detail] 已清除 {len(rids)} 条旧记录", file=sys.stderr)
+
+# Step 2: Get fresh Dashboard data
+resp = urllib.request.urlopen(DASHBOARD_URL)
+data = json.loads(resp.read())
+items = data.get("items", [])
+CORE_AGENTS = {"pm-chief", "arch-1", "dev-1", "dev-2", "qa-1", "review-1"}
+AGENT_ROLES = {"pm-chief":"PM","arch-1":"架构师","dev-1":"开发者","dev-2":"开发者","qa-1":"测试","review-1":"审查"}
+
+rows = []
+for item in items:
+    agent = item.get("assigned_agent", "") or ""
+    if agent not in CORE_AGENTS:
+        continue
+    status = item.get("board_status", "")
+    start_raw = (item.get("display_start_at", "") or "")
+    end_raw = (item.get("display_end_at", "") or "")
+    duration_sec = item.get("duration_seconds", 0)
+    title = (item.get("title", "?") or "?")[:80]
+    start_dt = start_raw[:16].replace("T", " ") if start_raw else ""
+    end_dt = end_raw[:16].replace("T", " ") if end_raw else ""
+    if status == "done":
+        completed_raw = (item.get("milestones", {}).get("completed", "") or "")
+        if completed_raw:
+            end_dt = completed_raw[:16].replace("T", " ")
+    duration_h = round(duration_sec / 3600, 1)
+    role = AGENT_ROLES.get(agent, agent)
+    rows.append([title, role, status, start_dt, end_dt, str(duration_h)])
+
+if rows:
+    payload = {"fields": ["任务名称", "负责人", "状态", "开始时间", "结束时间", "持续时长h"], "rows": rows}
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = TMP_DIR / "task_sync_payload.json"
+    tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    result = run_lark(["lark-cli", "base", "+record-batch-create",
+        "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+        "--as", "user", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
+    tmp.unlink()
+    if result and result.get("ok"):
+        count = len(result.get("data", {}).get("record_id_list", []))
+        print(f"[task-detail] 已同步 {count} 条任务（含时分）", file=sys.stderr)
+    else:
+        print("[task-detail] 同步失败", file=sys.stderr)
+else:
+    print("[task-detail] 无任务数据", file=sys.stderr)
+TDEOF
 exit "$ERRORS"

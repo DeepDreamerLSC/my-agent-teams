@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-19T17:14:25+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T17:25:59+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T17:31:10+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T17:32:39+08:00", "reason": "pm accepted final 95% go verdict and closed verification task"}

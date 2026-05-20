@@ -1,0 +1,15 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "resumed_at": "2026-05-19T15:14:29+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "qa-1",
+  "reason": "review 返修：报告器必须对齐 frozen 95% contract。分数/阈值按 100 分制处理（不能把 95、19.2 等 points 值 clamp 到 1.0）；表格维度需兼容 editable_word_tables / editable_table 到统一 tables 输出，并稳定触发表格硬门禁。补真实 contract fixture 与 smoke coverage 后再回审。",
+  "archived_files": [
+    "ack.20260519T151429.json",
+    "claim.20260519T151429.json",
+    "review.20260519T151429.json",
+    "review.20260519T151429.md",
+    "verify.20260519T151429.json",
+    "result.20260519T151429.json"
+  ]
+}

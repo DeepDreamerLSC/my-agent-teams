@@ -1,0 +1,1534 @@
+diff --git a/backend/app/services/pdf_to_word/visual_similarity_slow_review.py b/backend/app/services/pdf_to_word/visual_similarity_slow_review.py
+new file mode 100644
+index 0000000..766928a
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/visual_similarity_slow_review.py
+@@ -0,0 +1,179 @@
++from __future__ import annotations
++
++from collections.abc import Callable, Mapping, Sequence
++from typing import Any
++
++
++VISUAL_SIMILARITY_SLOW_REVIEW_VERSION = 'pdf_to_word_visual_similarity_slow_review/v1'
++VISUAL_SIMILARITY_SLOW_REVIEW_MODEL = 'qwen3_vl_8b'
++
++
++def build_visual_similarity_slow_review_audit(
++    *,
++    page_scores: Sequence[Mapping[str, Any]],
++    key_regions: Sequence[Mapping[str, Any]],
++    thresholds: Mapping[str, float],
++    gate_enabled: bool,
++    artifact_ready_for_scoring: bool,
++    rollout_enabled: bool = True,
++    reviewer: Callable[[dict[str, Any]], Mapping[str, Any]] | None = None,
++    candidate_model: str = VISUAL_SIMILARITY_SLOW_REVIEW_MODEL,
++    max_review_pages: int = 3,
++    fallback_action: str = 'manual_review',
++) -> dict[str, Any]:
++    region_map = _group_regions_by_page(key_regions)
++    page_entries: list[dict[str, Any]] = []
++    scheduled_count = 0
++    executed_count = 0
++    fallback_count = 0
++
++    for page in page_scores:
++        page_index = int(page.get('page_index') or 0)
++        page_regions = region_map.get(page_index, ())
++        trigger_reasons = _collect_low_confidence_reasons(
++            page=page,
++            regions=page_regions,
++            thresholds=thresholds,
++        )
++        entry = {
++            'page_index': page_index,
++            'triggered': False,
++            'executed': False,
++            'model_profile': None,
++            'trigger_reasons': trigger_reasons,
++            'decision_reason': '',
++            'review_status': 'not_requested',
++            'fallback_action': None,
++            'response': None,
++            'error': None,
++        }
++
++        if not gate_enabled:
++            entry['decision_reason'] = 'default_sync_disabled'
++            entry['review_status'] = 'disabled'
++            page_entries.append(entry)
++            continue
++        if not artifact_ready_for_scoring:
++            entry['decision_reason'] = 'artifact_not_ready'
++            entry['review_status'] = 'disabled'
++            page_entries.append(entry)
++            continue
++        if not rollout_enabled:
++            entry['decision_reason'] = 'rollout_disabled'
++            entry['review_status'] = 'disabled'
++            page_entries.append(entry)
++            continue
++        if _has_hard_fail(page=page, regions=page_regions):
++            entry['decision_reason'] = 'hard_fail_page_or_region'
++            page_entries.append(entry)
++            continue
++        if not trigger_reasons:
++            entry['decision_reason'] = 'page_confident_no_slow_review'
++            page_entries.append(entry)
++            continue
++        if scheduled_count >= max(0, int(max_review_pages)):
++            entry['decision_reason'] = 'review_budget_exhausted'
++            entry['review_status'] = 'not_requested'
++            page_entries.append(entry)
++            continue
++
++        entry['triggered'] = True
++        entry['model_profile'] = candidate_model
++        scheduled_count += 1
++
++        if reviewer is None:
++            entry['decision_reason'] = 'slow_review_worker_not_configured'
++            entry['review_status'] = 'fallback_skipped'
++            entry['fallback_action'] = fallback_action
++            fallback_count += 1
++            page_entries.append(entry)
++            continue
++
++        request = {
++            'page_index': page_index,
++            'model_profile': candidate_model,
++            'trigger_reasons': trigger_reasons,
++            'page_score': dict(page),
++            'key_regions': [dict(region) for region in page_regions],
++        }
++        try:
++            response = reviewer(request)
++        except Exception as exc:  # pragma: no cover - defensive runtime guard
++            entry['decision_reason'] = 'slow_review_worker_failed'
++            entry['review_status'] = 'fallback_skipped'
++            entry['fallback_action'] = fallback_action
++            entry['error'] = str(exc)
++            fallback_count += 1
++            page_entries.append(entry)
++            continue
++
++        entry['decision_reason'] = 'slow_review_completed'
++        entry['review_status'] = 'completed'
++        entry['executed'] = True
++        entry['response'] = dict(response or {})
++        executed_count += 1
++        page_entries.append(entry)
++
++    return {
++        'report_type': VISUAL_SIMILARITY_SLOW_REVIEW_VERSION,
++        'enabled': gate_enabled,
++        'artifact_ready_for_scoring': artifact_ready_for_scoring,
++        'rollout_enabled': rollout_enabled,
++        'candidate_model': candidate_model,
++        'max_review_pages': int(max_review_pages),
++        'selected_page_count': scheduled_count,
++        'executed_page_count': executed_count,
++        'fallback_page_count': fallback_count,
++        'pages': page_entries,
++    }
++
++
++def _collect_low_confidence_reasons(
++    *,
++    page: Mapping[str, Any],
++    regions: Sequence[Mapping[str, Any]],
++    thresholds: Mapping[str, float],
++) -> list[str]:
++    reasons = list(page.get('review_reasons') or [])
++    page_thresholds = page.get('thresholds') if isinstance(page.get('thresholds'), Mapping) else {}
++    review_band = float(thresholds.get('slow_model_review_band') or 0.03)
++    similarity = _optional_float(page.get('page_render_similarity'))
++    similarity_min = float(page_thresholds.get('page_render_similarity_min') or 0.0)
++    if _is_near_threshold(similarity, minimum=similarity_min, review_band=review_band):
++        reasons.append('near_threshold_page_render_similarity')
++
++    for region in regions:
++        reasons.extend(str(item) for item in region.get('review_reasons') or [])
++        region_thresholds = region.get('thresholds') if isinstance(region.get('thresholds'), Mapping) else {}
++        region_similarity = _optional_float(region.get('region_similarity'))
++        region_min = float(region_thresholds.get('region_similarity_min') or 0.0)
++        if _is_near_threshold(region_similarity, minimum=region_min, review_band=review_band):
++            reasons.append(f"near_threshold_key_region_similarity:{region.get('region_id')}")
++
++    return sorted({str(reason).strip() for reason in reasons if str(reason).strip()})
++
++
++def _has_hard_fail(*, page: Mapping[str, Any], regions: Sequence[Mapping[str, Any]]) -> bool:
++    if page.get('passed') is False:
++        return True
++    return any(region.get('passed') is False for region in regions)
++
++
++def _group_regions_by_page(key_regions: Sequence[Mapping[str, Any]]) -> dict[int, list[Mapping[str, Any]]]:
++    grouped: dict[int, list[Mapping[str, Any]]] = {}
++    for region in key_regions:
++        page_index = int(region.get('page_index') or 0)
++        grouped.setdefault(page_index, []).append(region)
++    return grouped
++
++
++def _optional_float(value: object) -> float | None:
++    if value is None or value == '':
++        return None
++    return float(value)
++
++
++def _is_near_threshold(value: float | None, *, minimum: float, review_band: float) -> bool:
++    if value is None:
++        return False
++    return minimum <= value < minimum + review_band
+diff --git a/backend/app/services/pdf_to_word/visual_similarity_gate.py b/backend/app/services/pdf_to_word/visual_similarity_gate.py
+new file mode 100644
+index 0000000..c53c200
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/visual_similarity_gate.py
+@@ -0,0 +1,785 @@
++from __future__ import annotations
++
++import json
++from collections.abc import Callable, Mapping, Sequence
++from pathlib import Path
++from typing import Any
++
++from app.services.pdf_to_word.visual_similarity_slow_review import (
++    VISUAL_SIMILARITY_SLOW_REVIEW_MODEL,
++    build_visual_similarity_slow_review_audit,
++)
++
++
++VISUAL_SIMILARITY_GATE_VERSION = 'pdf_to_word_visual_similarity_gate/v1'
++VISUAL_SIMILARITY_REPORT_TYPE = 'pdf_to_word_visual_similarity_evidence'
++VISUAL_SIMILARITY_ARTIFACT_NAME = 'visual_similarity.json'
++VISUAL_SIMILARITY_DIMENSION_KEY = 'visual_similarity'
++VISUAL_SIMILARITY_DIMENSION_WEIGHT = 17
++QUALITY_HYBRID_ASYNC_MODE = 'quality/hybrid_async'
++DEFAULT_SYNC_MODE = 'default_sync'
++QUALITY_GATE_MODES = {'quality', 'hybrid_async', QUALITY_HYBRID_ASYNC_MODE}
++DEFAULT_SYNC_MODES = {'', 'auto', 'apple', 'fast', 'balanced', DEFAULT_SYNC_MODE}
++ALLOWED_SUBJECT_PAGE_TYPES = (
++    'science',
++    'math',
++    'english',
++    'chinese',
++    'negative',
++    'answer_section',
++)
++ALLOWED_REGION_TYPES = (
++    'question_number',
++    'question_backbone',
++    'table',
++    'image',
++    'options',
++    'answer_area',
++    'reading',
++    'formula_graphic',
++)
++ARTIFACT_REQUIRED_FIELDS = (
++    'report_type',
++    'contract_version',
++    'status',
++    'failure_code',
++    'mode_boundary',
++    'score_contract',
++    'thresholds',
++    'render_pairs',
++    'page_scores',
++    'key_regions',
++    'vetoes',
++    'subject_page_type',
++    'human_review_required',
++    'evidence_paths',
++    'slow_model_review',
++)
++DEFAULT_THRESHOLDS: dict[str, float] = {
++    'document_overall_similarity_min': 0.95,
++    'critical_page_render_similarity_min': 0.92,
++    'regular_page_render_similarity_min': 0.88,
++    'key_region_similarity_min': 0.90,
++    'bbox_iou_min': 0.85,
++    'layout_density_delta_max': 0.08,
++    'text_coverage_delta_max': 0.10,
++    'image_coverage_delta_max': 0.10,
++    'slow_model_review_band': 0.03,
++}
++
++
++class VisualSimilarityGateError(ValueError):
++    """Raised when a visual-similarity contract fixture is structurally invalid."""
++
++
++def load_visual_similarity_contract(path: str | Path) -> dict[str, Any]:
++    contract_path = Path(path).expanduser().resolve()
++    return json.loads(contract_path.read_text(encoding='utf-8'))
++
++
++def resolve_visual_gate_mode(requested_mode: str | None, *, parser_backend: str | None = None) -> str:
++    mode = _normalize_mode(requested_mode)
++    backend = str(parser_backend or '').strip().lower()
++    if mode in QUALITY_GATE_MODES:
++        return QUALITY_HYBRID_ASYNC_MODE
++    if backend == 'hybrid_experimental' and mode == 'quality':
++        return QUALITY_HYBRID_ASYNC_MODE
++    if mode in DEFAULT_SYNC_MODES:
++        return DEFAULT_SYNC_MODE
++    return DEFAULT_SYNC_MODE
++
++
++def write_visual_similarity_gate_artifact(report: Mapping[str, Any], output_path: str | Path) -> Path:
++    artifact_path = Path(output_path).expanduser().resolve()
++    artifact_path.parent.mkdir(parents=True, exist_ok=True)
++    artifact_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
++    return artifact_path
++
++
++def build_visual_similarity_gate_report(
++    contract: Mapping[str, Any],
++    *,
++    requested_mode: str | None = None,
++    parser_backend: str | None = None,
++    slow_review_worker: Callable[[dict[str, Any]], Mapping[str, Any]] | None = None,
++) -> dict[str, Any]:
++    _validate_contract(contract)
++    thresholds = _coerce_thresholds(contract.get('thresholds'))
++    gate_mode = resolve_visual_gate_mode(requested_mode, parser_backend=parser_backend)
++    gate_enabled = gate_mode == QUALITY_HYBRID_ASYNC_MODE
++    subject_page_type = _normalize_subject_page_type(contract.get('subject_page_type'), fallback='negative')
++    render_pair_artifact, render_pair_artifact_path, render_pair_load_error = _load_render_pair_artifact(contract)
++    render_pair_validation = _validate_render_pair_artifact(
++        render_pair_artifact,
++        render_pair_artifact_path,
++        load_error=render_pair_load_error,
++    )
++
++    render_pairs = list(render_pair_artifact.get('render_pairs') or []) if isinstance(render_pair_artifact, Mapping) else []
++    page_scores, page_vetoes, page_review_reasons, page_ready_failures = _build_page_scores(
++        contract.get('page_scores') or [],
++        render_pairs,
++        thresholds=thresholds,
++        default_subject_page_type=subject_page_type,
++    )
++    page_subject_by_index = {
++        int(page['page_index']): str(page['subject_page_type'])
++        for page in page_scores
++        if int(page.get('page_index') or 0) > 0
++    }
++    key_regions, region_vetoes, region_review_reasons, region_ready_failures = _build_key_regions(
++        contract.get('key_regions') or [],
++        thresholds=thresholds,
++        page_subject_by_index=page_subject_by_index,
++        default_subject_page_type=subject_page_type,
++    )
++
++    readiness_failures = sorted(
++        set(
++            list(render_pair_validation['readiness_failures'])
++            + page_ready_failures
++            + region_ready_failures
++        )
++    )
++    artifact_ready_for_scoring = not readiness_failures
++
++    vetoes: list[dict[str, Any]] = []
++    if readiness_failures:
++        vetoes.append(
++            _make_veto(
++                code='visual_similarity_artifact_not_ready',
++                scope='document',
++                severity='p0',
++                reason='visual similarity artifact lacks real render-pair evidence or complete scoring payload',
++                blocking=True,
++                details=readiness_failures,
++            )
++        )
++    vetoes.extend(page_vetoes)
++    vetoes.extend(region_vetoes)
++
++    aggregate = _build_aggregate(render_pairs, page_scores, key_regions, vetoes)
++    if artifact_ready_for_scoring and aggregate['overall_page_similarity_mean'] is not None:
++        if aggregate['overall_page_similarity_mean'] < thresholds['document_overall_similarity_min']:
++            vetoes.append(
++                _make_veto(
++                    code='document_overall_similarity_below_threshold',
++                    scope='document',
++                    severity='p1',
++                    reason=(
++                        f"overall page similarity {aggregate['overall_page_similarity_mean']:.4f} below "
++                        f"{thresholds['document_overall_similarity_min']:.4f}"
++                    ),
++                    blocking=True,
++                )
++            )
++            aggregate = _build_aggregate(render_pairs, page_scores, key_regions, vetoes)
++
++    blocking_vetoes = [veto for veto in vetoes if veto.get('blocking')]
++    if not artifact_ready_for_scoring:
++        status = 'artifact_not_ready'
++        failure_code = 'visual_similarity_artifact_not_ready'
++    elif blocking_vetoes:
++        status = 'failed'
++        failure_code = 'visual_similarity_veto_triggered'
++    else:
++        status = 'ready'
++        failure_code = None
++
++    slow_model_policy = _build_slow_model_policy(contract, enabled=gate_enabled)
++    slow_model_review = build_visual_similarity_slow_review_audit(
++        page_scores=page_scores,
++        key_regions=key_regions,
++        thresholds=thresholds,
++        gate_enabled=gate_enabled,
++        artifact_ready_for_scoring=artifact_ready_for_scoring,
++        rollout_enabled=bool(slow_model_policy.get('rollout_enabled', True)),
++        reviewer=slow_review_worker,
++        candidate_model=str(slow_model_policy.get('candidate_models', [VISUAL_SIMILARITY_SLOW_REVIEW_MODEL])[0]),
++        max_review_pages=int(slow_model_policy.get('max_review_pages') or 3),
++        fallback_action=str(slow_model_policy.get('fallback_action') or 'manual_review'),
++    )
++
++    slow_review_reasons = []
++    for page in slow_model_review['pages']:
++        if page.get('triggered'):
++            slow_review_reasons.append(f"slow_review_triggered:p{page.get('page_index')}")
++        if page.get('review_status') == 'fallback_skipped':
++            slow_review_reasons.append(f"slow_review_fallback:p{page.get('page_index')}")
++        elif page.get('review_status') == 'completed':
++            slow_review_reasons.append(f"slow_review_completed:p{page.get('page_index')}")
++
++    human_review_reasons = sorted(
++        set(page_review_reasons)
++        | set(region_review_reasons)
++        | set(slow_review_reasons)
++        | ({'visual_similarity_artifact_not_ready'} if not artifact_ready_for_scoring else set())
++    )
++
++    return {
++        'report_type': VISUAL_SIMILARITY_REPORT_TYPE,
++        'contract_version': str(contract.get('contract_version') or VISUAL_SIMILARITY_GATE_VERSION),
++        'artifact_name': VISUAL_SIMILARITY_ARTIFACT_NAME,
++        'implementation_status': str(
++            contract.get('implementation_status')
++            or ('real_render_pair_artifact_ready' if artifact_ready_for_scoring else 'contract_only_render_pair_missing')
++        ),
++        'status': status,
++        'failure_code': failure_code,
++        'mode_boundary': {
++            'requested_mode': _normalize_mode(requested_mode),
++            'parser_backend': str(parser_backend or '').strip() or None,
++            'resolved_gate_mode': gate_mode,
++            'enabled': gate_enabled,
++            'default_sync_safe': True,
++            'default_sync_invokes_render_or_slow_model': False,
++            'reason': (
++                'visual similarity enters the 95-point route only in quality/hybrid_async'
++                if gate_enabled
++                else 'default synchronous modes must not count visual similarity scoring'
++            ),
++        },
++        'score_contract': _build_score_contract(
++            gate_enabled=gate_enabled,
++            artifact_ready_for_scoring=artifact_ready_for_scoring,
++            blocking_vetoes=blocking_vetoes,
++        ),
++        'thresholds': thresholds,
++        'artifact_contract': _build_artifact_contract(contract),
++        'render_pair_status': render_pair_validation['status'],
++        'render_pair_failure_code': render_pair_validation['failure_code'],
++        'render_pairs': render_pairs,
++        'page_scores': page_scores,
++        'key_regions': key_regions,
++        'vetoes': vetoes,
++        'blocking_failures': [str(veto.get('code') or '') for veto in blocking_vetoes],
++        'subject_page_type': subject_page_type,
++        'human_review_required': bool(human_review_reasons),
++        'human_review_reasons': human_review_reasons,
++        'evidence_paths': _build_evidence_paths(contract, render_pair_artifact, render_pair_artifact_path),
++        'aggregate': aggregate,
++        'artifact_ready_for_scoring': artifact_ready_for_scoring,
++        'gate_passed': artifact_ready_for_scoring and not blocking_vetoes,
++        'slow_model_policy': slow_model_policy,
++        'slow_model_review': slow_model_review,
++        'known_gaps': list(contract.get('known_gaps') or []),
++        'downstream_required_work': list(contract.get('downstream_required_work') or []),
++    }
++
++
++def _validate_contract(contract: Mapping[str, Any]) -> None:
++    required = {
++        'contract_version',
++        'source_policy',
++        'thresholds',
++        'slow_model_policy',
++        'artifact_contract',
++        'page_scores',
++        'key_regions',
++        'evidence_paths',
++    }
++    missing = sorted(required - set(contract))
++    if missing:
++        raise VisualSimilarityGateError(f'missing visual similarity contract fields: {missing}')
++    if str(contract.get('contract_version') or '') != VISUAL_SIMILARITY_GATE_VERSION:
++        raise VisualSimilarityGateError('unsupported visual similarity contract_version')
++
++    source_policy = contract.get('source_policy') if isinstance(contract.get('source_policy'), Mapping) else {}
++    if int(source_policy.get('visual_similarity_weight') or 0) != VISUAL_SIMILARITY_DIMENSION_WEIGHT:
++        raise VisualSimilarityGateError('visual_similarity_weight must remain 17 in the 95-point route')
++    if 'quality/hybrid_async' not in str(source_policy.get('quality_target_scope') or ''):
++        raise VisualSimilarityGateError('quality_target_scope must mention quality/hybrid_async')
++
++    slow_model_policy = contract.get('slow_model_policy')
++    if not isinstance(slow_model_policy, Mapping):
++        raise VisualSimilarityGateError('slow_model_policy must be an object')
++    disallowed = {str(item).strip() for item in slow_model_policy.get('disallowed_modes') or []}
++    if not {'fast', 'balanced', DEFAULT_SYNC_MODE}.issubset(disallowed):
++        raise VisualSimilarityGateError('slow_model_policy must explicitly block default sync modes')
++    active_candidates = [str(item).strip() for item in slow_model_policy.get('candidate_models') or []]
++    if active_candidates != [VISUAL_SIMILARITY_SLOW_REVIEW_MODEL]:
++        raise VisualSimilarityGateError('active slow-model candidate_models must be exactly [qwen3_vl_8b]')
++
++    artifact_contract = contract.get('artifact_contract')
++    if not isinstance(artifact_contract, Mapping):
++        raise VisualSimilarityGateError('artifact_contract must be an object')
++    required_fields = set(artifact_contract.get('required_fields') or [])
++    if not set(ARTIFACT_REQUIRED_FIELDS).issubset(required_fields):
++        raise VisualSimilarityGateError('artifact_contract.required_fields must include canonical visual evidence fields')
++    allowed_subject_types = set(artifact_contract.get('allowed_subject_page_types') or [])
++    if not set(ALLOWED_SUBJECT_PAGE_TYPES).issubset(allowed_subject_types):
++        raise VisualSimilarityGateError('artifact_contract.allowed_subject_page_types must cover all required subject/page classes')
++    allowed_region_types = set(artifact_contract.get('allowed_region_types') or [])
++    if not {'table', 'image', 'options', 'answer_area', 'reading', 'formula_graphic', 'question_backbone'}.issubset(allowed_region_types):
++        raise VisualSimilarityGateError('artifact_contract.allowed_region_types must cover common cross-subject key-region classes')
++
++
++def _load_render_pair_artifact(contract: Mapping[str, Any]) -> tuple[dict[str, Any] | None, str | None, str | None]:
++    inline_payload = contract.get('render_pair_artifact')
++    if isinstance(inline_payload, Mapping):
++        return dict(inline_payload), None, None
++    render_pair_path = str(contract.get('render_pair_artifact_path') or '').strip()
++    if not render_pair_path:
++        return None, None, None
++    path = Path(render_pair_path).expanduser().resolve()
++    if not path.exists():
++        return None, str(path), 'render_pair_artifact_missing'
++    try:
++        return json.loads(path.read_text(encoding='utf-8')), str(path), None
++    except Exception as exc:  # pragma: no cover - defensive runtime guard
++        return None, str(path), f'render_pair_artifact_unreadable:{exc}'
++
++
++def _validate_render_pair_artifact(
++    payload: Mapping[str, Any] | None,
++    artifact_path: str | None,
++    *,
++    load_error: str | None,
++) -> dict[str, Any]:
++    readiness_failures: list[str] = []
++    failure_code: str | None = None
++    status = 'missing'
++    if load_error:
++        readiness_failures.append(load_error)
++        failure_code = load_error.split(':', 1)[0]
++    elif not isinstance(payload, Mapping):
++        readiness_failures.append('render_pair_artifact_missing')
++        failure_code = 'render_pair_artifact_missing'
++    else:
++        status = str(payload.get('status') or '').strip() or 'missing'
++        if artifact_path and not Path(artifact_path).exists():
++            readiness_failures.append('render_pair_artifact_path_missing')
++        if status != 'success' or payload.get('ok') is not True or payload.get('failure_code'):
++            readiness_failures.append(f'render_pair_status_not_success:{status or "unknown"}')
++            failure_code = str(payload.get('failure_code') or status or 'render_pair_failed')
++        render_pairs = list(payload.get('render_pairs') or [])
++        if not render_pairs:
++            readiness_failures.append('render_pair_list_missing')
++            failure_code = failure_code or 'render_pair_list_missing'
++        for pair in render_pairs:
++            if not isinstance(pair, Mapping):
++                readiness_failures.append('render_pair_entry_invalid')
++                failure_code = failure_code or 'render_pair_entry_invalid'
++                continue
++            page_index = int(pair.get('page_index') or 0)
++            pair_status = str(pair.get('pair_status') or '').strip()
++            if pair_status != 'matched':
++                readiness_failures.append(f'render_pair_not_matched:p{page_index}')
++                failure_code = failure_code or 'render_pair_not_matched'
++            for side_key in ('source_pdf', 'output_docx'):
++                side = pair.get(side_key)
++                if not isinstance(side, Mapping):
++                    readiness_failures.append(f'render_pair_side_missing:{side_key}:p{page_index}')
++                    failure_code = failure_code or 'render_pair_side_missing'
++                    continue
++                for field_name in ('image_path', 'render_artifact'):
++                    raw_path = str(side.get(field_name) or '').strip()
++                    if not raw_path:
++                        readiness_failures.append(f'render_pair_field_missing:{side_key}:{field_name}:p{page_index}')
++                        failure_code = failure_code or 'render_pair_field_missing'
++                        continue
++                    if not Path(raw_path).expanduser().exists():
++                        readiness_failures.append(f'render_pair_path_missing:{side_key}:{field_name}:p{page_index}')
++                        failure_code = failure_code or 'render_pair_path_missing'
++    return {
++        'ready': not readiness_failures,
++        'status': status,
++        'failure_code': failure_code,
++        'readiness_failures': readiness_failures,
++    }
++
++
++def _build_page_scores(
++    raw_scores: Sequence[object],
++    render_pairs: Sequence[object],
++    *,
++    thresholds: Mapping[str, float],
++    default_subject_page_type: str,
++) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str]]:
++    raw_by_page = {
++        int(item.get('page_index') or 0): item
++        for item in raw_scores
++        if isinstance(item, Mapping) and int(item.get('page_index') or 0) > 0
++    }
++    reports: list[dict[str, Any]] = []
++    vetoes: list[dict[str, Any]] = []
++    review_reasons: list[str] = []
++    readiness_failures: list[str] = []
++
++    for pair in render_pairs:
++        if not isinstance(pair, Mapping):
++            continue
++        page_index = int(pair.get('page_index') or 0)
++        pair_status = str(pair.get('pair_status') or 'unknown').strip() or 'unknown'
++        raw = raw_by_page.get(page_index)
++        evidence = _build_page_evidence(pair, raw if isinstance(raw, Mapping) else None)
++        if raw is None:
++            readiness_failures.append(f'page_score_missing:p{page_index}')
++            reports.append(
++                {
++                    'page_index': page_index,
++                    'subject_page_type': default_subject_page_type,
++                    'page_role': 'unknown',
++                    'pair_status': pair_status,
++                    'page_render_similarity': None,
++                    'layout_density_delta': None,
++                    'text_coverage_delta': None,
++                    'image_coverage_delta': None,
++                    'thresholds': {'page_render_similarity_min': thresholds['critical_page_render_similarity_min']},
++                    'passed': False,
++                    'review_required': True,
++                    'review_reasons': ['page_score_missing'],
++                    'evidence': evidence,
++                }
++            )
++            review_reasons.append(f'page_score_missing:p{page_index}')
++            continue
++
++        subject_page_type = _normalize_subject_page_type(raw.get('subject_page_type'), fallback=default_subject_page_type)
++        page_role = str(raw.get('page_role') or 'regular').strip().lower() or 'regular'
++        similarity_threshold = (
++            thresholds['critical_page_render_similarity_min']
++            if page_role == 'critical'
++            else thresholds['regular_page_render_similarity_min']
++        )
++        similarity = _optional_float(raw.get('page_render_similarity'))
++        layout_density_delta = _optional_float(raw.get('layout_density_delta'))
++        text_coverage_delta = _optional_float(raw.get('text_coverage_delta'))
++        image_coverage_delta = _optional_float(raw.get('image_coverage_delta'))
++
++        page_review_reasons: list[str] = []
++        page_passed = pair_status == 'matched'
++        if pair_status != 'matched':
++            readiness_failures.append(f'render_pair_not_matched:p{page_index}')
++
++        if None in (similarity, layout_density_delta, text_coverage_delta, image_coverage_delta):
++            readiness_failures.append(f'page_score_metrics_incomplete:p{page_index}')
++            page_passed = False
++
++        if similarity is None:
++            page_review_reasons.append(f'page_render_similarity_missing:p{page_index}')
++        elif similarity < similarity_threshold:
++            vetoes.append(
++                _make_veto(
++                    code='page_render_similarity_below_threshold',
++                    scope='page',
++                    severity='p0' if page_role == 'critical' else 'p1',
++                    reason=f'page render similarity {similarity:.4f} below {similarity_threshold:.4f} on page {page_index}',
++                    blocking=True,
++                    page_index=page_index,
++                )
++            )
++            page_passed = False
++        elif similarity < similarity_threshold + thresholds['slow_model_review_band']:
++            page_review_reasons.append(f'near_threshold_page_render_similarity:p{page_index}')
++
++        if layout_density_delta is not None and layout_density_delta > thresholds['layout_density_delta_max']:
++            vetoes.append(
++                _make_veto(
++                    code='layout_density_delta_above_threshold',
++                    scope='page',
++                    severity='p1',
++                    reason=f'layout density delta {layout_density_delta:.4f} above {thresholds["layout_density_delta_max"]:.4f} on page {page_index}',
++                    blocking=True,
++                    page_index=page_index,
++                )
++            )
++            page_passed = False
++        if text_coverage_delta is not None and text_coverage_delta > thresholds['text_coverage_delta_max']:
++            vetoes.append(
++                _make_veto(
++                    code='text_coverage_delta_above_threshold',
++                    scope='page',
++                    severity='p1',
++                    reason=f'text coverage delta {text_coverage_delta:.4f} above {thresholds["text_coverage_delta_max"]:.4f} on page {page_index}',
++                    blocking=True,
++                    page_index=page_index,
++                )
++            )
++            page_passed = False
++        if image_coverage_delta is not None and image_coverage_delta > thresholds['image_coverage_delta_max']:
++            vetoes.append(
++                _make_veto(
++                    code='image_coverage_delta_above_threshold',
++                    scope='page',
++                    severity='p1',
++                    reason=f'image coverage delta {image_coverage_delta:.4f} above {thresholds["image_coverage_delta_max"]:.4f} on page {page_index}',
++                    blocking=True,
++                    page_index=page_index,
++                )
++            )
++            page_passed = False
++
++        reports.append(
++            {
++                'page_index': page_index,
++                'subject_page_type': subject_page_type,
++                'page_role': page_role,
++                'pair_status': pair_status,
++                'page_render_similarity': similarity,
++                'layout_density_delta': layout_density_delta,
++                'text_coverage_delta': text_coverage_delta,
++                'image_coverage_delta': image_coverage_delta,
++                'thresholds': {
++                    'page_render_similarity_min': similarity_threshold,
++                    'layout_density_delta_max': thresholds['layout_density_delta_max'],
++                    'text_coverage_delta_max': thresholds['text_coverage_delta_max'],
++                    'image_coverage_delta_max': thresholds['image_coverage_delta_max'],
++                },
++                'passed': page_passed,
++                'review_required': bool(page_review_reasons),
++                'review_reasons': page_review_reasons,
++                'evidence': evidence,
++            }
++        )
++        review_reasons.extend(page_review_reasons)
++    return reports, vetoes, review_reasons, readiness_failures
++
++
++def _build_key_regions(
++    raw_regions: Sequence[object],
++    *,
++    thresholds: Mapping[str, float],
++    page_subject_by_index: Mapping[int, str],
++    default_subject_page_type: str,
++) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], list[str]]:
++    reports: list[dict[str, Any]] = []
++    vetoes: list[dict[str, Any]] = []
++    review_reasons: list[str] = []
++    readiness_failures: list[str] = []
++
++    for index, region in enumerate(raw_regions, start=1):
++        if not isinstance(region, Mapping):
++            continue
++        page_index = int(region.get('page_index') or 0)
++        region_id = str(region.get('region_id') or f'p{page_index}:r{index}').strip()
++        similarity = _optional_float(region.get('region_similarity'))
++        bbox_iou = _optional_float(region.get('bbox_iou'))
++        subject_page_type = _normalize_subject_page_type(
++            region.get('subject_page_type'),
++            fallback=page_subject_by_index.get(page_index, default_subject_page_type),
++        )
++        region_review_reasons: list[str] = []
++        region_passed = True
++        if page_index not in page_subject_by_index:
++            readiness_failures.append(f'key_region_without_page_score:{region_id}')
++            region_passed = False
++        if similarity is None or bbox_iou is None:
++            readiness_failures.append(f'key_region_metrics_incomplete:{region_id}')
++            region_passed = False
++        elif similarity < thresholds['key_region_similarity_min']:
++            vetoes.append(
++                _make_veto(
++                    code='key_region_similarity_below_threshold',
++                    scope='region',
++                    severity='p0',
++                    reason=f'key region similarity {similarity:.4f} below {thresholds["key_region_similarity_min"]:.4f} for {region_id}',
++                    blocking=True,
++                    page_index=page_index,
++                    region_id=region_id,
++                )
++            )
++            region_passed = False
++        elif similarity < thresholds['key_region_similarity_min'] + thresholds['slow_model_review_band']:
++            region_review_reasons.append(f'near_threshold_region_similarity:{region_id}')
++
++        if bbox_iou is not None and bbox_iou < thresholds['bbox_iou_min']:
++            vetoes.append(
++                _make_veto(
++                    code='key_region_bbox_iou_below_threshold',
++                    scope='region',
++                    severity='p0',
++                    reason=f'bbox IoU {bbox_iou:.4f} below {thresholds["bbox_iou_min"]:.4f} for {region_id}',
++                    blocking=True,
++                    page_index=page_index,
++                    region_id=region_id,
++                )
++            )
++            region_passed = False
++
++        reports.append(
++            {
++                'page_index': page_index,
++                'subject_page_type': subject_page_type,
++                'region_id': region_id,
++                'region_type': str(region.get('region_type') or 'unknown').strip(),
++                'required': bool(region.get('required', True)),
++                'bbox': dict(region.get('bbox') or {}),
++                'region_similarity': similarity,
++                'bbox_iou': bbox_iou,
++                'thresholds': {
++                    'region_similarity_min': thresholds['key_region_similarity_min'],
++                    'bbox_iou_min': thresholds['bbox_iou_min'],
++                },
++                'passed': region_passed,
++                'review_required': bool(region_review_reasons),
++                'review_reasons': region_review_reasons,
++                'evidence': {
++                    'source_crop_path': str(region.get('source_crop_path') or ''),
++                    'docx_crop_path': str(region.get('docx_crop_path') or ''),
++                    'diff_image_path': str(region.get('diff_image_path') or ''),
++                },
++            }
++        )
++        review_reasons.extend(region_review_reasons)
++    return reports, vetoes, review_reasons, readiness_failures
++
++
++def _build_page_evidence(pair: Mapping[str, Any], raw: Mapping[str, Any] | None) -> dict[str, str]:
++    source_pdf = pair.get('source_pdf') if isinstance(pair.get('source_pdf'), Mapping) else {}
++    output_docx = pair.get('output_docx') if isinstance(pair.get('output_docx'), Mapping) else {}
++    return {
++        'source_image_path': str(source_pdf.get('image_path') or ''),
++        'docx_image_path': str(output_docx.get('image_path') or ''),
++        'source_render_artifact': str(source_pdf.get('render_artifact') or ''),
++        'docx_render_artifact': str(output_docx.get('render_artifact') or ''),
++        'diff_image_path': str((raw or {}).get('diff_image_path') or ''),
++    }
++
++
++def _build_aggregate(
++    render_pairs: Sequence[object],
++    page_scores: Sequence[Mapping[str, Any]],
++    key_regions: Sequence[Mapping[str, Any]],
++    vetoes: Sequence[Mapping[str, Any]],
++) -> dict[str, Any]:
++    similarity_values = [
++        float(page['page_render_similarity'])
++        for page in page_scores
++        if page.get('page_render_similarity') is not None
++    ]
++    return {
++        'render_pair_count': len(render_pairs),
++        'matched_render_pair_count': sum(
++            1 for pair in render_pairs if isinstance(pair, Mapping) and str(pair.get('pair_status') or '') == 'matched'
++        ),
++        'page_score_count': len(page_scores),
++        'key_region_count': len(key_regions),
++        'critical_page_count': sum(1 for page in page_scores if page.get('page_role') == 'critical'),
++        'human_review_page_count': sum(1 for page in page_scores if page.get('review_required')),
++        'human_review_region_count': sum(1 for region in key_regions if region.get('review_required')),
++        'overall_page_similarity_mean': _mean(similarity_values),
++        'veto_count': len(vetoes),
++        'blocking_veto_count': sum(1 for veto in vetoes if veto.get('blocking')),
++    }
++
++
++def _build_score_contract(
++    *,
++    gate_enabled: bool,
++    artifact_ready_for_scoring: bool,
++    blocking_vetoes: Sequence[Mapping[str, Any]],
++) -> dict[str, Any]:
++    blocked = bool(blocking_vetoes)
++    if not gate_enabled:
++        skipped_score_reason = 'default_sync_excludes_visual_similarity_dimension'
++    elif not artifact_ready_for_scoring:
++        skipped_score_reason = 'visual_similarity_artifact_not_ready'
++    elif blocked:
++        skipped_score_reason = 'visual_similarity_veto_triggered'
++    else:
++        skipped_score_reason = None
++    return {
++        'dimension_key': VISUAL_SIMILARITY_DIMENSION_KEY,
++        'dimension_weight': VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++        'target_total_score_threshold': 95,
++        'enters_95_total_score': gate_enabled and artifact_ready_for_scoring,
++        'score_awarded_when_passed': VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++        'score_awarded': VISUAL_SIMILARITY_DIMENSION_WEIGHT if gate_enabled and artifact_ready_for_scoring and not blocked else 0,
++        'blocking_when_enabled': True,
++        'skipped_score_reason': skipped_score_reason,
++    }
++
++
++def _build_slow_model_policy(contract: Mapping[str, Any], *, enabled: bool) -> dict[str, Any]:
++    policy = contract.get('slow_model_policy') if isinstance(contract.get('slow_model_policy'), Mapping) else {}
++    return {
++        'enabled': enabled,
++        'rollout_enabled': bool(policy.get('rollout_enabled', True)),
++        'allowed_modes': list(policy.get('allowed_modes') or ['quality', 'hybrid_async']),
++        'disallowed_modes': list(policy.get('disallowed_modes') or ['fast', 'balanced', DEFAULT_SYNC_MODE]),
++        'candidate_models': list(policy.get('candidate_models') or [VISUAL_SIMILARITY_SLOW_REVIEW_MODEL]),
++        'max_review_pages': int(policy.get('max_review_pages') or 3),
++        'fallback_action': str(policy.get('fallback_action') or 'manual_review'),
++        'notes': str(policy.get('notes') or '').strip(),
++    }
++
++
++def _build_artifact_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
++    artifact_contract = contract.get('artifact_contract')
++    payload = dict(artifact_contract) if isinstance(artifact_contract, Mapping) else {}
++    payload['required_fields'] = list(payload.get('required_fields') or ARTIFACT_REQUIRED_FIELDS)
++    payload['required_artifacts'] = list(
++        payload.get('required_artifacts') or ['visual_similarity.json', 'render_pair.json', 'slow_model_review.json']
++    )
++    return payload
++
++
++def _build_evidence_paths(
++    contract: Mapping[str, Any],
++    render_pair_artifact: Mapping[str, Any] | None,
++    render_pair_artifact_path: str | None,
++) -> dict[str, Any]:
++    contract_paths = contract.get('evidence_paths') if isinstance(contract.get('evidence_paths'), Mapping) else {}
++    render_pair_paths = render_pair_artifact.get('evidence_paths') if isinstance(render_pair_artifact, Mapping) and isinstance(render_pair_artifact.get('evidence_paths'), Mapping) else {}
++    return {
++        'render_pair_artifact_path': render_pair_artifact_path,
++        'render_pair_output_root': str(render_pair_paths.get('output_root') or ''),
++        'source_pdf_render_dir': str(render_pair_paths.get('source_pdf_render_dir') or ''),
++        'output_docx_render_dir': str(render_pair_paths.get('output_docx_render_dir') or ''),
++        'docx_converted_pdf_path': str(render_pair_paths.get('docx_converted_pdf_path') or ''),
++        **{str(key): value for key, value in contract_paths.items()},
++    }
++
++
++def _make_veto(
++    *,
++    code: str,
++    scope: str,
++    severity: str,
++    reason: str,
++    blocking: bool,
++    page_index: int | None = None,
++    region_id: str | None = None,
++    details: Sequence[str] | None = None,
++) -> dict[str, Any]:
++    return {
++        'code': code,
++        'scope': scope,
++        'severity': severity,
++        'blocking': blocking,
++        'page_index': page_index,
++        'region_id': region_id,
++        'reason': reason,
++        'details': list(details or []),
++    }
++
++
++def _normalize_subject_page_type(value: object, *, fallback: str) -> str:
++    normalized = str(value or '').strip()
++    return normalized if normalized in ALLOWED_SUBJECT_PAGE_TYPES else fallback
++
++
++def _normalize_mode(mode: str | None) -> str:
++    return str(mode or '').strip().lower()
++
++
++def _coerce_thresholds(payload: object) -> dict[str, float]:
++    thresholds = dict(DEFAULT_THRESHOLDS)
++    if isinstance(payload, Mapping):
++        for key in DEFAULT_THRESHOLDS:
++            if key in payload:
++                thresholds[key] = float(payload[key])
++    return thresholds
++
++
++def _optional_float(value: object) -> float | None:
++    if value is None or value == '':
++        return None
++    return float(value)
++
++
++def _mean(values: Sequence[float]) -> float | None:
++    if not values:
++        return None
++    return round(sum(values) / len(values), 4)
+diff --git a/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py b/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py
+new file mode 100644
+index 0000000..cf95977
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py
+@@ -0,0 +1,255 @@
++from __future__ import annotations
++
++import pytest
++
++from app.services.pdf_to_word.visual_similarity_slow_review import (
++    VISUAL_SIMILARITY_SLOW_REVIEW_MODEL,
++    build_visual_similarity_slow_review_audit,
++)
++
++
++def _thresholds() -> dict[str, float]:
++    return {
++        'critical_page_render_similarity_min': 0.92,
++        'regular_page_render_similarity_min': 0.88,
++        'key_region_similarity_min': 0.90,
++        'slow_model_review_band': 0.03,
++    }
++
++
++def _low_confidence_pages() -> list[dict[str, object]]:
++    return [
++        {
++            'page_index': 1,
++            'page_role': 'critical',
++            'page_render_similarity': 0.93,
++            'thresholds': {'page_render_similarity_min': 0.92},
++            'review_reasons': ['near_threshold_page_render_similarity:p1'],
++        },
++        {
++            'page_index': 2,
++            'page_role': 'regular',
++            'page_render_similarity': 0.89,
++            'thresholds': {'page_render_similarity_min': 0.88},
++            'review_reasons': ['near_threshold_page_render_similarity:p2'],
++        },
++    ]
++
++
++def _low_confidence_regions() -> list[dict[str, object]]:
++    return [
++        {
++            'page_index': 1,
++            'region_id': 'math:p1:table-01',
++            'region_similarity': 0.905,
++            'thresholds': {'region_similarity_min': 0.90},
++            'review_reasons': ['near_threshold_region_similarity:math:p1:table-01'],
++        }
++    ]
++
++
++def test_default_sync_mode_never_triggers_slow_review():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages(),
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=False,
++        artifact_ready_for_scoring=True,
++    )
++
++    assert audit['enabled'] is False
++    assert audit['selected_page_count'] == 0
++    assert audit['pages'][0]['triggered'] is False
++    assert audit['pages'][0]['decision_reason'] == 'default_sync_disabled'
++    assert audit['pages'][0]['review_status'] == 'disabled'
++
++
++def test_quality_mode_executes_low_confidence_page_review():
++    seen_requests: list[dict[str, object]] = []
++
++    def reviewer(request: dict[str, object]) -> dict[str, object]:
++        seen_requests.append(request)
++        return {'decision': 'keep_for_manual_compare', 'confidence': 0.74}
++
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages(),
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        reviewer=reviewer,
++        max_review_pages=1,
++    )
++
++    first_page = audit['pages'][0]
++    second_page = audit['pages'][1]
++
++    assert audit['candidate_model'] == VISUAL_SIMILARITY_SLOW_REVIEW_MODEL
++    assert audit['selected_page_count'] == 1
++    assert audit['executed_page_count'] == 1
++    assert first_page['triggered'] is True
++    assert first_page['executed'] is True
++    assert first_page['review_status'] == 'completed'
++    assert first_page['decision_reason'] == 'slow_review_completed'
++    assert first_page['model_profile'] == VISUAL_SIMILARITY_SLOW_REVIEW_MODEL
++    assert first_page['response']['decision'] == 'keep_for_manual_compare'
++    assert seen_requests[0]['page_index'] == 1
++    assert seen_requests[0]['key_regions'][0]['region_id'] == 'math:p1:table-01'
++    assert second_page['triggered'] is False
++    assert second_page['decision_reason'] == 'review_budget_exhausted'
++
++
++def test_confident_pages_are_skipped():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=[
++            {
++                'page_index': 3,
++                'page_role': 'regular',
++                'page_render_similarity': 0.97,
++                'thresholds': {'page_render_similarity_min': 0.88},
++                'review_reasons': [],
++            }
++        ],
++        key_regions=[],
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++    )
++
++    page = audit['pages'][0]
++
++    assert page['triggered'] is False
++    assert page['executed'] is False
++    assert page['decision_reason'] == 'page_confident_no_slow_review'
++    assert page['review_status'] == 'not_requested'
++
++
++def test_rollout_can_be_disabled_without_touching_default_sync_path():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages(),
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        rollout_enabled=False,
++    )
++
++    assert audit['rollout_enabled'] is False
++    assert audit['selected_page_count'] == 0
++    assert audit['pages'][0]['decision_reason'] == 'rollout_disabled'
++    assert audit['pages'][0]['review_status'] == 'disabled'
++
++
++def test_missing_reviewer_falls_back_to_manual_review():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages()[:1],
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        reviewer=None,
++    )
++
++    page = audit['pages'][0]
++
++    assert audit['fallback_page_count'] == 1
++    assert page['triggered'] is True
++    assert page['executed'] is False
++    assert page['review_status'] == 'fallback_skipped'
++    assert page['decision_reason'] == 'slow_review_worker_not_configured'
++    assert page['fallback_action'] == 'manual_review'
++
++
++def test_reviewer_failure_is_tracked_and_falls_back():
++    def reviewer(_: dict[str, object]) -> dict[str, object]:
++        raise RuntimeError('slow worker timeout')
++
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages()[:1],
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        reviewer=reviewer,
++    )
++
++    page = audit['pages'][0]
++
++    assert audit['fallback_page_count'] == 1
++    assert page['review_status'] == 'fallback_skipped'
++    assert page['decision_reason'] == 'slow_review_worker_failed'
++    assert page['fallback_action'] == 'manual_review'
++    assert 'slow worker timeout' in page['error']
++
++
++def test_artifact_not_ready_prevents_execution():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=_low_confidence_pages()[:1],
++        key_regions=_low_confidence_regions(),
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=False,
++    )
++
++    page = audit['pages'][0]
++
++    assert page['triggered'] is False
++    assert page['decision_reason'] == 'artifact_not_ready'
++    assert page['review_status'] == 'disabled'
++
++
++def test_near_threshold_window_is_closed_open_range():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=[
++            {
++                'page_index': 10,
++                'page_role': 'critical',
++                'page_render_similarity': 0.92,
++                'thresholds': {'page_render_similarity_min': 0.92},
++                'review_reasons': [],
++            },
++            {
++                'page_index': 11,
++                'page_role': 'critical',
++                'page_render_similarity': 0.919,
++                'thresholds': {'page_render_similarity_min': 0.92},
++                'review_reasons': [],
++            },
++        ],
++        key_regions=[],
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        reviewer=None,
++    )
++
++    assert audit['pages'][0]['triggered'] is True
++    assert audit['pages'][0]['decision_reason'] == 'slow_review_worker_not_configured'
++    assert audit['pages'][1]['triggered'] is False
++    assert audit['pages'][1]['decision_reason'] == 'page_confident_no_slow_review'
++
++
++def test_hard_fail_page_is_never_sent_to_slow_review():
++    audit = build_visual_similarity_slow_review_audit(
++        page_scores=[
++            {
++                'page_index': 20,
++                'page_role': 'critical',
++                'page_render_similarity': 0.93,
++                'thresholds': {'page_render_similarity_min': 0.92},
++                'review_reasons': [],
++                'passed': False,
++            }
++        ],
++        key_regions=[],
++        thresholds=_thresholds(),
++        gate_enabled=True,
++        artifact_ready_for_scoring=True,
++        reviewer=None,
++    )
++
++    page = audit['pages'][0]
++
++    assert page['triggered'] is False
++    assert page['decision_reason'] == 'hard_fail_page_or_region'
++    assert page['review_status'] == 'not_requested'
+diff --git a/backend/tests/test_pdf_to_word_visual_similarity_gate.py b/backend/tests/test_pdf_to_word_visual_similarity_gate.py
+new file mode 100644
+index 0000000..2944a7b
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_visual_similarity_gate.py
+@@ -0,0 +1,291 @@
++from __future__ import annotations
++
++import copy
++from pathlib import Path
++
++import pytest
++
++from app.services.pdf_to_word.visual_similarity_gate import (
++    ALLOWED_REGION_TYPES,
++    ALLOWED_SUBJECT_PAGE_TYPES,
++    ARTIFACT_REQUIRED_FIELDS,
++    QUALITY_HYBRID_ASYNC_MODE,
++    VISUAL_SIMILARITY_GATE_VERSION,
++    VisualSimilarityGateError,
++    build_visual_similarity_gate_report,
++    resolve_visual_gate_mode,
++)
++from app.services.pdf_to_word.visual_similarity_slow_review import VISUAL_SIMILARITY_SLOW_REVIEW_MODEL
++
++
++def _ensure_fixture_file(path: Path) -> None:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    if path.suffix == '.json':
++        path.write_text('{}\n', encoding='utf-8')
++    else:
++        path.write_bytes(b'fixture')
++
++
++def _build_render_pair_artifact(tmp_path: Path) -> dict[str, object]:
++    render_root = tmp_path / 'renders'
++    output_root = render_root / 'docx'
++    source_root = render_root / 'source'
++    converted_pdf = render_root / 'rendered-output.pdf'
++    _ensure_fixture_file(converted_pdf)
++
++    render_pairs: list[dict[str, object]] = []
++    for page_index in (1, 2):
++        source_image = source_root / f'page-{page_index:03d}.png'
++        source_meta = source_root / f'page-{page_index:03d}.json'
++        docx_image = output_root / f'page-{page_index:03d}.png'
++        docx_meta = output_root / f'page-{page_index:03d}.json'
++        for artifact_path in (source_image, source_meta, docx_image, docx_meta):
++            _ensure_fixture_file(artifact_path)
++        render_pairs.append(
++            {
++                'page_index': page_index,
++                'pair_status': 'matched',
++                'alignment_mode': 'page_index',
++                'source_pdf': {
++                    'page_index': page_index,
++                    'image_path': str(source_image),
++                    'render_artifact': str(source_meta),
++                },
++                'output_docx': {
++                    'page_index': page_index,
++                    'image_path': str(docx_image),
++                    'render_artifact': str(docx_meta),
++                },
++            }
++        )
++
++    return {
++        'report_type': 'pdf_to_word_render_pair/v1',
++        'status': 'success',
++        'ok': True,
++        'failure_code': None,
++        'errors': [],
++        'render_pairs': render_pairs,
++        'evidence_paths': {
++            'output_root': str(render_root),
++            'source_pdf_render_dir': str(source_root),
++            'output_docx_render_dir': str(output_root),
++            'docx_converted_pdf_path': str(converted_pdf),
++        },
++    }
++
++
++def _build_contract(tmp_path: Path, *, rollout_enabled: bool = True) -> dict[str, object]:
++    debug_root = tmp_path / 'debug'
++    diff_root = tmp_path / 'diffs'
++    for artifact_path in (
++        debug_root / 'quality_ready.html',
++        debug_root / 'quality_ready.md',
++        diff_root / 'pages' / 'page-001-diff.png',
++        diff_root / 'pages' / 'page-002-diff.png',
++        diff_root / 'regions' / 'math-p1-table-source.png',
++        diff_root / 'regions' / 'math-p1-table-docx.png',
++        diff_root / 'regions' / 'math-p1-table-diff.png',
++    ):
++        _ensure_fixture_file(artifact_path)
++
++    return {
++        'contract_version': VISUAL_SIMILARITY_GATE_VERSION,
++        'implementation_status': 'real_render_pair_artifact_ready',
++        'source_policy': {
++            'route_doc_date': '2026-05-19',
++            'target_total_score_threshold': 95,
++            'visual_similarity_weight': 17,
++            'quality_target_scope': 'quality/hybrid_async only',
++            'default_sync_policy': 'default sync cannot use render comparison or slow models',
++            'sync_boundary': 'default sync cannot be slowed by render comparison or slow visual models',
++        },
++        'thresholds': {
++            'document_overall_similarity_min': 0.95,
++            'critical_page_render_similarity_min': 0.92,
++            'regular_page_render_similarity_min': 0.88,
++            'key_region_similarity_min': 0.90,
++            'bbox_iou_min': 0.85,
++            'layout_density_delta_max': 0.08,
++            'text_coverage_delta_max': 0.10,
++            'image_coverage_delta_max': 0.10,
++            'slow_model_review_band': 0.03,
++        },
++        'slow_model_policy': {
++            'allowed_modes': ['quality', 'hybrid_async'],
++            'disallowed_modes': ['fast', 'balanced', 'default_sync'],
++            'candidate_models': ['qwen3_vl_8b'],
++            'rollout_enabled': rollout_enabled,
++            'max_review_pages': 2,
++            'fallback_action': 'manual_review',
++            'notes': 'Slow review is gray-only evidence for low-confidence pages in quality/hybrid_async.',
++        },
++        'artifact_contract': {
++            'required_artifacts': ['visual_similarity.json', 'render_pair.json', 'slow_model_review.json'],
++            'required_fields': list(ARTIFACT_REQUIRED_FIELDS),
++            'allowed_subject_page_types': list(ALLOWED_SUBJECT_PAGE_TYPES),
++            'allowed_region_types': list(ALLOWED_REGION_TYPES),
++        },
++        'subject_page_type': 'math',
++        'render_pair_artifact': _build_render_pair_artifact(tmp_path),
++        'page_scores': [
++            {
++                'page_index': 1,
++                'subject_page_type': 'math',
++                'page_role': 'critical',
++                'page_render_similarity': 0.93,
++                'layout_density_delta': 0.02,
++                'text_coverage_delta': 0.01,
++                'image_coverage_delta': 0.01,
++                'diff_image_path': str(diff_root / 'pages' / 'page-001-diff.png'),
++            },
++            {
++                'page_index': 2,
++                'subject_page_type': 'math',
++                'page_role': 'regular',
++                'page_render_similarity': 0.98,
++                'layout_density_delta': 0.01,
++                'text_coverage_delta': 0.01,
++                'image_coverage_delta': 0.01,
++                'diff_image_path': str(diff_root / 'pages' / 'page-002-diff.png'),
++            },
++        ],
++        'key_regions': [
++            {
++                'page_index': 1,
++                'subject_page_type': 'math',
++                'region_id': 'math:p1:table-01',
++                'region_type': 'table',
++                'required': True,
++                'bbox': {'x0': 88.0, 'y0': 392.0, 'x1': 512.0, 'y1': 582.0},
++                'region_similarity': 0.905,
++                'bbox_iou': 0.91,
++                'source_crop_path': str(diff_root / 'regions' / 'math-p1-table-source.png'),
++                'docx_crop_path': str(diff_root / 'regions' / 'math-p1-table-docx.png'),
++                'diff_image_path': str(diff_root / 'regions' / 'math-p1-table-diff.png'),
++            }
++        ],
++        'evidence_paths': {
++            'debug_html_path': str(debug_root / 'quality_ready.html'),
++            'debug_markdown_path': str(debug_root / 'quality_ready.md'),
++            'page_diff_dir': str(diff_root / 'pages'),
++            'key_region_diff_dir': str(diff_root / 'regions'),
++        },
++        'known_gaps': [],
++        'downstream_required_work': [],
++    }
++
++
++def test_quality_gate_triggers_slow_review_for_low_confidence_pages(tmp_path: Path):
++    contract = _build_contract(tmp_path)
++    seen_requests: list[dict[str, object]] = []
++
++    def reviewer(request: dict[str, object]) -> dict[str, object]:
++        seen_requests.append(request)
++        return {'decision': 'manual_compare', 'confidence': 0.77}
++
++    report = build_visual_similarity_gate_report(
++        contract,
++        requested_mode='quality',
++        parser_backend='hybrid_experimental',
++        slow_review_worker=reviewer,
++    )
++
++    first_page = report['slow_model_review']['pages'][0]
++    second_page = report['slow_model_review']['pages'][1]
++
++    assert report['mode_boundary']['resolved_gate_mode'] == QUALITY_HYBRID_ASYNC_MODE
++    assert report['status'] == 'ready'
++    assert report['artifact_ready_for_scoring'] is True
++    assert report['slow_model_policy']['candidate_models'] == [VISUAL_SIMILARITY_SLOW_REVIEW_MODEL]
++    assert first_page['triggered'] is True
++    assert first_page['executed'] is True
++    assert first_page['review_status'] == 'completed'
++    assert first_page['model_profile'] == VISUAL_SIMILARITY_SLOW_REVIEW_MODEL
++    assert first_page['response']['decision'] == 'manual_compare'
++    assert second_page['triggered'] is False
++    assert second_page['decision_reason'] == 'page_confident_no_slow_review'
++    assert seen_requests[0]['page_index'] == 1
++    assert report['human_review_required'] is True
++    assert 'slow_review_completed:p1' in report['human_review_reasons']
++
++
++def test_default_sync_never_triggers_slow_review(tmp_path: Path):
++    contract = _build_contract(tmp_path)
++
++    report = build_visual_similarity_gate_report(contract, requested_mode='balanced', parser_backend='apple')
++
++    assert resolve_visual_gate_mode('balanced', parser_backend='apple') == 'default_sync'
++    assert report['mode_boundary']['enabled'] is False
++    assert report['slow_model_policy']['enabled'] is False
++    assert report['status'] == 'ready'
++    assert report['score_contract']['score_awarded'] == 0
++    assert report['slow_model_review']['pages'][0]['triggered'] is False
++    assert report['slow_model_review']['pages'][0]['decision_reason'] == 'default_sync_disabled'
++
++
++def test_artifact_not_ready_disables_slow_review_but_preserves_audit_reason(tmp_path: Path):
++    contract = _build_contract(tmp_path)
++    broken = copy.deepcopy(contract)
++    broken['render_pair_artifact']['render_pairs'][0]['source_pdf']['image_path'] = str(tmp_path / 'missing-page-001.png')
++
++    report = build_visual_similarity_gate_report(broken, requested_mode='quality')
++
++    assert report['status'] == 'artifact_not_ready'
++    assert report['failure_code'] == 'visual_similarity_artifact_not_ready'
++    assert report['artifact_ready_for_scoring'] is False
++    assert 'render_pair_path_missing:source_pdf:image_path:p1' in report['vetoes'][0]['details']
++    assert report['slow_model_review']['pages'][0]['triggered'] is False
++    assert report['slow_model_review']['pages'][0]['decision_reason'] == 'artifact_not_ready'
++    assert 'visual_similarity_artifact_not_ready' in report['human_review_reasons']
++
++
++def test_rollout_disabled_keeps_quality_gate_traceable_and_revertible(tmp_path: Path):
++    contract = _build_contract(tmp_path, rollout_enabled=False)
++
++    report = build_visual_similarity_gate_report(contract, requested_mode='quality')
++
++    assert report['slow_model_policy']['enabled'] is True
++    assert report['slow_model_policy']['rollout_enabled'] is False
++    assert report['slow_model_review']['pages'][0]['triggered'] is False
++    assert report['slow_model_review']['pages'][0]['decision_reason'] == 'rollout_disabled'
++
++
++def test_missing_slow_reviewer_falls_back_to_manual_review(tmp_path: Path):
++    contract = _build_contract(tmp_path)
++
++    report = build_visual_similarity_gate_report(contract, requested_mode='quality', slow_review_worker=None)
++
++    first_page = report['slow_model_review']['pages'][0]
++
++    assert first_page['triggered'] is True
++    assert first_page['executed'] is False
++    assert first_page['review_status'] == 'fallback_skipped'
++    assert first_page['decision_reason'] == 'slow_review_worker_not_configured'
++    assert first_page['fallback_action'] == 'manual_review'
++    assert 'slow_review_triggered:p1' in report['human_review_reasons']
++    assert 'slow_review_fallback:p1' in report['human_review_reasons']
++
++
++def test_validation_rejects_non_qwen_candidate_models(tmp_path: Path):
++    broken = _build_contract(tmp_path)
++    broken['slow_model_policy']['candidate_models'] = ['glm_46v_flash']
++
++    with pytest.raises(VisualSimilarityGateError, match='candidate_models'):
++        build_visual_similarity_gate_report(broken, requested_mode='quality')
++
++
++def test_hard_fail_region_does_not_trigger_slow_review(tmp_path: Path):
++    contract = _build_contract(tmp_path)
++    contract['key_regions'][0]['bbox_iou'] = 0.70
++    contract['key_regions'][0]['region_similarity'] = 0.905
++
++    report = build_visual_similarity_gate_report(contract, requested_mode='quality')
++
++    first_page = report['slow_model_review']['pages'][0]
++
++    assert report['status'] == 'failed'
++    assert report['failure_code'] == 'visual_similarity_veto_triggered'
++    assert any(veto['code'] == 'key_region_bbox_iou_below_threshold' for veto in report['vetoes'])
++    assert first_page['triggered'] is False
++    assert first_page['decision_reason'] == 'hard_fail_page_or_region'

@@ -1,0 +1,8 @@
+{
+  "task_id": "视觉差异Debug报告与HTML对照页",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-20T00:19:14+08:00",
+  "summary": "dev-2 已按本轮 review 重新接手返修：移除 test_pdf_to_word_visual_diff_report.py 对 .runtime/worktrees 本机绝对路径的依赖，改为测试文件内联最小 canonical visual_similarity/render_pair payload，确保 pytest 只依赖仓库自身。"
+}

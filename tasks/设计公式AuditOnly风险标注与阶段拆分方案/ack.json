@@ -1,0 +1,8 @@
+{
+  "task_id": "设计公式AuditOnly风险标注与阶段拆分方案",
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "summary": "已读取任务 instruction 与 task.json，确认本任务仅产出公式 audit-only 风险标注与可编辑公式阶段拆分方案，不把公式纳入当前全学科95恢复主口径。",
+  "next_action": "读取输入事实中的阶段报告、差距计划、final acceptance、公式 baseline 与 crop 失败摘要，在 write_scope 内写入 Markdown/JSON 方案。",
+  "ack_at": "2026-05-20T08:12:21+08:00"
+}

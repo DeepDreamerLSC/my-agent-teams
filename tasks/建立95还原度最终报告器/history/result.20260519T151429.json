@@ -1,0 +1,22 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "agent": "qa-1",
+  "status": "done",
+  "summary": "已建立 95% fidelity 最终报告器：新增 build_fidelity_final_report_summary / write_fidelity_final_report_artifacts，可基于结构化输入输出 fidelity_metrics.json 与 fidelity_report.md；报告显式包含 overall_score、dimensions、tables.has_table_xml、blocking_failures 与未接入分项缺口，不会把未实现项假装为通过。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json"
+  ],
+  "tests": [
+    "PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_fidelity_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-fidelity-report --basetemp=/private/tmp/chiralium-pytest-temp-fidelity-report  # 4 passed, 4 warnings",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f diff --check -- backend/app/services/pdf_to_word/model_eval_runner.py backend/tests/test_pdf_to_word_fidelity_report.py backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json"
+  ],
+  "risks": [
+    "当前视觉相似度细分仍按路线文档显式标记为未接入；本报告器会将该缺口记为 missing_dimension 并阻断通过，而不会假设已完成。"
+  ],
+  "completed_at": "2026-05-19T14:56:27+08:00"
+}

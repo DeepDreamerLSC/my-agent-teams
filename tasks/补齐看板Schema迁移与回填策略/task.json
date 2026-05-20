@@ -53,10 +53,10 @@
   "result_summary": "已完成看板 Schema 迁移与回填策略设计，审查通过，无需 QA，允许后续按统一规则实现 version check、migrate、rebuild-all 与 backfill。",
   "last_error": null,
   "created_at": "2026-05-04T00:57:11+08:00",
-  "updated_at": "2026-05-18T18:52:38+08:00",
+  "updated_at": "2026-05-19T11:41:28+08:00",
   "merge_gate_state": "closed",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:52:38+08:00",
+  "state_invariant_checked_at": "2026-05-19T11:41:28+08:00",
   "state_invariant_violation_count": 0
 }

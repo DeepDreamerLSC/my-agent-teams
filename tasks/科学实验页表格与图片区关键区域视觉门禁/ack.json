@@ -1,0 +1,10 @@
+{
+  "task_id": "科学实验页表格与图片区关键区域视觉门禁",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "workspace_path": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373",
+  "acknowledged_at": "2026-05-19T21:40:23+08:00",
+  "acked_at": "2026-05-19T21:40:23+08:00",
+  "summary": "按 review 最小返修恢复本任务：将补强 science_visual_gate 的强 contract，确保关键 source region（至少 table/image/experiment_record/question_stem）缺失时进入 not_ready/blocker，且 image-question / table-question / record-table 等关键关系缺失时同样进入 not_ready/blocker；同时补对应 pytest，并在完成后重写 result.json。"
+}

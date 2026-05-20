@@ -1,0 +1,761 @@
+diff --git a/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json b/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json
+new file mode 100644
+index 0000000..956a7f9
+--- /dev/null
++++ b/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json
+@@ -0,0 +1,507 @@
++{
++  "manifest_version": "pdf_to_word_fidelity_manifest/v1",
++  "manifest_name": "冻结95还原度指标与样本清单",
++  "frozen_at": "2026-05-19T09:08:48+08:00",
++  "target": {
++    "score_threshold": 95,
++    "score_scale": 100,
++    "mode": "quality/hybrid_async",
++    "default_sync_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled"
++  },
++  "source_documents": [
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
++      "role": "phase_boundary_and_priority_source",
++      "availability": "present"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
++      "role": "pipeline_contract_source",
++      "availability": "present"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md",
++      "role": "fidelity_score_and_table_gate_source",
++      "availability": "planned_in_patch"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/20260518-072100/final_docx_gate_report.json",
++      "role": "current_sample_fact_source",
++      "availability": "present"
++    }
++  ],
++  "release_boundary": {
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "quality_target_scope": "quality/hybrid_async only",
++    "sync_boundary": "default sync cannot be slowed by slow models",
++    "table_policy": "any detected table structure must materialize as editable Word table when structure exists"
++  },
++  "aggregate_facts": {
++    "sample_count": 5,
++    "authoritative_docx_sample_count": 5,
++    "openable_docx_sample_count": 5,
++    "sample_with_word_media_count": 4,
++    "sample_with_table_xml_count": 2,
++    "pages_provenance_match_sample_count": 5,
++    "source_manifest_ok_sample_count": 5,
++    "sample_with_fallback_count": 3,
++    "document_fallback_sample_count": 1,
++    "explicit_answer_area_materialized_sample_count": 0,
++    "answer_section_materialized_sample_count": 0,
++    "sample_with_source_gate_pass_count": 5,
++    "samples_with_paddle_selected_pages_count": 4,
++    "samples_with_paddle_final_accepted_signal_count": 3
++  },
++  "scoring_dimensions": [
++    {
++      "key": "text_and_question_backbone",
++      "label": "文本与题号主干",
++      "weight": 20,
++      "phase": "P0",
++      "automatic_metrics": [
++        "ocr_text_f1",
++        "question_recall",
++        "question_precision",
++        "question_order_regression_count"
++      ],
++      "manual_checks": [
++        "抽查关键题干缺漏"
++      ],
++      "gate_checks": [
++        "baseline_text_regression",
++        "question_order_regression"
++      ]
++    },
++    {
++      "key": "exerciseir_structure",
++      "label": "ExerciseIR 结构",
++      "weight": 12,
++      "phase": "P0/P1",
++      "automatic_metrics": [
++        "exercise_item_count",
++        "option_assignment_accuracy",
++        "material_assignment_accuracy",
++        "reading_order_valid_rate"
++      ],
++      "manual_checks": [
++        "抽查串题",
++        "漏题"
++      ],
++      "gate_checks": [
++        "exercise_item_count_not_below_baseline",
++        "question_sequence_regression"
++      ]
++    },
++    {
++      "key": "editable_word_tables",
++      "label": "可编辑 Word 表格",
++      "weight": 18,
++      "phase": "P0/P1",
++      "automatic_metrics": [
++        "has_table_xml",
++        "docx_w_tbl_count",
++        "cell_text_f1",
++        "row_col_match_rate",
++        "span_reconstruction_rate"
++      ],
++      "manual_checks": [
++        "打开 Word 验证可编辑"
++      ],
++      "gate_checks": [
++        "table_detected_but_no_word_table",
++        "table_fallback_rate"
++      ]
++    },
++    {
++      "key": "image_and_graph_attachments",
++      "label": "图片/图形归属",
++      "weight": 10,
++      "phase": "P0",
++      "automatic_metrics": [
++        "image_attachment_rate",
++        "image_assignment_precision",
++        "word_media_count",
++        "media_render_valid_rate"
++      ],
++      "manual_checks": [
++        "抽查错挂",
++        "漏挂"
++      ],
++      "gate_checks": [
++        "image_attachment_missing",
++        "media_render_failure"
++      ]
++    },
++    {
++      "key": "formula_and_special_symbols",
++      "label": "公式/特殊符号",
++      "weight": 10,
++      "phase": "P1/P3",
++      "automatic_metrics": [
++        "formula_recall_proxy",
++        "omml_or_readable_fallback_rate",
++        "formula_editable_rate",
++        "special_symbol_preservation_rate"
++      ],
++      "manual_checks": [
++        "抽查数学/科学题"
++      ],
++      "gate_checks": [
++        "formula_regression",
++        "special_symbol_corruption"
++      ]
++    },
++    {
++      "key": "answer_and_work_area",
++      "label": "答案区/作答区",
++      "weight": 8,
++      "phase": "P1",
++      "automatic_metrics": [
++        "answer_area_detection_rate",
++        "answer_section_materialized_rate",
++        "answer_text_cleanliness",
++        "teacher_variant_consistency"
++      ],
++      "manual_checks": [
++        "抽查答案不污染题干"
++      ],
++      "gate_checks": [
++        "answer_area_pollution",
++        "answer_section_missing"
++      ]
++    },
++    {
++      "key": "visual_similarity",
++      "label": "视觉相似度",
++      "weight": 17,
++      "phase": "P3",
++      "automatic_metrics": [
++        "page_render_similarity",
++        "bbox_iou",
++        "layout_density_delta",
++        "paragraph_order_delta"
++      ],
++      "manual_checks": [
++        "抽查关键区域版式"
++      ],
++      "gate_checks": [
++        "visual_similarity_missing"
++      ]
++    },
++    {
++      "key": "stability_and_audit",
++      "label": "稳定性与回退审计",
++      "weight": 5,
++      "phase": "P0",
++      "automatic_metrics": [
++        "fallback_rate",
++        "warning_rate",
++        "artifact_completeness",
++        "docx_openable_rate"
++      ],
++      "manual_checks": [
++        "抽查报告可定位"
++      ],
++      "gate_checks": [
++        "docx_invalid",
++        "silent_fallback",
++        "default_sync_slowdown"
++      ]
++    }
++  ],
++  "p0_blockers": [
++    {
++      "key": "docx_invalid",
++      "description": "DOCX 无法解包/打开/主 XML 无效"
++    },
++    {
++      "key": "baseline_text_regression",
++      "description": "baseline 文本块被删改或题号主干缺失"
++    },
++    {
++      "key": "question_order_regression",
++      "description": "题号顺序明显错乱"
++    },
++    {
++      "key": "table_detected_but_no_word_table",
++      "description": "检测到表格但 DOCX 没有 <w:tbl>，仅图片/占位"
++    },
++    {
++      "key": "candidate_assignment_missing",
++      "description": "accepted candidate 缺 assigned_question_id 或合法材料归属"
++    },
++    {
++      "key": "silent_fallback",
++      "description": "fallback 无 reason / 无 artifact / 被标记为 pass"
++    },
++    {
++      "key": "default_sync_slowdown",
++      "description": "默认同步被 slow quality 模型拖慢"
++    }
++  ],
++  "sample_sets": {
++    "current_samples": [
++      {
++        "sample_key": "five_xia_science",
++        "sample_name": "五下科学",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "science_experiment_table_and_image_mixed",
++        "coverage_tags": [
++          "science-experiment",
++          "table-mixed",
++          "image-mixed"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          4,
++          5,
++          6
++        ],
++        "fallback_pages": [
++          1
++        ],
++        "current_gate_facts": {
++          "word_media_count": 4,
++          "table_xml_present": true,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "editable_word_tables",
++          "image_and_graph_attachments",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      },
++      {
++        "sample_key": "math_grade_8",
++        "sample_name": "数学八年级",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "math_exercise_with_sparse_image_and_table",
++        "coverage_tags": [
++          "math-exercise",
++          "sparse-image-and-table",
++          "positive-mixed"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          3,
++          4,
++          6,
++          7,
++          8
++        ],
++        "fallback_pages": [
++          5
++        ],
++        "current_gate_facts": {
++          "word_media_count": 2,
++          "table_xml_present": true,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "editable_word_tables",
++          "text_and_question_backbone",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      },
++      {
++        "sample_key": "math_exam",
++        "sample_name": "数学试卷",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "math_exam_image_dense",
++        "coverage_tags": [
++          "math-exam",
++          "image-dense",
++          "formula-suspected"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          3,
++          4,
++          6,
++          8,
++          9,
++          11
++        ],
++        "fallback_pages": [],
++        "current_gate_facts": {
++          "word_media_count": 20,
++          "table_xml_present": false,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "image_and_graph_attachments",
++          "formula_and_special_symbols",
++          "stability_and_audit"
++        ],
++        "known_gaps": [
++          "table_xml_absent_currently"
++        ]
++      },
++      {
++        "sample_key": "english_grade_8",
++        "sample_name": "英语八年级",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "language_exercise_sparse_media_with_fallback_pages",
++        "coverage_tags": [
++          "reading-material",
++          "sparse-media",
++          "fallback-pages"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          4,
++          5,
++          7,
++          9
++        ],
++        "fallback_pages": [
++          3,
++          8,
++          11,
++          12
++        ],
++        "current_gate_facts": {
++          "word_media_count": 1,
++          "table_xml_present": false,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "exerciseir_structure",
++          "stability_and_audit"
++        ],
++        "known_gaps": [
++          "table_xml_absent_currently"
++        ]
++      },
++      {
++        "sample_key": "chinese_grade_5_negative",
++        "sample_name": "语文五年级",
++        "status": "current",
++        "sample_role": "negative",
++        "page_type": "negative_non_exercise_or_question_region_unresolvable",
++        "coverage_tags": [
++          "negative",
++          "question-region-unresolvable",
++          "baseline-only"
++        ],
++        "source_profile": {
++          "default": "baseline_only",
++          "supplemental": null
++        },
++        "selected_pages": [],
++        "fallback_pages": [
++          1,
++          2,
++          3,
++          4,
++          5,
++          6,
++          7,
++          8,
++          9,
++          10,
++          11,
++          12,
++          13
++        ],
++        "current_gate_facts": {
++          "word_media_count": 0,
++          "table_xml_present": false,
++          "document_fallback": true,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": true
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      }
++    ],
++    "planned_extensions": [
++      {
++        "slot_key": "table_heavy_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "table-heavy",
++        "why": "专门压测 Word 表格结构与单元格/合并还原",
++        "focus_dimensions": [
++          "editable_word_tables",
++          "stability_and_audit"
++        ],
++        "expected_outputs": [
++          "NormalizedTableIR",
++          "<w:tbl>",
++          "docx_inspect.json"
++        ]
++      },
++      {
++        "slot_key": "multi_column_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "multi-column",
++        "why": "专门压测阅读顺序与布局相似度",
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "exerciseir_structure",
++          "visual_similarity"
++        ],
++        "expected_outputs": [
++          "reading_order_validator",
++          "layout_similarity_report"
++        ]
++      },
++      {
++        "slot_key": "answer_area_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "answer-area",
++        "why": "专门压测答案区/作答区分离与教师版变体",
++        "focus_dimensions": [
++          "answer_and_work_area",
++          "stability_and_audit"
++        ],
++        "expected_outputs": [
++          "answer_area_manifest",
++          "teacher_variant_diff"
++        ]
++      }
++    ]
++  }
++}
+diff --git a/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.schema.json b/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.schema.json
+new file mode 100644
+index 0000000..35cc4fc
+--- /dev/null
++++ b/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.schema.json
+@@ -0,0 +1,94 @@
++{
++  "$schema": "https://json-schema.org/draft/2020-12/schema",
++  "$id": "https://example.internal/pdf_to_word_fidelity_manifest.schema.json",
++  "title": "PDF to Word Fidelity Manifest",
++  "type": "object",
++  "required": [
++    "manifest_version",
++    "manifest_name",
++    "frozen_at",
++    "target",
++    "source_documents",
++    "release_boundary",
++    "aggregate_facts",
++    "scoring_dimensions",
++    "p0_blockers",
++    "sample_sets"
++  ],
++  "properties": {
++    "manifest_version": {
++      "type": "string"
++    },
++    "manifest_name": {
++      "type": "string"
++    },
++    "frozen_at": {
++      "type": "string"
++    },
++    "target": {
++      "type": "object",
++      "required": [
++        "score_threshold",
++        "score_scale",
++        "mode",
++        "default_sync_policy"
++      ],
++      "properties": {
++        "score_threshold": {
++          "type": "integer"
++        },
++        "score_scale": {
++          "type": "integer"
++        },
++        "mode": {
++          "type": "string"
++        },
++        "default_sync_policy": {
++          "type": "string"
++        }
++      }
++    },
++    "source_documents": {
++      "type": "array"
++    },
++    "release_boundary": {
++      "type": "object"
++    },
++    "aggregate_facts": {
++      "type": "object"
++    },
++    "scoring_dimensions": {
++      "type": "array",
++      "items": {
++        "type": "object",
++        "required": [
++          "key",
++          "label",
++          "weight",
++          "phase",
++          "automatic_metrics",
++          "manual_checks",
++          "gate_checks"
++        ]
++      }
++    },
++    "p0_blockers": {
++      "type": "array"
++    },
++    "sample_sets": {
++      "type": "object",
++      "required": [
++        "current_samples",
++        "planned_extensions"
++      ],
++      "properties": {
++        "current_samples": {
++          "type": "array"
++        },
++        "planned_extensions": {
++          "type": "array"
++        }
++      }
++    }
++  }
++}
+diff --git a/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_manifest.py b/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_manifest.py
+new file mode 100644
+index 0000000..eb3fb66
+--- /dev/null
++++ b/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_manifest.py
+@@ -0,0 +1,142 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "fidelity"
++MANIFEST_PATH = FIXTURE_DIR / "fidelity_manifest.json"
++SCHEMA_PATH = FIXTURE_DIR / "fidelity_manifest.schema.json"
++
++
++def _load_json(path: Path) -> dict:
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def _load_manifest() -> dict:
++    return _load_json(MANIFEST_PATH)
++
++
++def _current_sample_map(manifest: dict) -> dict[str, dict]:
++    return {
++        sample["sample_name"]: sample
++        for sample in manifest["sample_sets"]["current_samples"]
++    }
++
++
++def test_manifest_schema_requires_expected_top_level_sections():
++    schema = _load_json(SCHEMA_PATH)
++
++    assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
++    assert schema["title"] == "PDF to Word Fidelity Manifest"
++    assert set(schema["required"]) == {
++        "manifest_version",
++        "manifest_name",
++        "frozen_at",
++        "target",
++        "source_documents",
++        "release_boundary",
++        "aggregate_facts",
++        "scoring_dimensions",
++        "p0_blockers",
++        "sample_sets",
++    }
++
++
++
++def test_manifest_freezes_all_eight_scoring_dimensions_and_weight_sum():
++    manifest = _load_manifest()
++    dimensions = manifest["scoring_dimensions"]
++
++    assert manifest["manifest_version"] == "pdf_to_word_fidelity_manifest/v1"
++    assert len(dimensions) == 8
++    assert [item["key"] for item in dimensions] == [
++        "text_and_question_backbone",
++        "exerciseir_structure",
++        "editable_word_tables",
++        "image_and_graph_attachments",
++        "formula_and_special_symbols",
++        "answer_and_work_area",
++        "visual_similarity",
++        "stability_and_audit",
++    ]
++    assert sum(item["weight"] for item in dimensions) == 100
++    assert {item["weight"] for item in dimensions if item["key"] == "editable_word_tables"} == {18}
++
++
++
++def test_manifest_freezes_target_mode_and_p0_blockers():
++    manifest = _load_manifest()
++
++    assert manifest["target"] == {
++        "score_threshold": 95,
++        "score_scale": 100,
++        "mode": "quality/hybrid_async",
++        "default_sync_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    }
++    assert manifest["release_boundary"]["quality_target_scope"] == "quality/hybrid_async only"
++    assert {item["key"] for item in manifest["p0_blockers"]} == {
++        "docx_invalid",
++        "baseline_text_regression",
++        "question_order_regression",
++        "table_detected_but_no_word_table",
++        "candidate_assignment_missing",
++        "silent_fallback",
++        "default_sync_slowdown",
++    }
++
++
++
++def test_manifest_current_samples_cover_four_positive_or_mixed_and_one_negative():
++    manifest = _load_manifest()
++    current_samples = manifest["sample_sets"]["current_samples"]
++    sample_map = _current_sample_map(manifest)
++
++    assert manifest["aggregate_facts"]["sample_count"] == len(current_samples) == 5
++    assert manifest["aggregate_facts"]["sample_with_table_xml_count"] == 2
++    assert manifest["aggregate_facts"]["document_fallback_sample_count"] == 1
++    assert {sample["sample_name"] for sample in current_samples} == {
++        "五下科学",
++        "数学八年级",
++        "数学试卷",
++        "英语八年级",
++        "语文五年级",
++    }
++    assert sum(1 for sample in current_samples if sample["sample_role"] == "positive_mixed") == 4
++    assert sample_map["语文五年级"]["sample_role"] == "negative"
++    assert sample_map["语文五年级"]["source_profile"]["default"] == "baseline_only"
++    assert sample_map["语文五年级"]["current_gate_facts"]["document_fallback"] is True
++    assert sample_map["语文五年级"]["current_gate_facts"]["negative_baseline_only"] is True
++
++
++
++def test_manifest_current_sample_gate_facts_match_frozen_release_evidence():
++    manifest = _load_manifest()
++    sample_map = _current_sample_map(manifest)
++
++    assert sample_map["五下科学"]["current_gate_facts"] == {
++        "word_media_count": 4,
++        "table_xml_present": True,
++        "document_fallback": False,
++        "source_gate_ok": True,
++        "formula_audit_only": True,
++        "negative_baseline_only": False,
++    }
++    assert sample_map["数学八年级"]["current_gate_facts"]["table_xml_present"] is True
++    assert sample_map["数学试卷"]["current_gate_facts"]["word_media_count"] == 20
++    assert sample_map["数学试卷"]["current_gate_facts"]["table_xml_present"] is False
++    assert sample_map["英语八年级"]["fallback_pages"] == [3, 8, 11, 12]
++    assert sample_map["英语八年级"]["known_gaps"] == ["table_xml_absent_currently"]
++
++
++
++def test_manifest_planned_extensions_freeze_table_heavy_multi_column_and_answer_area_slots():
++    manifest = _load_manifest()
++    planned = manifest["sample_sets"]["planned_extensions"]
++
++    assert len(planned) == 3
++    assert {item["category"] for item in planned} == {
++        "table-heavy",
++        "multi-column",
++        "answer-area",
++    }
++    assert all(item["status"] == "planned" for item in planned)

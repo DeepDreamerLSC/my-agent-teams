@@ -1,0 +1,55 @@
+{
+  "task_id": "答案区教师版解析区独立门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T23:24:19+08:00",
+  "status": "approve",
+  "summary": "审查通过。本轮交付已把答案区/教师版/解析区从主线 final fidelity 中显式拆出：student 只保留主线防泄漏门禁，teacher / answer / analysis 改为独立专项结论；helper 会对 student 泄漏回归给出 no_go，对 teacher authoritative 覆盖不足给出 not_ready，并把 answer/analysis 在当前尚未成为一等输出变体时稳定标为 not_ready。相关 authoritative 夹具、回归测试与专项说明文档均已补齐，且不改当前工程门禁主流程。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/答案区教师版解析区独立门禁",
+      "finding": "当前任务目录没有新的顶层 `verify.json`，本轮主要依据 reviewer 本地复跑与 worktree 静态审阅给出结论。",
+      "recommendation": "若后续进入 QA 并补验证留痕，建议同步写入正式 verify.json，避免只依赖 result 与 patch 快照。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/tests/test_pdf_to_word_answer_section_gate.py",
+      "finding": "当前测试重点覆盖了 student 泄漏回归、teacher not_ready/pass、answer/analysis 默认 not_ready，但没有补 answer-only / analysis-only 在未来实现后可独立 pass 的正向样例。",
+      "recommendation": "若后续真的把 answer-only / analysis-only 升级为主链一等输出，建议再补对应 positive-path fixture 与测试，确保 not_ready -> pass 的切换口径可回归。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/答案区教师版解析区独立门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/答案区教师版解析区独立门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/答案区教师版解析区独立门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/答案区教师版解析区独立门禁/artifacts/task-077e09fe.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/app/services/pdf_to_word/answer_section_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/tests/test_pdf_to_word_answer_section_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/tests/fixtures/pdf_to_word/answer_section/authoritative_summary.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/tests/fixtures/pdf_to_word/answer_section/student_leak_regression.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/tests/fixtures/pdf_to_word/answer_section/teacher_full_coverage.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/artifacts/pdf2word/final-archive/reports/PDF转Word答案区教师版解析区独立门禁说明.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/app/services/pdf_to_word/exercise_ir.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend/app/services/pdf_to_word/exercise_docx_assembler.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider tests/test_pdf_to_word_answer_section_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-answer-gate-review --basetemp=/private/tmp/chiralium-pytest-temp-answer-gate-review",
+      "result": "7 passed, 4 warnings。"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-077e09fe/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<'PY' ... evaluate_answer_section_gate(authoritative_summary, variant in student/teacher/answer/analysis) ... PY",
+      "result": "返回结果符合专项边界：student=pass；teacher=not_ready（2/5 命中且缺五下科学/英语八年级/语文五年级）；answer=not_ready；analysis=not_ready。"
+    },
+    {
+      "command": "静态审阅 answer_section_gate.py 与现有 output variant 代码（exercise_ir.py / exercise_docx_assembler.py）",
+      "result": "确认 helper 明确把 student 保留在主线防泄漏边界，而 teacher / answer / analysis 统一排除出主线 final fidelity；同时与当前实际实现保持一致：现有主链稳定输出仍是 student / teacher / review，answer-only 与 analysis-only 仍会被独立门禁标记为 not_ready，不会被误宣称为已覆盖。"
+    },
+    {
+      "command": "人工核对专项说明文档与 authoritative fixtures",
+      "result": "确认文档明确写出旧 `explicit_answer_area_materialized_sample_count=0` / `answer_section_materialized_sample_count=0` 不能被误读为已覆盖答案区，并给出 PM 可直接使用的主线口径与专项口径。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

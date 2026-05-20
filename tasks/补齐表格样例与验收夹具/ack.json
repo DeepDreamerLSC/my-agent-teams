@@ -1,0 +1,9 @@
+{
+  "task_id": "补齐表格样例与验收夹具",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "working",
+  "acked_at": "2026-05-19T14:20:19+08:00",
+  "acknowledged_at": "2026-05-19T14:20:19+08:00",
+  "summary": "已读取 instruction.md 并开始执行。将在 /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81 工作，仅修改 table_goldens fixtures 与 test_pdf_to_word_table_fixtures.py，补齐表格正负样例与验收夹具。"
+}

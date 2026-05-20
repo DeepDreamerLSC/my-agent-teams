@@ -1,0 +1,29 @@
+{
+  "task_id": "慢模型复核灰度接入低置信视觉页",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已完成 low-confidence visual pages 的慢模型灰度接入：新增 visual_similarity_slow_review.py，按页输出 triggered/executed/review_status/decision_reason/fallback_action/error 等审计字段，并严格限制只有 quality/hybrid_async + artifact_ready_for_scoring 的低置信页才允许触发 qwen3_vl_8b。visual_similarity_gate.py 已接入 slow_model_policy / slow_model_review 报表：default_sync 永不触发慢模型；artifact_not_ready、rollout_disabled、worker 缺失/失败都会稳定落入可追踪回退语义，并把 slow_review_triggered / completed / fallback 原因并入 human_review_reasons。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_gate.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-slow-review --basetemp=/private/tmp/chiralium-pytest-temp-visual-slow-review -> 13 passed, 4 existing FastAPI deprecation warnings",
+    "git diff --no-index --check /dev/null <each new file> -> passed"
+  ],
+  "cost_latency_observations": [
+    "成本观测点：slow_model_policy.max_review_pages、slow_model_review.selected_page_count、executed_page_count、fallback_page_count 可直接衡量慢模型页数预算、实际执行量与回退比例。",
+    "时延观测点：default_sync 强制 disabled；只有 quality/hybrid_async 且低置信页才可能触发 reviewer，且每页都会记录 decision_reason（artifact_not_ready / rollout_disabled / slow_review_worker_not_configured / slow_review_completed 等）便于灰度回滚与耗时追踪。"
+  ],
+  "risks": [
+    "本轮只接入灰度审计与回退语义，slow_model_review.response 仍依赖后续实际 reviewer worker 的线上接线与耗时采样。",
+    "当前 human_review_reasons 会同时汇总近阈值页/区域与 slow review 审计原因；下游消费方需按 slow_model_review.pages[] 做逐页解释，不应把 completed/fallback 误当成直接放行信号。"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/artifacts/task-2d70ea1e.patch"
+  ],
+  "completed_at": "2026-05-19T22:28:23+08:00"
+}

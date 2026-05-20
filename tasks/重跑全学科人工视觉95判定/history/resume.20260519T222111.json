@@ -1,0 +1,11 @@
+{
+  "task_id": "重跑全学科人工视觉95判定",
+  "resumed_at": "2026-05-19T22:21:11+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "qa-1",
+  "reason": "数学与科学专项已最终收口，请基于最新已放行产物更新全学科人工视觉95最终结论",
+  "archived_files": [
+    "ack.20260519T222111.json",
+    "result.20260519T222111.json"
+  ]
+}

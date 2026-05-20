@@ -1,0 +1,10 @@
+{
+  "task_id": "实现表格结构归一化器",
+  "agent": "dev-1",
+  "agent_id": "dev-1",
+  "status": "working",
+  "workspace_path": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-7b1517a9",
+  "acknowledged_at": "2026-05-19T09:07:14+08:00",
+  "acked_at": "2026-05-19T09:07:14+08:00",
+  "summary": "已读取 instruction.md 并确认依赖任务“定义表格结构化IR契约”状态为 done，当前 write_scope 仅限 table_structure_normalizer.py 与对应测试文件，且与我现有待审任务无写入冲突；开始在指定 worktree 实现表格结构归一化器与覆盖测试。"
+}

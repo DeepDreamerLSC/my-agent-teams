@@ -1,0 +1,47 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T15:42:45+08:00",
+  "status": "approve",
+  "summary": "审查通过，当前可收口。返修已按上一轮 reviewer 要求对齐 frozen 95% contract：`threshold` 与各维度 `score` 现按 100 分制 points 处理，不再把 `95`、`19.2` 之类值 clamp 到 `1.0`；同时已补齐 `editable_word_tables` / `editable_table` -> `tables` 归一化，`tables.has_table_xml`、`hard_gate_passed` 与 `table_gate_failed:*` blocker 在真实别名输入下都能稳定落盘。我补充复跑 pytest/py_compile，并用 100 分制与表格别名 smoke input 复核，未再发现阻塞问题。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器",
+      "finding": "本轮任务目录仍无 `verify.json`，但 result、补充复跑测试与 smoke 复核已经足以支撑当前 review 结论。",
+      "recommendation": "后续若继续扩展视觉相似度或更大样本集回归，建议补一份 verify 留痕，便于 PM/QA 追溯。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/artifacts/95-424f239f.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-rereview-pyc python3 -m py_compile backend/app/services/pdf_to_word/model_eval_runner.py backend/tests/test_pdf_to_word_fidelity_report.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-rereview-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_fidelity_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-fidelity-report-rereview --basetemp=/private/tmp/chiralium-pytest-temp-fidelity-report-rereview",
+      "result": "4 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不构成阻塞。"
+    },
+    {
+      "command": "100 分制 smoke test：以 `threshold=95`、points 级维度分与 `editable_table` 输入调用 build_fidelity_final_report_summary",
+      "result": "输出保持 `threshold=95.0`、`overall_score=93.4`，不再发生 `threshold=1.0 / overall_score=100.0` 的错误钳制；表格别名也正确归一到 `tables`。"
+    },
+    {
+      "command": "表格别名硬门禁 smoke test：以 `editable_word_tables` 且 `table_xml_present=false` / `image_fallback_table_count=2` 输入调用 build_fidelity_final_report_summary",
+      "result": "输出 `tables.has_table_xml=false`、`tables.status=fail`，并稳定包含 `table_gate_failed:detected_without_word_table_xml` 与 `table_gate_failed:image_fallback_present`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

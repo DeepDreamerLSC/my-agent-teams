@@ -1,0 +1,35 @@
+{
+  "task_id": "冻结95还原度指标与样本清单",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T09:18:16+08:00",
+  "status": "approve",
+  "summary": "审查通过，当前可收口。基于 task 目录中的 result.json / verify.json 以及 write_scope 内 3 个文件复核，manifest、schema 与测试文件均与任务目标一致：已冻结 8 个主维度、100 分权重、7 个 P0 阻断项、4 个正/混合样例 + 1 个负样例及 3 个 planned extension 槽位；本地复跑 pytest 6 项通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json",
+      "finding": "manifest 中将 `95还原度与Word表格验收路线.md` 的 availability 标记为 `planned_in_patch`，与当前仓库中文件尚未正式落盘的事实一致。",
+      "recommendation": "待上游规划文档正式落盘后，可把该 source document 的 availability 更新为 `present`，减少后续 gate 对输入可用性的歧义。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/冻结95还原度指标与样本清单/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/冻结95还原度指标与样本清单/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/冻结95还原度指标与样本清单/verify.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.schema.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_manifest.py"
+  ],
+  "test_evidence": [
+    {
+      "command": ".venv/bin/python -m pytest tests/test_pdf_to_word_fidelity_manifest.py -q -o cache_dir=/private/tmp/chiralium-pytest-fidelity-manifest-review --basetemp=/private/tmp/chiralium-pytest-fidelity-manifest-review-tmp",
+      "result": "6 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不构成阻塞。"
+    },
+    {
+      "command": "静态复核 result.json / verify.json / fidelity_manifest.json / fidelity_manifest.schema.json / test_pdf_to_word_fidelity_manifest.py",
+      "result": "确认 result 与 verify 的结论一致；manifest 顶层结构完整，8 个评分维度顺序固定且权重总和为 100，P0 blockers 共 7 个，当前样本集为 4 个正/混合样例 + 1 个负样例，planned extension 为 table-heavy / multi-column / answer-area 三类。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

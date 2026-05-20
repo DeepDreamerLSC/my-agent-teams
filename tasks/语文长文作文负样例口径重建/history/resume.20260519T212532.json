@@ -1,0 +1,13 @@
+{
+  "task_id": "语文长文作文负样例口径重建",
+  "resumed_at": "2026-05-19T21:25:32+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "arch-1",
+  "reason": "review返修：canonical sample_key 需与 final-gated-manifest 对齐为 chinese_grade5，禁止用 current 后缀改写主键",
+  "archived_files": [
+    "ack.20260519T212532.json",
+    "review.20260519T212532.json",
+    "review.20260519T212532.md",
+    "result.20260519T212532.json"
+  ]
+}

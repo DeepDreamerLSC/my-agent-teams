@@ -1,0 +1,36 @@
+{
+  "task_id": "定义表格结构化IR契约",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T09:00:00+08:00",
+  "status": "approve",
+  "summary": "审查通过。NormalizedTableIR v1 已按任务要求冻结字段、span 语义、warning 语义与 raw 回溯字段；结构化正样例与 image-only 缺结构样例均可稳定区分 pass / review / fail，且 contract tests 通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/定义表格结构化IR契约",
+      "finding": "任务目录下没有 verify.json；本次审查已通过本地复跑 contract tests 作为补充验证证据。",
+      "recommendation": "后续若有 watcher 产物，可补充 verify.json 以便门禁链路留痕。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/定义表格结构化IR契约/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/定义表格结构化IR契约/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/定义表格结构化IR契约/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/table_ir.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_table_ir_contract.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_pdf_to_word_table_ir_contract.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-table-ir-review --basetemp=/private/tmp/chiralium-pytest-temp-table-ir-review",
+      "result": "6 passed, 4 warnings"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/chiralium diff --check -- backend/app/services/pdf_to_word/table_ir.py backend/tests/test_pdf_to_word_table_ir_contract.py backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json",
+      "result": "passed"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

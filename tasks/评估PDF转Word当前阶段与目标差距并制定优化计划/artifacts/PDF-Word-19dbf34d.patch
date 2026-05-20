@@ -1,0 +1,546 @@
+diff --git "a/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.md" "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.md"
+new file mode 100644
+index 0000000..ac46450
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.md"
+@@ -0,0 +1,148 @@
++# PDF转Word当前阶段与目标差距及优化计划
++
++- 生成时间：`2026-05-20T07:50:08+08:00`
++- 产出人：`arch-1`
++- 结论口径：**阶段差距评估与下一波实施拆分建议**，不是恢复人工视觉95的 GO 结论
++- 当前结论：**工程门禁 PASS；全学科人工视觉95 NO-GO**
++
++## 1. 执行摘要
++
++当前 PDF→Word 已从“模型横评/链路试验”推进到“默认同步可用 + 质量增强灰度可跑”的阶段：`apple_baseline` 仍是默认同步主 parser，`hybrid_experimental / quality/hybrid_async` 已能在表格、图片、image-dense、英语阅读等场景形成增强产物；`PaddleOCR-VL` 和 `qwen3_vl_8b` 只能作为局部补强或 review worker；公式链路仍是 audit-only。
++
++但当前不能恢复“全学科人工视觉95已达成”。核心原因不是单个科学/数学专项是否收口，而是**最终正向样例的视觉证据链没有在主工作区 materialize**，且语文仍只有 negative_guard。工程门禁 PASS 说明工程产物可归档、可打开、source gate 与 profile audit 可通过；它不说明每页/每区域视觉还原已达到人工95。
++
++短期治理应优先补 P0 证据链：正向样例 render pair、canonical `visual_similarity.json`、`fidelity_veto.json`、`human_review_report.json`、语文正向样例、final acceptance 对 human visual artifacts 的强依赖。只有这些完成后，才进入下一轮全学科人工视觉95重跑。
++
++## 2. 当前阶段定义
++
++- 阶段名称：**工程门禁可用、质量增强灰度可跑，但全学科人工视觉95未恢复**
++- 默认发布边界：`apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`
++- 工程门禁：`PASS`（`gate_passed=True`，正向候选 `4`，负样例 `1`）
++- 人工视觉门禁：`NO-GO` / `no_go_do_not_restore_all_subject_human_visual_95_claim`
++- 主 parser：`apple_baseline`；质量增强：`hybrid_experimental / quality/hybrid_async`；慢模型：`PaddleOCR-VL selected-page only`；公式：`audit-only / merge-disabled`。
++
++关键事实：
++
++- `apple_baseline`：5/5 样例、51 页，约 `6.92s/页`，仍是唯一稳定默认同步路径。
++- `hybrid_experimental`：5/5 样例，产出 `30` 个图片候选与 `5` 个表格块，适合质量灰度。
++- `PaddleOCR-VL`：候选上限强，但阶段报告约 `267.33s/页`，只适合 selected-page supplemental source。
++- 公式：候选 `18`，crop exact success `2/17`，不能进入当前 GO 口径。
++
++## 3. 目标阶段定义
++
++- 阶段名称：**全学科可复验95阶段目标**
++- 发布边界：默认同步仍保持 apple_baseline；质量/慢模型能力只在 quality/hybrid_async 灰度与 selected-page supplemental 下放开。
++
++可验证目标：
++1. 科学、数学、英语至少所有 positive_candidate 样例均具备 sample-level render_pair、canonical visual_similarity、fidelity_veto、human_review_report。
++2. 语文学科必须补齐至少一个 positive_candidate 长文/作文/阅读样例；当前 chinese_grade5 negative_guard 只能保留为负样例保护，不能计入正向95。
++3. human_visual_score >=95，关键页 >=92，关键区域 >=90，无 P0 veto，无证据缺口。
++4. 表格样例同时满足可编辑 DOCX table XML、单元格/合并关系/图文关系人工复核通过。
++5. 公式仍不计入当前恢复目标；如要计入，必须单独进入公式可编辑链路阶段目标。
++6. quality/hybrid_async 的成本边界有权威 timing/memory 证据，慢模型触发页比例和超时有硬门禁。
++7. 对外只允许宣称“工程门禁 PASS / 全学科人工视觉95 NO-GO”直到证据链全部落盘并通过复验。
++
++- GO 条件：所有 positive_candidate 全部具备终态视觉证据链并通过统一 Rubric；语文正样例补齐；final_acceptance 与 human_visual_acceptance 汇总一致。
++- NO-GO 条件：任一样例缺 render_pair / visual_similarity / fidelity_veto / human_review，或语文仍只有 negative_guard，或存在 P0 页级/区域级 veto。
++
++## 4. 为什么工程门禁 PASS 但人工视觉95仍 NO-GO
++
++1. 工程门禁当前主要验证 DOCX 可打开、source manifest/profile audit、fallback guard、paddle selected-only、formula audit-only 等工程事实，不等价于页面渲染相似度和人工视觉95。
++2. 正向样例缺 render_pair / visual_similarity / fidelity_veto / human_review_report，导致 17 分 visual similarity 与页级/区域级 veto 不能进入最终计分。
++3. 科学/数学专项 contract pass 证明局部契约收口，但不证明 final-archive 的每个正向样例已有终态视觉证据。
++4. 语文当前只有 negative_guard，eligible_for_human_visual_95=false；全学科 claim 缺语文学科正向支撑。
++5. 公式仍 audit-only，慢模型成本与 hybrid timing/memory 仍未形成生产级边界。
++
++结论：**工程门禁是可运行/可归档/可追溯门禁，人工视觉95是最终渲染 fidelity 门禁；二者不能互相替代。**
++
++## 5. 全学科覆盖矩阵
++
++| 学科 | 样例 | 当前角色 | 当前阶段 | 目标阶段 | 优先差距 |
++| --- | --- | --- | --- | --- | --- |
++| science | 五下科学 | `positive_candidate` | 工程门禁与专项 contract 已通过；有表格 XML 和媒体输出，但缺 sample-level 视觉证据链。 | 实验表格、图片、题干、图文关系均有 render-pair 对比、区域级 veto 与人工复核。 | P0: sample_level_visual_artifact_chain_missing；P0: page/region human review missing |
++| math | 数学八年级 / 数学试卷 | `positive_candidate` | 表格/图片专项已收口；公式仍 audit-only；数学试卷 image-dense 可产出媒体，但缺视觉终态证据。 | 表格可编辑结构、图片定位、题号顺序、公式/符号不误导均被页级/区域级复核覆盖。 | P0: visual evidence missing；P1: formula maturity only audit；P1: image-dense fidelity veto not materialized |
++| english | 英语八年级 | `positive_candidate` | 工程样例通过，但 fallback 页事实在 summary 与 authoritative 描述间仍有残余不一致；阅读段落/选项区域缺人审记录。 | 阅读顺序、选项绑定、fallback 页替换/保留事实统一，并具备 sample-level 视觉证据链。 | P0: visual evidence missing；P1: fallback fact alignment |
++| chinese | 语文五年级 | `negative_guard` | canonical sample_key=chinese_grade5；当前是 document_fallback / negative_guard，eligible_for_human_visual_95=false。 | 新增语文长文/作文/阅读正样例，并与其他学科使用同一 render-pair、visual_similarity、human review Rubric。 | P0: chinese_positive_evidence_missing |
++
++## 6. Gap Matrix
++
++| 维度 | 当前状态 | 目标状态 | 差距 | 严重度 | 必要动作 |
++| --- | --- | --- | --- | --- | --- |
++| 全学科覆盖度 | 当前 5 个样例中 4 个为 positive_candidate，语文五年级仅是 negative_guard；不能支撑“全学科正向95”。 | 科学、数学、语文、英语均至少有一个正向样例，且负样例只用于 guard，不混入正向分母。 | 缺语文正向证据；英语 fallback 事实需统一；科学/数学虽专项收口但缺终态人审证据。 | `P0` | 新增语文正样例；固化 subject/sample manifest；按 subject 输出正向/负向角色与资格字段 |
++| 人工视觉 fidelity / 页级与区域级 veto | 工程 gate_passed=true，但 positive_candidate 目录没有 render_pair、visual_similarity、fidelity_veto、human_review_report。 | 每个正向样例具备页级、区域级对比；P0 veto 能一票否决；人工分数可追溯到页面和区域。 | 缺终态视觉证据链，导致无法计算有效 human_visual_score。 | `P0` | 落地 render pair 生成器；接入 canonical visual_similarity.json；输出 fidelity_veto.json 与 human_review_report.json |
++| 表格可编辑性与结构完整性 | sample_with_table_xml_count=2；hybrid 在科学/数学八年级产出 5 个 table blocks，但人工95证据缺失。 | DOCX table XML 可编辑；单元格文本、合并关系、表头、图片邻接关系和答案区不丢失。 | contract pass 只证明结构进入链路，不证明最终视觉与编辑质量达到95。 | `P0/P1` | 建立 DOCX 表格结构门禁；建立表格区域人工复核清单；科学/数学表格样例重跑并绑定 visual veto |
++| 公式/符号链路成熟度 | 公式候选 18 个，crop 级 exact success=2/17；当前策略仍是 audit-only / merge-disabled。 | 短期不计入恢复95主目标；中期建立公式素材化、清理和可编辑输出专项门禁。 | 不能把公式候选数当作还原度；数学样例中公式/符号仍是高风险区域。 | `P1 for risk, P2 for editable formula release` | 维持 audit-only；建立公式风险标注与人审抽检；另拆公式可编辑专项 |
++| 视觉门禁证据链完整性 | visual_similarity gate contract 与 fidelity veto consumer 已就绪，但 final-archive 正向样例未 materialize canonical artifacts。 | final_acceptance 汇总必须强依赖 canonical artifacts；缺任一 artifact 即 NO-GO。 | 工具/contract 已有，最终样例落盘与汇总收口未连成闭环。 | `P0` | 在 final archive collector 中强校验 artifact presence；按样例产出 evidence index；QA 按 artifacts 而非口头专项结论复验 |
++| 性能/成本/慢模型灰度边界 | apple_baseline 约 6.92s/页；PaddleOCR-VL 约 267.33s/页且内存高；hybrid_experimental 缺 authoritative timing/memory。 | 默认同步零回归；quality/hybrid_async 有触发页比例、超时、缓存、成本预算和慢模型熔断。 | 质量收益存在，但慢模型成本边界尚不足以支撑默认或宽灰度。 | `P1` | 补 hybrid authoritative timing/memory；限制 Paddle selected-page；建立慢模型灰度预算与缓存门禁 |
++| 对外命名与对外口径 | 可说“工程门禁 PASS”；不可说“全学科人工视觉95恢复”。 | 工程门禁、质量灰度、人工视觉95三套口径分离，public claim 只引用已落盘证据。 | 若继续用局部专项 pass 替代全局 human visual pass，会再次产生对外过度宣称。 | `P0` | 统一 final acceptance 与 human acceptance summary；保留 NO-GO 声明；对外口径只允许证据驱动升级 |
++| 运行链路与可观测性 | source gate、profile audit、warnings 已有，但最终 visual evidence、fallback 页、成本指标未形成统一 dashboard。 | 每次 final run 都可查看 sample -> page -> region -> model cost -> veto -> human decision 的证据链。 | 缺少面向 PM/QA 的统一 evidence index 与回归趋势。 | `P1` | 建立 final evidence index；沉淀 fallback/slow-model/visual-veto 指标；自动生成 PM 可读状态页 |
++
++## 7. 优化计划
++
++### 7.1 短期/立即-72h（P0）
++
++- 把 4 个正向样例的 render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 落到 final-archive，并让缺失 artifact 直接触发 NO-GO。
++- 补齐语文正向样例定义：保留 chinese_grade5 negative_guard，同时新增 chinese_positive_* 样例进入正向候选。
++- 统一 final_acceptance_summary 与 final_human_visual_acceptance 的 subject/sample manifest，明确 positive_candidate / negative_guard / excluded。
++- 修正英语 fallback 页事实差异，避免同一正向样例在不同报告中页级事实不一致。
++- 冻结对外口径：继续使用“工程门禁 PASS；全学科人工视觉95 NO-GO”。
++
++### 7.2 中期/1周（P1）
++
++- 把表格可编辑性门禁升级为 DOCX table XML + 单元格文本/合并关系/图文关系 + visual region veto 三合一。
++- 为 quality/hybrid_async 增加 authoritative timing/memory/cost 报告，设定慢模型触发比例、超时和缓存指标。
++- 把 qwen3_vl_8b 仅作为严格 JSON review worker 灰度到低置信页，不参与正文生成。
++- 建立最终 evidence index / dashboard，让 PM 可直接看到每个样例的 artifact presence、veto、人工分数和成本。
++
++### 7.3 阶段目标/2周+（P2）
++
++- 在 sample-level 视觉证据链稳定后重跑全学科人工视觉95；仅当所有 P0/P1 缺口关闭后才允许恢复 GO 口径。
++- 将 PaddleOCR-VL 继续限制在 selected-page supplemental source，并评估更快 table/layout 局部模型替代。
++- 公式链路单独进入 feature-flagged editable formula 阶段，不作为当前恢复95的默认承诺。
++
++## 8. 建议拆解的下一波任务
++
++| 任务名 | 类别 | 优先级 | 负责人建议 | write_scope 建议 | 工时 | 依赖 | 验收 |
++| --- | --- | --- | --- | --- | --- | --- | --- |
++| 补齐正向样例视觉证据链并强制接入FinalArchive | 全学科共性整改项 | `P0` | dev-1 + qa-1 | `artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/render_pair.json`<br>`artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/visual_similarity.json`<br>`artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/fidelity_veto.json`<br>`artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/human_review_report.json`<br>`src/pdf_to_word/**/final_archive*`<br>`tests/pdf_to_word/**/final_archive*` | 1.5-2d | visual_similarity真实渲染对能力；fidelity_veto consumer | 4 个 positive_candidate 缺任一 canonical artifact 时 final_human_visual_acceptance 必须 NO-GO；artifact 全量存在时可进入人工复验。 |
++| 新增语文正向长文作文样例与统一Manifest | 特定学科/页型专项整改项 | `P0` | arch-1 设计 + dev-2 落地 + qa-1 复验 | `artifacts/pdf2word/final-output-samples/**/chinese*.json`<br>`artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向*/**`<br>`tests/fixtures/pdf2word/chinese_positive/**` | 1d 设计/夹具 + 1-2d 落地验证 | canonical sample_key 保持 chinese_grade5 负样例不改写；语文正向样例 owner 确认 | 语文至少一个 positive_candidate eligible_for_human_visual_95=true，且 negative_guard 不计入正向分母。 |
++| 升级FinalAcceptance为HumanVisual强依赖门禁 | 全学科共性整改项 | `P0` | dev-1 | `src/pdf_to_word/**/final_acceptance*`<br>`scripts/**/pdf2word*acceptance*`<br>`tests/pdf_to_word/**/acceptance*` | 1d | canonical artifact names: render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json | 工程 gate 不能在 human visual artifact 缺失时输出可恢复95；result 必须明确 PASS/NO-GO 双口径。 |
++| 表格可编辑结构与区域视觉Veto联合门禁 | 特定学科/页型专项整改项 | `P1` | dev-2 + qa-1 | `src/pdf_to_word/**/table*`<br>`src/pdf_to_word/**/docx*`<br>`tests/pdf_to_word/**/table*`<br>`artifacts/pdf2word/**/table_gate*` | 2d | 正向样例视觉证据链；DOCX table XML 检查器 | 五下科学、数学八年级表格区域同时通过结构、编辑性、视觉区域 veto。 |
++| 英语Fallback页事实统一与阅读顺序复验 | 特定学科/页型专项整改项 | `P1` | qa-1 + dev-1 | `artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/**`<br>`tests/pdf_to_word/**/english*` | 0.5-1d | final_acceptance_summary 与 authoritative archive 对齐 | fallback pages 在所有 summary/report 中一致；阅读段落、选项、题号顺序通过人工抽检。 |
++| HybridAsync成本预算与慢模型灰度门禁 | 全学科共性整改项 | `P1` | dev-1 | `src/pdf_to_word/**/hybrid*`<br>`src/pdf_to_word/**/metrics*`<br>`artifacts/pdf2word/**/cost*`<br>`tests/pdf_to_word/**/hybrid*` | 1-1.5d | hybrid_experimental authoritative timing/memory rerun | 默认同步 0 回归；quality 模式触发页比例、Paddle/Qwen 调用耗时、缓存命中、超时熔断可观测。 |
++| 公式AuditOnly风险标注与可编辑公式阶段拆分 | 特定学科/页型专项整改项 | `P2` | arch-1 方案 + dev-2 实验 | `artifacts/pdf2word/**/formula*`<br>`src/pdf_to_word/**/formula*`<br>`tests/pdf_to_word/**/formula*` | 2-3d 实验，不进入当前95恢复门禁 | qwen3_vl_8b crop 实验基线；MinerU formula candidates | 当前阶段继续 audit-only；若进入下一阶段，必须有公式素材化、清理、可编辑输出和人工复验门禁。 |
++
++## 9. 必修项、灰度项与分阶段目标
++
++### 9.1 恢复全学科目标前的必修项
++
++- 正向样例视觉证据链落盘并被 final acceptance 强校验。
++- 语文正向样例补齐；`chinese_grade5` 继续保留为 negative_guard，不能改写为正向样例。
++- 科学/数学/英语/语文全部按同一 Rubric 产生人工复核记录。
++- 对外口径继续保持 NO-GO，直到以上证据全部可复验。
++
++### 9.2 可在灰度阶段继续演进
++
++- `hybrid_experimental / quality/hybrid_async` 的成本、缓存、触发策略。
++- `PaddleOCR-VL` selected-page supplemental source 的性能优化。
++- `qwen3_vl_8b` 严格 JSON review worker，用于低置信页/歧义候选审查。
++
++### 9.3 需要拆成后续阶段目标
++
++- 公式可编辑链路：当前只做 audit-only；不能作为本轮恢复95的承诺。
++- 慢模型替代评估：只能评估局部能力模型，不重启端到端 parser 横评。
++- 答案区/教师版/authoritative/student/review 变体：不混入本轮主线95口径，需另行定义。
++
++## 10. 风险与依赖
++
++- 最大风险是继续把工程 gate_passed=true 或专项 contract pass 误读为全学科人工视觉95 pass。
++- 语文正样例缺失是全学科口径的硬阻断；不能用 negative_guard 或其他学科样例替代。
++- 慢模型成本边界未固化前，PaddleOCR-VL / Qwen3-VL 只能灰度或审查，不能进入默认同步。
++- 公式链路成熟度不足，若提前计入数学95会放大人工视觉 NO-GO 风险。
++- 所有 P0 证据链任务依赖真实 render pair 能稳定生成并落盘。
++
++## 11. 最终建议
++
++下一步不要再用“局部专项 pass”推进全局 GO 口径，应先完成 P0 证据链闭环。PM 可立即按第 8 节拆任务：先补正向样例视觉证据链、语文正向样例、FinalAcceptance 强依赖门禁；再推进表格结构门禁、英语 fallback 统一和 hybrid 成本预算；最后才进入公式与慢模型长期治理。
++
++在 P0 关闭前，对外统一口径为：**当前工程门禁 PASS，默认同步与质量灰度边界未放宽；全学科人工视觉95仍为 NO-GO，不恢复宣称。**
+diff --git "a/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.json" "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.json"
+new file mode 100644
+index 0000000..d910da1
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\345\275\223\345\211\215\351\230\266\346\256\265\344\270\216\347\233\256\346\240\207\345\267\256\350\267\235\345\217\212\344\274\230\345\214\226\350\256\241\345\210\222.json"
+@@ -0,0 +1,386 @@
++{
++  "report_type": "pdf2word_stage_gap_and_optimization_plan/v1",
++  "generated_at": "2026-05-20T07:50:08+08:00",
++  "generated_by": "arch-1",
++  "status": "done",
++  "source_reports": {
++    "stage_diff_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
++    "stage_diff_json": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.json",
++    "comparison_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/横评最终报告.md",
++    "technical_route": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
++    "final_acceptance_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
++    "human_visual_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md"
++  },
++  "current_stage_summary": {
++    "stage_name": "工程门禁可用、质量增强灰度可跑，但全学科人工视觉95未恢复",
++    "as_of": "2026-05-20",
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "engineering_gate": {
++      "status": "pass",
++      "gate_passed": true,
++      "positive_candidate_count": 4,
++      "negative_guard_count": 1,
++      "aggregate": {
++        "sample_count": 5,
++        "authoritative_docx_sample_count": 5,
++        "openable_docx_sample_count": 5,
++        "sample_with_word_media_count": 4,
++        "sample_with_table_xml_count": 2,
++        "pages_provenance_match_sample_count": 5,
++        "source_manifest_ok_sample_count": 5,
++        "sample_with_fallback_count": 3,
++        "document_fallback_sample_count": 1,
++        "explicit_answer_area_materialized_sample_count": 0,
++        "answer_section_materialized_sample_count": 0
++      }
++    },
++    "human_visual_gate": {
++      "status": "no-go",
++      "conclusion": "no_go_do_not_restore_all_subject_human_visual_95_claim",
++      "overall_score_available": false,
++      "blocked_by": [
++        "sample_level_visual_artifact_chain_missing",
++        "all_subject_human_review_records_missing",
++        "chinese_positive_evidence_missing"
++      ]
++    },
++    "parser_policy": {
++      "default_sync_parser": "apple_baseline",
++      "quality_enhancement": "hybrid_experimental / quality/hybrid_async only",
++      "supplemental_source": "PaddleOCR-VL selected-page only",
++      "formula_lane": "audit-only / merge-disabled"
++    },
++    "key_metrics": {
++      "apple_baseline_sec_per_page": 6.92,
++      "apple_baseline_docx_samples": "5/5",
++      "hybrid_experimental_docx_samples": "5/5",
++      "hybrid_table_blocks": 5,
++      "hybrid_image_candidates": 30,
++      "paddle_image_candidates": 165,
++      "paddle_sec_per_page_stage_report": 267.33,
++      "formula_candidate_count": 18,
++      "formula_crop_exact_success": "2/17"
++    }
++  },
++  "target_definition": {
++    "stage_name": "全学科可复验95阶段目标",
++    "not_a_single_switch": true,
++    "release_boundary": "默认同步仍保持 apple_baseline；质量/慢模型能力只在 quality/hybrid_async 灰度与 selected-page supplemental 下放开。",
++    "target_checks": [
++      "科学、数学、英语至少所有 positive_candidate 样例均具备 sample-level render_pair、canonical visual_similarity、fidelity_veto、human_review_report。",
++      "语文学科必须补齐至少一个 positive_candidate 长文/作文/阅读样例；当前 chinese_grade5 negative_guard 只能保留为负样例保护，不能计入正向95。",
++      "human_visual_score >=95，关键页 >=92，关键区域 >=90，无 P0 veto，无证据缺口。",
++      "表格样例同时满足可编辑 DOCX table XML、单元格/合并关系/图文关系人工复核通过。",
++      "公式仍不计入当前恢复目标；如要计入，必须单独进入公式可编辑链路阶段目标。",
++      "quality/hybrid_async 的成本边界有权威 timing/memory 证据，慢模型触发页比例和超时有硬门禁。",
++      "对外只允许宣称“工程门禁 PASS / 全学科人工视觉95 NO-GO”直到证据链全部落盘并通过复验。"
++    ],
++    "go_condition": "所有 positive_candidate 全部具备终态视觉证据链并通过统一 Rubric；语文正样例补齐；final_acceptance 与 human_visual_acceptance 汇总一致。",
++    "no_go_condition": "任一样例缺 render_pair / visual_similarity / fidelity_veto / human_review，或语文仍只有 negative_guard，或存在 P0 页级/区域级 veto。"
++  },
++  "why_engineering_pass_but_human_visual_no_go": [
++    "工程门禁当前主要验证 DOCX 可打开、source manifest/profile audit、fallback guard、paddle selected-only、formula audit-only 等工程事实，不等价于页面渲染相似度和人工视觉95。",
++    "正向样例缺 render_pair / visual_similarity / fidelity_veto / human_review_report，导致 17 分 visual similarity 与页级/区域级 veto 不能进入最终计分。",
++    "科学/数学专项 contract pass 证明局部契约收口，但不证明 final-archive 的每个正向样例已有终态视觉证据。",
++    "语文当前只有 negative_guard，eligible_for_human_visual_95=false；全学科 claim 缺语文学科正向支撑。",
++    "公式仍 audit-only，慢模型成本与 hybrid timing/memory 仍未形成生产级边界。"
++  ],
++  "subject_matrix": [
++    {
++      "subject": "science",
++      "sample": "五下科学",
++      "role": "positive_candidate",
++      "current_state": "工程门禁与专项 contract 已通过；有表格 XML 和媒体输出，但缺 sample-level 视觉证据链。",
++      "target_state": "实验表格、图片、题干、图文关系均有 render-pair 对比、区域级 veto 与人工复核。",
++      "priority_gap": "P0: sample_level_visual_artifact_chain_missing；P0: page/region human review missing"
++    },
++    {
++      "subject": "math",
++      "sample": "数学八年级 / 数学试卷",
++      "role": "positive_candidate",
++      "current_state": "表格/图片专项已收口；公式仍 audit-only；数学试卷 image-dense 可产出媒体，但缺视觉终态证据。",
++      "target_state": "表格可编辑结构、图片定位、题号顺序、公式/符号不误导均被页级/区域级复核覆盖。",
++      "priority_gap": "P0: visual evidence missing；P1: formula maturity only audit；P1: image-dense fidelity veto not materialized"
++    },
++    {
++      "subject": "english",
++      "sample": "英语八年级",
++      "role": "positive_candidate",
++      "current_state": "工程样例通过，但 fallback 页事实在 summary 与 authoritative 描述间仍有残余不一致；阅读段落/选项区域缺人审记录。",
++      "target_state": "阅读顺序、选项绑定、fallback 页替换/保留事实统一，并具备 sample-level 视觉证据链。",
++      "priority_gap": "P0: visual evidence missing；P1: fallback fact alignment"
++    },
++    {
++      "subject": "chinese",
++      "sample": "语文五年级",
++      "role": "negative_guard",
++      "current_state": "canonical sample_key=chinese_grade5；当前是 document_fallback / negative_guard，eligible_for_human_visual_95=false。",
++      "target_state": "新增语文长文/作文/阅读正样例，并与其他学科使用同一 render-pair、visual_similarity、human review Rubric。",
++      "priority_gap": "P0: chinese_positive_evidence_missing"
++    }
++  ],
++  "gap_matrix": [
++    {
++      "dimension": "全学科覆盖度",
++      "current": "当前 5 个样例中 4 个为 positive_candidate，语文五年级仅是 negative_guard；不能支撑“全学科正向95”。",
++      "target": "科学、数学、语文、英语均至少有一个正向样例，且负样例只用于 guard，不混入正向分母。",
++      "gap": "缺语文正向证据；英语 fallback 事实需统一；科学/数学虽专项收口但缺终态人审证据。",
++      "severity": "P0",
++      "required_actions": [
++        "新增语文正样例",
++        "固化 subject/sample manifest",
++        "按 subject 输出正向/负向角色与资格字段"
++      ]
++    },
++    {
++      "dimension": "人工视觉 fidelity / 页级与区域级 veto",
++      "current": "工程 gate_passed=true，但 positive_candidate 目录没有 render_pair、visual_similarity、fidelity_veto、human_review_report。",
++      "target": "每个正向样例具备页级、区域级对比；P0 veto 能一票否决；人工分数可追溯到页面和区域。",
++      "gap": "缺终态视觉证据链，导致无法计算有效 human_visual_score。",
++      "severity": "P0",
++      "required_actions": [
++        "落地 render pair 生成器",
++        "接入 canonical visual_similarity.json",
++        "输出 fidelity_veto.json 与 human_review_report.json"
++      ]
++    },
++    {
++      "dimension": "表格可编辑性与结构完整性",
++      "current": "sample_with_table_xml_count=2；hybrid 在科学/数学八年级产出 5 个 table blocks，但人工95证据缺失。",
++      "target": "DOCX table XML 可编辑；单元格文本、合并关系、表头、图片邻接关系和答案区不丢失。",
++      "gap": "contract pass 只证明结构进入链路，不证明最终视觉与编辑质量达到95。",
++      "severity": "P0/P1",
++      "required_actions": [
++        "建立 DOCX 表格结构门禁",
++        "建立表格区域人工复核清单",
++        "科学/数学表格样例重跑并绑定 visual veto"
++      ]
++    },
++    {
++      "dimension": "公式/符号链路成熟度",
++      "current": "公式候选 18 个，crop 级 exact success=2/17；当前策略仍是 audit-only / merge-disabled。",
++      "target": "短期不计入恢复95主目标；中期建立公式素材化、清理和可编辑输出专项门禁。",
++      "gap": "不能把公式候选数当作还原度；数学样例中公式/符号仍是高风险区域。",
++      "severity": "P1 for risk, P2 for editable formula release",
++      "required_actions": [
++        "维持 audit-only",
++        "建立公式风险标注与人审抽检",
++        "另拆公式可编辑专项"
++      ]
++    },
++    {
++      "dimension": "视觉门禁证据链完整性",
++      "current": "visual_similarity gate contract 与 fidelity veto consumer 已就绪，但 final-archive 正向样例未 materialize canonical artifacts。",
++      "target": "final_acceptance 汇总必须强依赖 canonical artifacts；缺任一 artifact 即 NO-GO。",
++      "gap": "工具/contract 已有，最终样例落盘与汇总收口未连成闭环。",
++      "severity": "P0",
++      "required_actions": [
++        "在 final archive collector 中强校验 artifact presence",
++        "按样例产出 evidence index",
++        "QA 按 artifacts 而非口头专项结论复验"
++      ]
++    },
++    {
++      "dimension": "性能/成本/慢模型灰度边界",
++      "current": "apple_baseline 约 6.92s/页；PaddleOCR-VL 约 267.33s/页且内存高；hybrid_experimental 缺 authoritative timing/memory。",
++      "target": "默认同步零回归；quality/hybrid_async 有触发页比例、超时、缓存、成本预算和慢模型熔断。",
++      "gap": "质量收益存在，但慢模型成本边界尚不足以支撑默认或宽灰度。",
++      "severity": "P1",
++      "required_actions": [
++        "补 hybrid authoritative timing/memory",
++        "限制 Paddle selected-page",
++        "建立慢模型灰度预算与缓存门禁"
++      ]
++    },
++    {
++      "dimension": "对外命名与对外口径",
++      "current": "可说“工程门禁 PASS”；不可说“全学科人工视觉95恢复”。",
++      "target": "工程门禁、质量灰度、人工视觉95三套口径分离，public claim 只引用已落盘证据。",
++      "gap": "若继续用局部专项 pass 替代全局 human visual pass，会再次产生对外过度宣称。",
++      "severity": "P0",
++      "required_actions": [
++        "统一 final acceptance 与 human acceptance summary",
++        "保留 NO-GO 声明",
++        "对外口径只允许证据驱动升级"
++      ]
++    },
++    {
++      "dimension": "运行链路与可观测性",
++      "current": "source gate、profile audit、warnings 已有，但最终 visual evidence、fallback 页、成本指标未形成统一 dashboard。",
++      "target": "每次 final run 都可查看 sample -> page -> region -> model cost -> veto -> human decision 的证据链。",
++      "gap": "缺少面向 PM/QA 的统一 evidence index 与回归趋势。",
++      "severity": "P1",
++      "required_actions": [
++        "建立 final evidence index",
++        "沉淀 fallback/slow-model/visual-veto 指标",
++        "自动生成 PM 可读状态页"
++      ]
++    }
++  ],
++  "priority_actions": [
++    {
++      "phase": "短期/立即-72h",
++      "priority": "P0",
++      "actions": [
++        "把 4 个正向样例的 render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 落到 final-archive，并让缺失 artifact 直接触发 NO-GO。",
++        "补齐语文正向样例定义：保留 chinese_grade5 negative_guard，同时新增 chinese_positive_* 样例进入正向候选。",
++        "统一 final_acceptance_summary 与 final_human_visual_acceptance 的 subject/sample manifest，明确 positive_candidate / negative_guard / excluded。",
++        "修正英语 fallback 页事实差异，避免同一正向样例在不同报告中页级事实不一致。",
++        "冻结对外口径：继续使用“工程门禁 PASS；全学科人工视觉95 NO-GO”。"
++      ]
++    },
++    {
++      "phase": "中期/1周",
++      "priority": "P1",
++      "actions": [
++        "把表格可编辑性门禁升级为 DOCX table XML + 单元格文本/合并关系/图文关系 + visual region veto 三合一。",
++        "为 quality/hybrid_async 增加 authoritative timing/memory/cost 报告，设定慢模型触发比例、超时和缓存指标。",
++        "把 qwen3_vl_8b 仅作为严格 JSON review worker 灰度到低置信页，不参与正文生成。",
++        "建立最终 evidence index / dashboard，让 PM 可直接看到每个样例的 artifact presence、veto、人工分数和成本。"
++      ]
++    },
++    {
++      "phase": "阶段目标/2周+",
++      "priority": "P2",
++      "actions": [
++        "在 sample-level 视觉证据链稳定后重跑全学科人工视觉95；仅当所有 P0/P1 缺口关闭后才允许恢复 GO 口径。",
++        "将 PaddleOCR-VL 继续限制在 selected-page supplemental source，并评估更快 table/layout 局部模型替代。",
++        "公式链路单独进入 feature-flagged editable formula 阶段，不作为当前恢复95的默认承诺。"
++      ]
++    }
++  ],
++  "recommended_next_tasks": [
++    {
++      "task_name": "补齐正向样例视觉证据链并强制接入FinalArchive",
++      "category": "全学科共性整改项",
++      "priority": "P0",
++      "owner_suggestion": "dev-1 + qa-1",
++      "write_scope": [
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/render_pair.json",
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/visual_similarity.json",
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/fidelity_veto.json",
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/human_review_report.json",
++        "src/pdf_to_word/**/final_archive*",
++        "tests/pdf_to_word/**/final_archive*"
++      ],
++      "effort": "1.5-2d",
++      "dependencies": [
++        "visual_similarity真实渲染对能力",
++        "fidelity_veto consumer"
++      ],
++      "acceptance": "4 个 positive_candidate 缺任一 canonical artifact 时 final_human_visual_acceptance 必须 NO-GO；artifact 全量存在时可进入人工复验。"
++    },
++    {
++      "task_name": "新增语文正向长文作文样例与统一Manifest",
++      "category": "特定学科/页型专项整改项",
++      "priority": "P0",
++      "owner_suggestion": "arch-1 设计 + dev-2 落地 + qa-1 复验",
++      "write_scope": [
++        "artifacts/pdf2word/final-output-samples/**/chinese*.json",
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向*/**",
++        "tests/fixtures/pdf2word/chinese_positive/**"
++      ],
++      "effort": "1d 设计/夹具 + 1-2d 落地验证",
++      "dependencies": [
++        "canonical sample_key 保持 chinese_grade5 负样例不改写",
++        "语文正向样例 owner 确认"
++      ],
++      "acceptance": "语文至少一个 positive_candidate eligible_for_human_visual_95=true，且 negative_guard 不计入正向分母。"
++    },
++    {
++      "task_name": "升级FinalAcceptance为HumanVisual强依赖门禁",
++      "category": "全学科共性整改项",
++      "priority": "P0",
++      "owner_suggestion": "dev-1",
++      "write_scope": [
++        "src/pdf_to_word/**/final_acceptance*",
++        "scripts/**/pdf2word*acceptance*",
++        "tests/pdf_to_word/**/acceptance*"
++      ],
++      "effort": "1d",
++      "dependencies": [
++        "canonical artifact names: render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json"
++      ],
++      "acceptance": "工程 gate 不能在 human visual artifact 缺失时输出可恢复95；result 必须明确 PASS/NO-GO 双口径。"
++    },
++    {
++      "task_name": "表格可编辑结构与区域视觉Veto联合门禁",
++      "category": "特定学科/页型专项整改项",
++      "priority": "P1",
++      "owner_suggestion": "dev-2 + qa-1",
++      "write_scope": [
++        "src/pdf_to_word/**/table*",
++        "src/pdf_to_word/**/docx*",
++        "tests/pdf_to_word/**/table*",
++        "artifacts/pdf2word/**/table_gate*"
++      ],
++      "effort": "2d",
++      "dependencies": [
++        "正向样例视觉证据链",
++        "DOCX table XML 检查器"
++      ],
++      "acceptance": "五下科学、数学八年级表格区域同时通过结构、编辑性、视觉区域 veto。"
++    },
++    {
++      "task_name": "英语Fallback页事实统一与阅读顺序复验",
++      "category": "特定学科/页型专项整改项",
++      "priority": "P1",
++      "owner_suggestion": "qa-1 + dev-1",
++      "write_scope": [
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/**",
++        "tests/pdf_to_word/**/english*"
++      ],
++      "effort": "0.5-1d",
++      "dependencies": [
++        "final_acceptance_summary 与 authoritative archive 对齐"
++      ],
++      "acceptance": "fallback pages 在所有 summary/report 中一致；阅读段落、选项、题号顺序通过人工抽检。"
++    },
++    {
++      "task_name": "HybridAsync成本预算与慢模型灰度门禁",
++      "category": "全学科共性整改项",
++      "priority": "P1",
++      "owner_suggestion": "dev-1",
++      "write_scope": [
++        "src/pdf_to_word/**/hybrid*",
++        "src/pdf_to_word/**/metrics*",
++        "artifacts/pdf2word/**/cost*",
++        "tests/pdf_to_word/**/hybrid*"
++      ],
++      "effort": "1-1.5d",
++      "dependencies": [
++        "hybrid_experimental authoritative timing/memory rerun"
++      ],
++      "acceptance": "默认同步 0 回归；quality 模式触发页比例、Paddle/Qwen 调用耗时、缓存命中、超时熔断可观测。"
++    },
++    {
++      "task_name": "公式AuditOnly风险标注与可编辑公式阶段拆分",
++      "category": "特定学科/页型专项整改项",
++      "priority": "P2",
++      "owner_suggestion": "arch-1 方案 + dev-2 实验",
++      "write_scope": [
++        "artifacts/pdf2word/**/formula*",
++        "src/pdf_to_word/**/formula*",
++        "tests/pdf_to_word/**/formula*"
++      ],
++      "effort": "2-3d 实验，不进入当前95恢复门禁",
++      "dependencies": [
++        "qwen3_vl_8b crop 实验基线",
++        "MinerU formula candidates"
++      ],
++      "acceptance": "当前阶段继续 audit-only；若进入下一阶段，必须有公式素材化、清理、可编辑输出和人工复验门禁。"
++    }
++  ],
++  "risks_and_dependencies": [
++    "最大风险是继续把工程 gate_passed=true 或专项 contract pass 误读为全学科人工视觉95 pass。",
++    "语文正样例缺失是全学科口径的硬阻断；不能用 negative_guard 或其他学科样例替代。",
++    "慢模型成本边界未固化前，PaddleOCR-VL / Qwen3-VL 只能灰度或审查，不能进入默认同步。",
++    "公式链路成熟度不足，若提前计入数学95会放大人工视觉 NO-GO 风险。",
++    "所有 P0 证据链任务依赖真实 render pair 能稳定生成并落盘。"
++  ],
++  "decision": {
++    "current_go_no_go": "工程门禁 PASS；全学科人工视觉95 NO-GO",
++    "recommended_release_policy": "保持 apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "next_review_condition": "P0 证据链与语文正向样例补齐后，再组织全学科人工视觉95重跑。"
++  }
++}

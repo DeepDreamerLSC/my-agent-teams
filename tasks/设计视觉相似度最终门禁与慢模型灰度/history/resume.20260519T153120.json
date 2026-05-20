@@ -1,0 +1,14 @@
+{
+  "task_id": "设计视觉相似度最终门禁与慢模型灰度",
+  "resumed_at": "2026-05-19T15:31:20+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "arch-1",
+  "reason": "owner返修：视觉相似度设计契约需与路线文档完全对齐。required artifact 统一为 visual_similarity.json（如需 debug 报告可另加 optional artifact）；active slow-model candidate 仅保留当前路线已认可的 qwen3_vl_8b，glm_46v_flash 改为 future/blocked/comparison-only 非激活字段。同步更新 fixture/test 后再回审。",
+  "archived_files": [
+    "ack.20260519T153120.json",
+    "claim.20260519T153120.json",
+    "review.20260519T153120.json",
+    "review.20260519T153120.md",
+    "result.20260519T153120.json"
+  ]
+}

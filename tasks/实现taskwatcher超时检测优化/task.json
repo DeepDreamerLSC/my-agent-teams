@@ -29,7 +29,7 @@
   "result_summary": "已在现有 shell watcher 架构上完成超时检测优化：dispatched 任务改为“3 分钟无 ack 且无 Working/无后续工件才重发”，working 超过 30 分钟只通知 PM 介入、不再重发，并保留重发冷却避免短时间重复重发。（QA 已通过自动收口） QA 结论：QA 验证通过。超时检测优化三项核心策略均已正确落地：（1）dispatched 3 分钟无 ack 且无工件且无 Working 信号才重发，重发冷却 300s 去抖；（2）working 超 30 分钟只通知 PM 介入不自动重发；（3）工件优先（result/review/design-review/verify 存在则跳过重发判断）。shell 语法检查通过，集成测试 10/10 全部 PASS。",
   "last_error": null,
   "created_at": "2026-04-26T16:28:08+08:00",
-  "updated_at": "2026-05-18T18:52:58+08:00",
+  "updated_at": "2026-05-19T11:41:09+08:00",
   "root_request_id": "task-watcher可靠性优化第一批",
   "parent_task_id": "建立taskwatcher可靠性优化上下文",
   "id": "实现taskwatcher超时检测优化",
@@ -53,7 +53,7 @@
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:52:58+08:00",
+  "state_invariant_checked_at": "2026-05-19T11:41:09+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

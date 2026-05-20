@@ -1,0 +1,1147 @@
+diff --git a/backend/app/services/pdf_to_word/visual_diff_report.py b/backend/app/services/pdf_to_word/visual_diff_report.py
+new file mode 100644
+index 0000000..563b2f2
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/visual_diff_report.py
+@@ -0,0 +1,786 @@
++from __future__ import annotations
++
++import json
++from datetime import datetime
++from html import escape
++from pathlib import Path
++from typing import Any, Mapping, Sequence
++from urllib.parse import quote
++
++
++VISUAL_DIFF_REPORT_VERSION = 'pdf_to_word_visual_diff_report/v1'
++VISUAL_DIFF_REPORT_JSON = 'visual_diff_report.json'
++VISUAL_DIFF_INDEX_HTML = 'index.html'
++VISUAL_DIFF_PAGES_DIR = 'pages'
++
++
++def load_visual_diff_payload(path: str | Path) -> dict[str, Any]:
++    return json.loads(Path(path).expanduser().resolve().read_text(encoding='utf-8'))
++
++
++def build_debug_placeholder_data_uri(
++    label: str,
++    *,
++    fill: str = '#eef2ff',
++    stroke: str = '#475569',
++    width: int = 420,
++    height: int = 240,
++) -> str:
++    safe_label = escape(str(label or 'debug-view'))
++    svg = (
++        f'<svg xmlns="http://www.w3.org/2000/svg" width="{int(width)}" height="{int(height)}" viewBox="0 0 {int(width)} {int(height)}">'
++        f'<rect width="100%" height="100%" rx="18" fill="{fill}" stroke="{stroke}" stroke-width="4"/>'
++        f'<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" '
++        f'font-family="Arial, Helvetica, sans-serif" font-size="20" fill="{stroke}">{safe_label}</text>'
++        '</svg>'
++    )
++    return 'data:image/svg+xml;charset=utf-8,' + quote(svg)
++
++
++def build_visual_diff_report(payload: Mapping[str, Any]) -> dict[str, Any]:
++    sample_name = str(
++        payload.get('sample_name')
++        or payload.get('report_name')
++        or payload.get('artifact_name')
++        or payload.get('source_name')
++        or 'visual-diff-debug'
++    ).strip()
++    default_subject = str(payload.get('subject') or payload.get('subject_page_type') or '').strip() or None
++    pages = _collect_pages(payload, default_subject=default_subject)
++
++    subject_scope = sorted({str(page.get('subject') or 'unknown') for page in pages})
++    page_count = len(pages)
++    page_failure_count = sum(1 for page in pages if page['failure_reasons'])
++    key_region_count = sum(len(page['key_regions']) for page in pages)
++    veto_count = sum(len(page['vetoes']) for page in pages)
++    blocker_count = sum(len(page['blockers']) for page in pages)
++
++    return {
++        'report_type': VISUAL_DIFF_REPORT_VERSION,
++        'generated_at': datetime.now().astimezone().isoformat(timespec='seconds'),
++        'sample_name': sample_name,
++        'subject_scope': subject_scope,
++        'page_count': page_count,
++        'page_failure_count': page_failure_count,
++        'key_region_count': key_region_count,
++        'veto_count': veto_count,
++        'blocker_count': blocker_count,
++        'summary': {
++            'page_count': page_count,
++            'page_failure_count': page_failure_count,
++            'key_region_count': key_region_count,
++            'veto_count': veto_count,
++            'blocker_count': blocker_count,
++            'subjects': subject_scope,
++            'open_local_html_hint': 'open index.html directly in browser',
++        },
++        'pages': pages,
++    }
++
++
++def _collect_pages(payload: Mapping[str, Any], *, default_subject: str | None) -> list[dict[str, Any]]:
++    pages_payload = payload.get('pages')
++    bespoke_pages = [
++        _normalize_page(page, default_subject=default_subject, page_ordinal=index + 1)
++        for index, page in enumerate(pages_payload)
++        if isinstance(page, Mapping)
++    ] if isinstance(pages_payload, list) else []
++    if bespoke_pages:
++        return bespoke_pages
++    return _normalize_canonical_visual_similarity_pages(payload, default_subject=default_subject)
++
++
++def _normalize_canonical_visual_similarity_pages(
++    payload: Mapping[str, Any],
++    *,
++    default_subject: str | None,
++) -> list[dict[str, Any]]:
++    render_pairs = payload.get('render_pairs')
++    if not isinstance(render_pairs, list):
++        render_pairs = _dig(payload, 'render_pair_artifact', 'render_pairs')
++    page_scores = payload.get('page_scores')
++    key_regions = payload.get('key_regions')
++    vetoes = payload.get('vetoes')
++    if not any(isinstance(items, list) and items for items in (render_pairs, page_scores, key_regions, vetoes)):
++        return []
++
++    render_pair_by_page = _index_mapping_list_by_page(render_pairs)
++    page_score_by_page = _index_mapping_list_by_page(page_scores)
++    key_regions_by_page = _group_mapping_list_by_page(key_regions)
++    vetoes_by_page = _group_mapping_list_by_page(vetoes)
++
++    page_indexes = sorted(
++        set(render_pair_by_page)
++        | set(page_score_by_page)
++        | set(key_regions_by_page)
++        | set(vetoes_by_page)
++    )
++    pages: list[dict[str, Any]] = []
++    for page_ordinal, page_index in enumerate(page_indexes, start=1):
++        render_pair = render_pair_by_page.get(page_index, {})
++        page_score = page_score_by_page.get(page_index, {})
++        merged_page = {
++            'page_index': page_index,
++            'subject': (
++                _non_empty(page_score.get('subject_page_type'))
++                or _non_empty(payload.get('subject_page_type'))
++                or default_subject
++                or 'unknown'
++            ),
++            'page_title': _build_canonical_page_title(page_index, page_score),
++            'pair_status': _non_empty(render_pair.get('pair_status')) or _non_empty(page_score.get('pair_status')) or 'matched',
++            'overall_score': (
++                page_score.get('page_render_similarity')
++                if page_score.get('page_render_similarity') is not None
++                else page_score.get('score')
++            ),
++            'source_image_path': (
++                _non_empty(_dig(page_score, 'evidence', 'source_image_path'))
++                or _non_empty(_dig(render_pair, 'source_pdf', 'image_path'))
++            ),
++            'output_image_path': (
++                _non_empty(_dig(page_score, 'evidence', 'docx_image_path'))
++                or _non_empty(_dig(render_pair, 'output_docx', 'image_path'))
++            ),
++            'diff_image_path': (
++                _non_empty(_dig(page_score, 'evidence', 'diff_image_path'))
++                or _non_empty(page_score.get('diff_image_path'))
++                or _non_empty(_dig(render_pair, 'diff_image_path'))
++            ),
++            'failure_reasons': list(page_score.get('review_reasons') or []),
++            'blockers': _canonical_blockers_for_page(payload, page_index),
++            'vetoes': vetoes_by_page.get(page_index, []),
++            'key_regions': key_regions_by_page.get(page_index, []),
++            'render_pair': render_pair,
++        }
++        pages.append(_normalize_page(merged_page, default_subject=default_subject, page_ordinal=page_ordinal))
++    return pages
++
++
++def write_visual_diff_report(report: Mapping[str, Any], output_root: str | Path) -> dict[str, str]:
++    root = Path(output_root).expanduser().resolve()
++    root.mkdir(parents=True, exist_ok=True)
++    pages_dir = root / VISUAL_DIFF_PAGES_DIR
++    pages_dir.mkdir(parents=True, exist_ok=True)
++
++    report_path = root / VISUAL_DIFF_REPORT_JSON
++    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
++
++    page_links: dict[int, str] = {}
++    for page in report.get('pages') or []:
++        if not isinstance(page, Mapping):
++            continue
++        page_index = int(page.get('page_index') or 0)
++        page_file = pages_dir / f'page-{page_index:03d}.html'
++        page_file.write_text(_render_page_html(page), encoding='utf-8')
++        page_links[page_index] = page_file.relative_to(root).as_posix()
++
++    index_path = root / VISUAL_DIFF_INDEX_HTML
++    index_path.write_text(_render_index_html(report, page_links=page_links), encoding='utf-8')
++
++    return {
++        'output_root': str(root),
++        'report_json': str(report_path),
++        'index_html': str(index_path),
++        'pages_dir': str(pages_dir),
++    }
++
++
++def generate_visual_diff_report(payload: Mapping[str, Any], output_root: str | Path) -> dict[str, Any]:
++    report = build_visual_diff_report(payload)
++    artifact_paths = write_visual_diff_report(report, output_root)
++    enriched = dict(report)
++    enriched['artifact_paths'] = artifact_paths
++    return enriched
++
++
++def _normalize_page(
++    page: Mapping[str, Any],
++    *,
++    default_subject: str | None,
++    page_ordinal: int,
++) -> dict[str, Any]:
++    page_index = _coerce_int(
++        page.get('page_index')
++        or _dig(page, 'render_pair', 'page_index')
++        or _dig(page, 'source_pdf', 'page_index')
++        or page_ordinal,
++        default=page_ordinal,
++    )
++    subject = str(page.get('subject') or default_subject or 'unknown').strip() or 'unknown'
++    source_image_path = (
++        _non_empty(page.get('source_image_path'))
++        or _non_empty(_dig(page, 'evidence', 'source_image_path'))
++        or _non_empty(_dig(page, 'render_pair', 'source_pdf', 'image_path'))
++        or _non_empty(_dig(page, 'source_pdf', 'image_path'))
++    )
++    output_image_path = (
++        _non_empty(page.get('output_image_path'))
++        or _non_empty(_dig(page, 'evidence', 'docx_image_path'))
++        or _non_empty(_dig(page, 'render_pair', 'output_docx', 'image_path'))
++        or _non_empty(_dig(page, 'output_docx', 'image_path'))
++    )
++    diff_image_path = (
++        _non_empty(page.get('diff_image_path'))
++        or _non_empty(_dig(page, 'evidence', 'diff_image_path'))
++        or _non_empty(_dig(page, 'render_pair', 'diff_image_path'))
++        or _non_empty(page.get('diff_path'))
++    )
++    key_regions = _normalize_key_regions(page)
++    blockers = _normalize_blockers(page.get('blockers'))
++    vetoes = _normalize_vetoes(page.get('vetoes'))
++    failure_reasons = _collect_failure_reasons(page, blockers=blockers, vetoes=vetoes, key_regions=key_regions)
++
++    return {
++        'page_index': page_index,
++        'subject': subject,
++        'page_title': str(page.get('page_title') or f'Page {page_index}').strip() or f'Page {page_index}',
++        'pair_status': str(page.get('pair_status') or _dig(page, 'render_pair', 'pair_status') or 'matched').strip() or 'matched',
++        'overall_score': _coerce_float(page.get('score') or page.get('overall_score')),
++        'source_image_path': source_image_path,
++        'output_image_path': output_image_path,
++        'diff_image_path': diff_image_path,
++        'source_image_uri': _to_openable_uri(source_image_path),
++        'output_image_uri': _to_openable_uri(output_image_path),
++        'diff_image_uri': _to_openable_uri(diff_image_path),
++        'failure_reasons': failure_reasons,
++        'blockers': blockers,
++        'vetoes': vetoes,
++        'key_regions': key_regions,
++    }
++
++
++def _normalize_key_regions(page: Mapping[str, Any]) -> list[dict[str, Any]]:
++    raw_items = page.get('key_regions')
++    if not isinstance(raw_items, list):
++        raw_items = page.get('region_scores')
++    if not isinstance(raw_items, list):
++        raw_items = []
++
++    results: list[dict[str, Any]] = []
++    for index, item in enumerate(raw_items, start=1):
++        if not isinstance(item, Mapping):
++            continue
++        region_id = (
++            _non_empty(item.get('region_id'))
++            or _non_empty(item.get('relation_id'))
++            or _non_empty(item.get('id'))
++            or f'region-{index}'
++        )
++        region_kind = (
++            _non_empty(item.get('region_kind'))
++            or _non_empty(item.get('region_type'))
++            or _non_empty(item.get('kind'))
++            or _non_empty(item.get('relation_kind'))
++            or 'unknown'
++        )
++        score = _coerce_float(item.get('score') if item.get('score') is not None else item.get('region_similarity'))
++        reasons = _normalize_string_list(item.get('reasons') or item.get('failure_reasons'))
++        summary = _non_empty(item.get('summary')) or ('; '.join(reasons) if reasons else None)
++        source_crop_path = (
++            _non_empty(item.get('source_crop_path'))
++            or _non_empty(_dig(item, 'evidence', 'source_crop_path'))
++            or _non_empty(_dig(item, 'crops', 'source'))
++        )
++        output_crop_path = (
++            _non_empty(item.get('output_crop_path'))
++            or _non_empty(item.get('docx_crop_path'))
++            or _non_empty(_dig(item, 'evidence', 'output_crop_path'))
++            or _non_empty(_dig(item, 'evidence', 'docx_crop_path'))
++            or _non_empty(_dig(item, 'crops', 'output'))
++        )
++        diff_crop_path = (
++            _non_empty(item.get('diff_crop_path'))
++            or _non_empty(item.get('diff_image_path'))
++            or _non_empty(_dig(item, 'evidence', 'diff_crop_path'))
++            or _non_empty(_dig(item, 'evidence', 'diff_image_path'))
++            or _non_empty(_dig(item, 'crops', 'diff'))
++        )
++        results.append({
++            'region_id': region_id,
++            'region_kind': region_kind,
++            'score': score,
++            'status': _score_status(score),
++            'summary': summary,
++            'reasons': reasons,
++            'source_crop_path': source_crop_path,
++            'output_crop_path': output_crop_path,
++            'diff_crop_path': diff_crop_path,
++            'source_crop_uri': _to_openable_uri(source_crop_path),
++            'output_crop_uri': _to_openable_uri(output_crop_path),
++            'diff_crop_uri': _to_openable_uri(diff_crop_path),
++        })
++    return results
++
++
++def _index_mapping_list_by_page(value: Any) -> dict[int, Mapping[str, Any]]:
++    if not isinstance(value, list):
++        return {}
++    indexed: dict[int, Mapping[str, Any]] = {}
++    for item in value:
++        if not isinstance(item, Mapping):
++            continue
++        page_index = _coerce_int(item.get('page_index'), default=0)
++        if page_index > 0:
++            indexed[page_index] = item
++    return indexed
++
++
++def _group_mapping_list_by_page(value: Any) -> dict[int, list[Mapping[str, Any]]]:
++    if not isinstance(value, list):
++        return {}
++    grouped: dict[int, list[Mapping[str, Any]]] = {}
++    for item in value:
++        if not isinstance(item, Mapping):
++            continue
++        page_index = _coerce_int(item.get('page_index'), default=0)
++        if page_index <= 0:
++            continue
++        grouped.setdefault(page_index, []).append(item)
++    return grouped
++
++
++def _canonical_blockers_for_page(payload: Mapping[str, Any], page_index: int) -> list[dict[str, Any]]:
++    blockers: list[dict[str, Any]] = []
++    raw_blockers = payload.get('blockers')
++    if isinstance(raw_blockers, list):
++        for item in raw_blockers:
++            if not isinstance(item, Mapping):
++                continue
++            blocker_page = _coerce_int(item.get('page_index'), default=page_index)
++            if blocker_page == page_index:
++                blockers.append(item)
++    return blockers
++
++
++def _build_canonical_page_title(page_index: int, page_score: Mapping[str, Any]) -> str:
++    subject = _non_empty(page_score.get('subject_page_type'))
++    page_role = _non_empty(page_score.get('page_role'))
++    fragments = [f'Page {page_index}']
++    if subject:
++        fragments.append(subject)
++    if page_role:
++        fragments.append(page_role)
++    return ' · '.join(fragments)
++
++
++def _normalize_blockers(value: Any) -> list[dict[str, Any]]:
++    if not isinstance(value, list):
++        return []
++    results: list[dict[str, Any]] = []
++    for item in value:
++        if isinstance(item, Mapping):
++            summary = _non_empty(item.get('summary')) or _non_empty(item.get('message')) or _non_empty(item.get('code'))
++            results.append({
++                'code': _non_empty(item.get('code')) or 'unknown_blocker',
++                'summary': summary or 'unknown blocker',
++            })
++        elif (text := _non_empty(item)) is not None:
++            results.append({'code': text, 'summary': text})
++    return results
++
++
++def _normalize_vetoes(value: Any) -> list[dict[str, Any]]:
++    if not isinstance(value, list):
++        return []
++    results: list[dict[str, Any]] = []
++    for item in value:
++        if not isinstance(item, Mapping):
++            continue
++        summary = _non_empty(item.get('summary')) or _non_empty(item.get('message')) or _non_empty(item.get('code'))
++        results.append({
++            'code': _non_empty(item.get('code')) or 'unknown_veto',
++            'summary': summary or 'unknown veto',
++            'recommended_common_code': _non_empty(item.get('recommended_common_code')),
++        })
++    return results
++
++
++def _collect_failure_reasons(
++    page: Mapping[str, Any],
++    *,
++    blockers: Sequence[Mapping[str, Any]],
++    vetoes: Sequence[Mapping[str, Any]],
++    key_regions: Sequence[Mapping[str, Any]],
++) -> list[str]:
++    results: list[str] = []
++    seen: set[str] = set()
++
++    for item in blockers:
++        summary = _non_empty(item.get('summary'))
++        if summary and summary not in seen:
++            results.append(summary)
++            seen.add(summary)
++    for item in vetoes:
++        summary = _non_empty(item.get('summary'))
++        if summary and summary not in seen:
++            results.append(summary)
++            seen.add(summary)
++    for raw in _normalize_string_list(page.get('failure_reasons') or page.get('low_score_reasons')):
++        if raw not in seen:
++            results.append(raw)
++            seen.add(raw)
++    for region in key_regions:
++        status = str(region.get('status') or '')
++        if status != 'fail':
++            continue
++        summary = _non_empty(region.get('summary')) or _non_empty(region.get('region_kind'))
++        if summary and summary not in seen:
++            results.append(summary)
++            seen.add(summary)
++    return results
++
++
++def _score_status(score: float | None) -> str:
++    if score is None:
++        return 'unknown'
++    if score < 0.75:
++        return 'fail'
++    if score < 0.88:
++        return 'warn'
++    return 'pass'
++
++
++def _render_index_html(report: Mapping[str, Any], *, page_links: Mapping[int, str]) -> str:
++    pages = report.get('pages') or []
++    cards_html = []
++    for page in pages:
++        if not isinstance(page, Mapping):
++            continue
++        page_index = int(page.get('page_index') or 0)
++        page_link = page_links.get(page_index, '#')
++        status = 'no-go' if page.get('failure_reasons') else 'pass'
++        failure_html = ''.join(f'<li>{escape(str(reason))}</li>' for reason in page.get('failure_reasons') or []) or '<li>无显式失败原因</li>'
++        cards_html.append(
++            f'''
++            <section class="page-card">
++              <div class="page-card-header">
++                <div>
++                  <h2>{escape(str(page.get("page_title") or f"Page {page_index}"))}</h2>
++                  <p class="meta">Page {page_index} · {escape(str(page.get("subject") or "unknown"))} · status={escape(status)}</p>
++                </div>
++                <a class="detail-link" href="{escape(page_link)}">打开详情页</a>
++              </div>
++              <div class="image-grid">
++                {_render_image_tile('Source PDF', page.get('source_image_uri'))}
++                {_render_image_tile('Output DOCX', page.get('output_image_uri'))}
++                {_render_image_tile('Diff Overlay', page.get('diff_image_uri'))}
++              </div>
++              <div class="failure-box">
++                <h3>失败原因</h3>
++                <ul>{failure_html}</ul>
++              </div>
++            </section>
++            '''
++        )
++
++    summary = report.get('summary') or {}
++    subjects = ', '.join(str(item) for item in summary.get('subjects') or [])
++    return f'''<!DOCTYPE html>
++<html lang="zh-CN">
++<head>
++  <meta charset="utf-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1" />
++  <title>{escape(str(report.get("sample_name") or "visual-diff-debug"))} - Visual Diff Debug</title>
++  <style>{_base_css()}</style>
++</head>
++<body>
++  <main class="container">
++    <header class="hero">
++      <h1>视觉差异 Debug 报告</h1>
++      <p class="hero-subtitle">{escape(str(report.get("sample_name") or "visual-diff-debug"))}</p>
++      <div class="summary-grid">
++        <div class="summary-card"><span>页数</span><strong>{int(summary.get("page_count") or 0)}</strong></div>
++        <div class="summary-card"><span>失败页</span><strong>{int(summary.get("page_failure_count") or 0)}</strong></div>
++        <div class="summary-card"><span>关键区域</span><strong>{int(summary.get("key_region_count") or 0)}</strong></div>
++        <div class="summary-card"><span>学科</span><strong>{escape(subjects or "-")}</strong></div>
++      </div>
++      <p class="hint">本地直接打开本页即可查看每页 source/output/diff 预览；点击详情页可进一步定位 key-region crop 与失败原因。</p>
++    </header>
++    {''.join(cards_html)}
++  </main>
++</body>
++</html>'''
++
++
++def _render_page_html(page: Mapping[str, Any]) -> str:
++    key_region_cards = []
++    for region in page.get('key_regions') or []:
++        if not isinstance(region, Mapping):
++            continue
++        reasons_html = ''.join(f'<li>{escape(str(reason))}</li>' for reason in region.get('reasons') or []) or '<li>无</li>'
++        key_region_cards.append(
++            f'''
++            <section class="region-card">
++              <div class="region-header">
++                <h3>{escape(str(region.get("region_kind") or "unknown"))}</h3>
++                <span class="badge badge-{escape(str(region.get("status") or "unknown"))}">{escape(str(region.get("status") or "unknown"))}</span>
++              </div>
++              <p class="meta">{escape(str(region.get("region_id") or "region"))} · score={escape(_format_score(region.get("score")))}</p>
++              <div class="image-grid crop-grid">
++                {_render_image_tile('Source Crop', region.get('source_crop_uri'))}
++                {_render_image_tile('Output Crop', region.get('output_crop_uri'))}
++                {_render_image_tile('Diff Crop', region.get('diff_crop_uri'))}
++              </div>
++              <div class="failure-box">
++                <h4>失败原因</h4>
++                <ul>{reasons_html}</ul>
++              </div>
++            </section>
++            '''
++        )
++
++    blockers_html = ''.join(
++        f'<li>{escape(str(item.get("summary") or item.get("code") or "blocker"))}</li>'
++        for item in page.get('blockers') or []
++    ) or '<li>无</li>'
++    vetoes_html = ''.join(
++        f'<li>{escape(str(item.get("summary") or item.get("code") or "veto"))}'
++        + (f' <code>{escape(str(item.get("recommended_common_code")))}</code>' if item.get('recommended_common_code') else '')
++        + '</li>'
++        for item in page.get('vetoes') or []
++    ) or '<li>无</li>'
++    failures_html = ''.join(f'<li>{escape(str(reason))}</li>' for reason in page.get('failure_reasons') or []) or '<li>无</li>'
++
++    return f'''<!DOCTYPE html>
++<html lang="zh-CN">
++<head>
++  <meta charset="utf-8" />
++  <meta name="viewport" content="width=device-width, initial-scale=1" />
++  <title>{escape(str(page.get("page_title") or "page"))} - Visual Diff Detail</title>
++  <style>{_base_css()}</style>
++</head>
++<body>
++  <main class="container">
++    <header class="hero">
++      <a class="detail-link" href="../index.html">← 返回总览</a>
++      <h1>{escape(str(page.get("page_title") or "Page"))}</h1>
++      <p class="hero-subtitle">Page {int(page.get("page_index") or 0)} · {escape(str(page.get("subject") or "unknown"))} · pair={escape(str(page.get("pair_status") or "matched"))}</p>
++      <p class="hint">overall_score={escape(_format_score(page.get("overall_score")))}，可结合失败原因和 crop 对照快速定位 no-go 页。</p>
++    </header>
++    <section class="page-card">
++      <div class="image-grid">
++        {_render_image_tile('Source PDF', page.get('source_image_uri'))}
++        {_render_image_tile('Output DOCX', page.get('output_image_uri'))}
++        {_render_image_tile('Diff Overlay', page.get('diff_image_uri'))}
++      </div>
++    </section>
++    <section class="page-card">
++      <div class="triple-columns">
++        <div class="failure-box"><h3>失败原因</h3><ul>{failures_html}</ul></div>
++        <div class="failure-box"><h3>Blockers</h3><ul>{blockers_html}</ul></div>
++        <div class="failure-box"><h3>Vetoes</h3><ul>{vetoes_html}</ul></div>
++      </div>
++    </section>
++    <section class="page-card">
++      <h2>Key Region Crops</h2>
++      <div class="region-grid">
++        {''.join(key_region_cards) or '<p>无关键区域 crop。</p>'}
++      </div>
++    </section>
++  </main>
++</body>
++</html>'''
++
++
++def _render_image_tile(title: str, image_uri: Any) -> str:
++    if image_uri:
++        content = f'<img src="{escape(str(image_uri))}" alt="{escape(title)}" loading="lazy" />'
++    else:
++        content = '<div class="img-placeholder">image unavailable</div>'
++    return f'<figure class="image-tile"><figcaption>{escape(title)}</figcaption>{content}</figure>'
++
++
++def _base_css() -> str:
++    return '''
++      :root {
++        color-scheme: light;
++        --bg: #f8fafc;
++        --card: #ffffff;
++        --border: #cbd5e1;
++        --text: #0f172a;
++        --muted: #475569;
++        --accent: #2563eb;
++        --danger: #b91c1c;
++        --warn: #b45309;
++        --pass: #166534;
++      }
++      * { box-sizing: border-box; }
++      body {
++        margin: 0;
++        background: var(--bg);
++        color: var(--text);
++        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
++      }
++      .container {
++        max-width: 1280px;
++        margin: 0 auto;
++        padding: 24px;
++      }
++      .hero, .page-card, .region-card {
++        background: var(--card);
++        border: 1px solid var(--border);
++        border-radius: 18px;
++        padding: 20px;
++        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
++      }
++      .hero { margin-bottom: 20px; }
++      .hero-subtitle, .meta, .hint {
++        color: var(--muted);
++      }
++      .summary-grid, .image-grid, .triple-columns, .region-grid {
++        display: grid;
++        gap: 16px;
++      }
++      .summary-grid {
++        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
++        margin: 18px 0;
++      }
++      .summary-card {
++        border: 1px solid var(--border);
++        border-radius: 14px;
++        padding: 14px;
++        background: #f8fafc;
++      }
++      .summary-card span {
++        display: block;
++        color: var(--muted);
++        font-size: 12px;
++        margin-bottom: 8px;
++      }
++      .summary-card strong {
++        font-size: 20px;
++      }
++      .page-card, .region-card { margin-bottom: 20px; }
++      .page-card-header, .region-header {
++        display: flex;
++        justify-content: space-between;
++        align-items: flex-start;
++        gap: 12px;
++      }
++      .detail-link {
++        color: var(--accent);
++        text-decoration: none;
++        font-weight: 600;
++      }
++      .image-grid {
++        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
++        margin-top: 16px;
++      }
++      .crop-grid {
++        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
++      }
++      .image-tile {
++        margin: 0;
++        padding: 12px;
++        border: 1px solid var(--border);
++        border-radius: 14px;
++        background: #f8fafc;
++      }
++      .image-tile figcaption {
++        font-size: 12px;
++        color: var(--muted);
++        margin-bottom: 10px;
++      }
++      .image-tile img, .img-placeholder {
++        width: 100%;
++        border-radius: 12px;
++        display: block;
++        border: 1px solid #e2e8f0;
++        background: white;
++      }
++      .img-placeholder {
++        min-height: 180px;
++        display: grid;
++        place-items: center;
++        color: var(--muted);
++        font-size: 14px;
++      }
++      .failure-box {
++        padding: 14px;
++        border: 1px solid var(--border);
++        border-radius: 14px;
++        background: #fff;
++      }
++      .failure-box h3, .failure-box h4 {
++        margin-top: 0;
++      }
++      .failure-box ul {
++        margin: 0;
++        padding-left: 18px;
++      }
++      .triple-columns {
++        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
++      }
++      .region-grid {
++        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
++      }
++      .badge {
++        display: inline-flex;
++        align-items: center;
++        padding: 4px 10px;
++        border-radius: 999px;
++        font-size: 12px;
++        font-weight: 700;
++      }
++      .badge-pass { background: #dcfce7; color: var(--pass); }
++      .badge-warn { background: #fef3c7; color: var(--warn); }
++      .badge-fail { background: #fee2e2; color: var(--danger); }
++      .badge-unknown { background: #e2e8f0; color: var(--muted); }
++    '''
++
++
++def _format_score(value: Any) -> str:
++    if value is None:
++        return 'n/a'
++    try:
++        return f'{float(value):.4f}'
++    except (TypeError, ValueError):
++        return str(value)
++
++
++def _normalize_string_list(values: Any) -> list[str]:
++    if not isinstance(values, Sequence) or isinstance(values, (str, bytes, bytearray)):
++        return []
++    results: list[str] = []
++    for value in values:
++        if (text := _non_empty(value)) is not None and text not in results:
++            results.append(text)
++    return results
++
++
++def _dig(payload: Any, *keys: str) -> Any:
++    current = payload
++    for key in keys:
++        if not isinstance(current, Mapping):
++            return None
++        current = current.get(key)
++    return current
++
++
++def _non_empty(value: Any) -> str | None:
++    text = str(value or '').strip()
++    return text or None
++
++
++def _coerce_int(value: Any, *, default: int) -> int:
++    try:
++        return int(value)
++    except (TypeError, ValueError):
++        return default
++
++
++def _coerce_float(value: Any) -> float | None:
++    try:
++        return float(value)
++    except (TypeError, ValueError):
++        return None
++
++
++def _to_openable_uri(value: str | None) -> str | None:
++    text = _non_empty(value)
++    if text is None:
++        return None
++    if text.startswith(('data:', 'http://', 'https://', 'file://')):
++        return text
++    return Path(text).expanduser().resolve().as_uri()
+diff --git a/backend/tests/test_pdf_to_word_visual_diff_report.py b/backend/tests/test_pdf_to_word_visual_diff_report.py
+new file mode 100644
+index 0000000..c562bc2
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_visual_diff_report.py
+@@ -0,0 +1,349 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++from app.services.pdf_to_word.visual_diff_report import (
++    VISUAL_DIFF_REPORT_VERSION,
++    build_debug_placeholder_data_uri,
++    build_visual_diff_report,
++    generate_visual_diff_report,
++    write_visual_diff_report,
++)
++
++
++def _write_fixture_file(path: Path, *, content: str | bytes = 'fixture') -> str:
++    path.parent.mkdir(parents=True, exist_ok=True)
++    if isinstance(content, bytes):
++        path.write_bytes(content)
++    else:
++        path.write_text(content, encoding='utf-8')
++    return str(path)
++
++
++def _materialize_canonical_payload(tmp_path: Path) -> tuple[dict, dict]:
++    source_page_1 = _write_fixture_file(tmp_path / 'renders/source/page-001.png')
++    source_page_2 = _write_fixture_file(tmp_path / 'renders/source/page-002.png')
++    docx_page_1 = _write_fixture_file(tmp_path / 'renders/docx/page-001.png')
++    docx_page_2 = _write_fixture_file(tmp_path / 'renders/docx/page-002.png')
++    _write_fixture_file(tmp_path / 'renders/source/page-001.json', content='{}\n')
++    _write_fixture_file(tmp_path / 'renders/source/page-002.json', content='{}\n')
++    _write_fixture_file(tmp_path / 'renders/docx/page-001.json', content='{}\n')
++    _write_fixture_file(tmp_path / 'renders/docx/page-002.json', content='{}\n')
++    _write_fixture_file(tmp_path / 'renders/docx/rendered-output.pdf')
++    page_diff_1 = _write_fixture_file(tmp_path / 'diffs/pages/page-001-diff.png')
++    page_diff_2 = _write_fixture_file(tmp_path / 'diffs/pages/page-002-diff.png')
++    region_source_1 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-table-source.png')
++    region_docx_1 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-table-docx.png')
++    region_diff_1 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-table-diff.png')
++    region_source_2 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-formula-source.png')
++    region_docx_2 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-formula-docx.png')
++    region_diff_2 = _write_fixture_file(tmp_path / 'diffs/regions/math-p1-formula-diff.png')
++    region_source_3 = _write_fixture_file(tmp_path / 'diffs/regions/math-p2-backbone-source.png')
++    region_docx_3 = _write_fixture_file(tmp_path / 'diffs/regions/math-p2-backbone-docx.png')
++    region_diff_3 = _write_fixture_file(tmp_path / 'diffs/regions/math-p2-backbone-diff.png')
++
++    payload = {
++        'contract_version': 'pdf_to_word_visual_similarity_gate/v1',
++        'artifact_name': 'visual_similarity.json',
++        'subject_page_type': 'math',
++        'page_scores': [
++            {
++                'page_index': 1,
++                'subject_page_type': 'math',
++                'page_role': 'critical',
++                'page_render_similarity': 0.962,
++                'diff_image_path': page_diff_1,
++                'review_reasons': ['near_threshold_region_similarity:math:p1:table-01'],
++            },
++            {
++                'page_index': 2,
++                'subject_page_type': 'math',
++                'page_role': 'regular',
++                'page_render_similarity': 0.948,
++                'diff_image_path': page_diff_2,
++            },
++        ],
++        'key_regions': [
++            {
++                'page_index': 1,
++                'region_id': 'math:p1:table-01',
++                'region_type': 'table',
++                'region_similarity': 0.927,
++                'source_crop_path': region_source_1,
++                'docx_crop_path': region_docx_1,
++                'diff_image_path': region_diff_1,
++            },
++            {
++                'page_index': 1,
++                'region_id': 'math:p1:formula-graphic',
++                'region_type': 'formula_graphic',
++                'region_similarity': 0.931,
++                'source_crop_path': region_source_2,
++                'docx_crop_path': region_docx_2,
++                'diff_image_path': region_diff_2,
++            },
++            {
++                'page_index': 2,
++                'region_id': 'math:p2:question-backbone',
++                'region_type': 'question_backbone',
++                'region_similarity': 0.907,
++                'source_crop_path': region_source_3,
++                'docx_crop_path': region_docx_3,
++                'diff_image_path': region_diff_3,
++            },
++        ],
++    }
++    render_pair_payload = {
++        'render_pairs': [
++            {
++                'page_index': 1,
++                'pair_status': 'matched',
++                'source_pdf': {'page_index': 1, 'image_path': source_page_1, 'render_artifact': str(tmp_path / 'renders/source/page-001.json')},
++                'output_docx': {'page_index': 1, 'image_path': docx_page_1, 'render_artifact': str(tmp_path / 'renders/docx/page-001.json')},
++            },
++            {
++                'page_index': 2,
++                'pair_status': 'matched',
++                'source_pdf': {'page_index': 2, 'image_path': source_page_2, 'render_artifact': str(tmp_path / 'renders/source/page-002.json')},
++                'output_docx': {'page_index': 2, 'image_path': docx_page_2, 'render_artifact': str(tmp_path / 'renders/docx/page-002.json')},
++            },
++        ],
++    }
++    return payload, render_pair_payload
++
++
++def _sample_payload(tmp_path: Path) -> dict:
++    local_source = tmp_path / 'source-page.png'
++    local_output = tmp_path / 'output-page.png'
++    local_diff = tmp_path / 'diff-page.png'
++    for path, text in (
++        (local_source, 'source'),
++        (local_output, 'output'),
++        (local_diff, 'diff'),
++    ):
++        path.write_text(text, encoding='utf-8')
++
++    return {
++        'sample_name': '全学科 debug demo',
++        'pages': [
++            {
++                'page_index': 1,
++                'subject': 'science',
++                'page_title': '科学表格图文混合页',
++                'source_image_path': build_debug_placeholder_data_uri('science source', fill='#dbeafe'),
++                'output_image_path': build_debug_placeholder_data_uri('science output', fill='#e0f2fe'),
++                'diff_image_path': build_debug_placeholder_data_uri('science diff', fill='#fee2e2'),
++                'failure_reasons': ['表格外框和图片区绑定都异常'],
++                'blockers': [{'code': 'science_required_relation_missing', 'summary': 'science relation missing'}],
++                'vetoes': [{'code': 'science_table_region_critical_distortion', 'summary': '科学表格严重失真', 'recommended_common_code': 'table_visual_adjacency_severe_misalignment'}],
++                'region_scores': [
++                    {
++                        'region_id': 'table-1',
++                        'kind': 'table',
++                        'score': 0.42,
++                        'reasons': ['table_row_column_mismatch'],
++                        'source_crop_path': build_debug_placeholder_data_uri('science table src', width=220, height=140),
++                        'output_crop_path': build_debug_placeholder_data_uri('science table out', fill='#fef3c7', width=220, height=140),
++                        'diff_crop_path': build_debug_placeholder_data_uri('science table diff', fill='#fee2e2', width=220, height=140),
++                    }
++                ],
++            },
++            {
++                'page_index': 2,
++                'subject': 'math',
++                'page_title': '数学公式图形页',
++                'source_image_path': str(local_source),
++                'output_image_path': str(local_output),
++                'diff_image_path': str(local_diff),
++                'vetoes': [{'code': 'formula_or_graphic_region_critical_distortion', 'summary': '公式区严重失真', 'recommended_common_code': 'formula_or_graphic_region_critical_distortion'}],
++                'key_regions': [
++                    {
++                        'region_id': 'formula-1',
++                        'region_kind': 'formula',
++                        'score': 0.51,
++                        'reasons': ['bbox_iou_below_threshold'],
++                        'source_crop_path': build_debug_placeholder_data_uri('math formula src', width=220, height=140),
++                        'output_crop_path': build_debug_placeholder_data_uri('math formula out', fill='#fef3c7', width=220, height=140),
++                        'diff_crop_path': build_debug_placeholder_data_uri('math formula diff', fill='#fee2e2', width=220, height=140),
++                    }
++                ],
++            },
++            {
++                'page_index': 3,
++                'subject': 'english',
++                'page_title': '英语阅读选项页',
++                'render_pair': {
++                    'pair_status': 'matched',
++                    'source_pdf': {'image_path': build_debug_placeholder_data_uri('english source', fill='#ede9fe')},
++                    'output_docx': {'image_path': build_debug_placeholder_data_uri('english output', fill='#e0e7ff')},
++                    'diff_image_path': build_debug_placeholder_data_uri('english diff', fill='#fee2e2'),
++                },
++                'failure_reasons': ['阅读段落换行崩坏', '选项缩进丢失'],
++                'key_regions': [
++                    {
++                        'region_id': 'reading-1',
++                        'region_kind': 'reading_passage',
++                        'score': 0.48,
++                        'reasons': ['reading_line_break_profile_changed'],
++                        'source_crop_path': build_debug_placeholder_data_uri('english reading src', width=220, height=140),
++                        'output_crop_path': build_debug_placeholder_data_uri('english reading out', fill='#fef3c7', width=220, height=140),
++                        'diff_crop_path': build_debug_placeholder_data_uri('english reading diff', fill='#fee2e2', width=220, height=140),
++                    },
++                    {
++                        'region_id': 'options-1',
++                        'region_kind': 'options',
++                        'score': 0.52,
++                        'reasons': ['option_indent_deviates'],
++                        'source_crop_path': build_debug_placeholder_data_uri('english option src', width=220, height=140),
++                        'output_crop_path': build_debug_placeholder_data_uri('english option out', fill='#fef3c7', width=220, height=140),
++                        'diff_crop_path': build_debug_placeholder_data_uri('english option diff', fill='#fee2e2', width=220, height=140),
++                    }
++                ],
++            },
++            {
++                'page_index': 4,
++                'subject': 'chinese',
++                'page_title': '语文长文读序页',
++                'source_image_path': build_debug_placeholder_data_uri('chinese source', fill='#dcfce7'),
++                'output_image_path': build_debug_placeholder_data_uri('chinese output', fill='#f0fdf4'),
++                'diff_image_path': build_debug_placeholder_data_uri('chinese diff', fill='#fee2e2'),
++                'failure_reasons': ['长文读序错位'],
++                'key_regions': [
++                    {
++                        'region_id': 'essay-1',
++                        'region_kind': 'reading_order',
++                        'score': 0.63,
++                        'reasons': ['critical_page_reading_order_break'],
++                        'source_crop_path': build_debug_placeholder_data_uri('chinese order src', width=220, height=140),
++                        'output_crop_path': build_debug_placeholder_data_uri('chinese order out', fill='#fef3c7', width=220, height=140),
++                        'diff_crop_path': build_debug_placeholder_data_uri('chinese order diff', fill='#fee2e2', width=220, height=140),
++                    }
++                ],
++            },
++        ],
++    }
++
++
++def test_build_visual_diff_report_normalizes_cross_subject_pages_and_failures(tmp_path: Path):
++    payload = _sample_payload(tmp_path)
++
++    report = build_visual_diff_report(payload)
++
++    assert report['report_type'] == VISUAL_DIFF_REPORT_VERSION
++    assert report['sample_name'] == '全学科 debug demo'
++    assert report['page_count'] == 4
++    assert report['page_failure_count'] == 4
++    assert report['key_region_count'] == 5
++    assert report['subject_scope'] == ['chinese', 'english', 'math', 'science']
++
++    math_page = report['pages'][1]
++    assert math_page['source_image_uri'].startswith('file://')
++    assert math_page['output_image_uri'].startswith('file://')
++    assert '公式区严重失真' in math_page['failure_reasons']
++
++    english_page = report['pages'][2]
++    assert english_page['pair_status'] == 'matched'
++    assert english_page['source_image_uri'].startswith('data:image/svg+xml')
++    assert {item['region_kind'] for item in english_page['key_regions']} == {'reading_passage', 'options'}
++
++
++def test_write_visual_diff_report_outputs_openable_index_and_page_html(tmp_path: Path):
++    payload = _sample_payload(tmp_path)
++    report = build_visual_diff_report(payload)
++
++    artifact_paths = write_visual_diff_report(report, tmp_path / 'debug-html')
++
++    index_path = Path(artifact_paths['index_html'])
++    page_path = Path(artifact_paths['pages_dir']) / 'page-003.html'
++    report_json_path = Path(artifact_paths['report_json'])
++
++    assert index_path.exists()
++    assert page_path.exists()
++    assert report_json_path.exists()
++
++    index_html = index_path.read_text(encoding='utf-8')
++    page_html = page_path.read_text(encoding='utf-8')
++    report_json = json.loads(report_json_path.read_text(encoding='utf-8'))
++
++    assert '视觉差异 Debug 报告' in index_html
++    assert '打开详情页' in index_html
++    assert '英语阅读选项页' in index_html
++    assert '全学科 debug demo' in report_json['sample_name']
++    assert '../index.html' in page_html
++    assert 'Key Region Crops' in page_html
++    assert 'reading_line_break_profile_changed' in page_html
++
++
++def test_generate_visual_diff_report_returns_artifact_paths_and_preserves_data_uris(tmp_path: Path):
++    payload = _sample_payload(tmp_path)
++
++    report = generate_visual_diff_report(payload, tmp_path / 'artifact-out')
++
++    assert report['artifact_paths']['index_html'].endswith('index.html')
++    assert report['artifact_paths']['report_json'].endswith('visual_diff_report.json')
++    assert report['pages'][0]['source_image_uri'].startswith('data:image/svg+xml')
++    assert report['pages'][0]['key_regions'][0]['diff_crop_uri'].startswith('data:image/svg+xml')
++
++
++def test_build_visual_diff_report_consumes_canonical_visual_similarity_fixture(tmp_path: Path):
++    payload, render_pair_payload = _materialize_canonical_payload(tmp_path)
++
++    raw_report = build_visual_diff_report(payload)
++    assert raw_report['page_count'] == 2
++    assert raw_report['key_region_count'] == 3
++    assert raw_report['pages']
++
++    payload['render_pairs'] = render_pair_payload['render_pairs']
++    payload['vetoes'] = [
++        {
++            'code': 'key_region_similarity_below_threshold',
++            'summary': 'table region similarity too low',
++            'recommended_common_code': 'table_visual_adjacency_severe_misalignment',
++            'page_index': 1,
++            'region_id': 'math:p1:table-01',
++        }
++    ]
++
++    report = generate_visual_diff_report(payload, tmp_path / 'canonical-debug-html')
++
++    assert report['report_type'] == VISUAL_DIFF_REPORT_VERSION
++    assert report['page_count'] == 2
++    assert report['key_region_count'] == 3
++    assert report['subject_scope'] == ['math']
++    assert report['pages']
++    assert report['pages'][0]['source_image_uri'].startswith('file://')
++    assert report['pages'][0]['output_image_uri'].startswith('file://')
++    assert report['pages'][0]['key_regions'][0]['output_crop_uri'].startswith('file://')
++    assert report['artifact_paths']['index_html'].endswith('index.html')
++    assert Path(report['artifact_paths']['index_html']).exists()
++    assert Path(report['artifact_paths']['report_json']).exists()
++
++
++def test_build_visual_diff_report_preserves_docx_and_diff_crop_paths():
++    payload = {
++        'pages': [
++            {
++                'page_index': 1,
++                'subject': 'math',
++                'key_regions': [
++                    {
++                        'region_id': 'math:p1:table-01',
++                        'region_type': 'table',
++                        'region_similarity': 0.91,
++                        'source_crop_path': '/tmp/source-crop.png',
++                        'docx_crop_path': '/tmp/docx-crop.png',
++                        'diff_image_path': '/tmp/diff-crop.png',
++                    }
++                ],
++            }
++        ]
++    }
++
++    report = build_visual_diff_report(payload)
++
++    region = report['pages'][0]['key_regions'][0]
++    assert region['output_crop_path'] == '/tmp/docx-crop.png'
++    assert region['diff_crop_path'] == '/tmp/diff-crop.png'
++    assert region['output_crop_uri'].startswith('file://')
++    assert region['diff_crop_uri'].startswith('file://')

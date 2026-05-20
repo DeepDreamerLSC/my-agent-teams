@@ -1,0 +1,35 @@
+{
+  "task_id": "建立PDF转Word最终门禁样例清单与分层治理",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T19:02:14+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "样例治理任务通过：final-gated manifest 已成为 canonical source->output 配对清单；科学、数学、英语、语文四类样例都被纳入清单；student/teacher/review/authoritative/debug 变体已显式排除，后续 render pair 与人工 Rubric 可直接消费。",
+  "acceptance_criteria": {
+    "1_pm_will_not_confuse_variants_with_final_gated": {
+      "status": "pass",
+      "evidence": "manifest 为每个样例列出 excluded_variants，并把 p2-answer-teacher/authoritative 与 hybrid-e2e-validation 根路径写入 excluded_roots；README 和治理说明重复声明这些产物不可直接用于主线 95。"
+    },
+    "2_final_gated_manifest_covers_science_math_chinese_english": {
+      "status": "pass",
+      "evidence": "manifest.samples 覆盖 五下科学、数学八年级、数学试卷、英语八年级、语文五年级；其中语文五年级保留在 final_gated 套件中，但 evaluation_role=negative_guard，不参与正向 95 平均。"
+    },
+    "3_downstream_tasks_can_consume_without_oral_explanation": {
+      "status": "pass",
+      "evidence": "README 与治理说明明确 render pair、Rubric、最终判定都只消费 final-gated-manifest.json 的 canonical 配对，并解释了 published_aliases、excluded_roots 与当前未闭环事项。"
+    },
+    "4_claim_policy_field_not_frozen_prematurely": {
+      "status": "pass",
+      "evidence": "manifest/README/治理说明均按 PM 2026-05-19 同步，未定稿 claim/declaration policy 字段名，仅使用 tier / evaluation_role / eligible_for_human_visual_95。"
+    }
+  },
+  "test_commands": [
+    "static evidence review over final_acceptance_summary.json + hybrid_experimental_authoritative_archive_report.json + p2-answer-teacher/authoritative/summary.json + p2-answer-teacher/variants/summary.json",
+    "git diff --check -- artifacts/pdf2word/final-output-samples/final-gated-manifest.json artifacts/pdf2word/final-output-samples/README.final-gated.md artifacts/pdf2word/final-archive/reports/PDF转Word样例分层治理说明.md"
+  ],
+  "recommendations": [
+    "先等 arch-1 完成 canonical naming 返修，再统一 claim/declaration policy 的 schema 字段名。",
+    "再由 render pair 生成器和人工视觉 Rubric 直接消费本 manifest，进入下一轮全学科人工视觉复验。"
+  ]
+}

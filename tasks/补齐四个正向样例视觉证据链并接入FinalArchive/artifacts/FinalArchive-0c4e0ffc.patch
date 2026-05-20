@@ -1,0 +1,3392 @@
+diff --git a/backend/app/services/pdf_to_word/page_renderer.py b/backend/app/services/pdf_to_word/page_renderer.py
+index e049c6c..6745626 100644
+--- a/backend/app/services/pdf_to_word/page_renderer.py
++++ b/backend/app/services/pdf_to_word/page_renderer.py
+@@ -1,55 +1,117 @@
+ from __future__ import annotations
+ 
++import hashlib
+ import json
++import shutil
++import subprocess
++from dataclasses import dataclass
+ from pathlib import Path
++from typing import Callable
+ 
+ import pypdfium2 as pdfium
+ 
+ 
++DOCX_RENDER_TIMEOUT_SECONDS = 180
++
++
++@dataclass
++class PageRenderError(RuntimeError):
++    code: str
++    message: str
++    details: dict | None = None
++
++    def __post_init__(self) -> None:
++        RuntimeError.__init__(self, self.message)
++        if self.details is None:
++            self.details = {}
++
++    def to_dict(self) -> dict:
++        return {
++            "code": self.code,
++            "message": self.message,
++            "details": dict(self.details or {}),
++        }
++
++
+ def estimate_pdf_page_count(raw_bytes: bytes) -> int:
+     return max(1, raw_bytes.count(b"/Type /Page"))
+ 
+ 
+-def render_pdf_pages_for_parser(
++def sha256_file(path: str | Path) -> str:
++    resolved = Path(path).expanduser().resolve()
++    digest = hashlib.sha256()
++    with resolved.open("rb") as handle:
++        for chunk in iter(lambda: handle.read(65536), b""):
++            digest.update(chunk)
++    return digest.hexdigest()
++
++
++def _normalize_process_output(value: str | bytes | None) -> str:
++    if value is None:
++        return ""
++    if isinstance(value, bytes):
++        return value.decode("utf-8", errors="replace").strip()
++    return value.strip()
++
++
++def render_pdf_pages(
+     pdf_path: str | Path,
+     *,
+     source_name: str,
+     render_root: Path,
+     render_dpi: int,
++    metadata_extra: dict | None = None,
+ ) -> list[dict]:
+     source_path = Path(pdf_path).expanduser().resolve()
+-    document = pdfium.PdfDocument(str(source_path))
++    if not source_path.exists():
++        raise PageRenderError(
++            "pdf_not_found",
++            f"PDF file not found: {source_path}",
++            details={"pdf_path": str(source_path)},
++        )
++
+     render_root.mkdir(parents=True, exist_ok=True)
++    metadata_extra = dict(metadata_extra or {})
++
++    try:
++        document = pdfium.PdfDocument(str(source_path))
++    except Exception as exc:  # pragma: no cover
++        raise PageRenderError(
++            "pdf_open_failed",
++            f"failed to open pdf for rendering: {source_path}",
++            details={"pdf_path": str(source_path), "error": str(exc)},
++        ) from exc
+ 
+     rendered_pages: list[dict] = []
+     scale = max(render_dpi, 72) / 72.0
+-    for page_zero_index in range(len(document)):
+-        page = document[page_zero_index]
+-        width_points, height_points = page.get_size()
+-        rotation_degrees = int(page.get_rotation())
+-        bitmap = page.render(scale=scale)
+-        image = bitmap.to_pil()
+-
+-        image_path = render_root / f"page-{page_zero_index + 1:03d}.png"
+-        meta_path = render_root / f"page-{page_zero_index + 1:03d}.json"
+-        image.save(image_path)
+-
+-        payload = {
+-            "page_index": page_zero_index + 1,
+-            "source_name": source_name,
+-            "source_pdf": str(source_path),
+-            "render_dpi": render_dpi,
+-            "width_points": float(width_points),
+-            "height_points": float(height_points),
+-            "rotation_degrees": rotation_degrees,
+-            "pixel_width": image.width,
+-            "pixel_height": image.height,
+-            "image_path": str(image_path),
+-        }
+-        meta_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+-        rendered_pages.append(
+-            {
++    try:
++        for page_zero_index in range(len(document)):
++            try:
++                page = document[page_zero_index]
++                width_points, height_points = page.get_size()
++                rotation_degrees = int(page.get_rotation())
++                bitmap = page.render(scale=scale)
++                image = bitmap.to_pil()
++            except Exception as exc:
++                raise PageRenderError(
++                    "pdf_page_render_failed",
++                    f"failed to render pdf page {page_zero_index + 1}",
++                    details={
++                        "pdf_path": str(source_path),
++                        "page_index": page_zero_index + 1,
++                        "error": str(exc),
++                    },
++                ) from exc
++
++            image_path = render_root / f"page-{page_zero_index + 1:03d}.png"
++            meta_path = render_root / f"page-{page_zero_index + 1:03d}.json"
++            image.save(image_path)
++            image_sha256 = sha256_file(image_path)
++
++            payload = {
+                 "page_index": page_zero_index + 1,
++                "source_name": source_name,
++                "source_pdf": str(source_path),
+                 "render_dpi": render_dpi,
+                 "width_points": float(width_points),
+                 "height_points": float(height_points),
+@@ -57,7 +119,190 @@ def render_pdf_pages_for_parser(
+                 "pixel_width": image.width,
+                 "pixel_height": image.height,
+                 "image_path": str(image_path),
+-                "render_artifact": str(meta_path),
++                "image_sha256": image_sha256,
++                **metadata_extra,
+             }
+-        )
++            meta_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++            rendered_pages.append(
++                {
++                    "page_index": page_zero_index + 1,
++                    "render_dpi": render_dpi,
++                    "width_points": float(width_points),
++                    "height_points": float(height_points),
++                    "rotation_degrees": rotation_degrees,
++                    "pixel_width": image.width,
++                    "pixel_height": image.height,
++                    "image_path": str(image_path),
++                    "image_sha256": image_sha256,
++                    "render_artifact": str(meta_path),
++                    **metadata_extra,
++                }
++            )
++    finally:
++        close = getattr(document, "close", None)
++        if callable(close):
++            close()
+     return rendered_pages
++
++
++def render_pdf_pages_for_parser(
++    pdf_path: str | Path,
++    *,
++    source_name: str,
++    render_root: Path,
++    render_dpi: int,
++) -> list[dict]:
++    return render_pdf_pages(
++        pdf_path,
++        source_name=source_name,
++        render_root=render_root,
++        render_dpi=render_dpi,
++    )
++
++
++def convert_docx_to_pdf(
++    docx_path: str | Path,
++    *,
++    output_pdf_path: str | Path,
++    converter: Callable[[Path, Path], str | Path | None] | None = None,
++    timeout_seconds: int = DOCX_RENDER_TIMEOUT_SECONDS,
++) -> Path:
++    resolved_docx_path = Path(docx_path).expanduser().resolve()
++    resolved_output_pdf_path = Path(output_pdf_path).expanduser().resolve()
++
++    if not resolved_docx_path.exists():
++        raise PageRenderError(
++            "docx_not_found",
++            f"DOCX file not found: {resolved_docx_path}",
++            details={"docx_path": str(resolved_docx_path)},
++        )
++
++    resolved_output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
++
++    if converter is not None:
++        try:
++            candidate = converter(resolved_docx_path, resolved_output_pdf_path)
++        except PageRenderError:
++            raise
++        except Exception as exc:
++            raise PageRenderError(
++                "docx_pdf_conversion_failed",
++                f"custom docx converter failed for {resolved_docx_path.name}",
++                details={"docx_path": str(resolved_docx_path), "error": str(exc)},
++            ) from exc
++        candidate_path = Path(candidate).expanduser().resolve() if candidate else resolved_output_pdf_path
++        if not candidate_path.exists():
++            raise PageRenderError(
++                "docx_pdf_missing",
++                "custom docx converter did not produce a PDF artifact",
++                details={
++                    "docx_path": str(resolved_docx_path),
++                    "expected_pdf_path": str(candidate_path),
++                },
++            )
++        if candidate_path != resolved_output_pdf_path:
++            shutil.copy2(candidate_path, resolved_output_pdf_path)
++        return resolved_output_pdf_path
++
++    renderer_binary = shutil.which("soffice") or shutil.which("libreoffice")
++    if not renderer_binary:
++        raise PageRenderError(
++            "docx_renderer_unavailable",
++            "LibreOffice/soffice is required to render DOCX pages into PDF",
++            details={"docx_path": str(resolved_docx_path)},
++        )
++
++    command = [
++        renderer_binary,
++        "--headless",
++        "--convert-to",
++        "pdf",
++        "--outdir",
++        str(resolved_output_pdf_path.parent),
++        str(resolved_docx_path),
++    ]
++    try:
++        completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout_seconds)
++    except subprocess.TimeoutExpired as exc:
++        timeout_stdout = getattr(exc, "stdout", None)
++        if timeout_stdout is None:
++            timeout_stdout = getattr(exc, "output", None)
++        raise PageRenderError(
++            "docx_pdf_conversion_timeout",
++            f"docx to pdf conversion timed out for {resolved_docx_path.name}",
++            details={
++                "docx_path": str(resolved_docx_path),
++                "command": command,
++                "timeout_seconds": timeout_seconds,
++                "stdout": _normalize_process_output(timeout_stdout),
++                "stderr": _normalize_process_output(getattr(exc, "stderr", None)),
++            },
++        ) from exc
++    if completed.returncode != 0:
++        raise PageRenderError(
++            "docx_pdf_conversion_failed",
++            f"docx to pdf conversion failed for {resolved_docx_path.name}",
++            details={
++                "docx_path": str(resolved_docx_path),
++                "command": command,
++                "stdout": _normalize_process_output(completed.stdout),
++                "stderr": _normalize_process_output(completed.stderr),
++                "returncode": completed.returncode,
++            },
++        )
++
++    generated_pdf = resolved_output_pdf_path.parent / f"{resolved_docx_path.stem}.pdf"
++    candidate_path = generated_pdf if generated_pdf.exists() else resolved_output_pdf_path
++    if not candidate_path.exists():
++        raise PageRenderError(
++            "docx_pdf_missing",
++            f"docx conversion finished without a PDF artifact for {resolved_docx_path.name}",
++            details={
++                "docx_path": str(resolved_docx_path),
++                "expected_pdf_path": str(candidate_path),
++            },
++        )
++    if candidate_path != resolved_output_pdf_path:
++        shutil.move(str(candidate_path), str(resolved_output_pdf_path))
++    return resolved_output_pdf_path
++
++
++def render_docx_pages(
++    docx_path: str | Path,
++    *,
++    render_root: Path,
++    render_dpi: int,
++    converted_pdf_path: str | Path | None = None,
++    converter: Callable[[Path, Path], str | Path | None] | None = None,
++    timeout_seconds: int = DOCX_RENDER_TIMEOUT_SECONDS,
++) -> dict:
++    resolved_docx_path = Path(docx_path).expanduser().resolve()
++    resolved_render_root = Path(render_root).expanduser().resolve()
++    resolved_render_root.mkdir(parents=True, exist_ok=True)
++
++    pdf_path = (
++        Path(converted_pdf_path).expanduser().resolve()
++        if converted_pdf_path is not None
++        else resolved_render_root / f"{resolved_docx_path.stem}.rendered.pdf"
++    )
++    converted_pdf = convert_docx_to_pdf(
++        resolved_docx_path,
++        output_pdf_path=pdf_path,
++        converter=converter,
++        timeout_seconds=timeout_seconds,
++    )
++    pages = render_pdf_pages(
++        converted_pdf,
++        source_name=resolved_docx_path.name,
++        render_root=resolved_render_root,
++        render_dpi=render_dpi,
++        metadata_extra={
++            "source_docx": str(resolved_docx_path),
++            "converted_pdf_path": str(converted_pdf),
++        },
++    )
++    return {
++        "docx_path": str(resolved_docx_path),
++        "converted_pdf_path": str(converted_pdf),
++        "pages": pages,
++    }
+diff --git a/backend/app/services/pdf_to_word/workspace.py b/backend/app/services/pdf_to_word/workspace.py
+index 5b2b617..0455130 100644
+--- a/backend/app/services/pdf_to_word/workspace.py
++++ b/backend/app/services/pdf_to_word/workspace.py
+@@ -4,6 +4,15 @@ import json
+ import shutil
+ import tempfile
+ from pathlib import Path
++from typing import Any
++
++
++CANONICAL_VISUAL_EVIDENCE_FILENAMES = (
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json",
++)
+ 
+ 
+ class PDFToWordWorkspace:
+@@ -25,13 +34,51 @@ class PDFToWordWorkspace:
+         shutil.rmtree(self.path, ignore_errors=True)
+         self.path = None
+ 
+-    def write_json(self, name: str, payload: dict) -> Path:
++    def ensure_dir(self, *parts: str) -> Path:
+         if self.path is None:
+             raise RuntimeError("workspace is not active")
+-        target = self.path / name
+-        target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++        target = self.path.joinpath(*parts)
++        target.mkdir(parents=True, exist_ok=True)
+         return target
+ 
++    def write_json(self, name: str, payload: dict[str, Any]) -> Path:
++        if self.path is None:
++            raise RuntimeError("workspace is not active")
++        return write_json_payload(self.path / name, payload)
++
++    def write_canonical_visual_evidence(self, artifact_name: str, payload: dict[str, Any]) -> Path:
++        if artifact_name not in CANONICAL_VISUAL_EVIDENCE_FILENAMES:
++            raise ValueError(f"unsupported canonical visual evidence artifact: {artifact_name}")
++        return self.write_json(artifact_name, payload)
++
++
++def write_json_payload(path: str | Path, payload: dict[str, Any]) -> Path:
++    target = Path(path).expanduser().resolve()
++    target.parent.mkdir(parents=True, exist_ok=True)
++    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    return target
++
++
++def collect_canonical_visual_evidence(sample_root: str | Path) -> dict[str, Any]:
++    resolved_root = Path(sample_root).expanduser().resolve()
++    artifacts: dict[str, dict[str, Any]] = {}
++    missing: list[str] = []
++    for file_name in CANONICAL_VISUAL_EVIDENCE_FILENAMES:
++        path = resolved_root / file_name
++        exists = path.exists()
++        artifacts[file_name] = {
++            "path": str(path),
++            "exists": exists,
++        }
++        if not exists:
++            missing.append(file_name)
++    return {
++        "sample_root": str(resolved_root),
++        "artifacts": artifacts,
++        "missing_artifacts": missing,
++        "complete": not missing,
++    }
++
+ 
+ def create_pdf_to_word_workspace(root: Path) -> PDFToWordWorkspace:
+     return PDFToWordWorkspace(root)
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalArchive-0c4e0ffc/backend/app/services/pdf_to_word/visual_similarity_gate.py
+@@ -0,0 +1,333 @@
++from __future__ import annotations
++
++import json
++from collections.abc import Mapping, Sequence
++from pathlib import Path
++from typing import Any
++
++
++VISUAL_SIMILARITY_GATE_VERSION = "pdf_to_word_visual_similarity_gate/v1"
++VISUAL_SIMILARITY_ARTIFACT_NAME = "visual_similarity.json"
++VISUAL_SIMILARITY_REPORT_TYPE = "pdf_to_word_visual_similarity_evidence"
++VISUAL_SIMILARITY_DIMENSION_KEY = "visual_similarity"
++VISUAL_SIMILARITY_DIMENSION_WEIGHT = 17
++QUALITY_HYBRID_ASYNC_MODE = "quality/hybrid_async"
++DEFAULT_SYNC_MODE = "default_sync"
++QUALITY_GATE_MODES = {"quality", "hybrid_async", QUALITY_HYBRID_ASYNC_MODE}
++DEFAULT_SYNC_MODES = {"", "auto", "apple", "fast", "balanced", DEFAULT_SYNC_MODE}
++
++DEFAULT_THRESHOLDS: dict[str, float] = {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.90,
++}
++
++
++class VisualSimilarityGateError(ValueError):
++    """Raised when a visual-similarity payload is structurally invalid."""
++
++
++def load_visual_similarity_contract(path: str | Path) -> dict[str, Any]:
++    contract_path = Path(path).expanduser().resolve()
++    return json.loads(contract_path.read_text(encoding="utf-8"))
++
++
++def write_visual_similarity_gate_artifact(report: Mapping[str, Any], output_path: str | Path) -> Path:
++    artifact_path = Path(output_path).expanduser().resolve()
++    artifact_path.parent.mkdir(parents=True, exist_ok=True)
++    artifact_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    return artifact_path
++
++
++def resolve_visual_gate_mode(requested_mode: str | None, *, parser_backend: str | None = None) -> str:
++    mode = _normalize_mode(requested_mode)
++    backend = str(parser_backend or "").strip().lower()
++    if mode in QUALITY_GATE_MODES:
++        return QUALITY_HYBRID_ASYNC_MODE
++    if backend == "hybrid_experimental" and mode == "quality":
++        return QUALITY_HYBRID_ASYNC_MODE
++    if mode in DEFAULT_SYNC_MODES:
++        return DEFAULT_SYNC_MODE
++    return DEFAULT_SYNC_MODE
++
++
++def build_visual_similarity_gate_report(
++    contract: Mapping[str, Any],
++    *,
++    requested_mode: str | None = None,
++    parser_backend: str | None = None,
++) -> dict[str, Any]:
++    _validate_contract(contract)
++    thresholds = _coerce_thresholds(contract.get("thresholds"))
++    gate_mode = resolve_visual_gate_mode(requested_mode, parser_backend=parser_backend)
++    gate_enabled = gate_mode == QUALITY_HYBRID_ASYNC_MODE
++    render_pair = _load_render_pair_artifact(contract)
++    render_pair_status = str(render_pair.get("status") or "missing").strip() or "missing"
++    render_pairs = list(render_pair.get("render_pairs") or []) if isinstance(render_pair, Mapping) else []
++    render_pair_ready = bool(render_pair.get("ok")) and render_pair_status == "success"
++
++    page_scores = _build_page_scores(contract.get("page_scores") or [], render_pairs)
++    key_regions = _build_key_regions(contract.get("key_regions") or [])
++    aggregate = _build_aggregate(page_scores, key_regions, render_pairs)
++    blocking_failures = []
++    human_review_reasons = []
++    if not render_pair_ready:
++        blocking_failures.append("visual_similarity_artifact_not_ready")
++        human_review_reasons.append("render_pair_not_ready")
++    if aggregate["page_score_count"] == 0:
++        blocking_failures.append("page_scores_missing")
++        human_review_reasons.append("page_scores_missing")
++
++    status = "ready" if gate_enabled and not blocking_failures else "artifact_not_ready" if gate_enabled else "skipped_default_sync"
++    failure_code = None if not blocking_failures else blocking_failures[0]
++    artifact_ready_for_scoring = gate_enabled and not blocking_failures
++
++    vetoes = []
++    if blocking_failures:
++        vetoes.append(
++            {
++                "code": "visual_similarity_artifact_not_ready",
++                "scope": "document",
++                "severity": "p0",
++                "blocking": True,
++                "reason": "render pair or page-level similarity evidence is not ready for scoring",
++                "details": list(blocking_failures),
++            }
++        )
++
++    return {
++        "report_type": VISUAL_SIMILARITY_REPORT_TYPE,
++        "contract_version": VISUAL_SIMILARITY_GATE_VERSION,
++        "artifact_name": VISUAL_SIMILARITY_ARTIFACT_NAME,
++        "implementation_status": str(
++            contract.get("implementation_status")
++            or ("real_render_pair_artifact_ready" if render_pair_ready else "archive_materialized_render_pair_pending")
++        ),
++        "status": status,
++        "failure_code": failure_code,
++        "mode_boundary": {
++            "requested_mode": _normalize_mode(requested_mode),
++            "parser_backend": str(parser_backend or "").strip() or None,
++            "resolved_gate_mode": gate_mode,
++            "enabled": gate_enabled,
++            "default_sync_safe": True,
++            "default_sync_invokes_render_or_slow_model": False,
++            "reason": (
++                "visual similarity counts only in quality/hybrid_async"
++                if gate_enabled
++                else "default synchronous modes do not score visual similarity"
++            ),
++        },
++        "score_contract": {
++            "dimension_key": VISUAL_SIMILARITY_DIMENSION_KEY,
++            "dimension_weight": VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++            "eligible_for_final_score": artifact_ready_for_scoring,
++            "counts_toward_final_score": artifact_ready_for_scoring,
++            "reason": (
++                "real render pair + page scores ready"
++                if artifact_ready_for_scoring
++                else "artifact materialized but not ready to restore the 17-point visual_similarity lane"
++            ),
++        },
++        "thresholds": thresholds,
++        "artifact_contract": _build_artifact_contract(contract),
++        "render_pair_status": render_pair_status,
++        "render_pair_failure_code": str(render_pair.get("failure_code") or "") or None,
++        "render_pairs": render_pairs,
++        "page_scores": page_scores,
++        "key_regions": key_regions,
++        "vetoes": vetoes,
++        "blocking_failures": blocking_failures,
++        "subject_page_type": str(contract.get("subject_page_type") or "").strip() or None,
++        "human_review_required": bool(human_review_reasons),
++        "human_review_reasons": human_review_reasons,
++        "evidence_paths": _normalize_paths(contract.get("evidence_paths")),
++        "aggregate": aggregate,
++        "artifact_ready_for_scoring": artifact_ready_for_scoring,
++        "gate_passed": artifact_ready_for_scoring,
++        "slow_model_policy": _normalize_slow_model_policy(contract.get("slow_model_policy")),
++        "slow_model_review": {
++            "enabled": gate_enabled and render_pair_ready,
++            "selected_page_count": 0,
++            "executed_page_count": 0,
++            "fallback_page_count": 0,
++            "pages": [],
++            "status": "not_requested" if gate_enabled else "disabled_default_sync",
++        },
++        "known_gaps": [str(item) for item in contract.get("known_gaps") or [] if str(item).strip()],
++        "downstream_required_work": [
++            str(item) for item in contract.get("downstream_required_work") or [] if str(item).strip()
++        ],
++    }
++
++
++def _validate_contract(contract: Mapping[str, Any]) -> None:
++    required = {
++        "contract_version",
++        "source_policy",
++        "thresholds",
++        "slow_model_policy",
++        "artifact_contract",
++        "page_scores",
++        "key_regions",
++        "evidence_paths",
++    }
++    missing = sorted(required - set(contract))
++    if missing:
++        raise VisualSimilarityGateError(f"missing visual similarity contract fields: {missing}")
++    if str(contract.get("contract_version") or "") != VISUAL_SIMILARITY_GATE_VERSION:
++        raise VisualSimilarityGateError("unsupported visual similarity contract_version")
++    source_policy = contract.get("source_policy") if isinstance(contract.get("source_policy"), Mapping) else {}
++    if int(source_policy.get("visual_similarity_weight") or 0) != VISUAL_SIMILARITY_DIMENSION_WEIGHT:
++        raise VisualSimilarityGateError("visual_similarity_weight must remain 17 in the 95-point route")
++
++
++def _coerce_thresholds(payload: object) -> dict[str, float]:
++    thresholds = dict(DEFAULT_THRESHOLDS)
++    if isinstance(payload, Mapping):
++        for key in DEFAULT_THRESHOLDS:
++            if key in payload:
++                thresholds[key] = float(payload[key])
++    return thresholds
++
++
++def _load_render_pair_artifact(contract: Mapping[str, Any]) -> Mapping[str, Any]:
++    inline_payload = contract.get("render_pair_artifact")
++    if isinstance(inline_payload, Mapping):
++        return inline_payload
++    path_value = str(contract.get("render_pair_artifact_path") or "").strip()
++    if not path_value:
++        return {}
++    path = Path(path_value).expanduser().resolve()
++    if not path.exists():
++        return {"status": "missing", "ok": False, "failure_code": "render_pair_artifact_missing"}
++    try:
++        payload = json.loads(path.read_text(encoding="utf-8"))
++    except Exception as exc:  # pragma: no cover
++        return {"status": "invalid", "ok": False, "failure_code": f"render_pair_artifact_unreadable:{exc}"}
++    return payload if isinstance(payload, Mapping) else {"status": "invalid", "ok": False, "failure_code": "render_pair_artifact_not_object"}
++
++
++def _build_artifact_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
++    artifact_contract = contract.get("artifact_contract")
++    if isinstance(artifact_contract, Mapping):
++        return dict(artifact_contract)
++    return {
++        "required_artifacts": [
++            "render_pair.json",
++            "visual_similarity.json",
++            "fidelity_veto.json",
++            "human_review_report.json",
++        ],
++        "required_fields": [
++            "report_type",
++            "contract_version",
++            "status",
++            "failure_code",
++            "mode_boundary",
++            "score_contract",
++            "thresholds",
++            "render_pairs",
++            "page_scores",
++            "key_regions",
++            "vetoes",
++            "subject_page_type",
++            "human_review_required",
++            "evidence_paths",
++            "slow_model_review",
++        ],
++    }
++
++
++def _normalize_paths(payload: object) -> dict[str, Any]:
++    if not isinstance(payload, Mapping):
++        return {}
++    return {str(key): value for key, value in payload.items()}
++
++
++def _normalize_slow_model_policy(payload: object) -> dict[str, Any]:
++    if not isinstance(payload, Mapping):
++        return {
++            "candidate_models": ["qwen3_vl_8b"],
++            "disallowed_modes": ["fast", "balanced", DEFAULT_SYNC_MODE],
++            "fallback_action": "manual_review",
++        }
++    return {
++        "candidate_models": list(payload.get("candidate_models") or ["qwen3_vl_8b"]),
++        "disallowed_modes": list(payload.get("disallowed_modes") or ["fast", "balanced", DEFAULT_SYNC_MODE]),
++        "fallback_action": str(payload.get("fallback_action") or "manual_review"),
++    }
++
++
++def _build_page_scores(raw_scores: Sequence[object], render_pairs: Sequence[object]) -> list[dict[str, Any]]:
++    if not raw_scores:
++        return [
++            {
++                "page_index": int(pair.get("page_index") or 0),
++                "pair_status": str(pair.get("pair_status") or "unknown"),
++                "page_role": "critical",
++                "page_render_similarity": None,
++                "review_required": True,
++                "review_reasons": ["page_score_missing"],
++            }
++            for pair in render_pairs
++            if isinstance(pair, Mapping)
++        ]
++    page_scores: list[dict[str, Any]] = []
++    for item in raw_scores:
++        if not isinstance(item, Mapping):
++            continue
++        page_scores.append(
++            {
++                "page_index": int(item.get("page_index") or 0),
++                "pair_status": str(item.get("pair_status") or "unknown"),
++                "page_role": str(item.get("page_role") or "critical"),
++                "page_render_similarity": item.get("page_render_similarity"),
++                "review_required": bool(item.get("review_required", True)),
++                "review_reasons": list(item.get("review_reasons") or []),
++            }
++        )
++    return page_scores
++
++
++def _build_key_regions(raw_regions: Sequence[object]) -> list[dict[str, Any]]:
++    key_regions: list[dict[str, Any]] = []
++    for item in raw_regions:
++        if not isinstance(item, Mapping):
++            continue
++        key_regions.append(
++            {
++                "page_index": int(item.get("page_index") or 0),
++                "region_kind": str(item.get("region_kind") or "unknown"),
++                "region_label": str(item.get("region_label") or ""),
++                "region_similarity": item.get("region_similarity"),
++                "review_required": bool(item.get("review_required", True)),
++            }
++        )
++    return key_regions
++
++
++def _build_aggregate(
++    page_scores: Sequence[Mapping[str, Any]],
++    key_regions: Sequence[Mapping[str, Any]],
++    render_pairs: Sequence[object],
++) -> dict[str, Any]:
++    numeric_scores = [
++        float(item["page_render_similarity"])
++        for item in page_scores
++        if item.get("page_render_similarity") not in (None, "")
++    ]
++    return {
++        "render_pair_count": len(render_pairs),
++        "page_score_count": len(page_scores),
++        "key_region_count": len(key_regions),
++        "render_pair_ready_page_count": sum(
++            1 for pair in render_pairs if isinstance(pair, Mapping) and str(pair.get("pair_status") or "") == "matched"
++        ),
++        "overall_page_similarity_mean": round(sum(numeric_scores) / len(numeric_scores), 4) if numeric_scores else None,
++    }
++
++
++def _normalize_mode(requested_mode: str | None) -> str:
++    return str(requested_mode or "").strip().lower()
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalArchive-0c4e0ffc/backend/app/services/pdf_to_word/fidelity_veto.py
+@@ -0,0 +1,319 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from typing import Any, Sequence
++
++
++FIDELITY_VETO_CONTRACT_VERSION = "pdf_to_word_fidelity_veto/v1"
++FIDELITY_VETO_ARTIFACT_NAME = "fidelity_veto.json"
++FIDELITY_VETO_TAXONOMY: dict[str, dict[str, Any]] = {
++    "critical_page_reading_order_break": {
++        "severity": "p0",
++        "scope": "page",
++        "category": "reading_order",
++        "label": "关键页读序崩坏",
++    },
++    "table_visual_adjacency_severe_misalignment": {
++        "severity": "p0",
++        "scope": "region",
++        "category": "table_visual_adjacency",
++        "label": "表格视觉邻接严重错位",
++    },
++    "formula_or_graphic_region_critical_distortion": {
++        "severity": "p0",
++        "scope": "region",
++        "category": "formula_or_graphic",
++        "label": "公式/图形区关键失真",
++    },
++    "english_reading_or_option_region_critical_distortion": {
++        "severity": "p0",
++        "scope": "region",
++        "category": "english_reading_or_option",
++        "label": "英语阅读/选项区关键失真",
++    },
++    "critical_fallback_not_visually_close_to_source": {
++        "severity": "p0",
++        "scope": "page",
++        "category": "fallback_gap",
++        "label": "关键页 fallback 无法接近原 PDF",
++    },
++}
++
++
++def write_fidelity_veto_artifact(payload: dict[str, Any], output_path: str | Path) -> Path:
++    artifact_path = Path(output_path).expanduser().resolve()
++    artifact_path.parent.mkdir(parents=True, exist_ok=True)
++    artifact_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    return artifact_path
++
++
++def summarize_fidelity_veto_payload(
++    payload: dict[str, Any],
++    *,
++    sample_name: str,
++    artifact_candidates: Sequence[Path] | None = None,
++    artifact_path: str | Path | None = None,
++) -> dict[str, Any]:
++    page_scores = _normalize_page_scores(payload.get("page_scores"))
++    render_pairs = payload.get("render_pairs") if isinstance(payload.get("render_pairs"), list) else []
++    vetoes = _collect_raw_vetoes(payload)
++    p0_vetoes = [item for item in vetoes if str(item.get("severity") or "").lower() == "p0"]
++    taxonomy_counts: dict[str, int] = {}
++    for item in p0_vetoes:
++        code = str(item.get("canonical_code") or "unknown_veto")
++        taxonomy_counts[code] = int(taxonomy_counts.get(code, 0)) + 1
++    return {
++        "contract_version": str(payload.get("contract_version") or FIDELITY_VETO_CONTRACT_VERSION),
++        "status": "present",
++        "artifact_path": str(Path(artifact_path).expanduser().resolve()) if artifact_path else None,
++        "artifact_candidates": [str(path) for path in (artifact_candidates or [])],
++        "sample_name": str(payload.get("sample_name") or sample_name),
++        "subject": _str_or_none(payload.get("subject")),
++        "document_page_type": _str_or_none(payload.get("document_page_type") or payload.get("page_type")),
++        "overall_score": _coerce_float(payload.get("overall_score") if payload.get("overall_score") is not None else payload.get("score")),
++        "human_review_required": bool(payload.get("human_review_required")),
++        "page_score_count": len(page_scores),
++        "min_page_score": min(page_scores) if page_scores else None,
++        "render_pair_count": len(render_pairs),
++        "veto_count": len(vetoes),
++        "p0_veto_count": len(p0_vetoes),
++        "page_veto_count": sum(1 for item in vetoes if item.get("scope") == "page"),
++        "region_veto_count": sum(1 for item in vetoes if item.get("scope") == "region"),
++        "taxonomy_counts": taxonomy_counts,
++        "failed_taxonomy": sorted(taxonomy_counts),
++        "vetoes": vetoes,
++        "p0_vetoes": p0_vetoes,
++        "no_go": bool(p0_vetoes),
++        "error": None,
++    }
++
++
++def load_fidelity_veto_summary(
++    *,
++    sample_name: str,
++    sample_dir: str | Path,
++    archive_root: str | Path,
++    source_manifest: dict[str, Any] | None = None,
++) -> dict[str, Any]:
++    candidates = _candidate_artifact_paths(
++        sample_name=sample_name,
++        sample_dir=sample_dir,
++        archive_root=archive_root,
++        source_manifest=source_manifest,
++    )
++    artifact_path = next((path for path in candidates if path.exists() and path.is_file()), None)
++    if artifact_path is None:
++        return _empty_summary(sample_name=sample_name, status="missing", artifact_candidates=candidates)
++    try:
++        payload = json.loads(artifact_path.read_text(encoding="utf-8"))
++    except Exception as exc:
++        return _empty_summary(
++            sample_name=sample_name,
++            status="invalid",
++            artifact_candidates=candidates,
++            artifact_path=artifact_path,
++            error=str(exc),
++        )
++    if not isinstance(payload, dict):
++        return _empty_summary(
++            sample_name=sample_name,
++            status="invalid",
++            artifact_candidates=candidates,
++            artifact_path=artifact_path,
++            error="fidelity_veto_payload_not_object",
++        )
++    return summarize_fidelity_veto_payload(
++        payload,
++        sample_name=sample_name,
++        artifact_candidates=candidates,
++        artifact_path=artifact_path,
++    )
++
++
++def build_fidelity_veto_gate_summary(sample_summaries: Sequence[dict[str, Any]]) -> dict[str, Any]:
++    samples = [dict(item) for item in sample_summaries if isinstance(item, dict)]
++    taxonomy_counts: dict[str, int] = {}
++    for sample in samples:
++        for key, value in (sample.get("taxonomy_counts") or {}).items():
++            taxonomy_counts[str(key)] = int(taxonomy_counts.get(str(key), 0)) + int(value or 0)
++    return {
++        "status": (
++            "waiting_for_upstream_artifact"
++            if not any(sample.get("status") == "present" for sample in samples)
++            else "partial_coverage"
++            if any(sample.get("status") != "present" for sample in samples)
++            else "active"
++        ),
++        "contract_version": FIDELITY_VETO_CONTRACT_VERSION,
++        "supported_p0_veto_codes": sorted(FIDELITY_VETO_TAXONOMY),
++        "available_sample_count": sum(1 for sample in samples if sample.get("status") == "present"),
++        "missing_sample_count": sum(1 for sample in samples if sample.get("status") == "missing"),
++        "invalid_sample_count": sum(1 for sample in samples if sample.get("status") == "invalid"),
++        "p0_veto_count": sum(int(sample.get("p0_veto_count") or 0) for sample in samples),
++        "p0_triggered": any(int(sample.get("p0_veto_count") or 0) > 0 for sample in samples),
++        "taxonomy_counts": dict(sorted(taxonomy_counts.items())),
++        "samples": [
++            {
++                "sample_name": str(sample.get("sample_name") or ""),
++                "status": sample.get("status"),
++                "veto_count": int(sample.get("veto_count") or 0),
++                "p0_veto_count": int(sample.get("p0_veto_count") or 0),
++                "failed_taxonomy": list(sample.get("failed_taxonomy") or []),
++                "no_go": bool(sample.get("no_go")),
++            }
++            for sample in samples
++        ],
++    }
++
++
++def _candidate_artifact_paths(
++    *,
++    sample_name: str,
++    sample_dir: str | Path,
++    archive_root: str | Path,
++    source_manifest: dict[str, Any] | None = None,
++) -> list[Path]:
++    sample_root = Path(sample_dir).expanduser().resolve()
++    archive_path = Path(archive_root).expanduser().resolve()
++    source_artifacts = (
++        source_manifest.get("source_artifacts")
++        if isinstance(source_manifest, dict) and isinstance(source_manifest.get("source_artifacts"), dict)
++        else {}
++    )
++    candidates = []
++    for key in ("fidelity_veto_path", "visual_similarity_path"):
++        value = source_artifacts.get(key) if isinstance(source_artifacts, dict) else None
++        if value:
++            candidates.append(Path(str(value)))
++    candidates.extend(
++        [
++            sample_root / FIDELITY_VETO_ARTIFACT_NAME,
++            sample_root / "visual_similarity.json",
++            archive_path / "reports" / "fidelity-veto" / f"{sample_name}.json",
++            archive_path / "reports" / "visual_similarity" / f"{sample_name}.json",
++        ]
++    )
++    return _dedupe_paths(candidates)
++
++
++def _empty_summary(
++    *,
++    sample_name: str,
++    status: str,
++    artifact_candidates: Sequence[Path],
++    artifact_path: Path | None = None,
++    error: str | None = None,
++) -> dict[str, Any]:
++    return {
++        "contract_version": FIDELITY_VETO_CONTRACT_VERSION,
++        "status": status,
++        "artifact_path": str(artifact_path) if artifact_path else None,
++        "artifact_candidates": [str(path) for path in artifact_candidates],
++        "sample_name": sample_name,
++        "subject": None,
++        "document_page_type": None,
++        "overall_score": None,
++        "human_review_required": False,
++        "page_score_count": 0,
++        "min_page_score": None,
++        "render_pair_count": 0,
++        "veto_count": 0,
++        "p0_veto_count": 0,
++        "page_veto_count": 0,
++        "region_veto_count": 0,
++        "taxonomy_counts": {},
++        "failed_taxonomy": [],
++        "vetoes": [],
++        "p0_vetoes": [],
++        "no_go": False,
++        "error": error,
++    }
++
++
++def _normalize_page_scores(payload: Any) -> list[float]:
++    if not isinstance(payload, list):
++        return []
++    scores: list[float] = []
++    for item in payload:
++        if not isinstance(item, dict):
++            continue
++        value = _coerce_float(item.get("score") if item.get("score") is not None else item.get("similarity_score"))
++        if value is not None:
++            scores.append(value)
++    return scores
++
++
++def _collect_raw_vetoes(payload: dict[str, Any]) -> list[dict[str, Any]]:
++    vetoes: list[dict[str, Any]] = []
++    for field_name, default_scope in (("vetoes", None), ("page_vetoes", "page"), ("region_vetoes", "region")):
++        items = payload.get(field_name)
++        if not isinstance(items, list):
++            continue
++        for item in items:
++            if isinstance(item, dict):
++                vetoes.append(_normalize_veto_entry(item, default_scope=default_scope))
++    return vetoes
++
++
++def _normalize_veto_entry(entry: dict[str, Any], *, default_scope: str | None = None) -> dict[str, Any]:
++    raw_code = _str_or_none(entry.get("code") or entry.get("reason_code") or entry.get("kind"))
++    canonical_code = raw_code if raw_code in FIDELITY_VETO_TAXONOMY else raw_code or "unknown_veto"
++    taxonomy = FIDELITY_VETO_TAXONOMY.get(canonical_code) or {}
++    scope = _str_or_none(entry.get("scope")) or default_scope or _str_or_none(taxonomy.get("scope")) or "page"
++    return {
++        "code": raw_code or canonical_code,
++        "canonical_code": canonical_code,
++        "severity": str(entry.get("severity") or taxonomy.get("severity") or "p1").strip().lower(),
++        "scope": scope,
++        "page_index": _coerce_int(entry.get("page_index") or entry.get("page")),
++        "region_kind": _str_or_none(entry.get("region_kind")),
++        "region_id": _str_or_none(entry.get("region_id")),
++        "summary": _str_or_none(entry.get("summary") or entry.get("reason") or taxonomy.get("label")) or canonical_code,
++        "category": _str_or_none(taxonomy.get("category")),
++        "label": _str_or_none(taxonomy.get("label")),
++        "triggered": bool(entry.get("triggered", True)),
++        "evidence_paths": _normalize_evidence_paths(entry.get("evidence_paths") or entry.get("evidence")),
++    }
++
++
++def _normalize_evidence_paths(value: Any) -> list[str]:
++    if isinstance(value, list):
++        return [text for item in value if (text := _str_or_none(item))]
++    if isinstance(value, dict):
++        return [text for item in value.values() if (text := _str_or_none(item))]
++    if isinstance(value, str):
++        text = _str_or_none(value)
++        return [text] if text else []
++    return []
++
++
++def _dedupe_paths(paths: Sequence[Path]) -> list[Path]:
++    result: list[Path] = []
++    seen: set[Path] = set()
++    for raw_path in paths:
++        path = raw_path.expanduser().resolve()
++        if path in seen:
++            continue
++        seen.add(path)
++        result.append(path)
++    return result
++
++
++def _str_or_none(value: Any) -> str | None:
++    text = str(value or "").strip()
++    return text or None
++
++
++def _coerce_int(value: Any) -> int | None:
++    try:
++        return int(value)
++    except (TypeError, ValueError):
++        return None
++
++
++def _coerce_float(value: Any) -> float | None:
++    try:
++        return float(value)
++    except (TypeError, ValueError):
++        return None
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalArchive-0c4e0ffc/backend/tests/fixtures/pdf_to_word/visual_similarity/final_archive_positive_samples_manifest.json
+@@ -0,0 +1,26 @@
++{
++  "contract_version": "pdf_to_word_visual_similarity_final_archive_fixture/v1",
++  "profile_name": "hybrid_experimental",
++  "required_samples": [
++    "五下科学",
++    "数学八年级",
++    "数学试卷",
++    "英语八年级"
++  ],
++  "required_artifacts": [
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "sample_subjects": {
++    "五下科学": "science",
++    "数学八年级": "math",
++    "数学试卷": "math",
++    "英语八年级": "english"
++  },
++  "notes": [
++    "该 fixture 只冻结 final-archive positive_candidate 的 canonical artifact 文件名与样例集合。",
++    "artifact presence 是进入 FinalArchive/FinalAcceptance 汇总链路的前置条件，不等于人眼视觉95已恢复。"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalArchive-0c4e0ffc/backend/tests/fixtures/pdf_to_word/fidelity/final_archive_positive_samples_manifest.json
+@@ -0,0 +1,20 @@
++{
++  "contract_version": "pdf_to_word_fidelity_final_archive_fixture/v1",
++  "supported_p0_veto_codes": [
++    "critical_page_reading_order_break",
++    "table_visual_adjacency_severe_misalignment",
++    "formula_or_graphic_region_critical_distortion",
++    "english_reading_or_option_region_critical_distortion",
++    "critical_fallback_not_visually_close_to_source"
++  ],
++  "required_samples": [
++    "五下科学",
++    "数学八年级",
++    "数学试卷",
++    "英语八年级"
++  ],
++  "notes": [
++    "本 fixture 用于冻结 FinalArchive 阶段应能消费的 fidelity_veto taxonomy。",
++    "即使 artifact 已落盘，只要存在 P0 veto 或 human_review_report 仍是 no_go，仍不能恢复全学科人工视觉95宣称。"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json
+@@ -0,0 +1,152 @@
++{
++  "report_type": "pdf_to_word_render_pair/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "source_name": "五下科学",
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
++  "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
++  "render_dpi": 180,
++  "status": "docx_render_missing",
++  "ok": false,
++  "failure_code": "docx_renderer_unavailable",
++  "errors": [
++    {
++      "code": "docx_renderer_unavailable",
++      "message": "LibreOffice/soffice is required to render DOCX pages into PDF",
++      "details": {
++        "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
++        "renderer_binary": null
++      }
++    }
++  ],
++  "page_counts": {
++    "source_pdf": 6,
++    "output_docx": 0,
++    "matched": 0
++  },
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 1,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 2,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 3,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 4,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 5,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 6,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    }
++  ],
++  "evidence_paths": {
++    "output_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
++    "source_pdf_render_dir": null,
++    "output_docx_render_dir": null,
++    "docx_converted_pdf_path": null
++  },
++  "notes": [
++    "canonical render_pair materialized for final-archive artifact presence",
++    "real docx render remains blocked by missing LibreOffice/soffice in the current environment"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json
+@@ -0,0 +1,125 @@
++{
++  "report_type": "pdf_to_word_visual_similarity_evidence",
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "artifact_name": "visual_similarity.json",
++  "implementation_status": "archive_materialized_render_pair_pending",
++  "status": "artifact_not_ready",
++  "failure_code": "visual_similarity_artifact_not_ready",
++  "mode_boundary": {
++    "requested_mode": "quality",
++    "parser_backend": "hybrid_experimental",
++    "resolved_gate_mode": "quality/hybrid_async",
++    "enabled": true,
++    "default_sync_safe": true,
++    "default_sync_invokes_render_or_slow_model": false,
++    "reason": "visual similarity counts only in quality/hybrid_async"
++  },
++  "score_contract": {
++    "dimension_key": "visual_similarity",
++    "dimension_weight": 17,
++    "eligible_for_final_score": false,
++    "counts_toward_final_score": false,
++    "reason": "artifact materialized but not ready to restore the 17-point visual_similarity lane"
++  },
++  "thresholds": {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.9
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "required_fields": [
++      "report_type",
++      "contract_version",
++      "status",
++      "failure_code",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "render_pairs",
++      "page_scores",
++      "key_regions",
++      "vetoes",
++      "subject_page_type",
++      "human_review_required",
++      "evidence_paths",
++      "slow_model_review"
++    ]
++  },
++  "render_pair_status": "docx_render_missing",
++  "render_pair_failure_code": "docx_renderer_unavailable",
++  "render_pairs": [],
++  "page_scores": [],
++  "key_regions": [],
++  "vetoes": [
++    {
++      "code": "visual_similarity_artifact_not_ready",
++      "scope": "document",
++      "severity": "p0",
++      "blocking": true,
++      "reason": "render pair or page-level similarity evidence is not ready for scoring",
++      "details": [
++        "visual_similarity_artifact_not_ready",
++        "render_pair_not_ready",
++        "page_scores_missing"
++      ]
++    }
++  ],
++  "blocking_failures": [
++    "visual_similarity_artifact_not_ready",
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "subject_page_type": "science_experiment_table_and_image_mixed",
++  "human_review_required": true,
++  "human_review_reasons": [
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "evidence_paths": {
++    "sample_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
++    "render_pair_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx"
++  },
++  "artifact_ready_for_scoring": false,
++  "gate_passed": false,
++  "slow_model_policy": {
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "fallback_action": "manual_review"
++  },
++  "slow_model_review": {
++    "enabled": false,
++    "selected_page_count": 0,
++    "executed_page_count": 0,
++    "fallback_page_count": 0,
++    "pages": [],
++    "status": "disabled_default_sync"
++  },
++  "known_gaps": [
++    "docx_renderer_unavailable",
++    "page_scores_missing",
++    "key_regions_missing"
++  ],
++  "downstream_required_work": [
++    "install_docx_renderer_or_enable_converter",
++    "rerun_render_pair_generation",
++    "rerun_visual_similarity_scoring",
++    "complete_human_review_report_after_scoring"
++  ],
++  "sample_name": "五下科学",
++  "subject": "science"
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json
+@@ -0,0 +1,104 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "五下科学",
++  "subject": "science",
++  "document_page_type": "science_experiment_table_and_image_mixed",
++  "status": "no_go",
++  "overall_score": null,
++  "human_review_required": true,
++  "page_scores": [],
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    }
++  ],
++  "vetoes": [
++    {
++      "code": "critical_page_reading_order_break",
++      "canonical_code": "critical_page_reading_order_break",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 1,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第1页 fallback/读序事实不适合作为最终视觉95证据",
++      "category": "reading_order",
++      "label": "关键页读序崩坏",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json"
++      ]
++    },
++    {
++      "code": "critical_fallback_not_visually_close_to_source",
++      "canonical_code": "critical_fallback_not_visually_close_to_source",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 1,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第1页 fallback 尚未获得真实 render pair，因此不能证明与原 PDF 足够接近",
++      "category": "fallback_gap",
++      "label": "关键页 fallback 无法接近原 PDF",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json"
++      ]
++    }
++  ],
++  "page_vetoes": [],
++  "region_vetoes": [],
++  "evidence_paths": {
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx"
++  },
++  "notes": [
++    "artifact presence materialized for final-archive positive sample suite",
++    "human review remains no-go until a real render pair and scored visual similarity chain exist"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json
+@@ -0,0 +1,46 @@
++{
++  "report_type": "pdf_to_word_human_review_report/v1",
++  "contract_version": "pdf_to_word_human_review_report/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "五下科学",
++  "subject": "science",
++  "page_type": "science_experiment_table_and_image_mixed",
++  "evaluation_role": "positive_candidate",
++  "engineering_gate_status": "pass",
++  "eligible_for_human_visual_95": false,
++  "human_visual_decision": "no_go",
++  "human_visual_score": null,
++  "human_visual_thresholds": {
++    "sample_min": 95,
++    "critical_page_min": 92,
++    "critical_region_min": 90
++  },
++  "artifact_presence": {
++    "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++    "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
++    "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json",
++    "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json"
++  },
++  "artifact_ready_for_scoring": false,
++  "scoring_ready": false,
++  "blocking_reasons": [
++    "render_pair_not_ready",
++    "visual_similarity_not_ready",
++    "p0_fidelity_veto_present",
++    "sample_level_evidence_chain_materialized_but_not_scored"
++  ],
++  "fidelity_veto_summary": {
++    "status": "present",
++    "p0_veto_count": 2,
++    "veto_count": 2,
++    "failed_taxonomy": [
++      "critical_fallback_not_visually_close_to_source",
++      "critical_page_reading_order_break"
++    ]
++  },
++  "summary": "canonical artifact chain materialized, but render pair and scored similarity are still unavailable for final human-visual declaration",
++  "notes": [
++    "This is a presence/eligibility artifact, not a restoration of the human visual 95 claim.",
++    "final-archive should now detect sample-level canonical artifacts directly from the sample directory."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/source_manifest.json
+@@ -0,0 +1,38 @@
++{
++  "normalized_sample_name": "五下科学",
++  "original_sample_name": "五下科学",
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学",
++  "copied_files": [
++    "pages.jsonl",
++    "validator-report.json"
++  ],
++  "generated_files": [
++    "output.docx",
++    "metrics.json",
++    "warnings.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "missing_files": [],
++  "source_artifacts": {
++    "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
++    "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json",
++    "validation_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json",
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json",
++    "canonical_visual_evidence_materialized": true
++  },
++  "notes": [
++    "pages.jsonl 由 hybrid-pages.jsonl 复制并重命名，保持 final-archive 内各 profile 的统一文件名约定。",
++    "output.docx / metrics.json / warnings.json 在 final-archive 内基于 authoritative hybrid-pages 现算生成；源 hybrid-e2e-validation 套件本身未自带这三类最终归档文件。",
++    "validator-report.json 作为同目录 provenance 证据一并复制，便于审查 fallback / accepted_candidate 等逐页事实。",
++    "canonical render_pair / visual_similarity / fidelity_veto / human_review_report artifacts are now materialized in the sample directory for final-archive presence checks.",
++    "These artifacts do not restore human visual 95 on their own because the render_pair remains docx_render_missing in the current environment."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json
+@@ -0,0 +1,190 @@
++{
++  "report_type": "pdf_to_word_render_pair/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "source_name": "数学八年级",
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++  "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
++  "render_dpi": 180,
++  "status": "docx_render_missing",
++  "ok": false,
++  "failure_code": "docx_renderer_unavailable",
++  "errors": [
++    {
++      "code": "docx_renderer_unavailable",
++      "message": "LibreOffice/soffice is required to render DOCX pages into PDF",
++      "details": {
++        "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
++        "renderer_binary": null
++      }
++    }
++  ],
++  "page_counts": {
++    "source_pdf": 8,
++    "output_docx": 0,
++    "matched": 0
++  },
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 1,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 2,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 3,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 4,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 5,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 6,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 7,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 8,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    }
++  ],
++  "evidence_paths": {
++    "output_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
++    "source_pdf_render_dir": null,
++    "output_docx_render_dir": null,
++    "docx_converted_pdf_path": null
++  },
++  "notes": [
++    "canonical render_pair materialized for final-archive artifact presence",
++    "real docx render remains blocked by missing LibreOffice/soffice in the current environment"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json
+@@ -0,0 +1,125 @@
++{
++  "report_type": "pdf_to_word_visual_similarity_evidence",
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "artifact_name": "visual_similarity.json",
++  "implementation_status": "archive_materialized_render_pair_pending",
++  "status": "artifact_not_ready",
++  "failure_code": "visual_similarity_artifact_not_ready",
++  "mode_boundary": {
++    "requested_mode": "quality",
++    "parser_backend": "hybrid_experimental",
++    "resolved_gate_mode": "quality/hybrid_async",
++    "enabled": true,
++    "default_sync_safe": true,
++    "default_sync_invokes_render_or_slow_model": false,
++    "reason": "visual similarity counts only in quality/hybrid_async"
++  },
++  "score_contract": {
++    "dimension_key": "visual_similarity",
++    "dimension_weight": 17,
++    "eligible_for_final_score": false,
++    "counts_toward_final_score": false,
++    "reason": "artifact materialized but not ready to restore the 17-point visual_similarity lane"
++  },
++  "thresholds": {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.9
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "required_fields": [
++      "report_type",
++      "contract_version",
++      "status",
++      "failure_code",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "render_pairs",
++      "page_scores",
++      "key_regions",
++      "vetoes",
++      "subject_page_type",
++      "human_review_required",
++      "evidence_paths",
++      "slow_model_review"
++    ]
++  },
++  "render_pair_status": "docx_render_missing",
++  "render_pair_failure_code": "docx_renderer_unavailable",
++  "render_pairs": [],
++  "page_scores": [],
++  "key_regions": [],
++  "vetoes": [
++    {
++      "code": "visual_similarity_artifact_not_ready",
++      "scope": "document",
++      "severity": "p0",
++      "blocking": true,
++      "reason": "render pair or page-level similarity evidence is not ready for scoring",
++      "details": [
++        "visual_similarity_artifact_not_ready",
++        "render_pair_not_ready",
++        "page_scores_missing"
++      ]
++    }
++  ],
++  "blocking_failures": [
++    "visual_similarity_artifact_not_ready",
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "subject_page_type": "math_exercise_with_sparse_image_and_table",
++  "human_review_required": true,
++  "human_review_reasons": [
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "evidence_paths": {
++    "sample_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
++    "render_pair_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx"
++  },
++  "artifact_ready_for_scoring": false,
++  "gate_passed": false,
++  "slow_model_policy": {
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "fallback_action": "manual_review"
++  },
++  "slow_model_review": {
++    "enabled": false,
++    "selected_page_count": 0,
++    "executed_page_count": 0,
++    "fallback_page_count": 0,
++    "pages": [],
++    "status": "disabled_default_sync"
++  },
++  "known_gaps": [
++    "docx_renderer_unavailable",
++    "page_scores_missing",
++    "key_regions_missing"
++  ],
++  "downstream_required_work": [
++    "install_docx_renderer_or_enable_converter",
++    "rerun_render_pair_generation",
++    "rerun_visual_similarity_scoring",
++    "complete_human_review_report_after_scoring"
++  ],
++  "sample_name": "数学八年级",
++  "subject": "math"
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json
+@@ -0,0 +1,83 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "数学八年级",
++  "subject": "math",
++  "document_page_type": "math_exercise_with_sparse_image_and_table",
++  "status": "review_required",
++  "overall_score": null,
++  "human_review_required": true,
++  "page_scores": [],
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    }
++  ],
++  "vetoes": [],
++  "page_vetoes": [],
++  "region_vetoes": [],
++  "evidence_paths": {
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx"
++  },
++  "notes": [
++    "artifact presence materialized for final-archive positive sample suite",
++    "human review remains no-go until a real render pair and scored visual similarity chain exist"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json
+@@ -0,0 +1,42 @@
++{
++  "report_type": "pdf_to_word_human_review_report/v1",
++  "contract_version": "pdf_to_word_human_review_report/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "数学八年级",
++  "subject": "math",
++  "page_type": "math_exercise_with_sparse_image_and_table",
++  "evaluation_role": "positive_candidate",
++  "engineering_gate_status": "pass",
++  "eligible_for_human_visual_95": false,
++  "human_visual_decision": "no_go",
++  "human_visual_score": null,
++  "human_visual_thresholds": {
++    "sample_min": 95,
++    "critical_page_min": 92,
++    "critical_region_min": 90
++  },
++  "artifact_presence": {
++    "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
++    "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
++    "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json",
++    "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json"
++  },
++  "artifact_ready_for_scoring": false,
++  "scoring_ready": false,
++  "blocking_reasons": [
++    "render_pair_not_ready",
++    "visual_similarity_not_ready",
++    "sample_level_evidence_chain_materialized_but_not_scored"
++  ],
++  "fidelity_veto_summary": {
++    "status": "review_required",
++    "p0_veto_count": 0,
++    "veto_count": 0,
++    "failed_taxonomy": []
++  },
++  "summary": "canonical artifact chain materialized, but render pair and scored similarity are still unavailable for final human-visual declaration",
++  "notes": [
++    "This is a presence/eligibility artifact, not a restoration of the human visual 95 claim.",
++    "final-archive should now detect sample-level canonical artifacts directly from the sample directory."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/source_manifest.json
+@@ -0,0 +1,38 @@
++{
++  "normalized_sample_name": "数学八年级",
++  "original_sample_name": "数学 八年级下册pdf",
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级",
++  "copied_files": [
++    "pages.jsonl",
++    "validator-report.json"
++  ],
++  "generated_files": [
++    "output.docx",
++    "metrics.json",
++    "warnings.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "missing_files": [],
++  "source_artifacts": {
++    "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
++    "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json",
++    "validation_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json",
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json",
++    "canonical_visual_evidence_materialized": true
++  },
++  "notes": [
++    "pages.jsonl 由 hybrid-pages.jsonl 复制并重命名，保持 final-archive 内各 profile 的统一文件名约定。",
++    "output.docx / metrics.json / warnings.json 在 final-archive 内基于 authoritative hybrid-pages 现算生成；源 hybrid-e2e-validation 套件本身未自带这三类最终归档文件。",
++    "validator-report.json 作为同目录 provenance 证据一并复制，便于审查 fallback / accepted_candidate 等逐页事实。",
++    "canonical render_pair / visual_similarity / fidelity_veto / human_review_report artifacts are now materialized in the sample directory for final-archive presence checks.",
++    "These artifacts do not restore human visual 95 on their own because the render_pair remains docx_render_missing in the current environment."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json
+@@ -0,0 +1,266 @@
++{
++  "report_type": "pdf_to_word_render_pair/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "source_name": "数学试卷",
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++  "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
++  "render_dpi": 180,
++  "status": "docx_render_missing",
++  "ok": false,
++  "failure_code": "docx_renderer_unavailable",
++  "errors": [
++    {
++      "code": "docx_renderer_unavailable",
++      "message": "LibreOffice/soffice is required to render DOCX pages into PDF",
++      "details": {
++        "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
++        "renderer_binary": null
++      }
++    }
++  ],
++  "page_counts": {
++    "source_pdf": 12,
++    "output_docx": 0,
++    "matched": 0
++  },
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 1,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 2,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 3,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 4,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 5,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 6,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 7,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 8,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 9,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 9,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 10,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 10,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 11,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 11,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 12,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 12,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    }
++  ],
++  "evidence_paths": {
++    "output_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
++    "source_pdf_render_dir": null,
++    "output_docx_render_dir": null,
++    "docx_converted_pdf_path": null
++  },
++  "notes": [
++    "canonical render_pair materialized for final-archive artifact presence",
++    "real docx render remains blocked by missing LibreOffice/soffice in the current environment"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json
+@@ -0,0 +1,125 @@
++{
++  "report_type": "pdf_to_word_visual_similarity_evidence",
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "artifact_name": "visual_similarity.json",
++  "implementation_status": "archive_materialized_render_pair_pending",
++  "status": "artifact_not_ready",
++  "failure_code": "visual_similarity_artifact_not_ready",
++  "mode_boundary": {
++    "requested_mode": "quality",
++    "parser_backend": "hybrid_experimental",
++    "resolved_gate_mode": "quality/hybrid_async",
++    "enabled": true,
++    "default_sync_safe": true,
++    "default_sync_invokes_render_or_slow_model": false,
++    "reason": "visual similarity counts only in quality/hybrid_async"
++  },
++  "score_contract": {
++    "dimension_key": "visual_similarity",
++    "dimension_weight": 17,
++    "eligible_for_final_score": false,
++    "counts_toward_final_score": false,
++    "reason": "artifact materialized but not ready to restore the 17-point visual_similarity lane"
++  },
++  "thresholds": {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.9
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "required_fields": [
++      "report_type",
++      "contract_version",
++      "status",
++      "failure_code",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "render_pairs",
++      "page_scores",
++      "key_regions",
++      "vetoes",
++      "subject_page_type",
++      "human_review_required",
++      "evidence_paths",
++      "slow_model_review"
++    ]
++  },
++  "render_pair_status": "docx_render_missing",
++  "render_pair_failure_code": "docx_renderer_unavailable",
++  "render_pairs": [],
++  "page_scores": [],
++  "key_regions": [],
++  "vetoes": [
++    {
++      "code": "visual_similarity_artifact_not_ready",
++      "scope": "document",
++      "severity": "p0",
++      "blocking": true,
++      "reason": "render pair or page-level similarity evidence is not ready for scoring",
++      "details": [
++        "visual_similarity_artifact_not_ready",
++        "render_pair_not_ready",
++        "page_scores_missing"
++      ]
++    }
++  ],
++  "blocking_failures": [
++    "visual_similarity_artifact_not_ready",
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "subject_page_type": "math_exam_image_dense",
++  "human_review_required": true,
++  "human_review_reasons": [
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "evidence_paths": {
++    "sample_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
++    "render_pair_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx"
++  },
++  "artifact_ready_for_scoring": false,
++  "gate_passed": false,
++  "slow_model_policy": {
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "fallback_action": "manual_review"
++  },
++  "slow_model_review": {
++    "enabled": false,
++    "selected_page_count": 0,
++    "executed_page_count": 0,
++    "fallback_page_count": 0,
++    "pages": [],
++    "status": "disabled_default_sync"
++  },
++  "known_gaps": [
++    "docx_renderer_unavailable",
++    "page_scores_missing",
++    "key_regions_missing"
++  ],
++  "downstream_required_work": [
++    "install_docx_renderer_or_enable_converter",
++    "rerun_render_pair_generation",
++    "rerun_visual_similarity_scoring",
++    "complete_human_review_report_after_scoring"
++  ],
++  "sample_name": "数学试卷",
++  "subject": "math"
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json
+@@ -0,0 +1,111 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "数学试卷",
++  "subject": "math",
++  "document_page_type": "math_exam_image_dense",
++  "status": "review_required",
++  "overall_score": null,
++  "human_review_required": true,
++  "page_scores": [],
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 9,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 10,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 11,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 12,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    }
++  ],
++  "vetoes": [],
++  "page_vetoes": [],
++  "region_vetoes": [],
++  "evidence_paths": {
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx"
++  },
++  "notes": [
++    "artifact presence materialized for final-archive positive sample suite",
++    "human review remains no-go until a real render pair and scored visual similarity chain exist"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json
+@@ -0,0 +1,42 @@
++{
++  "report_type": "pdf_to_word_human_review_report/v1",
++  "contract_version": "pdf_to_word_human_review_report/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "数学试卷",
++  "subject": "math",
++  "page_type": "math_exam_image_dense",
++  "evaluation_role": "positive_candidate",
++  "engineering_gate_status": "pass",
++  "eligible_for_human_visual_95": false,
++  "human_visual_decision": "no_go",
++  "human_visual_score": null,
++  "human_visual_thresholds": {
++    "sample_min": 95,
++    "critical_page_min": 92,
++    "critical_region_min": 90
++  },
++  "artifact_presence": {
++    "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
++    "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
++    "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json",
++    "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json"
++  },
++  "artifact_ready_for_scoring": false,
++  "scoring_ready": false,
++  "blocking_reasons": [
++    "render_pair_not_ready",
++    "visual_similarity_not_ready",
++    "sample_level_evidence_chain_materialized_but_not_scored"
++  ],
++  "fidelity_veto_summary": {
++    "status": "review_required",
++    "p0_veto_count": 0,
++    "veto_count": 0,
++    "failed_taxonomy": []
++  },
++  "summary": "canonical artifact chain materialized, but render pair and scored similarity are still unavailable for final human-visual declaration",
++  "notes": [
++    "This is a presence/eligibility artifact, not a restoration of the human visual 95 claim.",
++    "final-archive should now detect sample-level canonical artifacts directly from the sample directory."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/source_manifest.json
+@@ -0,0 +1,38 @@
++{
++  "normalized_sample_name": "数学试卷",
++  "original_sample_name": "数学试卷",
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷",
++  "copied_files": [
++    "pages.jsonl",
++    "validator-report.json"
++  ],
++  "generated_files": [
++    "output.docx",
++    "metrics.json",
++    "warnings.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "missing_files": [],
++  "source_artifacts": {
++    "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
++    "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json",
++    "validation_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json",
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json",
++    "canonical_visual_evidence_materialized": true
++  },
++  "notes": [
++    "pages.jsonl 由 hybrid-pages.jsonl 复制并重命名，保持 final-archive 内各 profile 的统一文件名约定。",
++    "output.docx / metrics.json / warnings.json 在 final-archive 内基于 authoritative hybrid-pages 现算生成；源 hybrid-e2e-validation 套件本身未自带这三类最终归档文件。",
++    "validator-report.json 作为同目录 provenance 证据一并复制，便于审查 fallback / accepted_candidate 等逐页事实。",
++    "canonical render_pair / visual_similarity / fidelity_veto / human_review_report artifacts are now materialized in the sample directory for final-archive presence checks.",
++    "These artifacts do not restore human visual 95 on their own because the render_pair remains docx_render_missing in the current environment."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json
+@@ -0,0 +1,266 @@
++{
++  "report_type": "pdf_to_word_render_pair/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "source_name": "英语八年级",
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++  "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
++  "render_dpi": 180,
++  "status": "docx_render_missing",
++  "ok": false,
++  "failure_code": "docx_renderer_unavailable",
++  "errors": [
++    {
++      "code": "docx_renderer_unavailable",
++      "message": "LibreOffice/soffice is required to render DOCX pages into PDF",
++      "details": {
++        "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
++        "renderer_binary": null
++      }
++    }
++  ],
++  "page_counts": {
++    "source_pdf": 12,
++    "output_docx": 0,
++    "matched": 0
++  },
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 1,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 2,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 3,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 4,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 5,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 6,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 7,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 8,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 9,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 9,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 10,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 10,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 11,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 11,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    },
++    {
++      "page_index": 12,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": {
++        "page_index": 12,
++        "image_path": null,
++        "image_sha256": null,
++        "render_artifact": null,
++        "page_size_points": null,
++        "pixel_size": null,
++        "rotation_degrees": null
++      },
++      "output_docx": null,
++      "review_required": true,
++      "review_reasons": [
++        "docx_renderer_unavailable"
++      ]
++    }
++  ],
++  "evidence_paths": {
++    "output_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
++    "source_pdf_render_dir": null,
++    "output_docx_render_dir": null,
++    "docx_converted_pdf_path": null
++  },
++  "notes": [
++    "canonical render_pair materialized for final-archive artifact presence",
++    "real docx render remains blocked by missing LibreOffice/soffice in the current environment"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json
+@@ -0,0 +1,125 @@
++{
++  "report_type": "pdf_to_word_visual_similarity_evidence",
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "artifact_name": "visual_similarity.json",
++  "implementation_status": "archive_materialized_render_pair_pending",
++  "status": "artifact_not_ready",
++  "failure_code": "visual_similarity_artifact_not_ready",
++  "mode_boundary": {
++    "requested_mode": "quality",
++    "parser_backend": "hybrid_experimental",
++    "resolved_gate_mode": "quality/hybrid_async",
++    "enabled": true,
++    "default_sync_safe": true,
++    "default_sync_invokes_render_or_slow_model": false,
++    "reason": "visual similarity counts only in quality/hybrid_async"
++  },
++  "score_contract": {
++    "dimension_key": "visual_similarity",
++    "dimension_weight": 17,
++    "eligible_for_final_score": false,
++    "counts_toward_final_score": false,
++    "reason": "artifact materialized but not ready to restore the 17-point visual_similarity lane"
++  },
++  "thresholds": {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.9
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "required_fields": [
++      "report_type",
++      "contract_version",
++      "status",
++      "failure_code",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "render_pairs",
++      "page_scores",
++      "key_regions",
++      "vetoes",
++      "subject_page_type",
++      "human_review_required",
++      "evidence_paths",
++      "slow_model_review"
++    ]
++  },
++  "render_pair_status": "docx_render_missing",
++  "render_pair_failure_code": "docx_renderer_unavailable",
++  "render_pairs": [],
++  "page_scores": [],
++  "key_regions": [],
++  "vetoes": [
++    {
++      "code": "visual_similarity_artifact_not_ready",
++      "scope": "document",
++      "severity": "p0",
++      "blocking": true,
++      "reason": "render pair or page-level similarity evidence is not ready for scoring",
++      "details": [
++        "visual_similarity_artifact_not_ready",
++        "render_pair_not_ready",
++        "page_scores_missing"
++      ]
++    }
++  ],
++  "blocking_failures": [
++    "visual_similarity_artifact_not_ready",
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "subject_page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "human_review_required": true,
++  "human_review_reasons": [
++    "render_pair_not_ready",
++    "page_scores_missing"
++  ],
++  "evidence_paths": {
++    "sample_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
++    "render_pair_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx"
++  },
++  "artifact_ready_for_scoring": false,
++  "gate_passed": false,
++  "slow_model_policy": {
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "fallback_action": "manual_review"
++  },
++  "slow_model_review": {
++    "enabled": false,
++    "selected_page_count": 0,
++    "executed_page_count": 0,
++    "fallback_page_count": 0,
++    "pages": [],
++    "status": "disabled_default_sync"
++  },
++  "known_gaps": [
++    "docx_renderer_unavailable",
++    "page_scores_missing",
++    "key_regions_missing"
++  ],
++  "downstream_required_work": [
++    "install_docx_renderer_or_enable_converter",
++    "rerun_render_pair_generation",
++    "rerun_visual_similarity_scoring",
++    "complete_human_review_report_after_scoring"
++  ],
++  "sample_name": "英语八年级",
++  "subject": "english"
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json
+@@ -0,0 +1,180 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "英语八年级",
++  "subject": "english",
++  "document_page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "status": "no_go",
++  "overall_score": null,
++  "human_review_required": true,
++  "page_scores": [],
++  "render_pairs": [
++    {
++      "page_index": 1,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 2,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 3,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 4,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 5,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 6,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 7,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 8,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 9,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 10,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 11,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    },
++    {
++      "page_index": 12,
++      "pair_status": "docx_unrendered",
++      "alignment_mode": "page_index",
++      "source_pdf": null,
++      "output_docx": null
++    }
++  ],
++  "vetoes": [
++    {
++      "code": "critical_page_reading_order_break",
++      "canonical_code": "critical_page_reading_order_break",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 3,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第3页 fallback/读序事实不适合作为最终视觉95证据",
++      "category": "reading_order",
++      "label": "关键页读序崩坏",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json"
++      ]
++    },
++    {
++      "code": "critical_fallback_not_visually_close_to_source",
++      "canonical_code": "critical_fallback_not_visually_close_to_source",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 3,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第3页 fallback 尚未获得真实 render pair，因此不能证明与原 PDF 足够接近",
++      "category": "fallback_gap",
++      "label": "关键页 fallback 无法接近原 PDF",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json"
++      ]
++    },
++    {
++      "code": "critical_page_reading_order_break",
++      "canonical_code": "critical_page_reading_order_break",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 11,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第11页 fallback/读序事实不适合作为最终视觉95证据",
++      "category": "reading_order",
++      "label": "关键页读序崩坏",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json"
++      ]
++    },
++    {
++      "code": "critical_fallback_not_visually_close_to_source",
++      "canonical_code": "critical_fallback_not_visually_close_to_source",
++      "severity": "p0",
++      "scope": "page",
++      "page_index": 11,
++      "region_kind": null,
++      "region_id": null,
++      "summary": "第11页 fallback 尚未获得真实 render pair，因此不能证明与原 PDF 足够接近",
++      "category": "fallback_gap",
++      "label": "关键页 fallback 无法接近原 PDF",
++      "triggered": true,
++      "evidence_paths": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json"
++      ]
++    }
++  ],
++  "page_vetoes": [],
++  "region_vetoes": [],
++  "evidence_paths": {
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx"
++  },
++  "notes": [
++    "artifact presence materialized for final-archive positive sample suite",
++    "human review remains no-go until a real render pair and scored visual similarity chain exist"
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json
+@@ -0,0 +1,46 @@
++{
++  "report_type": "pdf_to_word_human_review_report/v1",
++  "contract_version": "pdf_to_word_human_review_report/v1",
++  "generated_at": "2026-05-20T08:49:55+08:00",
++  "sample_name": "英语八年级",
++  "subject": "english",
++  "page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "evaluation_role": "positive_candidate",
++  "engineering_gate_status": "pass",
++  "eligible_for_human_visual_95": false,
++  "human_visual_decision": "no_go",
++  "human_visual_score": null,
++  "human_visual_thresholds": {
++    "sample_min": 95,
++    "critical_page_min": 92,
++    "critical_region_min": 90
++  },
++  "artifact_presence": {
++    "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++    "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
++    "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json",
++    "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json"
++  },
++  "artifact_ready_for_scoring": false,
++  "scoring_ready": false,
++  "blocking_reasons": [
++    "render_pair_not_ready",
++    "visual_similarity_not_ready",
++    "p0_fidelity_veto_present",
++    "sample_level_evidence_chain_materialized_but_not_scored"
++  ],
++  "fidelity_veto_summary": {
++    "status": "present",
++    "p0_veto_count": 4,
++    "veto_count": 4,
++    "failed_taxonomy": [
++      "critical_fallback_not_visually_close_to_source",
++      "critical_page_reading_order_break"
++    ]
++  },
++  "summary": "canonical artifact chain materialized, but render pair and scored similarity are still unavailable for final human-visual declaration",
++  "notes": [
++    "This is a presence/eligibility artifact, not a restoration of the human visual 95 claim.",
++    "final-archive should now detect sample-level canonical artifacts directly from the sample directory."
++  ]
++}
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/source_manifest.json
+@@ -0,0 +1,38 @@
++{
++  "normalized_sample_name": "英语八年级",
++  "original_sample_name": "英语 八年级下册",
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级",
++  "copied_files": [
++    "pages.jsonl",
++    "validator-report.json"
++  ],
++  "generated_files": [
++    "output.docx",
++    "metrics.json",
++    "warnings.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "missing_files": [],
++  "source_artifacts": {
++    "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
++    "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json",
++    "validation_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/report.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json",
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json",
++    "canonical_visual_evidence_materialized": true
++  },
++  "notes": [
++    "pages.jsonl 由 hybrid-pages.jsonl 复制并重命名，保持 final-archive 内各 profile 的统一文件名约定。",
++    "output.docx / metrics.json / warnings.json 在 final-archive 内基于 authoritative hybrid-pages 现算生成；源 hybrid-e2e-validation 套件本身未自带这三类最终归档文件。",
++    "validator-report.json 作为同目录 provenance 证据一并复制，便于审查 fallback / accepted_candidate 等逐页事实。",
++    "canonical render_pair / visual_similarity / fidelity_veto / human_review_report artifacts are now materialized in the sample directory for final-archive presence checks.",
++    "These artifacts do not restore human visual 95 on their own because the render_pair remains docx_render_missing in the current environment."
++  ]
++}

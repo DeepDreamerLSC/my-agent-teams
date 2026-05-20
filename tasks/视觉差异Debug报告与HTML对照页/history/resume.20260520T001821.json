@@ -1,0 +1,14 @@
+{
+  "task_id": "视觉差异Debug报告与HTML对照页",
+  "resumed_at": "2026-05-20T00:18:21+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "review 未通过：当前主逻辑已基本正确，但测试依赖 .runtime/worktrees 下的本机绝对路径，不能作为稳定门禁。请移除 CANONICAL_FIXTURE_ROOT/QUALITY_READY_* 的绝对路径依赖，优先把最小 canonical payload/render_pair 内联到当前测试文件 helper（或改为读取仓库内稳定 fixture），确保 pytest 只依赖仓库自身即可运行。",
+  "archived_files": [
+    "ack.20260520T001821.json",
+    "review.20260520T001821.json",
+    "review.20260520T001821.md",
+    "verify.20260520T001821.json",
+    "result.20260520T001821.json"
+  ]
+}

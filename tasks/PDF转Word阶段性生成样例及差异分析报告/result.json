@@ -1,0 +1,39 @@
+{
+  "task_id": "PDF转Word阶段性生成样例及差异分析报告",
+  "agent": "pm-chief",
+  "status": "done",
+  "summary": "已完成 PDF转Word 阶段性生成样例与差异分析报告，覆盖 apple_baseline、hybrid_experimental、MinerU、PaddleOCR-VL、GLM/Qwen 等方案的代表样例、聚合对比、工程评分、关键差异与改进方向，并准备通过飞书同步给林总工。",
+  "completed_at": "2026-05-20T07:34:50+08:00",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.json"
+  ],
+  "deliverables": {
+    "markdown_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
+    "json_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.json"
+  },
+  "key_findings": [
+    "当前默认同步主 parser 仍应保持 apple_baseline；它仍是结构稳定性与性能边界最稳的同步路径。",
+    "hybrid_experimental 仍应作为 quality/hybrid_async 的质量增强主线，在表格、图片与 image-dense 页上最有现实价值。",
+    "PaddleOCR-VL 更适合作为 selected-page 补强源，不适合直接进入同步主链。",
+    "公式/符号链路仍未进入生产闭环，当前只能维持 audit-only / crop 级实验。",
+    "当前工程门禁可通过，但截至 2026-05-19 全学科人工视觉95 仍为 NO-GO，不能对外宣称已恢复。"
+  ],
+  "next_improvements": [
+    "补齐 sample-level render_pair / visual_similarity / fidelity_veto / human_review 证据链，收敛工程 PASS 与人工视觉95 NO-GO 的口径断层。",
+    "为 hybrid_experimental 补 authoritative timing / memory 证据，明确 quality/hybrid_async 的真实性能边界。",
+    "继续将 PaddleOCR-VL 限定在 selected-page 补强，并优先优化 table_heavy / image_dense 页耗时与 provenance。",
+    "公式链路继续保持 audit-only，优先推进 crop/materialization 与 output cleanup，而不是直接放开 merge。"
+  ],
+  "evidence_paths": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/横评最终报告.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md"
+  ],
+  "risks": [
+    "当前报告基于现有归档产物与结构化证据，因缺少统一截图资产，截图部分以样例路径与描述替代。",
+    "报告中的 1~5 分工程评分仅用于阶段差异分析，不等同人工视觉95或最终对外交付分。"
+  ]
+}

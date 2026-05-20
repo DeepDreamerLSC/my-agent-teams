@@ -30,7 +30,7 @@
   "result_summary": "已完成 PPTX 装配器图片页插入能力：office_export_service 现在支持根据 slide.image_path 把整页渲染好的图片写入 ppt/media 并作为单页图片插入最终 .pptx；同时保留现有结构化标题+bullets 简洁模式不回归。（QA 已通过自动收口） QA 结论：QA 验证通过。build_pptx_bytes 已支持通过 slide.image_path 将整页渲染图插入 .pptx（图片写入 ppt/media + image relationship），现有结构化标题+bullets 简洁模式无回归，7 测试全部通过，review 已 APPROVE。",
   "last_error": null,
   "created_at": "2026-05-01T02:13:42+08:00",
-  "updated_at": "2026-05-18T18:53:05+08:00",
+  "updated_at": "2026-05-19T11:41:17+08:00",
   "review_round": 0,
   "max_review_rounds": 3,
   "depends_on": [
@@ -58,7 +58,7 @@
   "state_invariant_violations": [],
   "state_invariant_violation_count": 0,
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-18T18:53:05+08:00",
+  "state_invariant_checked_at": "2026-05-19T11:41:17+08:00",
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-18T15:11:37+08:00",
   "merge_gate_state": "closed"

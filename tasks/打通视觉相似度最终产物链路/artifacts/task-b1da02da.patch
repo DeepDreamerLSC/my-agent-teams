@@ -1,0 +1,2361 @@
+diff --git a/backend/app/services/pdf_to_word/model_eval_runner.py b/backend/app/services/pdf_to_word/model_eval_runner.py
+index 559f067..360d561 100644
+--- a/backend/app/services/pdf_to_word/model_eval_runner.py
++++ b/backend/app/services/pdf_to_word/model_eval_runner.py
+@@ -20,6 +20,14 @@ from app.services.pdf_to_word.parser_adapters.base_adapter import AdapterResult,
+ from app.services.pdf_to_word.parser_adapters.inference.backend import create_backend
+ from app.services.pdf_to_word.parser_adapters.inference.config import InferenceConfig
+ from app.services.pdf_to_word.parser_adapters.inference.schemas import BackendStatus, InferenceResponse, PageInferenceRequest
++from app.services.pdf_to_word.visual_similarity_gate import (
++    VISUAL_SIMILARITY_DIMENSION_KEY,
++    VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++    VISUAL_SIMILARITY_REPORT_TYPE,
++    build_visual_similarity_gate_report,
++    load_visual_similarity_contract,
++    write_visual_similarity_gate_artifact,
++)
+ 
+ 
+ AdapterFactory = Callable[[str], BaseParserAdapter]
+@@ -74,6 +82,11 @@ HYBRID_FINAL_DOCX_GATE_EXPECTATIONS = {
+     'explicit_answer_area_materialized_sample_count': 0,
+     'answer_section_materialized_sample_count': 0,
+ }
++VISUAL_SIMILARITY_ARTIFACT_FILENAME = 'visual_similarity.json'
++VISUAL_SIMILARITY_CONTRACT_ONLY_STATUS = 'contract_only_no_renderer_or_slow_model_invoked'
++FIDELITY_FINAL_REPORT_TYPE = 'pdf2word_fidelity_final_report'
++FIDELITY_FINAL_REPORT_DEFAULT_THRESHOLD = 95.0
++FIDELITY_TABLE_DIMENSION_ALIASES = ('editable_table', 'editable_word_tables', 'tables')
+ REGRESSION_MANIFEST_VERSION = 'pdf2word_regression_manifest/v1'
+ REGRESSION_DEFAULT_COVERAGE_TIER = 'current_five_sample_baseline'
+ REGRESSION_CURRENT_BASELINE_SOURCE = 'final_archive_authoritative+hybrid_e2e_validation'
+@@ -115,6 +128,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
+     parser.add_argument('--no-docx', action='store_true', help='Skip DOCX artifact generation and only emit JSON artifacts.')
+     parser.add_argument('--local-capability-eval', action='store_true', help='Build a local capability evaluation report from existing archive and hybrid audit artifacts.')
+     parser.add_argument('--final-docx-gate', action='store_true', help='Build a release evidence gate report for the archived hybrid final DOCX artifacts.')
++    parser.add_argument('--visual-similarity-artifact', action='store_true', help='Build the canonical quality/hybrid_async visual_similarity.json artifact from structured visual facts.')
++    parser.add_argument('--visual-similarity-input', help='Structured visual similarity contract / precomputed facts JSON path.')
++    parser.add_argument('--visual-similarity-mode', default='quality', help='Requested mode for visual similarity artifact generation. Defaults to quality.')
++    parser.add_argument('--visual-similarity-parser-backend', default='hybrid_experimental', help='Parser backend label for visual similarity artifact generation. Defaults to hybrid_experimental.')
++    parser.add_argument('--fidelity-final-report', action='store_true', help='Build the final 95% fidelity report from structured metrics input.')
++    parser.add_argument('--fidelity-report-input', help='Structured fidelity report input JSON path.')
+     parser.add_argument('--regression-summary', action='store_true', help='Build a larger-sample regression manifest and summary from existing archive/e2e artifacts.')
+     parser.add_argument('--regression-manifest', help='Optional regression manifest JSON path. If omitted, bootstrap from the current authoritative archive sample set.')
+     parser.add_argument('--archive-root', help='Local capability eval archive root. Defaults to artifacts/pdf2word/final-archive inferred from --output-dir.')
+@@ -1346,6 +1365,384 @@ def write_final_docx_gate_artifacts(summary: dict[str, Any], output_dir: str | P
+     return target_dir
+ 
+ 
++def build_visual_similarity_artifact_summary(
++    *,
++    input_path: str | Path,
++    requested_mode: str | None = None,
++    parser_backend: str | None = None,
++) -> dict[str, Any]:
++    contract = load_visual_similarity_contract(input_path)
++    return build_visual_similarity_gate_report(
++        contract,
++        requested_mode=requested_mode,
++        parser_backend=parser_backend,
++    )
++
++
++def write_visual_similarity_artifacts(summary: dict[str, Any], output_dir: str | Path) -> Path:
++    target_dir = Path(output_dir).expanduser().resolve()
++    target_dir.mkdir(parents=True, exist_ok=True)
++    write_visual_similarity_gate_artifact(summary, target_dir / VISUAL_SIMILARITY_ARTIFACT_FILENAME)
++    return target_dir
++
++
++def _coerce_fidelity_score(value: Any) -> float | None:
++    try:
++        numeric = float(value)
++    except (TypeError, ValueError):
++        return None
++    if numeric < 0:
++        numeric = 0.0
++    return round(numeric, 4)
++
++
++def _coerce_fidelity_notes(value: Any) -> list[str]:
++    if isinstance(value, list):
++        return [str(item) for item in value if str(item).strip()]
++    if isinstance(value, str) and value.strip():
++        return [value.strip()]
++    return []
++
++
++def _resolve_fidelity_dimension_threshold(*, weight: float | None, threshold: float) -> float:
++    normalized_threshold = max(0.0, float(threshold))
++    if weight is None or float(weight) <= 0:
++        return round(normalized_threshold, 4)
++    return round(float(weight) * normalized_threshold / 100.0, 4)
++
++
++def _normalize_fidelity_weights_payload(payload: dict[str, Any]) -> dict[str, float]:
++    weights: dict[str, float] = {}
++    for raw_name, raw_value in payload.items():
++        name = str(raw_name).strip()
++        if not name:
++            continue
++        normalized_name = 'tables' if name in FIDELITY_TABLE_DIMENSION_ALIASES else name
++        try:
++            weights[normalized_name] = round(float(raw_value), 4)
++        except (TypeError, ValueError):
++            continue
++    return weights
++
++
++def _normalize_fidelity_dimensions_payload(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
++    dimensions: dict[str, dict[str, Any]] = {}
++    for raw_name, raw_value in payload.items():
++        name = str(raw_name).strip()
++        if not name or not isinstance(raw_value, dict):
++            continue
++        normalized_name = 'tables' if name in FIDELITY_TABLE_DIMENSION_ALIASES else name
++        merged_payload = dict(dimensions.get(normalized_name) or {})
++        merged_payload.update(raw_value)
++        dimensions[normalized_name] = merged_payload
++    return dimensions
++
++
++def _normalize_fidelity_tables(payload: dict[str, Any], *, threshold: float, weight: float | None) -> tuple[dict[str, Any], list[str]]:
++    score = _coerce_fidelity_score(payload.get('score'))
++    implemented = _coerce_bool(payload.get('implemented', score is not None))
++    notes = _coerce_fidelity_notes(payload.get('notes') or payload.get('warnings'))
++    detected_table_sample_count = int(payload.get('detected_table_sample_count') or 0)
++    sample_with_table_xml_count = int(payload.get('sample_with_table_xml_count') or 0)
++    image_fallback_table_count = int(payload.get('image_fallback_table_count') or payload.get('table_fallback_count') or 0)
++    raw_has_table_xml = payload.get('has_table_xml') if 'has_table_xml' in payload else payload.get('table_xml_present')
++    has_table_xml = _coerce_bool(raw_has_table_xml)
++    if not has_table_xml and sample_with_table_xml_count > 0:
++        has_table_xml = True
++    if score is None and implemented:
++        score = 0.0
++    dimension_threshold = _resolve_fidelity_dimension_threshold(weight=weight, threshold=threshold)
++    hard_gate_passed = (
++        implemented
++        and (
++            detected_table_sample_count <= 0
++            or (
++                has_table_xml
++                and sample_with_table_xml_count >= detected_table_sample_count
++                and image_fallback_table_count == 0
++            )
++        )
++    )
++    if not implemented:
++        status = 'missing'
++    elif not hard_gate_passed:
++        status = 'fail'
++    elif score is not None and score >= dimension_threshold:
++        status = 'pass'
++    else:
++        status = 'review'
++    blockers: list[str] = []
++    if not implemented:
++        blockers.append('dimension_missing:tables')
++    elif detected_table_sample_count > 0 and sample_with_table_xml_count < detected_table_sample_count:
++        blockers.append('table_gate_failed:detected_without_word_table_xml')
++    if image_fallback_table_count > 0:
++        blockers.append('table_gate_failed:image_fallback_present')
++    return (
++        {
++            'implemented': implemented,
++            'status': status,
++            'score': score,
++            'has_table_xml': has_table_xml,
++            'detected_table_sample_count': detected_table_sample_count,
++            'sample_with_table_xml_count': sample_with_table_xml_count,
++            'image_fallback_table_count': image_fallback_table_count,
++            'hard_gate_passed': hard_gate_passed,
++            'notes': notes,
++        },
++        blockers,
++    )
++
++
++def _resolve_input_relative_path(base_path: Path, value: Any) -> Path | None:
++    text = _coerce_str_path(value)
++    if not text:
++        return None
++    path = Path(text).expanduser()
++    if not path.is_absolute():
++        path = base_path.parent / path
++    return path.resolve()
++
++
++def _normalize_visual_similarity_from_artifact(
++    artifact_path: Path,
++    *,
++    threshold: float,
++    weight: float | None,
++    existing_notes: list[str] | None = None,
++) -> tuple[dict[str, Any], list[str]]:
++    blockers: list[str] = []
++    notes = list(existing_notes or [])
++    if not artifact_path.exists():
++        blockers.append('visual_similarity_artifact_missing')
++        return (
++            {
++                'implemented': False,
++                'status': 'missing',
++                'score': None,
++                'weight': round(float(weight or 0.0), 4),
++                'weighted_score': 0.0,
++                'notes': notes,
++                'artifact_path': str(artifact_path),
++            },
++            blockers,
++        )
++
++    artifact = _read_json(artifact_path)
++    if str(artifact.get('report_type') or '').strip() != VISUAL_SIMILARITY_REPORT_TYPE:
++        blockers.append('visual_similarity_artifact_invalid')
++        return (
++            {
++                'implemented': False,
++                'status': 'missing',
++                'score': None,
++                'weight': round(float(weight or 0.0), 4),
++                'weighted_score': 0.0,
++                'notes': notes + [f'invalid report_type: {artifact.get("report_type")}'],
++                'artifact_path': str(artifact_path),
++            },
++            blockers,
++        )
++
++    implementation_status = str(artifact.get('implementation_status') or '').strip() or VISUAL_SIMILARITY_CONTRACT_ONLY_STATUS
++    gate_passed = _coerce_bool(artifact.get('gate_passed'))
++    score_contract = artifact.get('score_contract') if isinstance(artifact.get('score_contract'), dict) else {}
++    score = _coerce_fidelity_score(score_contract.get('score_awarded'))
++    if score is None and gate_passed:
++        score = round(float(weight or VISUAL_SIMILARITY_DIMENSION_WEIGHT), 4)
++    elif score is None:
++        score = 0.0
++    dimension_threshold = _resolve_fidelity_dimension_threshold(weight=weight, threshold=threshold)
++    artifact_failures = [str(item) for item in (artifact.get('blocking_failures') or []) if str(item).strip()]
++    readiness_notes = notes + [
++        f'artifact_path={artifact_path}',
++        f'implementation_status={implementation_status}',
++    ]
++
++    if implementation_status == VISUAL_SIMILARITY_CONTRACT_ONLY_STATUS:
++        blockers.append(f'visual_similarity_artifact_not_ready:{implementation_status}')
++        return (
++            {
++                'implemented': False,
++                'status': 'missing',
++                'score': None,
++                'weight': round(float(weight or 0.0), 4),
++                'weighted_score': 0.0,
++                'notes': readiness_notes,
++                'artifact_path': str(artifact_path),
++                'gate_passed': gate_passed,
++                'implementation_status': implementation_status,
++            },
++            blockers,
++        )
++
++    status = 'pass' if gate_passed and score >= dimension_threshold else 'review'
++    if not gate_passed:
++        status = 'fail'
++        blockers.extend(f'visual_similarity_gate_failed:{failure}' for failure in artifact_failures)
++
++    return (
++        {
++            'implemented': True,
++            'status': status,
++            'score': score,
++            'weight': round(float(weight or 0.0), 4),
++            'weighted_score': round(float(score or 0.0), 4),
++            'notes': readiness_notes,
++            'artifact_path': str(artifact_path),
++            'gate_passed': gate_passed,
++            'implementation_status': implementation_status,
++            'artifact_blocking_failures': artifact_failures,
++        },
++        blockers,
++    )
++
++
++def build_fidelity_final_report_summary(*, input_path: str | Path) -> dict[str, Any]:
++    resolved_input = Path(input_path).expanduser().resolve()
++    payload = _read_json(resolved_input)
++    threshold = _coerce_fidelity_score(payload.get('threshold'))
++    if threshold is None:
++        threshold = FIDELITY_FINAL_REPORT_DEFAULT_THRESHOLD
++    weights_payload = payload.get('weights') if isinstance(payload.get('weights'), dict) else {}
++    dimensions_payload = payload.get('dimensions') if isinstance(payload.get('dimensions'), dict) else {}
++    weights = _normalize_fidelity_weights_payload(weights_payload)
++    normalized_dimensions_payload = _normalize_fidelity_dimensions_payload(dimensions_payload)
++    visual_similarity_artifact_path = _resolve_input_relative_path(resolved_input, payload.get('visual_similarity_artifact_path'))
++
++    dimensions: dict[str, Any] = {}
++    missing_dimensions: list[str] = []
++    blocking_failures = [str(item) for item in (payload.get('blocking_failures') or []) if str(item).strip()]
++    weighted_total = 0.0
++
++    for name, weight in weights.items():
++        raw_dimension = normalized_dimensions_payload.get(name) if isinstance(normalized_dimensions_payload.get(name), dict) else {}
++        if name == 'tables':
++            table_summary, table_blockers = _normalize_fidelity_tables(raw_dimension, threshold=threshold, weight=weight)
++            score = table_summary.get('score')
++            weighted_score = round(float(score or 0.0), 4)
++            table_summary['weight'] = round(float(weight), 4)
++            table_summary['weighted_score'] = weighted_score
++            dimensions[name] = table_summary
++            weighted_total += weighted_score
++            blocking_failures.extend(table_blockers)
++            if table_summary['status'] == 'missing':
++                missing_dimensions.append(name)
++            continue
++
++        if name == VISUAL_SIMILARITY_DIMENSION_KEY and visual_similarity_artifact_path is not None:
++            visual_summary, visual_blockers = _normalize_visual_similarity_from_artifact(
++                visual_similarity_artifact_path,
++                threshold=threshold,
++                weight=weight,
++                existing_notes=_coerce_fidelity_notes(raw_dimension.get('notes') or raw_dimension.get('warnings')),
++            )
++            dimensions[name] = visual_summary
++            weighted_total += round(float(visual_summary.get('weighted_score') or 0.0), 4)
++            blocking_failures.extend(visual_blockers)
++            if visual_summary['status'] == 'missing':
++                missing_dimensions.append(name)
++            continue
++
++        implemented = _coerce_bool(raw_dimension.get('implemented', raw_dimension.get('score') is not None))
++        score = _coerce_fidelity_score(raw_dimension.get('score'))
++        notes = _coerce_fidelity_notes(raw_dimension.get('notes') or raw_dimension.get('warnings'))
++        dimension_threshold = _resolve_fidelity_dimension_threshold(weight=weight, threshold=threshold)
++        if not implemented or score is None:
++            status = 'missing'
++            weighted_score = 0.0
++            missing_dimensions.append(name)
++            blocking_failures.append(f'dimension_missing:{name}')
++        else:
++            weighted_score = round(float(score), 4)
++            weighted_total += weighted_score
++            status = 'pass' if score >= dimension_threshold else 'review'
++        dimensions[name] = {
++            'implemented': implemented and score is not None,
++            'status': status,
++            'score': score,
++            'weight': round(float(weight), 4),
++            'weighted_score': weighted_score,
++            'notes': notes,
++        }
++
++    tables = dict(dimensions.get('tables') or {})
++    overall_score = round(weighted_total, 4)
++    if overall_score < threshold:
++        blocking_failures.append(f'overall_score_below_threshold:{overall_score:.4f}')
++    blocking_failures = list(dict.fromkeys(blocking_failures))
++    report_passed = not missing_dimensions and not blocking_failures and overall_score >= threshold
++
++    return {
++        'report_type': FIDELITY_FINAL_REPORT_TYPE,
++        'generated_at': datetime.now().astimezone().isoformat(timespec='seconds'),
++        'input_path': str(resolved_input),
++        'schema_version': int(payload.get('schema_version') or 1),
++        'sample_set': str(payload.get('sample_set') or '').strip() or None,
++        'threshold': threshold,
++        'overall_score': overall_score,
++        'pass': report_passed,
++        'blocking_failures': blocking_failures,
++        'missing_dimensions': missing_dimensions,
++        'weights': {key: round(float(value), 4) for key, value in weights.items()},
++        'dimensions': dimensions,
++        'tables': tables,
++        'coverage': {
++            'dimension_count': len(weights),
++            'implemented_dimension_count': sum(1 for item in dimensions.values() if item.get('implemented')),
++            'missing_dimension_count': len(missing_dimensions),
++        },
++    }
++
++
++def _build_fidelity_final_report_markdown(summary: dict[str, Any]) -> str:
++    lines = [
++        '# PDF→Word 95% Fidelity Final Report',
++        '',
++        f"- Pass: `{str(summary.get('pass')).lower()}`",
++        f"- Overall score: `{summary.get('overall_score')}`",
++        f"- Threshold: `{summary.get('threshold')}`",
++        f"- Sample set: `{summary.get('sample_set')}`",
++        '',
++        '## Table Gate',
++        '',
++        f"- has_table_xml: `{(summary.get('tables') or {}).get('has_table_xml')}`",
++        f"- detected_table_sample_count: `{(summary.get('tables') or {}).get('detected_table_sample_count')}`",
++        f"- sample_with_table_xml_count: `{(summary.get('tables') or {}).get('sample_with_table_xml_count')}`",
++        f"- image_fallback_table_count: `{(summary.get('tables') or {}).get('image_fallback_table_count')}`",
++        f"- hard_gate_passed: `{(summary.get('tables') or {}).get('hard_gate_passed')}`",
++        '',
++        '## Dimensions',
++        '',
++    ]
++    for name, payload in (summary.get('dimensions') or {}).items():
++        lines.append(
++            f"- `{name}`: status=`{payload.get('status')}`, score=`{payload.get('score')}`, "
++            f"weight=`{payload.get('weight')}`, weighted=`{payload.get('weighted_score')}`"
++        )
++    lines.extend(['', '## Blocking Failures', ''])
++    failures = summary.get('blocking_failures') or []
++    if failures:
++        lines.extend(f'- `{failure}`' for failure in failures)
++    else:
++        lines.append('- None')
++    return '\n'.join(lines) + '\n'
++
++
++def write_fidelity_final_report_artifacts(summary: dict[str, Any], output_dir: str | Path) -> Path:
++    target_dir = Path(output_dir).expanduser().resolve()
++    target_dir.mkdir(parents=True, exist_ok=True)
++    (target_dir / 'fidelity_metrics.json').write_text(
++        json.dumps(summary, ensure_ascii=False, indent=2) + '\n',
++        encoding='utf-8',
++    )
++    (target_dir / 'fidelity_report.md').write_text(
++        _build_fidelity_final_report_markdown(summary),
++        encoding='utf-8',
++    )
++    return target_dir
++
++
+ def _normalize_regression_manifest_samples(payload: Any) -> list[dict[str, Any]]:
+     if isinstance(payload, list):
+         return [dict(item) for item in payload if isinstance(item, dict) and str(item.get('sample_name') or '').strip()]
+@@ -3889,6 +4286,26 @@ def main(argv: Sequence[str] | None = None) -> int:
+         print(run_root)
+         return 0
+ 
++    if args.visual_similarity_artifact:
++        _require_argument(parser, value=args.visual_similarity_input, flag='--visual-similarity-input')
++        run_root = build_run_output_root(args.output_dir, run_label=args.run_label)
++        summary = build_visual_similarity_artifact_summary(
++            input_path=args.visual_similarity_input,
++            requested_mode=args.visual_similarity_mode,
++            parser_backend=args.visual_similarity_parser_backend,
++        )
++        write_visual_similarity_artifacts(summary, run_root)
++        print(run_root)
++        return 0
++
++    if args.fidelity_final_report:
++        _require_argument(parser, value=args.fidelity_report_input, flag='--fidelity-report-input')
++        run_root = build_run_output_root(args.output_dir, run_label=args.run_label)
++        summary = build_fidelity_final_report_summary(input_path=args.fidelity_report_input)
++        write_fidelity_final_report_artifacts(summary, run_root)
++        print(run_root)
++        return 0
++
+     if args.regression_summary:
+         run_root = build_run_output_root(args.output_dir, run_label=args.run_label)
+         summary = build_regression_summary(
+diff --git a/backend/app/services/pdf_to_word/visual_similarity_gate.py b/backend/app/services/pdf_to_word/visual_similarity_gate.py
+new file mode 100644
+index 0000000..e07dbbb
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/visual_similarity_gate.py
+@@ -0,0 +1,449 @@
++from __future__ import annotations
++
++import json
++from collections.abc import Mapping, Sequence
++from pathlib import Path
++from typing import Any
++
++
++VISUAL_SIMILARITY_GATE_VERSION = 'pdf_to_word_visual_similarity_gate/v1'
++VISUAL_SIMILARITY_REPORT_TYPE = 'pdf_to_word_visual_similarity_gate_contract'
++VISUAL_SIMILARITY_DIMENSION_KEY = 'visual_similarity'
++VISUAL_SIMILARITY_DIMENSION_WEIGHT = 17
++QUALITY_HYBRID_ASYNC_MODE = 'quality/hybrid_async'
++DEFAULT_SYNC_MODE = 'default_sync'
++QUALITY_GATE_MODES = {'quality', 'hybrid_async', QUALITY_HYBRID_ASYNC_MODE}
++DEFAULT_SYNC_MODES = {'', 'auto', 'apple', 'fast', 'balanced', DEFAULT_SYNC_MODE}
++
++DEFAULT_THRESHOLDS: dict[str, float] = {
++    'page_render_similarity_min': 0.92,
++    'key_region_similarity_min': 0.88,
++    'bbox_iou_min': 0.85,
++    'layout_density_delta_max': 0.08,
++    'paragraph_order_delta_max': 0.05,
++    'slow_model_review_band': 0.03,
++}
++
++SLOW_MODEL_TRIGGER_KEYS = (
++    'near_threshold_page_render_similarity',
++    'key_region_below_threshold',
++    'layout_density_delta_outlier',
++    'bbox_iou_regression',
++    'multi_column_or_answer_area_ambiguous',
++)
++
++ARTIFACT_REQUIRED_KEYS = (
++    'visual_similarity.json',
++    'page_render_pairs',
++    'key_region_scores',
++    'slow_model_review.json',
++)
++
++
++class VisualSimilarityGateError(ValueError):
++    """Raised when a visual-similarity contract fixture is structurally invalid."""
++
++
++def load_visual_similarity_contract(path: str | Path) -> dict[str, Any]:
++    contract_path = Path(path).expanduser().resolve()
++    return json.loads(contract_path.read_text(encoding='utf-8'))
++
++
++def build_visual_similarity_gate_report(
++    contract: Mapping[str, Any],
++    *,
++    requested_mode: str | None = None,
++    parser_backend: str | None = None,
++) -> dict[str, Any]:
++    """Build the final visual-similarity gate contract report.
++
++    This function intentionally consumes precomputed/fixture facts only. It does
++    not render PDF/DOCX pages, call VLMs, or mutate the default synchronous PDF
++    to Word path. Downstream implementation can replace the fixture inputs with
++    real render-pair metrics while preserving this artifact shape.
++    """
++
++    _validate_contract(contract)
++    thresholds = _coerce_thresholds(contract.get('thresholds'))
++    gate_mode = resolve_visual_gate_mode(requested_mode, parser_backend=parser_backend)
++    gate_enabled = gate_mode == QUALITY_HYBRID_ASYNC_MODE
++    implementation_status = str(
++        contract.get('implementation_status') or 'contract_only_no_renderer_or_slow_model_invoked'
++    ).strip() or 'contract_only_no_renderer_or_slow_model_invoked'
++    samples = _build_sample_reports(contract.get('samples') or [], thresholds=thresholds, enabled=gate_enabled)
++    aggregate = _build_aggregate(samples)
++    slow_model_policy = _build_slow_model_policy(contract, enabled=gate_enabled)
++    blocking_failures = _collect_blocking_failures(samples, enabled=gate_enabled)
++    score_contract = _build_score_contract(samples, enabled=gate_enabled)
++
++    return {
++        'report_type': VISUAL_SIMILARITY_REPORT_TYPE,
++        'contract_version': str(contract.get('contract_version') or VISUAL_SIMILARITY_GATE_VERSION),
++        'implementation_status': implementation_status,
++        'mode_boundary': {
++            'requested_mode': _normalize_mode(requested_mode),
++            'parser_backend': str(parser_backend or '').strip() or None,
++            'resolved_gate_mode': gate_mode,
++            'enabled': gate_enabled,
++            'default_sync_safe': True,
++            'default_sync_invokes_render_or_slow_model': False,
++            'default_sync_policy': _source_policy(contract).get(
++                'default_sync_policy',
++                'apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled',
++            ),
++            'reason': (
++                'visual similarity participates in final scoring only in quality/hybrid_async'
++                if gate_enabled
++                else 'default synchronous modes skip render diff and slow-model review'
++            ),
++        },
++        'score_contract': score_contract,
++        'thresholds': thresholds,
++        'artifact_contract': _build_artifact_contract(contract),
++        'slow_model_policy': slow_model_policy,
++        'aggregate': aggregate,
++        'gate_passed': not blocking_failures,
++        'blocking_failures': blocking_failures,
++        'samples': samples,
++        'known_gaps': list(contract.get('known_gaps') or []),
++        'downstream_required_work': list(contract.get('downstream_required_work') or []),
++    }
++
++
++def resolve_visual_gate_mode(requested_mode: str | None, *, parser_backend: str | None = None) -> str:
++    mode = _normalize_mode(requested_mode)
++    backend = str(parser_backend or '').strip().lower()
++    if mode in QUALITY_GATE_MODES:
++        return QUALITY_HYBRID_ASYNC_MODE
++    if backend == 'hybrid_experimental' and mode == 'quality':
++        return QUALITY_HYBRID_ASYNC_MODE
++    if mode in DEFAULT_SYNC_MODES:
++        return DEFAULT_SYNC_MODE
++    return DEFAULT_SYNC_MODE
++
++
++def write_visual_similarity_gate_artifact(report: Mapping[str, Any], output_path: str | Path) -> Path:
++    path = Path(output_path).expanduser().resolve()
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
++    return path
++
++
++def _validate_contract(contract: Mapping[str, Any]) -> None:
++    required = {
++        'contract_version',
++        'source_policy',
++        'thresholds',
++        'slow_model_policy',
++        'artifact_contract',
++        'samples',
++    }
++    missing = sorted(required - set(contract))
++    if missing:
++        raise VisualSimilarityGateError(f'missing visual similarity contract fields: {missing}')
++    if str(contract.get('contract_version') or '') != VISUAL_SIMILARITY_GATE_VERSION:
++        raise VisualSimilarityGateError('unsupported visual similarity contract_version')
++    source_policy = _source_policy(contract)
++    if int(source_policy.get('visual_similarity_weight') or 0) != VISUAL_SIMILARITY_DIMENSION_WEIGHT:
++        raise VisualSimilarityGateError('visual_similarity_weight must remain 17 in the 95-point route')
++    if 'quality/hybrid_async' not in str(source_policy.get('quality_target_scope') or ''):
++        raise VisualSimilarityGateError('quality_target_scope must mention quality/hybrid_async')
++    slow_model_policy = contract.get('slow_model_policy')
++    if not isinstance(slow_model_policy, Mapping):
++        raise VisualSimilarityGateError('slow_model_policy must be an object')
++    disallowed = {str(item).strip() for item in slow_model_policy.get('disallowed_modes') or []}
++    if not {'fast', 'balanced', DEFAULT_SYNC_MODE}.issubset(disallowed):
++        raise VisualSimilarityGateError('slow_model_policy must explicitly block default sync modes')
++    active_candidates = [str(item).strip() for item in slow_model_policy.get('candidate_models') or []]
++    if active_candidates != ['qwen3_vl_8b']:
++        raise VisualSimilarityGateError('active slow-model candidate_models must be exactly [qwen3_vl_8b]')
++    artifact_contract = contract.get('artifact_contract')
++    if not isinstance(artifact_contract, Mapping):
++        raise VisualSimilarityGateError('artifact_contract must be an object')
++    required_artifacts = {str(item).strip() for item in artifact_contract.get('required_artifacts') or []}
++    if 'visual_similarity.json' not in required_artifacts:
++        raise VisualSimilarityGateError('required artifact must include canonical visual_similarity.json')
++    if 'visual_similarity_report.json' in required_artifacts:
++        raise VisualSimilarityGateError('visual_similarity_report.json may only be optional/debug, not required')
++
++
++def _source_policy(contract: Mapping[str, Any]) -> Mapping[str, Any]:
++    policy = contract.get('source_policy')
++    return policy if isinstance(policy, Mapping) else {}
++
++
++def _coerce_thresholds(payload: object) -> dict[str, float]:
++    thresholds = dict(DEFAULT_THRESHOLDS)
++    if isinstance(payload, Mapping):
++        for key in DEFAULT_THRESHOLDS:
++            if key in payload:
++                thresholds[key] = float(payload[key])
++    return thresholds
++
++
++def _build_sample_reports(
++    samples: Sequence[object],
++    *,
++    thresholds: Mapping[str, float],
++    enabled: bool,
++) -> list[dict[str, Any]]:
++    reports: list[dict[str, Any]] = []
++    for sample in samples:
++        if not isinstance(sample, Mapping):
++            continue
++        pages = _build_page_reports(sample.get('pages') or [], thresholds=thresholds, enabled=enabled)
++        key_region_count = sum(len(page['key_regions']) for page in pages)
++        render_pair_missing = sum(1 for page in pages if not page['render_pair_available'])
++        blocking_failures = [failure for page in pages for failure in page['blocking_failures']]
++        slow_model_trigger_count = sum(
++            len(page['slow_model_triggers'])
++            + sum(len(region['slow_model_triggers']) for region in page['key_regions'])
++            for page in pages
++        )
++        reports.append(
++            {
++                'sample_key': str(sample.get('sample_key') or '').strip(),
++                'sample_name': str(sample.get('sample_name') or '').strip(),
++                'sample_role': str(sample.get('sample_role') or '').strip(),
++                'page_type': str(sample.get('page_type') or '').strip(),
++                'source_profile': dict(sample.get('source_profile') or {}),
++                'selected_pages': list(sample.get('selected_pages') or []),
++                'pages': pages,
++                'page_count': len(pages),
++                'key_region_count': key_region_count,
++                'render_pair_missing_count': render_pair_missing,
++                'slow_model_candidate_region_count': slow_model_trigger_count,
++                'blocking_failures': blocking_failures if enabled else [],
++                'ok': not blocking_failures if enabled else True,
++                'scoring_status': 'scored' if enabled else 'skipped_default_sync',
++            }
++        )
++    return reports
++
++
++def _build_page_reports(
++    pages: Sequence[object],
++    *,
++    thresholds: Mapping[str, float],
++    enabled: bool,
++) -> list[dict[str, Any]]:
++    reports: list[dict[str, Any]] = []
++    for page in pages:
++        if not isinstance(page, Mapping):
++            continue
++        page_index = int(page.get('page_index') or 0)
++        render_pair_available = str(page.get('render_pair_status') or '').strip() == 'available'
++        similarity = _optional_float(page.get('page_render_similarity'))
++        density_delta = _optional_float(page.get('layout_density_delta'))
++        order_delta = _optional_float(page.get('paragraph_order_delta'))
++        key_regions = _build_region_reports(
++            page.get('key_regions') or [],
++            page_index=page_index,
++            thresholds=thresholds,
++            enabled=enabled,
++        )
++        blocking_failures: list[str] = []
++        if enabled and not render_pair_available:
++            blocking_failures.append(f'visual_similarity_missing_render_pair:p{page_index}')
++        if enabled and similarity is not None and similarity < thresholds['page_render_similarity_min']:
++            blocking_failures.append(f'page_render_similarity_below_threshold:p{page_index}')
++        if enabled and density_delta is not None and density_delta > thresholds['layout_density_delta_max']:
++            blocking_failures.append(f'layout_density_delta_above_threshold:p{page_index}')
++        if enabled and order_delta is not None and order_delta > thresholds['paragraph_order_delta_max']:
++            blocking_failures.append(f'paragraph_order_delta_above_threshold:p{page_index}')
++        blocking_failures.extend(
++            failure for region in key_regions for failure in region['blocking_failures']
++        )
++        slow_model_triggers = _page_slow_model_triggers(
++            similarity=similarity,
++            density_delta=density_delta,
++            thresholds=thresholds,
++            enabled=enabled,
++        )
++        reports.append(
++            {
++                'page_index': page_index,
++                'render_pair_available': render_pair_available,
++                'source_render_path': str(page.get('source_render_path') or ''),
++                'docx_render_path': str(page.get('docx_render_path') or ''),
++                'page_render_similarity': similarity,
++                'layout_density_delta': density_delta,
++                'paragraph_order_delta': order_delta,
++                'key_regions': key_regions,
++                'slow_model_triggers': slow_model_triggers,
++                'blocking_failures': blocking_failures,
++                'ok': not blocking_failures if enabled else True,
++            }
++        )
++    return reports
++
++
++def _build_region_reports(
++    regions: Sequence[object],
++    *,
++    page_index: int,
++    thresholds: Mapping[str, float],
++    enabled: bool,
++) -> list[dict[str, Any]]:
++    reports: list[dict[str, Any]] = []
++    for index, region in enumerate(regions, start=1):
++        if not isinstance(region, Mapping):
++            continue
++        region_id = str(region.get('region_id') or f'p{page_index}:r{index}').strip()
++        similarity = _optional_float(region.get('region_similarity'))
++        bbox_iou = _optional_float(region.get('bbox_iou'))
++        blocking_failures: list[str] = []
++        if enabled and similarity is not None and similarity < thresholds['key_region_similarity_min']:
++            blocking_failures.append(f'key_region_similarity_below_threshold:{region_id}')
++        if enabled and bbox_iou is not None and bbox_iou < thresholds['bbox_iou_min']:
++            blocking_failures.append(f'bbox_iou_below_threshold:{region_id}')
++        reports.append(
++            {
++                'region_id': region_id,
++                'region_type': str(region.get('region_type') or 'unknown').strip(),
++                'required': bool(region.get('required', True)),
++                'bbox': dict(region.get('bbox') or {}),
++                'region_similarity': similarity,
++                'bbox_iou': bbox_iou,
++                'slow_model_triggers': _region_slow_model_triggers(
++                    similarity=similarity,
++                    bbox_iou=bbox_iou,
++                    thresholds=thresholds,
++                    enabled=enabled,
++                ),
++                'blocking_failures': blocking_failures,
++                'ok': not blocking_failures if enabled else True,
++            }
++        )
++    return reports
++
++
++def _page_slow_model_triggers(
++    *,
++    similarity: float | None,
++    density_delta: float | None,
++    thresholds: Mapping[str, float],
++    enabled: bool,
++) -> list[str]:
++    if not enabled:
++        return []
++    triggers: list[str] = []
++    review_band = thresholds['slow_model_review_band']
++    if similarity is not None and similarity < thresholds['page_render_similarity_min'] + review_band:
++        triggers.append('near_threshold_page_render_similarity')
++    if density_delta is not None and density_delta > thresholds['layout_density_delta_max']:
++        triggers.append('layout_density_delta_outlier')
++    return triggers
++
++
++def _region_slow_model_triggers(
++    *,
++    similarity: float | None,
++    bbox_iou: float | None,
++    thresholds: Mapping[str, float],
++    enabled: bool,
++) -> list[str]:
++    if not enabled:
++        return []
++    triggers: list[str] = []
++    if similarity is not None and similarity < thresholds['key_region_similarity_min']:
++        triggers.append('key_region_below_threshold')
++    if bbox_iou is not None and bbox_iou < thresholds['bbox_iou_min']:
++        triggers.append('bbox_iou_regression')
++    return triggers
++
++
++def _build_aggregate(samples: Sequence[Mapping[str, Any]]) -> dict[str, int]:
++    page_count = sum(int(sample.get('page_count') or 0) for sample in samples)
++    region_count = sum(int(sample.get('key_region_count') or 0) for sample in samples)
++    return {
++        'sample_count': len(samples),
++        'page_count': page_count,
++        'key_region_count': region_count,
++        'render_pair_ready_page_count': sum(
++            1 for sample in samples for page in sample.get('pages', []) if page.get('render_pair_available')
++        ),
++        'missing_render_pair_page_count': sum(
++            int(sample.get('render_pair_missing_count') or 0) for sample in samples
++        ),
++        'slow_model_candidate_region_count': sum(
++            int(sample.get('slow_model_candidate_region_count') or 0) for sample in samples
++        ),
++        'sample_pass_count': sum(1 for sample in samples if sample.get('ok')),
++    }
++
++
++def _build_score_contract(samples: Sequence[Mapping[str, Any]], *, enabled: bool) -> dict[str, Any]:
++    failed_samples = sum(1 for sample in samples if not sample.get('ok'))
++    score_awarded = VISUAL_SIMILARITY_DIMENSION_WEIGHT if enabled and failed_samples == 0 else 0
++    return {
++        'dimension_key': VISUAL_SIMILARITY_DIMENSION_KEY,
++        'dimension_weight': VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++        'target_total_score_threshold': 95,
++        'enters_95_total_score': enabled,
++        'score_awarded_when_passed': VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++        'score_awarded': score_awarded,
++        'blocking_when_enabled': True,
++        'skipped_score_reason': None if enabled else 'default_sync_excludes_visual_similarity_dimension',
++    }
++
++
++def _build_slow_model_policy(contract: Mapping[str, Any], *, enabled: bool) -> dict[str, Any]:
++    policy = contract.get('slow_model_policy') if isinstance(contract.get('slow_model_policy'), Mapping) else {}
++    candidate_models = list(policy.get('candidate_models') or [])
++    return {
++        'enabled': enabled,
++        'allowed_modes': list(policy.get('allowed_modes') or ['quality', 'hybrid_async']),
++        'disallowed_modes': list(policy.get('disallowed_modes') or ['fast', 'balanced', DEFAULT_SYNC_MODE]),
++        'candidate_models': candidate_models,
++        'future_review_candidates': list(policy.get('future_review_candidates') or []),
++        'blocked_candidates': list(policy.get('blocked_candidates') or []),
++        'comparison_only_models': list(policy.get('comparison_only_models') or []),
++        'trigger_policy': str(policy.get('trigger_policy') or 'selective_only').strip(),
++        'triggers': list(policy.get('triggers') or SLOW_MODEL_TRIGGER_KEYS),
++        'max_review_regions_per_sample': int(policy.get('max_review_regions_per_sample') or 3),
++        'must_not_block_default_sync': True,
++        'notes': str(policy.get('notes') or '').strip(),
++    }
++
++
++def _build_artifact_contract(contract: Mapping[str, Any]) -> dict[str, Any]:
++    artifact_contract = contract.get('artifact_contract')
++    payload = dict(artifact_contract) if isinstance(artifact_contract, Mapping) else {}
++    required = list(payload.get('required_artifacts') or ARTIFACT_REQUIRED_KEYS)
++    payload['required_artifacts'] = required
++    payload['required_fields'] = list(
++        payload.get('required_fields')
++        or [
++            'contract_version',
++            'mode_boundary',
++            'score_contract',
++            'thresholds',
++            'aggregate',
++            'samples',
++            'blocking_failures',
++            'slow_model_policy',
++        ]
++    )
++    return payload
++
++
++def _collect_blocking_failures(samples: Sequence[Mapping[str, Any]], *, enabled: bool) -> list[str]:
++    if not enabled:
++        return []
++    failures: list[str] = []
++    for sample in samples:
++        sample_key = str(sample.get('sample_key') or 'unknown')
++        for failure in sample.get('blocking_failures') or []:
++            failures.append(f'{sample_key}:{failure}')
++    return failures
++
++
++def _normalize_mode(mode: str | None) -> str:
++    return str(mode or '').strip().lower()
++
++
++def _optional_float(value: object) -> float | None:
++    if value is None or value == '':
++        return None
++    return float(value)
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json b/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json
+new file mode 100644
+index 0000000..956a7f9
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json
+@@ -0,0 +1,507 @@
++{
++  "manifest_version": "pdf_to_word_fidelity_manifest/v1",
++  "manifest_name": "冻结95还原度指标与样本清单",
++  "frozen_at": "2026-05-19T09:08:48+08:00",
++  "target": {
++    "score_threshold": 95,
++    "score_scale": 100,
++    "mode": "quality/hybrid_async",
++    "default_sync_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled"
++  },
++  "source_documents": [
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
++      "role": "phase_boundary_and_priority_source",
++      "availability": "present"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
++      "role": "pipeline_contract_source",
++      "availability": "present"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md",
++      "role": "fidelity_score_and_table_gate_source",
++      "availability": "planned_in_patch"
++    },
++    {
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/20260518-072100/final_docx_gate_report.json",
++      "role": "current_sample_fact_source",
++      "availability": "present"
++    }
++  ],
++  "release_boundary": {
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "quality_target_scope": "quality/hybrid_async only",
++    "sync_boundary": "default sync cannot be slowed by slow models",
++    "table_policy": "any detected table structure must materialize as editable Word table when structure exists"
++  },
++  "aggregate_facts": {
++    "sample_count": 5,
++    "authoritative_docx_sample_count": 5,
++    "openable_docx_sample_count": 5,
++    "sample_with_word_media_count": 4,
++    "sample_with_table_xml_count": 2,
++    "pages_provenance_match_sample_count": 5,
++    "source_manifest_ok_sample_count": 5,
++    "sample_with_fallback_count": 3,
++    "document_fallback_sample_count": 1,
++    "explicit_answer_area_materialized_sample_count": 0,
++    "answer_section_materialized_sample_count": 0,
++    "sample_with_source_gate_pass_count": 5,
++    "samples_with_paddle_selected_pages_count": 4,
++    "samples_with_paddle_final_accepted_signal_count": 3
++  },
++  "scoring_dimensions": [
++    {
++      "key": "text_and_question_backbone",
++      "label": "文本与题号主干",
++      "weight": 20,
++      "phase": "P0",
++      "automatic_metrics": [
++        "ocr_text_f1",
++        "question_recall",
++        "question_precision",
++        "question_order_regression_count"
++      ],
++      "manual_checks": [
++        "抽查关键题干缺漏"
++      ],
++      "gate_checks": [
++        "baseline_text_regression",
++        "question_order_regression"
++      ]
++    },
++    {
++      "key": "exerciseir_structure",
++      "label": "ExerciseIR 结构",
++      "weight": 12,
++      "phase": "P0/P1",
++      "automatic_metrics": [
++        "exercise_item_count",
++        "option_assignment_accuracy",
++        "material_assignment_accuracy",
++        "reading_order_valid_rate"
++      ],
++      "manual_checks": [
++        "抽查串题",
++        "漏题"
++      ],
++      "gate_checks": [
++        "exercise_item_count_not_below_baseline",
++        "question_sequence_regression"
++      ]
++    },
++    {
++      "key": "editable_word_tables",
++      "label": "可编辑 Word 表格",
++      "weight": 18,
++      "phase": "P0/P1",
++      "automatic_metrics": [
++        "has_table_xml",
++        "docx_w_tbl_count",
++        "cell_text_f1",
++        "row_col_match_rate",
++        "span_reconstruction_rate"
++      ],
++      "manual_checks": [
++        "打开 Word 验证可编辑"
++      ],
++      "gate_checks": [
++        "table_detected_but_no_word_table",
++        "table_fallback_rate"
++      ]
++    },
++    {
++      "key": "image_and_graph_attachments",
++      "label": "图片/图形归属",
++      "weight": 10,
++      "phase": "P0",
++      "automatic_metrics": [
++        "image_attachment_rate",
++        "image_assignment_precision",
++        "word_media_count",
++        "media_render_valid_rate"
++      ],
++      "manual_checks": [
++        "抽查错挂",
++        "漏挂"
++      ],
++      "gate_checks": [
++        "image_attachment_missing",
++        "media_render_failure"
++      ]
++    },
++    {
++      "key": "formula_and_special_symbols",
++      "label": "公式/特殊符号",
++      "weight": 10,
++      "phase": "P1/P3",
++      "automatic_metrics": [
++        "formula_recall_proxy",
++        "omml_or_readable_fallback_rate",
++        "formula_editable_rate",
++        "special_symbol_preservation_rate"
++      ],
++      "manual_checks": [
++        "抽查数学/科学题"
++      ],
++      "gate_checks": [
++        "formula_regression",
++        "special_symbol_corruption"
++      ]
++    },
++    {
++      "key": "answer_and_work_area",
++      "label": "答案区/作答区",
++      "weight": 8,
++      "phase": "P1",
++      "automatic_metrics": [
++        "answer_area_detection_rate",
++        "answer_section_materialized_rate",
++        "answer_text_cleanliness",
++        "teacher_variant_consistency"
++      ],
++      "manual_checks": [
++        "抽查答案不污染题干"
++      ],
++      "gate_checks": [
++        "answer_area_pollution",
++        "answer_section_missing"
++      ]
++    },
++    {
++      "key": "visual_similarity",
++      "label": "视觉相似度",
++      "weight": 17,
++      "phase": "P3",
++      "automatic_metrics": [
++        "page_render_similarity",
++        "bbox_iou",
++        "layout_density_delta",
++        "paragraph_order_delta"
++      ],
++      "manual_checks": [
++        "抽查关键区域版式"
++      ],
++      "gate_checks": [
++        "visual_similarity_missing"
++      ]
++    },
++    {
++      "key": "stability_and_audit",
++      "label": "稳定性与回退审计",
++      "weight": 5,
++      "phase": "P0",
++      "automatic_metrics": [
++        "fallback_rate",
++        "warning_rate",
++        "artifact_completeness",
++        "docx_openable_rate"
++      ],
++      "manual_checks": [
++        "抽查报告可定位"
++      ],
++      "gate_checks": [
++        "docx_invalid",
++        "silent_fallback",
++        "default_sync_slowdown"
++      ]
++    }
++  ],
++  "p0_blockers": [
++    {
++      "key": "docx_invalid",
++      "description": "DOCX 无法解包/打开/主 XML 无效"
++    },
++    {
++      "key": "baseline_text_regression",
++      "description": "baseline 文本块被删改或题号主干缺失"
++    },
++    {
++      "key": "question_order_regression",
++      "description": "题号顺序明显错乱"
++    },
++    {
++      "key": "table_detected_but_no_word_table",
++      "description": "检测到表格但 DOCX 没有 <w:tbl>，仅图片/占位"
++    },
++    {
++      "key": "candidate_assignment_missing",
++      "description": "accepted candidate 缺 assigned_question_id 或合法材料归属"
++    },
++    {
++      "key": "silent_fallback",
++      "description": "fallback 无 reason / 无 artifact / 被标记为 pass"
++    },
++    {
++      "key": "default_sync_slowdown",
++      "description": "默认同步被 slow quality 模型拖慢"
++    }
++  ],
++  "sample_sets": {
++    "current_samples": [
++      {
++        "sample_key": "five_xia_science",
++        "sample_name": "五下科学",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "science_experiment_table_and_image_mixed",
++        "coverage_tags": [
++          "science-experiment",
++          "table-mixed",
++          "image-mixed"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          4,
++          5,
++          6
++        ],
++        "fallback_pages": [
++          1
++        ],
++        "current_gate_facts": {
++          "word_media_count": 4,
++          "table_xml_present": true,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "editable_word_tables",
++          "image_and_graph_attachments",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      },
++      {
++        "sample_key": "math_grade_8",
++        "sample_name": "数学八年级",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "math_exercise_with_sparse_image_and_table",
++        "coverage_tags": [
++          "math-exercise",
++          "sparse-image-and-table",
++          "positive-mixed"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          3,
++          4,
++          6,
++          7,
++          8
++        ],
++        "fallback_pages": [
++          5
++        ],
++        "current_gate_facts": {
++          "word_media_count": 2,
++          "table_xml_present": true,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "editable_word_tables",
++          "text_and_question_backbone",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      },
++      {
++        "sample_key": "math_exam",
++        "sample_name": "数学试卷",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "math_exam_image_dense",
++        "coverage_tags": [
++          "math-exam",
++          "image-dense",
++          "formula-suspected"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          3,
++          4,
++          6,
++          8,
++          9,
++          11
++        ],
++        "fallback_pages": [],
++        "current_gate_facts": {
++          "word_media_count": 20,
++          "table_xml_present": false,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "image_and_graph_attachments",
++          "formula_and_special_symbols",
++          "stability_and_audit"
++        ],
++        "known_gaps": [
++          "table_xml_absent_currently"
++        ]
++      },
++      {
++        "sample_key": "english_grade_8",
++        "sample_name": "英语八年级",
++        "status": "current",
++        "sample_role": "positive_mixed",
++        "page_type": "language_exercise_sparse_media_with_fallback_pages",
++        "coverage_tags": [
++          "reading-material",
++          "sparse-media",
++          "fallback-pages"
++        ],
++        "source_profile": {
++          "default": "mineru_full",
++          "supplemental": "paddleocr_vl"
++        },
++        "selected_pages": [
++          1,
++          4,
++          5,
++          7,
++          9
++        ],
++        "fallback_pages": [
++          3,
++          8,
++          11,
++          12
++        ],
++        "current_gate_facts": {
++          "word_media_count": 1,
++          "table_xml_present": false,
++          "document_fallback": false,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": false
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "exerciseir_structure",
++          "stability_and_audit"
++        ],
++        "known_gaps": [
++          "table_xml_absent_currently"
++        ]
++      },
++      {
++        "sample_key": "chinese_grade_5_negative",
++        "sample_name": "语文五年级",
++        "status": "current",
++        "sample_role": "negative",
++        "page_type": "negative_non_exercise_or_question_region_unresolvable",
++        "coverage_tags": [
++          "negative",
++          "question-region-unresolvable",
++          "baseline-only"
++        ],
++        "source_profile": {
++          "default": "baseline_only",
++          "supplemental": null
++        },
++        "selected_pages": [],
++        "fallback_pages": [
++          1,
++          2,
++          3,
++          4,
++          5,
++          6,
++          7,
++          8,
++          9,
++          10,
++          11,
++          12,
++          13
++        ],
++        "current_gate_facts": {
++          "word_media_count": 0,
++          "table_xml_present": false,
++          "document_fallback": true,
++          "source_gate_ok": true,
++          "formula_audit_only": true,
++          "negative_baseline_only": true
++        },
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "stability_and_audit"
++        ],
++        "known_gaps": []
++      }
++    ],
++    "planned_extensions": [
++      {
++        "slot_key": "table_heavy_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "table-heavy",
++        "why": "专门压测 Word 表格结构与单元格/合并还原",
++        "focus_dimensions": [
++          "editable_word_tables",
++          "stability_and_audit"
++        ],
++        "expected_outputs": [
++          "NormalizedTableIR",
++          "<w:tbl>",
++          "docx_inspect.json"
++        ]
++      },
++      {
++        "slot_key": "multi_column_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "multi-column",
++        "why": "专门压测阅读顺序与布局相似度",
++        "focus_dimensions": [
++          "text_and_question_backbone",
++          "exerciseir_structure",
++          "visual_similarity"
++        ],
++        "expected_outputs": [
++          "reading_order_validator",
++          "layout_similarity_report"
++        ]
++      },
++      {
++        "slot_key": "answer_area_extension",
++        "status": "planned",
++        "sample_role": "future_extension",
++        "category": "answer-area",
++        "why": "专门压测答案区/作答区分离与教师版变体",
++        "focus_dimensions": [
++          "answer_and_work_area",
++          "stability_and_audit"
++        ],
++        "expected_outputs": [
++          "answer_area_manifest",
++          "teacher_variant_diff"
++        ]
++      }
++    ]
++  }
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/missing_dimension_input.json b/backend/tests/fixtures/pdf_to_word/fidelity/missing_dimension_input.json
+new file mode 100644
+index 0000000..e8b3eab
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/missing_dimension_input.json
+@@ -0,0 +1,56 @@
++{
++  "schema_version": 1,
++  "sample_set": "current_five_sample_baseline",
++  "threshold": 95,
++  "weights": {
++    "text_and_question_backbone": 20,
++    "exerciseir_structure": 12,
++    "editable_word_tables": 18,
++    "image_and_graph_attachments": 10,
++    "formula_and_special_symbols": 10,
++    "answer_and_work_area": 8,
++    "visual_similarity": 17,
++    "stability_and_audit": 5
++  },
++  "dimensions": {
++    "text_and_question_backbone": {
++      "implemented": true,
++      "score": 19.2
++    },
++    "exerciseir_structure": {
++      "implemented": true,
++      "score": 11.6
++    },
++    "editable_word_tables": {
++      "implemented": true,
++      "score": 18,
++      "table_xml_present": true,
++      "detected_table_sample_count": 2,
++      "sample_with_table_xml_count": 2,
++      "image_fallback_table_count": 0
++    },
++    "image_and_graph_attachments": {
++      "implemented": true,
++      "score": 9.8
++    },
++    "formula_and_special_symbols": {
++      "implemented": true,
++      "score": 9.5
++    },
++    "answer_and_work_area": {
++      "implemented": true,
++      "score": 7.7
++    },
++    "visual_similarity": {
++      "implemented": false,
++      "notes": [
++        "not integrated yet"
++      ]
++    },
++    "stability_and_audit": {
++      "implemented": true,
++      "score": 5
++    }
++  },
++  "blocking_failures": []
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/pass_input.json b/backend/tests/fixtures/pdf_to_word/fidelity/pass_input.json
+new file mode 100644
+index 0000000..96a3aec
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/pass_input.json
+@@ -0,0 +1,57 @@
++{
++  "schema_version": 1,
++  "sample_set": "current_five_sample_baseline",
++  "threshold": 95,
++  "weights": {
++    "text_and_question_backbone": 20,
++    "exerciseir_structure": 12,
++    "editable_word_tables": 18,
++    "image_and_graph_attachments": 10,
++    "formula_and_special_symbols": 10,
++    "answer_and_work_area": 8,
++    "visual_similarity": 17,
++    "stability_and_audit": 5
++  },
++  "dimensions": {
++    "text_and_question_backbone": {
++      "implemented": true,
++      "score": 19.2
++    },
++    "exerciseir_structure": {
++      "implemented": true,
++      "score": 11.6
++    },
++    "editable_word_tables": {
++      "implemented": true,
++      "score": 18,
++      "table_xml_present": true,
++      "detected_table_sample_count": 2,
++      "sample_with_table_xml_count": 2,
++      "image_fallback_table_count": 0
++    },
++    "image_and_graph_attachments": {
++      "implemented": true,
++      "score": 9.8
++    },
++    "formula_and_special_symbols": {
++      "implemented": true,
++      "score": 9.5
++    },
++    "answer_and_work_area": {
++      "implemented": true,
++      "score": 7.7
++    },
++    "visual_similarity": {
++      "implemented": true,
++      "score": 16.4,
++      "notes": [
++        "v1 metric connected"
++      ]
++    },
++    "stability_and_audit": {
++      "implemented": true,
++      "score": 5
++    }
++  },
++  "blocking_failures": []
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/table_blocker_input.json b/backend/tests/fixtures/pdf_to_word/fidelity/table_blocker_input.json
+new file mode 100644
+index 0000000..c29cc92
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/table_blocker_input.json
+@@ -0,0 +1,54 @@
++{
++  "schema_version": 1,
++  "sample_set": "current_five_sample_baseline",
++  "threshold": 95,
++  "weights": {
++    "text_and_question_backbone": 20,
++    "exerciseir_structure": 12,
++    "editable_table": 18,
++    "image_and_graph_attachments": 10,
++    "formula_and_special_symbols": 10,
++    "answer_and_work_area": 8,
++    "visual_similarity": 17,
++    "stability_and_audit": 5
++  },
++  "dimensions": {
++    "text_and_question_backbone": {
++      "implemented": true,
++      "score": 19.2
++    },
++    "exerciseir_structure": {
++      "implemented": true,
++      "score": 11.6
++    },
++    "editable_table": {
++      "implemented": true,
++      "score": 17.4,
++      "table_xml_present": false,
++      "detected_table_sample_count": 2,
++      "sample_with_table_xml_count": 0,
++      "image_fallback_table_count": 2
++    },
++    "image_and_graph_attachments": {
++      "implemented": true,
++      "score": 9.8
++    },
++    "formula_and_special_symbols": {
++      "implemented": true,
++      "score": 9.5
++    },
++    "answer_and_work_area": {
++      "implemented": true,
++      "score": 7.7
++    },
++    "visual_similarity": {
++      "implemented": true,
++      "score": 16.4
++    },
++    "stability_and_audit": {
++      "implemented": true,
++      "score": 5
++    }
++  },
++  "blocking_failures": []
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/visual_similarity/quality_ready_contract.json b/backend/tests/fixtures/pdf_to_word/visual_similarity/quality_ready_contract.json
+new file mode 100644
+index 0000000..f1820fb
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/visual_similarity/quality_ready_contract.json
+@@ -0,0 +1,189 @@
++{
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "implementation_status": "quality_hybrid_async_artifact_ready",
++  "source_policy": {
++    "route_doc_date": "2026-05-18",
++    "target_total_score_threshold": 95,
++    "visual_similarity_weight": 17,
++    "quality_target_scope": "quality/hybrid_async only",
++    "default_sync_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "sync_boundary": "default sync cannot be slowed by render comparison or slow visual models"
++  },
++  "thresholds": {
++    "page_render_similarity_min": 0.92,
++    "key_region_similarity_min": 0.88,
++    "bbox_iou_min": 0.85,
++    "layout_density_delta_max": 0.08,
++    "paragraph_order_delta_max": 0.05,
++    "slow_model_review_band": 0.03
++  },
++  "slow_model_policy": {
++    "allowed_modes": [
++      "quality",
++      "hybrid_async"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "trigger_policy": "selective_only",
++    "max_review_regions_per_sample": 3,
++    "triggers": [
++      "near_threshold_page_render_similarity",
++      "key_region_below_threshold",
++      "layout_density_delta_outlier",
++      "bbox_iou_regression",
++      "multi_column_or_answer_area_ambiguous"
++    ],
++    "notes": "Slow visual review is gray-only evidence for quality/hybrid_async and must never run in default synchronous apple/auto paths.",
++    "future_review_candidates": [],
++    "blocked_candidates": [
++      {
++        "model": "glm_46v_flash",
++        "status": "blocked_current_route",
++        "reason": "2026-05-18 route keeps GLM-4.6V-Flash as paused/comparison-only, not an active quality gray candidate."
++      }
++    ],
++    "comparison_only_models": [
++      "glm_46v_flash"
++    ]
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "visual_similarity.json",
++      "page_render_pairs",
++      "key_region_scores",
++      "slow_model_review.json"
++    ],
++    "required_fields": [
++      "contract_version",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "aggregate",
++      "samples",
++      "blocking_failures",
++      "slow_model_policy"
++    ],
++    "render_pair_convention": {
++      "source_render_path": "renders/source/<sample>/<page>.png",
++      "docx_render_path": "renders/docx/<sample>/<page>.png",
++      "dpi": 180
++    },
++    "optional_artifacts": [
++      "visual_similarity_report.json",
++      "visual_similarity_debug.json"
++    ]
++  },
++  "samples": [
++    {
++      "sample_key": "math_grade_8",
++      "sample_name": "数学八年级",
++      "sample_role": "positive_mixed",
++      "page_type": "math_exercise_with_sparse_image_and_table",
++      "source_profile": {
++        "default": "mineru_full",
++        "supplemental": "paddleocr_vl"
++      },
++      "selected_pages": [
++        1,
++        3,
++        4,
++        6,
++        7,
++        8
++      ],
++      "pages": [
++        {
++          "page_index": 1,
++          "render_pair_status": "available",
++          "source_render_path": "renders/source/math_grade_8/page-001.png",
++          "docx_render_path": "renders/docx/math_grade_8/page-001.png",
++          "page_render_similarity": 0.948,
++          "layout_density_delta": 0.031,
++          "paragraph_order_delta": 0.018,
++          "key_regions": [
++            {
++              "region_id": "math_grade_8:p1:table-01",
++              "region_type": "editable_word_table",
++              "required": true,
++              "bbox": {
++                "x0": 88.0,
++                "y0": 392.0,
++                "x1": 512.0,
++                "y1": 582.0
++              },
++              "region_similarity": 0.914,
++              "bbox_iou": 0.902
++            },
++            {
++              "region_id": "math_grade_8:p1:question-backbone",
++              "region_type": "question_backbone",
++              "required": true,
++              "bbox": {
++                "x0": 72.0,
++                "y0": 86.0,
++                "x1": 520.0,
++                "y1": 330.0
++              },
++              "region_similarity": 0.936,
++              "bbox_iou": 0.918
++            }
++          ]
++        }
++      ]
++    },
++    {
++      "sample_key": "multi_column_extension_stub",
++      "sample_name": "多栏扩展槽位",
++      "sample_role": "future_extension",
++      "page_type": "multi_column_layout_similarity_probe",
++      "source_profile": {
++        "default": "mineru_full",
++        "supplemental": "paddleocr_vl"
++      },
++      "selected_pages": [
++        2
++      ],
++      "pages": [
++        {
++          "page_index": 2,
++          "render_pair_status": "available",
++          "source_render_path": "renders/source/multi_column_extension_stub/page-002.png",
++          "docx_render_path": "renders/docx/multi_column_extension_stub/page-002.png",
++          "page_render_similarity": 0.932,
++          "layout_density_delta": 0.052,
++          "paragraph_order_delta": 0.031,
++          "key_regions": [
++            {
++              "region_id": "multi_column_extension_stub:p2:column-flow",
++              "region_type": "multi_column_reading_order",
++              "required": true,
++              "bbox": {
++                "x0": 54.0,
++                "y0": 70.0,
++                "x1": 545.0,
++                "y1": 742.0
++              },
++              "region_similarity": 0.892,
++              "bbox_iou": 0.871
++            }
++          ]
++        }
++      ]
++    }
++  ],
++  "known_gaps": [
++    "Render pairs remain precomputed evidence in the fixture; this task only wires the canonical artifact contract and final consumer chain.",
++    "Slow visual models are represented by trigger policy and artifact contract, not live model calls."
++  ],
++  "downstream_required_work": [
++    "Implement PDF/DOCX render-pair generation under quality/hybrid_async artifacts.",
++    "Feed key-region crops from table/answer/image/question detectors into key_region_scores.",
++    "Add selective slow-model review runner for triggered regions only."
++  ]
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json b/backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json
+new file mode 100644
+index 0000000..42fb445
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json
+@@ -0,0 +1,188 @@
++{
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "source_policy": {
++    "route_doc_date": "2026-05-18",
++    "target_total_score_threshold": 95,
++    "visual_similarity_weight": 17,
++    "quality_target_scope": "quality/hybrid_async only",
++    "default_sync_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "sync_boundary": "default sync cannot be slowed by render comparison or slow visual models"
++  },
++  "thresholds": {
++    "page_render_similarity_min": 0.92,
++    "key_region_similarity_min": 0.88,
++    "bbox_iou_min": 0.85,
++    "layout_density_delta_max": 0.08,
++    "paragraph_order_delta_max": 0.05,
++    "slow_model_review_band": 0.03
++  },
++  "slow_model_policy": {
++    "allowed_modes": [
++      "quality",
++      "hybrid_async"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "trigger_policy": "selective_only",
++    "max_review_regions_per_sample": 3,
++    "triggers": [
++      "near_threshold_page_render_similarity",
++      "key_region_below_threshold",
++      "layout_density_delta_outlier",
++      "bbox_iou_regression",
++      "multi_column_or_answer_area_ambiguous"
++    ],
++    "notes": "Slow visual review is gray-only evidence for quality/hybrid_async and must never run in default synchronous apple/auto paths.",
++    "future_review_candidates": [],
++    "blocked_candidates": [
++      {
++        "model": "glm_46v_flash",
++        "status": "blocked_current_route",
++        "reason": "2026-05-18 route keeps GLM-4.6V-Flash as paused/comparison-only, not an active quality gray candidate."
++      }
++    ],
++    "comparison_only_models": [
++      "glm_46v_flash"
++    ]
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "visual_similarity.json",
++      "page_render_pairs",
++      "key_region_scores",
++      "slow_model_review.json"
++    ],
++    "required_fields": [
++      "contract_version",
++      "mode_boundary",
++      "score_contract",
++      "thresholds",
++      "aggregate",
++      "samples",
++      "blocking_failures",
++      "slow_model_policy"
++    ],
++    "render_pair_convention": {
++      "source_render_path": "renders/source/<sample>/<page>.png",
++      "docx_render_path": "renders/docx/<sample>/<page>.png",
++      "dpi": 180
++    },
++    "optional_artifacts": [
++      "visual_similarity_report.json",
++      "visual_similarity_debug.json"
++    ]
++  },
++  "samples": [
++    {
++      "sample_key": "math_grade_8",
++      "sample_name": "数学八年级",
++      "sample_role": "positive_mixed",
++      "page_type": "math_exercise_with_sparse_image_and_table",
++      "source_profile": {
++        "default": "mineru_full",
++        "supplemental": "paddleocr_vl"
++      },
++      "selected_pages": [
++        1,
++        3,
++        4,
++        6,
++        7,
++        8
++      ],
++      "pages": [
++        {
++          "page_index": 1,
++          "render_pair_status": "available",
++          "source_render_path": "renders/source/math_grade_8/page-001.png",
++          "docx_render_path": "renders/docx/math_grade_8/page-001.png",
++          "page_render_similarity": 0.948,
++          "layout_density_delta": 0.031,
++          "paragraph_order_delta": 0.018,
++          "key_regions": [
++            {
++              "region_id": "math_grade_8:p1:table-01",
++              "region_type": "editable_word_table",
++              "required": true,
++              "bbox": {
++                "x0": 88.0,
++                "y0": 392.0,
++                "x1": 512.0,
++                "y1": 582.0
++              },
++              "region_similarity": 0.914,
++              "bbox_iou": 0.902
++            },
++            {
++              "region_id": "math_grade_8:p1:question-backbone",
++              "region_type": "question_backbone",
++              "required": true,
++              "bbox": {
++                "x0": 72.0,
++                "y0": 86.0,
++                "x1": 520.0,
++                "y1": 330.0
++              },
++              "region_similarity": 0.936,
++              "bbox_iou": 0.918
++            }
++          ]
++        }
++      ]
++    },
++    {
++      "sample_key": "multi_column_extension_stub",
++      "sample_name": "多栏扩展槽位",
++      "sample_role": "future_extension",
++      "page_type": "multi_column_layout_similarity_probe",
++      "source_profile": {
++        "default": "mineru_full",
++        "supplemental": "paddleocr_vl"
++      },
++      "selected_pages": [
++        2
++      ],
++      "pages": [
++        {
++          "page_index": 2,
++          "render_pair_status": "available",
++          "source_render_path": "renders/source/multi_column_extension_stub/page-002.png",
++          "docx_render_path": "renders/docx/multi_column_extension_stub/page-002.png",
++          "page_render_similarity": 0.932,
++          "layout_density_delta": 0.052,
++          "paragraph_order_delta": 0.031,
++          "key_regions": [
++            {
++              "region_id": "multi_column_extension_stub:p2:column-flow",
++              "region_type": "multi_column_reading_order",
++              "required": true,
++              "bbox": {
++                "x0": 54.0,
++                "y0": 70.0,
++                "x1": 545.0,
++                "y1": 742.0
++              },
++              "region_similarity": 0.892,
++              "bbox_iou": 0.871
++            }
++          ]
++        }
++      ]
++    }
++  ],
++  "known_gaps": [
++    "No renderer is invoked by this contract stub; page_render_similarity values are fixture/precomputed evidence only.",
++    "Slow visual models are represented by trigger policy and artifact contract, not live model calls."
++  ],
++  "downstream_required_work": [
++    "Implement PDF/DOCX render-pair generation under quality/hybrid_async artifacts.",
++    "Feed key-region crops from table/answer/image/question detectors into key_region_scores.",
++    "Add selective slow-model review runner for triggered regions only."
++  ]
++}
+diff --git a/backend/tests/test_model_eval_runner.py b/backend/tests/test_model_eval_runner.py
+index 4665bd5..9a0b874 100644
+--- a/backend/tests/test_model_eval_runner.py
++++ b/backend/tests/test_model_eval_runner.py
+@@ -10,6 +10,7 @@ from PIL import Image
+ from app.services.pdf_to_word.model_eval_runner import (
+     build_arg_parser,
+     build_final_docx_gate_summary,
++    build_visual_similarity_artifact_summary,
+     build_formula_crop_eval_summary,
+     build_formula_crop_p1_summary,
+     build_local_capability_eval_summary,
+@@ -18,6 +19,7 @@ from app.services.pdf_to_word.model_eval_runner import (
+     resolve_requested_profiles,
+     run_evaluation,
+     write_final_docx_gate_artifacts,
++    write_visual_similarity_artifacts,
+     write_formula_crop_eval_artifacts,
+     write_formula_crop_p1_artifacts,
+     write_local_capability_eval_artifacts,
+@@ -31,6 +33,8 @@ from app.services.pdf_to_word.parser_adapters.inference.config import InferenceC
+ from app.services.pdf_to_word.parser_adapters.inference.schemas import BackendCapabilities, BackendStatus, InferenceResponse
+ from app.services.pdf_to_word.settings import PDFToWordSettings
+ 
++VISUAL_SIMILARITY_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "visual_similarity"
++
+ 
+ def _write_pdf(path: Path, *, page_count: int = 2) -> Path:
+     objects: list[bytes] = []
+@@ -212,6 +216,40 @@ def test_model_eval_runner_cli_argument_parsing():
+     assert parse_pages_argument(args.pages) == [0, 1, 2]
+ 
+ 
++def test_model_eval_runner_cli_parses_visual_similarity_artifact_mode():
++    parser = build_arg_parser()
++
++    args = parser.parse_args([
++        "--output-dir", "/tmp/output",
++        "--visual-similarity-artifact",
++        "--visual-similarity-input", str(VISUAL_SIMILARITY_FIXTURE_DIR / "quality_ready_contract.json"),
++        "--visual-similarity-mode", "quality",
++        "--visual-similarity-parser-backend", "hybrid_experimental",
++    ])
++
++    assert args.visual_similarity_artifact is True
++    assert args.visual_similarity_input.endswith("quality_ready_contract.json")
++    assert args.visual_similarity_mode == "quality"
++    assert args.visual_similarity_parser_backend == "hybrid_experimental"
++
++
++def test_visual_similarity_artifact_writer_uses_canonical_filename(tmp_path: Path):
++    summary = build_visual_similarity_artifact_summary(
++        input_path=VISUAL_SIMILARITY_FIXTURE_DIR / "quality_ready_contract.json",
++        requested_mode="quality",
++        parser_backend="hybrid_experimental",
++    )
++
++    write_visual_similarity_artifacts(summary, tmp_path)
++
++    artifact_path = tmp_path / "visual_similarity.json"
++    assert artifact_path.exists()
++    assert (tmp_path / "visual_similarity_report.json").exists() is False
++    payload = json.loads(artifact_path.read_text(encoding="utf-8"))
++    assert payload["report_type"] == "pdf_to_word_visual_similarity_gate_contract"
++    assert payload["implementation_status"] == "quality_hybrid_async_artifact_ready"
++
++
+ def test_resolve_requested_profiles_supports_profile_alias():
+     args = Namespace(profiles=None, profile=["apple_baseline"])
+     assert resolve_requested_profiles(args) == ["apple_baseline"]
+diff --git a/backend/tests/test_pdf_to_word_fidelity_report.py b/backend/tests/test_pdf_to_word_fidelity_report.py
+new file mode 100644
+index 0000000..56ac9dd
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_fidelity_report.py
+@@ -0,0 +1,140 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++
++from app.services.pdf_to_word.model_eval_runner import (
++    build_arg_parser,
++    build_fidelity_final_report_summary,
++    build_visual_similarity_artifact_summary,
++    write_fidelity_final_report_artifacts,
++    write_visual_similarity_artifacts,
++)
++
++FIDELITY_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "fidelity"
++VISUAL_SIMILARITY_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "visual_similarity"
++
++
++def _load_json(path: Path) -> dict:
++    return json.loads(path.read_text(encoding="utf-8"))
++
++
++def test_model_eval_runner_cli_parses_fidelity_final_report_mode():
++    parser = build_arg_parser()
++
++    args = parser.parse_args(
++        [
++            "--output-dir",
++            "/tmp/fidelity-out",
++            "--fidelity-final-report",
++            "--fidelity-report-input",
++            str(FIDELITY_FIXTURE_DIR / "pass_input.json"),
++        ]
++    )
++
++    assert args.fidelity_final_report is True
++    assert args.fidelity_report_input.endswith("pass_input.json")
++
++
++def test_fidelity_final_report_pass_summary_and_artifacts(tmp_path: Path):
++    summary = build_fidelity_final_report_summary(input_path=FIDELITY_FIXTURE_DIR / "pass_input.json")
++
++    assert summary["pass"] is True
++    assert summary["threshold"] == 95.0
++    assert summary["overall_score"] == 97.2
++    assert summary["blocking_failures"] == []
++    assert summary["weights"]["tables"] == 18.0
++    assert "editable_word_tables" not in summary["dimensions"]
++    assert summary["dimensions"]["tables"]["weight"] == 18.0
++    assert summary["dimensions"]["tables"]["weighted_score"] == 18.0
++    assert summary["tables"]["has_table_xml"] is True
++    assert summary["tables"]["hard_gate_passed"] is True
++
++    output_dir = tmp_path / "fidelity-report"
++    write_fidelity_final_report_artifacts(summary, output_dir)
++
++    metrics_payload = json.loads((output_dir / "fidelity_metrics.json").read_text(encoding="utf-8"))
++    markdown = (output_dir / "fidelity_report.md").read_text(encoding="utf-8")
++    assert metrics_payload["threshold"] == 95.0
++    assert metrics_payload["overall_score"] == 97.2
++    assert metrics_payload["tables"]["sample_with_table_xml_count"] == 2
++    assert "PDF→Word 95% Fidelity Final Report" in markdown
++    assert "Overall score: `97.2`" in markdown
++    assert "has_table_xml: `True`" in markdown
++
++
++def test_fidelity_final_report_table_blocker_fails_hard_gate():
++    summary = build_fidelity_final_report_summary(input_path=FIDELITY_FIXTURE_DIR / "table_blocker_input.json")
++
++    assert summary["pass"] is False
++    assert summary["overall_score"] == 96.6
++    assert summary["weights"]["tables"] == 18.0
++    assert "editable_table" not in summary["dimensions"]
++    assert summary["tables"]["has_table_xml"] is False
++    assert summary["tables"]["image_fallback_table_count"] == 2
++    assert summary["tables"]["status"] == "fail"
++    assert "table_gate_failed:detected_without_word_table_xml" in summary["blocking_failures"]
++    assert "table_gate_failed:image_fallback_present" in summary["blocking_failures"]
++
++
++def test_fidelity_final_report_missing_dimension_is_explicit_gap_not_false_pass():
++    summary = build_fidelity_final_report_summary(input_path=FIDELITY_FIXTURE_DIR / "missing_dimension_input.json")
++
++    assert summary["pass"] is False
++    assert summary["overall_score"] == 80.8
++    assert summary["missing_dimensions"] == ["visual_similarity"]
++    assert summary["dimensions"]["visual_similarity"]["status"] == "missing"
++    assert summary["dimensions"]["visual_similarity"]["weight"] == 17.0
++    assert "dimension_missing:visual_similarity" in summary["blocking_failures"]
++
++
++def test_fidelity_report_consumes_canonical_visual_similarity_artifact(tmp_path: Path):
++    visual_summary = build_visual_similarity_artifact_summary(
++        input_path=VISUAL_SIMILARITY_FIXTURE_DIR / "quality_ready_contract.json",
++        requested_mode="quality",
++        parser_backend="hybrid_experimental",
++    )
++    visual_output_dir = tmp_path / "visual-artifact"
++    write_visual_similarity_artifacts(visual_summary, visual_output_dir)
++
++    payload = _load_json(FIDELITY_FIXTURE_DIR / "missing_dimension_input.json")
++    payload["visual_similarity_artifact_path"] = str((visual_output_dir / "visual_similarity.json").resolve())
++    input_path = tmp_path / "fidelity-input-with-visual.json"
++    input_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++
++    summary = build_fidelity_final_report_summary(input_path=input_path)
++
++    assert summary["pass"] is True
++    assert summary["overall_score"] == 97.8
++    assert summary["missing_dimensions"] == []
++    assert summary["dimensions"]["visual_similarity"]["status"] == "pass"
++    assert summary["dimensions"]["visual_similarity"]["score"] == 17.0
++    assert summary["dimensions"]["visual_similarity"]["implementation_status"] == "quality_hybrid_async_artifact_ready"
++    assert "dimension_missing:visual_similarity" not in summary["blocking_failures"]
++    assert "visual_similarity_artifact_missing" not in summary["blocking_failures"]
++
++
++def test_contract_only_visual_similarity_artifact_does_not_false_pass(tmp_path: Path):
++    visual_summary = build_visual_similarity_artifact_summary(
++        input_path=VISUAL_SIMILARITY_FIXTURE_DIR / "visual_similarity_contract.json",
++        requested_mode="quality",
++        parser_backend="hybrid_experimental",
++    )
++    visual_output_dir = tmp_path / "visual-contract-only"
++    write_visual_similarity_artifacts(visual_summary, visual_output_dir)
++
++    payload = _load_json(FIDELITY_FIXTURE_DIR / "missing_dimension_input.json")
++    payload["visual_similarity_artifact_path"] = str((visual_output_dir / "visual_similarity.json").resolve())
++    input_path = tmp_path / "fidelity-input-contract-only.json"
++    input_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++
++    summary = build_fidelity_final_report_summary(input_path=input_path)
++
++    assert summary["pass"] is False
++    assert summary["overall_score"] == 80.8
++    assert summary["missing_dimensions"] == ["visual_similarity"]
++    assert summary["dimensions"]["visual_similarity"]["status"] == "missing"
++    assert (
++        "visual_similarity_artifact_not_ready:contract_only_no_renderer_or_slow_model_invoked"
++        in summary["blocking_failures"]
++    )
+diff --git a/backend/tests/test_pdf_to_word_visual_similarity_gate.py b/backend/tests/test_pdf_to_word_visual_similarity_gate.py
+new file mode 100644
+index 0000000..03b2c5a
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_visual_similarity_gate.py
+@@ -0,0 +1,141 @@
++from __future__ import annotations
++
++import copy
++from pathlib import Path
++
++from app.services.pdf_to_word.visual_similarity_gate import (
++    ARTIFACT_REQUIRED_KEYS,
++    QUALITY_HYBRID_ASYNC_MODE,
++    VISUAL_SIMILARITY_DIMENSION_KEY,
++    VISUAL_SIMILARITY_DIMENSION_WEIGHT,
++    VISUAL_SIMILARITY_GATE_VERSION,
++    VisualSimilarityGateError,
++    build_visual_similarity_gate_report,
++    load_visual_similarity_contract,
++    resolve_visual_gate_mode,
++)
++
++FIXTURE_DIR = Path(__file__).parent / 'fixtures' / 'pdf_to_word' / 'visual_similarity'
++CONTRACT_PATH = FIXTURE_DIR / 'visual_similarity_contract.json'
++
++
++def _load_contract() -> dict:
++    return load_visual_similarity_contract(CONTRACT_PATH)
++
++
++def test_fixture_freezes_contract_shape_and_95_score_weight():
++    contract = _load_contract()
++
++    assert contract['contract_version'] == VISUAL_SIMILARITY_GATE_VERSION
++    assert contract['source_policy']['target_total_score_threshold'] == 95
++    assert contract['source_policy']['visual_similarity_weight'] == VISUAL_SIMILARITY_DIMENSION_WEIGHT
++    assert contract['source_policy']['quality_target_scope'] == 'quality/hybrid_async only'
++    assert contract['thresholds'] == {
++        'page_render_similarity_min': 0.92,
++        'key_region_similarity_min': 0.88,
++        'bbox_iou_min': 0.85,
++        'layout_density_delta_max': 0.08,
++        'paragraph_order_delta_max': 0.05,
++        'slow_model_review_band': 0.03,
++    }
++    assert set(ARTIFACT_REQUIRED_KEYS) <= set(contract['artifact_contract']['required_artifacts'])
++    assert contract['artifact_contract']['required_artifacts'][0] == 'visual_similarity.json'
++    assert 'visual_similarity_report.json' not in contract['artifact_contract']['required_artifacts']
++    assert contract['slow_model_policy']['candidate_models'] == ['qwen3_vl_8b']
++    assert 'glm_46v_flash' in contract['slow_model_policy']['comparison_only_models']
++    assert contract['slow_model_policy']['blocked_candidates'][0]['model'] == 'glm_46v_flash'
++
++
++def test_default_sync_skips_visual_gate_and_never_enables_slow_models():
++    report = build_visual_similarity_gate_report(_load_contract(), requested_mode='balanced', parser_backend='apple')
++
++    assert report['mode_boundary']['resolved_gate_mode'] == 'default_sync'
++    assert report['mode_boundary']['enabled'] is False
++    assert report['mode_boundary']['default_sync_safe'] is True
++    assert report['mode_boundary']['default_sync_invokes_render_or_slow_model'] is False
++    assert report['score_contract']['dimension_key'] == VISUAL_SIMILARITY_DIMENSION_KEY
++    assert report['score_contract']['enters_95_total_score'] is False
++    assert report['score_contract']['score_awarded'] == 0
++    assert report['score_contract']['skipped_score_reason'] == 'default_sync_excludes_visual_similarity_dimension'
++    assert report['slow_model_policy']['enabled'] is False
++    assert {'fast', 'balanced', 'default_sync'} <= set(report['slow_model_policy']['disallowed_modes'])
++    assert report['blocking_failures'] == []
++    assert report['gate_passed'] is True
++
++
++def test_quality_hybrid_async_enables_visual_score_without_changing_default_policy():
++    report = build_visual_similarity_gate_report(
++        _load_contract(),
++        requested_mode='quality',
++        parser_backend='hybrid_experimental',
++    )
++
++    assert report['mode_boundary']['resolved_gate_mode'] == QUALITY_HYBRID_ASYNC_MODE
++    assert report['mode_boundary']['enabled'] is True
++    assert report['mode_boundary']['default_sync_safe'] is True
++    assert report['mode_boundary']['default_sync_invokes_render_or_slow_model'] is False
++    assert 'apple default + hybrid_experimental quality gray' in report['mode_boundary']['default_sync_policy']
++    assert report['score_contract']['enters_95_total_score'] is True
++    assert report['artifact_contract']['required_artifacts'][0] == 'visual_similarity.json'
++    assert 'visual_similarity_report.json' in report['artifact_contract']['optional_artifacts']
++    assert report['slow_model_policy']['candidate_models'] == ['qwen3_vl_8b']
++    assert 'glm_46v_flash' in report['slow_model_policy']['comparison_only_models']
++    assert report['score_contract']['dimension_weight'] == 17
++    assert report['score_contract']['score_awarded'] == 17
++    assert report['aggregate']['sample_count'] == 2
++    assert report['aggregate']['page_count'] == 2
++    assert report['aggregate']['key_region_count'] == 3
++    assert report['gate_passed'] is True
++    assert report['blocking_failures'] == []
++
++
++def test_quality_mode_below_threshold_has_structured_blocking_failure_and_zero_score():
++    contract = _load_contract()
++    failing = copy.deepcopy(contract)
++    failing['samples'][0]['pages'][0]['key_regions'][0]['region_similarity'] = 0.74
++
++    report = build_visual_similarity_gate_report(failing, requested_mode='hybrid_async')
++
++    assert report['gate_passed'] is False
++    assert report['score_contract']['score_awarded'] == 0
++    assert report['aggregate']['slow_model_candidate_region_count'] >= 1
++    assert any(
++        failure == 'math_grade_8:key_region_similarity_below_threshold:math_grade_8:p1:table-01'
++        for failure in report['blocking_failures']
++    )
++    region = report['samples'][0]['pages'][0]['key_regions'][0]
++    assert region['slow_model_triggers'] == ['key_region_below_threshold']
++
++
++def test_missing_render_pair_blocks_only_when_visual_gate_is_enabled():
++    contract = _load_contract()
++    missing = copy.deepcopy(contract)
++    missing['samples'][1]['pages'][0]['render_pair_status'] = 'planned'
++
++    sync_report = build_visual_similarity_gate_report(missing, requested_mode='fast')
++    quality_report = build_visual_similarity_gate_report(missing, requested_mode='quality')
++
++    assert sync_report['gate_passed'] is True
++    assert sync_report['blocking_failures'] == []
++    assert quality_report['gate_passed'] is False
++    assert 'multi_column_extension_stub:visual_similarity_missing_render_pair:p2' in quality_report['blocking_failures']
++
++
++def test_contract_rejects_missing_quality_boundary_fields():
++    contract = _load_contract()
++    broken = copy.deepcopy(contract)
++    broken['source_policy']['quality_target_scope'] = 'default sync'
++
++    try:
++        build_visual_similarity_gate_report(broken, requested_mode='quality')
++    except VisualSimilarityGateError as exc:
++        assert 'quality/hybrid_async' in str(exc)
++    else:  # pragma: no cover - assertion clarity for plain import runners
++        raise AssertionError('expected VisualSimilarityGateError')
++
++
++def test_mode_normalization_keeps_unknown_modes_out_of_default_sync_path():
++    assert resolve_visual_gate_mode('quality') == QUALITY_HYBRID_ASYNC_MODE
++    assert resolve_visual_gate_mode('hybrid_async') == QUALITY_HYBRID_ASYNC_MODE
++    assert resolve_visual_gate_mode('balanced', parser_backend='apple') == 'default_sync'
++    assert resolve_visual_gate_mode('fast', parser_backend='hybrid_experimental') == 'default_sync'

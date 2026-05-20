@@ -1,0 +1,9 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-19T08:22:23+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-19T08:22:58+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-19T08:28:06+08:00", "reason": "reserved task timed out without ack; returned to pool from arch-1"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-19T08:28:52+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-19T08:37:00+08:00", "reason": "reserved task timed out without ack; returned to pool from arch-1"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-19T08:52:22+08:00", "reason": "manual claim confirmation after watcher was not running"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T08:52:22+08:00", "reason": "manual ack confirmation after watcher was not running"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T08:52:22+08:00", "reason": "manual result confirmation after watcher was not running"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T09:03:00+08:00", "reason": "task-watcher auto close after review pass without qa"}

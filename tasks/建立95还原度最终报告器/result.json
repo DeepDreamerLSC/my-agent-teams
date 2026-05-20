@@ -1,0 +1,25 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "agent": "qa-1",
+  "status": "done",
+  "summary": "已按 review 返修 95 还原度最终报告器 contract：阈值切到 100 分制 threshold=95，overall_score/维度 score 保持 points 精度不再 clamp 到 1.0；补齐 editable_word_tables / editable_table -> tables 归一化、tables.has_table_xml 稳定输出与 table_gate_failed blocker 覆盖，并将测试/fixture 更新为真实 100 分制场景。",
+  "files_modified": [
+    "backend/app/services/pdf_to_word/model_eval_runner.py",
+    "backend/tests/test_pdf_to_word_fidelity_report.py",
+    "backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json",
+    "backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json",
+    "backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json"
+  ],
+  "tests": [
+    "PASS: PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "PASS: PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_fidelity_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-fidelity-report --basetemp=/private/tmp/chiralium-pytest-temp-fidelity-report"
+  ],
+  "risks": [
+    "本轮只回归了 fidelity report 定向测试；未额外跑更大范围的 PDF→Word 全量回归。"
+  ],
+  "artifacts_written": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/artifacts/95-424f239f.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/result.json"
+  ],
+  "completed_at": "2026-05-19T15:36:10+08:00"
+}

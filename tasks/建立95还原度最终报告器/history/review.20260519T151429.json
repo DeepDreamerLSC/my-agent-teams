@@ -1,0 +1,64 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T15:09:38+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。当前 `test_pdf_to_word_fidelity_report.py`、`py_compile` 与 QA `verify.json` 都通过，但实现的输入契约与已冻结的 95% fidelity 路线不一致：报告器把分数/阈值强制压成 0-1 比例值，并且只识别名为 `tables` 的表格维度。对真实的 100 分制 contract（`threshold=95`、维度得分按 points 落盘）以及 frozen manifest 的 `editable_word_tables` / 路线 schema 的 `editable_table` 输入，当前实现会产出失真总分，甚至直接绕过表格硬门禁，因此还不能作为统一出口收口。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py",
+      "finding": "95% 报告器把分数/阈值错误地当作 0-1 比例值处理，和已冻结的 100 分制契约不一致。`_coerce_fidelity_score()` 会把任何大于 1 的值钳制到 1.0，而 `build_fidelity_final_report_summary()` 又直接拿它处理 `threshold` 与各维度 `score`。因此当输入采用路线文档 / fidelity manifest 约定的 `threshold=95`、维度得分 `19.2 / 17.0 / ...` 时，阈值会被改写成 `1.0`，维度分也会被压成 `1.0`，最终 `overall_score` 错误地变成 `100.0`。",
+      "recommendation": "请先统一分数语义：要么显式采用 frozen manifest / 路线文档的 100 分制并直接消费 points 级维度分；要么把输入改成原始 0-1 rate 并新增独立的 raw->weighted 映射层，但不能继续对 `95` / `19.2` 这类合同值做 0-1 clamp。返修后请补一条使用真实 100 分制 contract 的 fixture/test，至少断言 `threshold=95`、`overall_score=95.4` 一类样例不会被改写成 `1.0/100.0`。",
+      "evidence": "上游 contract：`/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json:6-8` 定义 `score_threshold=95`、`score_scale=100`；路线文档 patch `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/artifacts/PDF-Word95-Word-8c140ca9.patch` 的 `8.2 fidelity_metrics.json Schema` 使用 points 级 `overall_score=95.4` 与维度 `score=19.2/17.0/...`。当前实现见 `model_eval_runner.py:1353-1362,1424,1458-1475`。我额外用 manifest-style smoke input 复核后得到 `threshold=1.0`、`overall_score=100.0`。"
+    },
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py",
+      "finding": "表格硬门禁只在输入维度名恰好等于 `tables` 时才生效，但上游共同事实源和路线 schema 分别使用 `editable_word_tables` 与 `editable_table`。当前实现只有 `if name == 'tables'` 才会走 `_normalize_fidelity_tables()`，最后也只从 `dimensions.get('tables')` 生成顶层 `tables` 摘要。结果是 manifest / route-aligned 输入会绕过 `has_table_xml` / `image_fallback_table_count` 检查，`tables.has_table_xml` 为空，无法稳定执行“检测到表格但没有 Word 表格 XML 必须失败”的硬门禁。",
+      "recommendation": "请把表格专项输入键与上游契约对齐，或增加明确映射层（例如 `editable_word_tables` / `editable_table` -> 输出 `tables`）；并补一条使用真实上游 key 的测试，断言 `tables.has_table_xml`、`table_gate_failed:*` 与 blocker 会稳定落盘。",
+      "evidence": "上游 contract：`/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json:73-87` 使用 `editable_word_tables`；路线文档 patch 的 `8.2 fidelity_metrics.json Schema` 使用 `editable_table`。当前实现见 `model_eval_runner.py:1434-1447,1470-1490`。现有测试仅覆盖 synthetic `tables` key：`backend/tests/test_pdf_to_word_fidelity_report.py:32-68`。我用 `editable_word_tables` smoke input 复核后得到 `tables={}`，且 `blocking_failures` 只剩 `overall_score_below_threshold:0.1800`，表格 blocker 未触发。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "info",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/verify.json",
+      "finding": "本轮基础工程质量和局部用例本身没有问题：QA verify 已存在，我补充复跑的 `py_compile` 与 `pytest backend/tests/test_pdf_to_word_fidelity_report.py` 也都通过。",
+      "recommendation": "返修时不要回退现有 CLI 入口、artifact 写盘与“缺项显式 missing”这部分成果，重点只需把输入 contract 与表格门禁 contract 收敛到 frozen manifest / route schema。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/verify.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/artifacts/95-424f239f.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/artifacts/PDF-Word95-Word-8c140ca9.patch"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-review-pyc python3 -m py_compile backend/app/services/pdf_to_word/model_eval_runner.py backend/tests/test_pdf_to_word_fidelity_report.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-review-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_fidelity_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-fidelity-report-review --basetemp=/private/tmp/chiralium-pytest-temp-fidelity-report-review",
+      "result": "4 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不构成本轮阻塞主因。"
+    },
+    {
+      "command": "manifest-style smoke test：用路线文档 100 分制 contract（`threshold=95`、8 个维度 points 级 `score`）调用 build_fidelity_final_report_summary",
+      "result": "当前实现输出 `threshold=1.0`、`overall_score=100.0`，说明 95/19.2 等合同值被错误钳制为 0-1 区间。"
+    },
+    {
+      "command": "table-key smoke test：用 frozen manifest 风格的 `editable_word_tables` 输入调用 build_fidelity_final_report_summary",
+      "result": "当前实现输出 `tables={}`，且 `blocking_failures` 只剩 `overall_score_below_threshold:0.1800`；`has_table_xml=false` / `image_fallback_table_count=2` 没有被提升为表格 blocker，说明表格硬门禁未绑定到真实上游 key。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

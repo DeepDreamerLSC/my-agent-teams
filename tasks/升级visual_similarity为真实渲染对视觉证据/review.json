@@ -1,0 +1,46 @@
+{
+  "task_id": "升级visual_similarity为真实渲染对视觉证据",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T20:08:02+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前实现已把 visual_similarity gate 从 contract-only 升级为真实 render-pair 视觉证据入口：canonical report 可稳定输出 render_pairs、page_scores、key_regions、vetoes、subject_page_type、human_review_required、evidence_paths、artifact_ready_for_scoring 等字段，并能明确区分 `ready`、`failed`、`artifact_not_ready` 三类状态。default_sync 不再计入 visual_similarity 17 分；quality/hybrid_async 仅在真实 render-pair 就绪且无 blocking veto 时 award 17 分。contract-only / 缺失 render pair / render pair 状态异常都不会再被误算为人工视觉通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "note",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级visual_similarity为真实渲染对视觉证据/verify.json",
+      "finding": "当前任务目录仍无 verify.json，且 task.json 中 `qa_gate_state=pending`。",
+      "recommendation": "本轮 review 仅表示代码审查通过；请继续走 QA，使用真实 render-pair / visual_similarity artifact 做一轮下游 reporter 与人工复验链路验证。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级visual_similarity为真实渲染对视觉证据/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级visual_similarity为真实渲染对视觉证据/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级visual_similarity为真实渲染对视觉证据/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级visual_similarity为真实渲染对视觉证据/artifacts/visual_similarity-be6f0714.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714/backend/tests/test_pdf_to_word_visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714/backend/tests/fixtures/pdf_to_word/visual_similarity/quality_ready_contract.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714/backend/tests/fixtures/pdf_to_word/visual_similarity/quality_ready_render_pair.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714/backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/visual-sim-review-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/visual_similarity_gate.py backend/tests/test_pdf_to_word_visual_similarity_gate.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714 && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/visual-sim-review-cache --basetemp=/private/tmp/visual-sim-review-tmp",
+      "result": "8 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本任务结论。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/visual_similarity-be6f0714 && git diff --check -- backend/app/services/pdf_to_word/visual_similarity_gate.py backend/tests/test_pdf_to_word_visual_similarity_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity",
+      "result": "通过，未发现 patch / whitespace 问题。"
+    },
+    {
+      "command": "静态复核 visual_similarity_gate.py + fixtures + tests",
+      "result": "确认 report 具备 render_pairs/page_scores/key_regions/vetoes/subject_page_type/human_review_required/evidence_paths 等核心字段；真实 render pair 就绪、contract-only、render pair 状态异常、关键区域 veto、default_sync 不计分等语义均有实现与测试覆盖。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

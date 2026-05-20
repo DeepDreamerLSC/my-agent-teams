@@ -1,0 +1,53 @@
+{
+  "task_id": "数学公式图形表格页专项视觉门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T21:27:40+08:00",
+  "status": "request_changes",
+  "summary": "本轮实现的总体方向是对的：已把公式、图形、表格、题块顺序抽成独立 math_visual_gate，并补了 fixture / pytest，formula audit-only、题块顺序回退、图形绑定回退、表格低分等显式失败路径也能被测出来。但当前 contract 仍有两个阻塞缺口：一是 focus page 缺失对应 specialized region payload 时会直接 `ready` 通过；二是图形-题干绑定证据可以被整体省略而不触发 not-ready / veto。这会让上游只要漏传 `formula_regions` / `graphic_regions` / `binding_pairs`，数学专项 gate 就被绕过，和任务要求“必须同时考虑公式/图形/表格/题块顺序”“图形与题干绑定异常要能显式暴露”不一致。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/app/services/pdf_to_word/math_visual_gate.py",
+      "finding": "当前实现不会把 focus page 上缺失的专项区域载荷视为 contract 不完整。`_build_math_pages()` 对 `formula_regions` / `graphic_regions` / `table_regions` 统一使用 `page.get(... ) or []`，即使 page 已声明 `focus_tags=[\"formula\"]` 或 `focus_tags=[\"graphic\"]`，只要对应 region list 被漏传，就不会产生 readiness failure。最小复现里，把 fixture 的 `pages[0].formula_regions=[]` 或 `pages[1].graphic_regions=[]` 后，report 仍然返回 `status=ready`、`artifact_ready_for_scoring=true`、且无任何 veto。",
+      "recommendation": "把 focus-tag 与专项载荷做强约束：当 page 声明 `formula` / `graphic` / `table` focus 时，对应 region list 不能为空；缺失时应进入 `artifact_not_ready`（例如 `formula_regions_missing:p1` / `graphic_regions_missing:p2`），并补一条 pytest 固化这类 payload 缺失不会被静默放过。",
+      "evidence": "代码路径：math_visual_gate.py:305-323。复现结果：`formula_regions=[]` -> `status=ready, artifact_ready_for_scoring=True, formula_region_count=0`；`graphic_regions=[]` -> `status=ready, artifact_ready_for_scoring=True, graphic_region_count=0`。"
+    },
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/app/services/pdf_to_word/math_visual_gate.py",
+      "finding": "图形-题干绑定当前只能在 `binding_pairs` 已存在、且 `binding_iou` 已给出的前提下才会失败；如果上游直接把绑定证据整体省略，gate 会直接 `ready` 通过。`_build_question_order_check()` 对 `binding_pairs` 取 `list(raw_order.get('binding_pairs') or [])`，空列表不会触发 readiness failure；图形 region 自身的 `binding_iou` 缺失也不算不完整。最小复现里，把 `pages[1].question_order.binding_pairs=[]`，甚至同时删除 `pages[1].graphic_regions[0].binding_iou`，report 仍然返回 `status=ready`、`artifact_ready_for_scoring=true`、`vetoes=[]`。这与任务要求“图形与题干绑定异常要能显式暴露”不符，因为‘无绑定证据’本身就被静默视为通过了。",
+      "recommendation": "对 graphic / question_order focus 页面补齐必需绑定证据校验：当存在 `graphic` 或 `question_order` focus 时，至少要有可核对的 `binding_pairs`，且每个绑定对都要有 `binding_iou`；缺失时应进入 `artifact_not_ready` 或显式 blocker。并补测试覆盖 `binding_pairs=[]`、`binding_iou` 缺失两条路径。",
+      "evidence": "代码路径：math_visual_gate.py:411-428、460-571。复现结果：`binding_pairs=[]` -> `status=ready, artifact_ready_for_scoring=True, vetoes=[]`；`graphic_regions[0].binding_iou` 缺失且 `binding_pairs=[]` -> 仍为 `status=ready, artifact_ready_for_scoring=True, vetoes=[]`。"
+    }
+  ],
+  "non_blocking_findings": [],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/artifacts/task-5d9bc040.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/app/services/pdf_to_word/math_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/tests/test_pdf_to_word_math_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/tests/fixtures/pdf_to_word/visual_similarity/math/math_visual_contract.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040/backend/tests/fixtures/pdf_to_word/visual_similarity/math/math_render_pair.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/math-visual-review-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/math_visual_gate.py backend/tests/test_pdf_to_word_math_visual_gate.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040 && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_math_visual_gate.py -q -o cache_dir=/private/tmp/math-visual-review-cache --basetemp=/private/tmp/math-visual-review-tmp",
+      "result": "9 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本轮结论。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-5d9bc040 && git diff --check -- backend/app/services/pdf_to_word/math_visual_gate.py backend/tests/test_pdf_to_word_math_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/math",
+      "result": "通过，未发现 patch / whitespace 问题。"
+    },
+    {
+      "command": "最小复现：基于 fixture 分别将 `pages[0].formula_regions=[]`、`pages[1].graphic_regions=[]`、`pages[1].question_order.binding_pairs=[]`、以及 `pages[1].graphic_regions[0].binding_iou` 删除后重跑 `build_math_visual_gate_report(..., requested_mode=\"quality\")`",
+      "result": "四种情况下 report 都仍返回 `status=ready`、`artifact_ready_for_scoring=true`，且 `vetoes=[]`（其中前两种还会把 formula/graphic region count 直接变为 0）。这证明缺失专项载荷与缺失绑定证据会被静默放过。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

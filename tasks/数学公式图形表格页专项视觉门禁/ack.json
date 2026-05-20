@@ -1,0 +1,8 @@
+{
+  "task_id": "数学公式图形表格页专项视觉门禁",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T21:37:16+08:00",
+  "summary": "dev-2 已按 review 最小返修恢复执行：补 focus page 专项 region payload 必填约束、binding_pairs/binding_iou 必填约束，并补对应 pytest 后重写 result.json。"
+}

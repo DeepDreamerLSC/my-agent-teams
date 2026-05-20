@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐公式Crop评测资产与OMML基线",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与 task.json，开始补齐公式 crop eval 的 materialization / OMML 基线、测试与 phase4 产物刷新。",
-  "acknowledged_at": "2026-05-17T16:09:00+08:00"
-}

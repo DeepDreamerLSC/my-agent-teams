@@ -1,0 +1,8 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T12:37:49+08:00",
+  "summary": "dev-2 已读取 instruction.md，确认在指定 worktree 中开始实现预热任务独占预留锁与跨 Agent 认领拦截。"
+}

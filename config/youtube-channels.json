@@ -1,0 +1,13 @@
+{
+  "channels": [
+    {"name": "Dwarkesh Patel", "id": "UCXl4i9dYBrFOabk0xGmbkRA", "url": "https://www.youtube.com/@DwarkeshPatel"},
+    {"name": "Latent Space", "id": "UCXrPJmb855SDGyI8MNB4_Qg", "url": "https://www.youtube.com/@thelatentspaceofficial"},
+    {"name": "Lex Fridman", "id": "UCSHZKyawb77ixDdsGog4iWA", "url": "https://www.youtube.com/@lexfridman"},
+    {"name": "Andrej Karpathy", "id": "UCXUPKJO5MZQN11PqgIvyuvQ", "url": "https://www.youtube.com/@AndrejKarpathy"},
+    {"name": "Yannic Kilcher", "id": "UCZHmQk67mSJgfCCTn7xBfew", "url": "https://www.youtube.com/@YannicKilcher"},
+    {"name": "No Priors", "id": "UCSI7h9hydQ40K5MJHnCrQvw", "url": "https://www.youtube.com/@NoPriorsPodcast"}
+  ],
+  "hours_lookback": 24,
+  "min_duration_seconds": 300,
+  "max_videos_per_channel": 5
+}

@@ -1,0 +1,10 @@
+{
+  "task_id": "重跑全学科人工视觉95判定",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "working",
+  "workspace_path": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-414c4425",
+  "acknowledged_at": "2026-05-19T22:34:43+08:00",
+  "acked_at": "2026-05-19T22:34:43+08:00",
+  "summary": "已基于 2026-05-19 最新已放行产物重新确认任务：数学专项与科学专项均 review+QA 通过，语文负样例口径已收口；本轮据此更新最终全学科人工视觉95结论，并给出可直接供 PM 对外使用的 go/no-go 口径。"
+}

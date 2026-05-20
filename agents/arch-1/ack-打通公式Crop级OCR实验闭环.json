@@ -1,7 +1,0 @@
-{
-  "task_id": "打通公式Crop级OCR实验闭环",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已重新读取 instruction.md，开始补齐公式 crop OCR 实验闭环：基于现有 formula_crop_inputs / expected-crops / OMML baseline 跑真实 profile 识别、落盘 ocr-results，并刷新包含 blocked 原因与对比统计的 phase4 报告。",
-  "acknowledged_at": "2026-05-17T17:41:00+08:00"
-}

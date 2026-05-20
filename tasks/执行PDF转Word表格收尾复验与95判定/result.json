@@ -1,0 +1,48 @@
+{
+  "task_id": "执行PDF转Word表格收尾复验与95判定",
+  "agent": "qa-1",
+  "status": "done",
+  "summary": "已完成最终收尾复验。结论为：表格/DOCX gate 通过，但 95% fidelity 最终宣称暂不通过。依据 final_docx_gate_report.json，五样例 DOCX 全部可打开、含表格的 2 个样例均已产出真实 <w:tbl>，不存在 table_detected_but_no_word_table；但依据 frozen manifest 的 100 分制口径（threshold=95，visual_similarity 权重 17）以及当前 final archive 中缺失 visual_similarity.json，视觉相似度维度仍处于 missing 状态，整体分数上限仅 83，无法正式达到 95 分门槛。建议：表格主链可在 quality/hybrid_async 边界内收口；不要宣称整体 95% 已达成，也不要放宽 default sync 发布口径，需待 visual_similarity 真实接入后再复验。",
+  "files_modified": [],
+  "overall_verdict": "conditional_pass",
+  "go_no_go": "no_go_for_95_declaration",
+  "threshold": 95,
+  "overall_score": null,
+  "overall_score_upper_bound": 83.0,
+  "blocking_failures": [
+    "visual_similarity_missing",
+    "overall_score_below_threshold:max_possible_83_without_visual_similarity"
+  ],
+  "tables": {
+    "table_gate_passed": true,
+    "sample_with_table_xml_count": 2,
+    "samples_with_table_xml": [
+      "五下科学",
+      "数学八年级"
+    ],
+    "samples_without_table_xml": [
+      "数学试卷",
+      "英语八年级",
+      "语文五年级"
+    ],
+    "detected_table_without_word_table_samples": []
+  },
+  "tests": [
+    "READ: /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/20260518-072100/final_docx_gate_report.json",
+    "READ: /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
+    "READ: /Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/fidelity_manifest.json",
+    "READ: /Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具/result.json + review.json",
+    "READ: /Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立95还原度最终报告器/result.json + review.json",
+    "READ: /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计视觉相似度最终门禁与慢模型灰度/result.json + review.json",
+    "PASS: python3 summary extraction confirmed gate_passed=true, sample_with_table_xml_count=2, structured_table_count>0 only for 五下科学/数学八年级, and no visual_similarity.json artifacts under /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word"
+  ],
+  "risks": [
+    "视觉相似度门禁当前仅冻结 contract/stub，尚未接入真实 visual_similarity.json artifact 链路。",
+    "本轮为只读终验；未在 master 上新增代码或重新生成新的 fidelity_metrics.json 产物。"
+  ],
+  "artifacts_written": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word表格收尾复验与95判定/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/执行PDF转Word表格收尾复验与95判定/verify.json"
+  ],
+  "completed_at": "2026-05-19T16:14:39+08:00"
+}

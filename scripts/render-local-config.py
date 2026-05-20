@@ -68,8 +68,7 @@ def apply_canonical_paths(config: dict[str, Any], *, workspace: Path, work_paren
         "root_agents_path": str(workspace / "AGENTS.md"),
     })
     notifications = config.setdefault("notifications", {})
-    if notifications.get("push_script"):
-        notifications["push_script"] = str(workspace / "scripts" / "feishu-push.sh")
+    notifications["push_script"] = str(workspace / "scripts" / "alert-card.sh")
     for agent_id, payload in (config.get("agents") or {}).items():
         if not isinstance(payload, dict):
             continue

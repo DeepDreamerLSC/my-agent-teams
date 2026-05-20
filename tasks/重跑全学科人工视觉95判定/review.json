@@ -1,0 +1,79 @@
+{
+  "task_id": "重跑全学科人工视觉95判定",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T22:51:10+08:00",
+  "status": "approve",
+  "summary": "审查通过。我已对照 instruction/result、最终产出的 final_human_visual_acceptance 报告/JSON、final_acceptance_summary、final-gated manifest、Rubric/基线报告、数学/科学专项 verify 与语文口径重建结果复核本轮结论。当前结论一致且可追溯：工程门禁 PASS 可保留，但截至 2026-05-19 全学科人工视觉95仍应维持 NO-GO，核心阻断点是四个正向样例在主工作区 final-archive 中仍缺 sample-level render_pair / visual_similarity / fidelity_veto / human_review 终态证据链，且语文当前仍仅为 negative_guard，不可计入正向95宣称。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定",
+      "finding": "任务目录当前没有 `verify.json`，本轮主要依据 reviewer 的静态交叉核对与本地校验给出结论。",
+      "recommendation": "若后续 watcher/QA 还会为同类最终收口任务补充 verify 产物，建议一并归档，便于门禁链路长期留痕。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+      "finding": "`evidence_paths.final_gated_manifest` / `rubric` / `baseline_report` / `chinese_manifest` 目前指向 `.runtime/worktrees/...` 下的上游任务产物；这些路径当前存在，但属于运行时工作树路径。",
+      "recommendation": "若后续需要把该 JSON 作为长期归档真相源，建议把这些上游 truth-source 同步沉淀到稳定 artifacts 路径，避免工作树清理后引用失效。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定/artifacts/95-414c4425.patch",
+      "finding": "任务 patch 快照文件当前为空；本轮审查实际以主工作区生成的三个最终产物文件为准完成复核。",
+      "recommendation": "后续若继续依赖 patch artifact 做差异审计，建议补强 untracked artifact 文件的 patch 捕获策略。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全样本人工视觉95判定结论.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word-53578117/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Rubric-336253f6/artifacts/pdf2word/final-archive/reports/PDF转Word全学科人工视觉复核Rubric.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Rubric-336253f6/artifacts/pdf2word/final-archive/reports/PDF转Word全学科视觉基线报告.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-434cf84f/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/verify.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/verify.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/语文长文作文负样例口径重建/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/语文长文作文负样例口径重建/result.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "python3 -m json.tool /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+      "result": "passed"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/chiralium diff --check -- artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json artifacts/pdf2word/final-archive/reports/PDF转Word全样本人工视觉95判定结论.md",
+      "result": "passed"
+    },
+    {
+      "command": "静态交叉核对 final_human_visual_acceptance.json 与 final_acceptance_summary.json / final-gated-manifest.json",
+      "result": "确认 sample_count=5、positive_candidate_count=4、negative_guard_count=1、一致覆盖科学/数学/英语/语文；subject_coverage 的 sample_key、evaluation_role、eligible_for_human_visual_95 与 canonical manifest 对齐。"
+    },
+    {
+      "command": "检查 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/{五下科学,数学八年级,数学试卷,英语八年级}",
+      "result": "四个正向样例目录当前都只包含 output.docx / pages.jsonl / metrics.json / source_manifest.json / validator-report.json / warnings.json，均未发现 render_pair.json、visual_similarity.json、fidelity_veto.json、human_review_report.json；与本轮 no-go 主因一致。"
+    },
+    {
+      "command": "静态核对数学专项与科学专项 task.json + verify.json，以及语文口径重建 task/result",
+      "result": "确认数学专项 review_gate_state=approved、qa_gate_state=passed；科学专项 review_gate_state=approved、qa_gate_state=passed；语文 canonical sample_key=chinese_grade5，当前 evaluation_role=negative_guard，不纳入正向95。"
+    },
+    {
+      "command": "读取 hybrid_experimental_authoritative_archive_report.json 与 final_acceptance_summary.json 中英语 fallback 事实",
+      "result": "确认英语 fallback 页仍存在 summary=3,8,11,12 与 authoritative residual limitation=3,11 的残余不一致；本轮报告已如实列为 remaining risk，而未误判为通过证据。"
+    },
+    {
+      "command": "检查 final_human_visual_acceptance.json 顶层 evidence_paths",
+      "result": "当前引用的 final_gated_manifest / rubric / baseline_report / chinese_manifest / math_verify / science_verify 路径均存在，可支撑本轮结构化结论追溯。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

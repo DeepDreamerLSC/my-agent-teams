@@ -1,0 +1,9 @@
+{
+  "task_id": "实现DOCX表格检查门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "working",
+  "acked_at": "2026-05-19T09:15:52+08:00",
+  "acknowledged_at": "2026-05-19T09:15:52+08:00",
+  "summary": "已读取 instruction.md 并开始执行。当前将在 /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-15c4e8d1 工作，仅修改 fidelity_gate.py、test_pdf_to_word_fidelity_gate.py 与 docx_inspect fixtures，先实现可机读的 DOCX inspect / table gate。"
+}

@@ -1,0 +1,27 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已按方案 A 将 pooled/dependency_wait 预热锁统一切到 pre_reserved_* 契约，watcher 支持同 slot 继承派发与 ack 后清理 dispatched claim 字段，并将 reserve-task.sh 纳入正式 patch artifact。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/claim-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/lib/task_state_invariants.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/reassign-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/reserve-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-pool-view.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_claim_task_reserved.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_reassign_task.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_task_pool_and_queue_router.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_task_watcher_push_reliability.py"
+  ],
+  "tests": [
+    "bash -n scripts/claim-task.sh scripts/task-watcher.sh scripts/reassign-task.sh scripts/reserve-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-2/.venv/bin/python -B -m pytest -p no:cacheprovider tests/test_claim_task_reserved.py tests/test_task_pool_and_queue_router.py tests/test_reassign_task.py tests/test_task_watcher_push_reliability.py"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现预热任务独占预留锁/artifacts/task-e9dcc5f6.patch"
+  ],
+  "risks": [],
+  "completed_at": "2026-05-19T14:42:45+08:00"
+}

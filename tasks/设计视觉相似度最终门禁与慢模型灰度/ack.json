@@ -1,0 +1,9 @@
+{
+  "task_id": "设计视觉相似度最终门禁与慢模型灰度",
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T15:33:21+08:00",
+  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-11eaf3b2",
+  "branch": "task/task-11eaf3b2",
+  "notes": "已确认 owner 返修：required artifact 统一为 visual_similarity.json；active slow-model candidate 仅 qwen3_vl_8b，glm_46v_flash 降级为非激活对照/blocked 字段；保持默认同步边界与 quality/hybrid_async 主方向不变。"
+}

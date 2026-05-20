@@ -65,7 +65,7 @@
   "last_gate_actor": "watcher",
   "last_gate_decision_at": "2026-05-18T09:29:45+08:00",
   "created_at": "2026-05-18T07:27:49+08:00",
-  "updated_at": "2026-05-18T18:52:59+08:00",
+  "updated_at": "2026-05-19T11:41:10+08:00",
   "claim_policy": "pull",
   "claim_scope": [
     "dev-2"
@@ -82,5 +82,5 @@
   "reserved_at": "2026-05-18T07:28:29+08:00",
   "reserved_reason": "dev-2承接高优先级输出变体任务，student/teacher/review 变体实现与验证",
   "execution_round": 0,
-  "state_invariant_checked_at": "2026-05-18T18:52:59+08:00"
+  "state_invariant_checked_at": "2026-05-19T11:41:10+08:00"
 }

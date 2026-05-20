@@ -1,0 +1,46 @@
+{
+  "task_id": "设计预热任务独占预留机制",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T13:02:30+08:00",
+  "status": "approve",
+  "summary": "返修后审查通过。文档已按 PM 仲裁固定为方案 A：pre-reserve 从写入起占用 reserved slot，dependency_ready -> dispatched 明确为同一 slot 的继承转换，不再要求额外 spare reserved slot；同时已把 task-pool-view / task-pool-router / claim-task / task-watcher 的 capacity gate 统一到“排除当前任务”口径，并补上 default_reserved_limit=1 不自锁的验收断言。此前关于预热任务可能卡死在 pooled + pre_reserved 的阻塞冲突已被消除。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制",
+      "finding": "任务目录下暂无 verify.json；本次审查主要依据 instruction/result、设计文档静态复核、补丁 diff 与对现有脚本容量门禁的兼容性交叉检查。",
+      "recommendation": "下游实现或 QA 若补充验证，可追加 verify.json 便于流程留痕。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e/design/collaboration/预热任务独占预留机制.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-pool-view.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-pool-router.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/claim-task.sh"
+  ],
+  "test_evidence": [
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e show --stat --format=fuller aaf739be318f84d3b4e9848d1c05ec60e30eae2f -- design/collaboration/预热任务独占预留机制.md",
+      "result": "确认返修提交只修改目标设计文档，范围未越界；本次返修新增 73 行、删除 18 行，聚焦容量语义澄清。"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e diff --check HEAD~1..HEAD -- design/collaboration/预热任务独占预留机制.md",
+      "result": "通过。返修补丁无空白或 patch 格式问题。"
+    },
+    {
+      "command": "静态复核 预热任务独占预留机制.md 第 3.4 / 6.3 / 6.4 / 9 节",
+      "result": "确认文档已显式冻结方案 A：写入即占 slot、同任务只占一个 slot、继承转换不做 spare slot 检查、`reserved_count_excluding_current_task` 辅助口径、`inherited_pre_reserved_slot` 展示语义，以及 `default_reserved_limit=1` 不自锁断言。"
+    },
+    {
+      "command": "交叉对照现有容量门禁实现：task-pool-view.py:192-198,279-295；task-watcher.sh:1450-1457,1634-1639；claim-task.sh:182-227",
+      "result": "确认返修后的设计已正面回应当前脚本的 `reserved_count < reserved_limit` 门禁口径：通过“排除当前任务 + 同 slot 继承转换”明确说明下游实现如何避免 pre-reserve 自锁，不再保留上一版的语义冲突。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

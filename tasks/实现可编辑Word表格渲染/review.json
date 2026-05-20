@@ -1,0 +1,51 @@
+{
+  "task_id": "实现可编辑Word表格渲染",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T12:36:33+08:00",
+  "status": "approve",
+  "summary": "审查通过。`docx_assembler.py` 已按 `table_ir.cells -> table_rows -> table_html -> image_path fallback` 优先级输出真实可编辑 `<w:tbl>`，并支持 `w:gridSpan` / `w:vMerge` 合并单元格；补充测试覆盖 structured fixture、rows 优先、HTML 合并与 fallback 不产出 `<w:tbl>`。我补充复跑 py_compile / diff --check / pytest，结果为 7 passed, 4 warnings。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现可编辑Word表格渲染",
+      "finding": "任务目录下暂无 verify.json；本次审查以 result.json、源码静态复核与补充复跑测试作为主要证据。",
+      "recommendation": "后续 QA / watcher 门禁补写 verify.json，完善流程留痕。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/app/services/pdf_to_word/docx_assembler.py",
+      "finding": "当前 worktree 未直接叠加上游“打通ExerciseIR表格载荷”的真实联调上下文，且 fallback 图片资产未随 fixture 一并进入本轮回归。",
+      "recommendation": "进入 integration 后，建议再跑一次真实 ExerciseIR→DOCX 端到端样例，并连同图片 fallback 资产打包路径一起验证。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现可编辑Word表格渲染/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现可编辑Word表格渲染/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现可编辑Word表格渲染/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/app/services/pdf_to_word/docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/app/services/pdf_to_word/exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/tests/test_pdf_exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONPYCACHEPREFIX=/private/tmp/pycache-word-table-review python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/app/services/pdf_to_word/docx_assembler.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/app/services/pdf_to_word/exercise_docx_assembler.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/tests/test_pdf_exercise_docx_assembler.py",
+      "result": "通过。3 个目标文件均可编译。"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428 diff --check -- backend/app/services/pdf_to_word/docx_assembler.py backend/app/services/pdf_to_word/exercise_docx_assembler.py backend/tests/test_pdf_exercise_docx_assembler.py",
+      "result": "通过。未发现空白或 patch 格式问题。"
+    },
+    {
+      "command": "PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend PYTHONPYCACHEPREFIX=/private/tmp/pycache-word-table-review /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Word-c8800428/backend/tests/test_pdf_exercise_docx_assembler.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-word-table-review --basetemp=/private/tmp/chiralium-pytest-temp-word-table-review",
+      "result": "7 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本任务结论。"
+    },
+    {
+      "command": "静态复核 docx_assembler.py / exercise_docx_assembler.py / test_pdf_exercise_docx_assembler.py",
+      "result": "确认渲染优先级为 `table_ir.cells -> table_rows -> table_html -> image_path fallback`；结构化表格与 HTML merge 路径均产出真实 `<w:tbl>`，fallback 路径不会误产出 `<w:tbl>`。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

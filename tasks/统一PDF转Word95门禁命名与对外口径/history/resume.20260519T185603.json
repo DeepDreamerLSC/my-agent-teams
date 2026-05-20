@@ -1,0 +1,13 @@
+{
+  "task_id": "统一PDF转Word95门禁命名与对外口径",
+  "resumed_at": "2026-05-19T18:56:03+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "arch-1",
+  "reason": "review rework: 统一 public_claim_policy/claim_policy 命名并修正 trailing whitespace 与验证描述",
+  "archived_files": [
+    "ack.20260519T185603.json",
+    "review.20260519T185603.json",
+    "review.20260519T185603.md",
+    "result.20260519T185603.json"
+  ]
+}

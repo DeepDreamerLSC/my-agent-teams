@@ -164,7 +164,7 @@ if [ -n "${DETAIL:-}" ]; then
 fi
 
 if [ -x "$FALLBACK_SCRIPT" ]; then
-  printf '%b\n' "$FALLBACK_MSG" | FEISHU_RECEIVE_ID="$FEISHU_OPEN_ID" "$FALLBACK_SCRIPT"
+  printf '%b\n' "$FALLBACK_MSG" | FEISHU_RECEIVE_ID="$FEISHU_OPEN_ID" FEISHU_MESSAGE_UUID="" "$FALLBACK_SCRIPT"
 else
   echo "ERROR: fallback push script not executable: $FALLBACK_SCRIPT" >&2
   exit 1

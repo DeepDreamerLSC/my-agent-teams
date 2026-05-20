@@ -1,0 +1,8 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-19T20:46:39+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T20:48:23+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T21:23:22+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T21:34:10+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-19T21:35:43+08:00", "reason": "resume-task: review返修：关键 source region 与 adjacent_to 关系缺失时不得静默通过，需进入 not_ready/blocker 并补 pytest", "actor": "pm-chief"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T22:09:29+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T22:09:30+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T22:20:20+08:00", "reason": "pm close after review+qa pass"}

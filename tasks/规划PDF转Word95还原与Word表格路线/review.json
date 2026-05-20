@@ -1,0 +1,35 @@
+{
+  "task_id": "规划PDF转Word95还原与Word表格路线",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T09:10:00+08:00",
+  "status": "approve",
+  "summary": "审查通过。三份路线文档已把 95% 还原度、Word 表格硬门禁、NormalizedTableIR、DOCX inspect/final fidelity gate、quality/async 与默认同步边界、以及可派发任务拆解写清，且与当前 has_table_xml=false 的事实边界一致。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线",
+      "finding": "任务目录下暂无 verify.json；本次审查以文档内容与关键字段检查作为证据。",
+      "recommendation": "后续若补充门禁验证产物，可追加 verify.json 以便留痕。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/task.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md"
+  ],
+  "test_evidence": [
+    {
+      "command": "grep -R -n '95% 还原度\\|NormalizedTableIR\\|has_table_xml\\|quality/hybrid_async\\|table_detected_but_no_word_table\\|<w:tbl>' artifacts/pdf2word/final-archive/reports/后续技术路线.md artifacts/pdf2word/final-archive/reports/端到端技术链路.md artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md",
+      "result": "关键结论已覆盖。"
+    },
+    {
+      "command": "sed -n '1,220p' artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md",
+      "result": "文档包含 95% 定义、P0 阻断项、阶段门禁与可派发任务清单。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

@@ -1,0 +1,14 @@
+{
+  "task_id": "数学公式图形表格页专项视觉门禁",
+  "resumed_at": "2026-05-19T21:34:59+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "review返修：focus page 缺失 formula/graphic/table payload 与 binding_pairs/binding_iou 缺失时不得静默通过，需进入 artifact_not_ready/blocker 并补 pytest",
+  "archived_files": [
+    "ack.20260519T213459.json",
+    "review.20260519T213459.json",
+    "review.20260519T213459.md",
+    "verify.20260519T213459.json",
+    "result.20260519T213459.json"
+  ]
+}

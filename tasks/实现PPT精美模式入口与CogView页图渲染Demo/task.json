@@ -33,7 +33,7 @@
   "result_summary": "初版 polished/CogView demo 的 review 驳回项已由「修正PPT精美模式Demo归档截断与CogView约束」修复并通过 review/QA，最终 PPTX 闭环也已由「收口PPT精美模式Demo最终PPTX闭环」通过 review/QA；PM 将该原始任务按后续补修证据收口。",
   "last_error": null,
   "created_at": "2026-05-01T02:13:42+08:00",
-  "updated_at": "2026-05-18T18:52:57+08:00",
+  "updated_at": "2026-05-19T11:41:08+08:00",
   "review_round": 1,
   "max_review_rounds": 3,
   "depends_on": [
@@ -62,5 +62,5 @@
   "merge_gate_state": "closed",
   "last_gate_actor": "pm-chief",
   "last_gate_decision_at": "2026-05-06T11:35:15+08:00",
-  "state_invariant_checked_at": "2026-05-18T18:52:57+08:00"
+  "state_invariant_checked_at": "2026-05-19T11:41:08+08:00"
 }

@@ -1,0 +1,61 @@
+{
+  "task_id": "英语阅读段落与选项区视觉门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T23:48:52+0800",
+  "status": "fail",
+  "pass": false,
+  "summary": "QA 复验不通过。当前英语专项评分、critical fallback veto、fixture 与 7 条 pytest 回归的主方向正确，但顶层 contract 仍存在阻塞缺口：当 payload 缺少 `pages` 或 `pages=[]` 时，evaluate_english_visual_gate() 仍返回 `status=ready`、`human_review_required=false`、`blockers=[]`。这会把空英语专项结果误当成可消费成功结果，不能放行。",
+  "acceptance_criteria": [
+    {
+      "criterion": "英语阅读/选项区可产生专项分数或失败原因",
+      "result": "partial_pass",
+      "evidence": "happy / linearized_fail / fallback_fail fixtures 均能产出专项分数、veto 或失败原因；但 payload 缺少 `pages` 或 `pages=[]` 时却返回 `ready` 且无 blocker，说明顶层 contract 尚未完整。"
+    },
+    {
+      "criterion": "文本完整但版面明显崩坏时不会误过",
+      "result": "pass",
+      "evidence": "复跑 pytest 确认 linearized fail 会触发 `english_reading_paragraph_layout_broken`、`english_option_indentation_broken`、`english_stem_option_spacing_broken`；critical fallback fail 会触发 `english_critical_fallback_page_layout_broken`。"
+    },
+    {
+      "criterion": "结果可被最终 reporter 消费",
+      "result": "fail",
+      "evidence": "空 payload 与空 pages 都返回 `ready + human_review_required=false + blockers=[]`，当前 consumer 无法区分“真正 ready”与“顶层英语专项数据缺失”，不满足可安全消费条件。"
+    }
+  ],
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend/app/services/pdf_to_word/english_visual_gate.py",
+      "finding": "顶层 `pages` contract 缺失。`evaluate_english_visual_gate()` 在 `pages_payload` 非 list 时直接归一化为 `[]`，最终 `status` 只由 page-level blockers 决定，因此 `evaluate_english_visual_gate({})` 与 `evaluate_english_visual_gate({\"pages\": []})` 都会返回 `status=ready`、`human_review_required=false`、`blockers=[]`。",
+      "recommendation": "当 payload 缺少 `pages` 或 `pages` 为空时，应显式返回 `status=not_ready`，并产出顶层 blocker（例如 `english_payload_missing_pages` / `english_pages_empty`）；同时避免下游把空结果当作 ready 成功结果。"
+    },
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend/tests/test_pdf_to_word_english_visual_gate.py",
+      "finding": "现有测试覆盖 happy path、linearized fail、critical fallback veto 及页内 contract 缺失，但未覆盖顶层 `pages` 缺失或空数组场景，因而未拦住 false-ready 缺陷。",
+      "recommendation": "至少补 2 条 pytest 回归：1) payload 缺失 `pages`；2) `pages=[]`。两者都应断言返回 `status=not_ready` 且带明确 blocker。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取 instruction.md、result.json、review.json/review.md 与 patch，确认本轮目标是建立英语阅读段落/选项区专项视觉门禁，并对接公共 visual_similarity/veto。",
+    "静态复核 english_visual_gate.py，确认专项评分、critical fallback veto 与页内 required region/layout signal/relation contract 已落地，同时确认顶层 `pages` 缺失时当前没有 blocker 保护。",
+    "复跑 py_compile 与 pytest，确认现有 7 条测试通过，但它们未覆盖顶层 `pages` 缺失/空数组回归。",
+    "执行 smoke：evaluate_english_visual_gate({}) 与 evaluate_english_visual_gate({\"pages\": []})，复现 review 中指出的 false-ready 问题。"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/english-visual-gate-qa-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend/app/services/pdf_to_word/english_visual_gate.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend/tests/test_pdf_to_word_english_visual_gate.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend/tests/test_pdf_to_word_english_visual_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-english-gate-qa --basetemp=/private/tmp/chiralium-pytest-temp-english-gate-qa -> 7 passed, 4 warnings in 0.05s",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<PY ... evaluate_english_visual_gate({}) / evaluate_english_visual_gate({\"pages\": []}) ... PY -> empty_payload=ready [] False; empty_pages=ready [] False",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-47439ec3 diff --check -- backend/app/services/pdf_to_word/english_visual_gate.py backend/tests/test_pdf_to_word_english_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/english -> passed"
+  ],
+  "non_blocking_observations": [
+    "review 已 request_changes，且当前 task.json 的 review_gate_state 仍未反映为 approved；本轮 QA 与审查结论一致。",
+    "pytest 的 4 条 warning 为既有 FastAPI on_event deprecation warning，与本轮阻塞结论无直接冲突。",
+    "当前任务目录此前没有顶层 verify.json，本轮已补正式 QA 留痕。"
+  ],
+  "regressions_found": [
+    "空 payload 与空 pages 被错误标记为 ready，可能让下游 reporter/consumer 把“无英语专项数据”误当成“英语专项通过”。"
+  ],
+  "recommended_next_action": "dev"
+}

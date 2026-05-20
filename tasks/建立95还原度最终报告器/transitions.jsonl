@@ -1,0 +1,11 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-19T12:10:47+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-19T14:40:52+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T14:41:47+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T14:57:10+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T15:12:06+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-19T15:14:29+08:00", "reason": "resume-task: review 返修：报告器必须对齐 frozen 95% contract。分数/阈值按 100 分制处理（不能把 95、19.2 等 points 值 clamp 到 1.0）；表格维度需兼容 editable_word_tables / editable_table 到统一 tables 输出，并稳定触发表格硬门禁。补真实 contract fixture 与 smoke coverage 后再回审。", "actor": "pm-chief"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-19T15:20:26+08:00", "reason": "reserved task timed out without ack; returned to pool from qa-1"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-19T15:20:58+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T15:23:08+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T15:36:39+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T15:46:44+08:00", "reason": "pm close: review approved and qa skipped; contract aligned to frozen 95% fidelity report"}

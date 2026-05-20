@@ -1,0 +1,44 @@
+{
+  "task_id": "视觉差异Debug报告与HTML对照页",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-20T00:14:12+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 复验通过。dev-2 已按上一轮 review 的最小返修口径补齐两处核心契约：1）build_visual_diff_report() 现在可直接归一 canonical visual_similarity artifact（render_pairs/page_scores/key_regions/vetoes），不再对真实 quality_ready_contract 生成空报告；2）key-region 归一化已兼容上游 docx_crop_path / diff_image_path，输出 crop 与 diff crop 不再丢失。相关 5 条 pytest 回归通过。",
+  "acceptance_criteria": [
+    {
+      "criterion": "可快速定位哪个页、哪个区域导致 no-go",
+      "result": "pass",
+      "evidence": "总览页仍提供每页 source/output/diff 预览；逐页详情页提供 blockers/vetoes/key-region crops。canonical smoke 后 report 非空，页级与区域级信息可直接消费。"
+    },
+    {
+      "criterion": "产物结构清晰，可供 review/QA 二次利用",
+      "result": "pass",
+      "evidence": "report 会稳定输出 visual_diff_report.json、index.html、pages/page-xxx.html；canonical visual_similarity fixture 现在可直接走 build_visual_diff_report()/generate_visual_diff_report() 生成非空报告。"
+    },
+    {
+      "criterion": "全学科关键区域都可展示",
+      "result": "pass",
+      "evidence": "demo-cross-subject 继续覆盖 science / math / english / chinese；新增 canonical 回归验证了真实 math visual_similarity artifact 的页级与 key-region 聚合，以及 output/diff crop 字段兼容。"
+    }
+  ],
+  "scenarios_verified": [
+    "重读 instruction.md、当前 result.json 以及 history/review.20260519T235744.{json,md}，确认本轮返修目标是补 canonical visual_similarity artifact 归一化与 key-region crop 字段兼容。",
+    "静态复核 visual_diff_report.py，确认新增 _collect_pages() / _normalize_canonical_visual_similarity_pages()，并在 _normalize_key_regions() 中兼容 docx_crop_path 与 diff_image_path。",
+    "静态复核 test_pdf_to_word_visual_diff_report.py，确认新增 2 条回归测试：直接消费 canonical fixture、保留 docx/diff crop 字段。",
+    "执行 py_compile、pytest、canonical smoke 与 diff --check，验证上一轮 review 指出的两类阻塞都已被修复。"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/visual-diff-report-qa-r2-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/app/services/pdf_to_word/visual_diff_report.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/tests/test_pdf_to_word_visual_diff_report.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/tests/test_pdf_to_word_visual_diff_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-diff-qa-r2 --basetemp=/private/tmp/chiralium-pytest-temp-visual-diff-qa-r2 -> 5 passed, 4 warnings in 0.07s",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<PY ... build_visual_diff_report(quality_ready_contract.json) ... PY -> raw_page_count=2, raw_key_regions=3; after attaching render_pairs/vetoes => full_page_count=2, subjects=[math], crop_fields=True/True",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b diff --check -- backend/app/services/pdf_to_word/visual_diff_report.py backend/tests/test_pdf_to_word_visual_diff_report.py artifacts/pdf2word/final-acceptance/debug-html -> passed"
+  ],
+  "non_blocking_observations": [
+    "当前顶层 review.json/review.md 已被 watcher 归档到 history/，本轮 QA 结合 archived review、当前 result 与代码/测试完成复验。",
+    "pytest 的 4 条 warning 为既有 FastAPI on_event deprecation warning，与本轮通过结论无直接冲突。",
+    "demo-cross-subject 仍以 placeholder 为主；这与 result.json 中声明的风险一致，不影响本轮“canonical artifact 接线已补齐”的通过结论。"
+  ],
+  "regressions_found": []
+}

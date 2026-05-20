@@ -1,0 +1,21 @@
+{
+  "task_id": "科学实验页表格与图片区关键区域视觉门禁",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已按 review 最小返修补强 science_visual_gate 的强 contract：science mixed page 现在要求关键 source region（至少 table/image/experiment_record/question_stem）存在且可用；若缺失关键 region，summary/page 会进入 status=not_ready，并产出 science_required_region_missing blocker。对 image-question、table-question、record-table 三类必要关系，也不再依赖“有 adjacent_to 才检查”；若 source region 已存在但缺少足够关系定义，summary/page 同样进入 status=not_ready，并产出 science_required_relation_missing blocker。这样 relation_scores 整体消失时不会再高分静默通过。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/visual_similarity/science"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider tests/test_pdf_to_word_science_visual_gate.py -> 6 passed",
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python (py_compile -> /private/tmp/pdf2word-science-visual-gate-rework-pyc for science_visual_gate.py and test_pdf_to_word_science_visual_gate.py)",
+    "git diff --check -- app/services/pdf_to_word/science_visual_gate.py tests/test_pdf_to_word_science_visual_gate.py -> passed"
+  ],
+  "risks": [
+    "当前返修只补强了 science 专项 gate 的 contract，不包含与公共 final reporter 的正式接线；后续仍需由上游把 status/blockers 接入公共 visual_similarity / veto 报告消费。",
+    "目前必要关系默认约束为 image-question、table-question、record-table；如后续科学页型出现不同的关键关系组合，需要通过 required_relation_kind_pairs 显式扩展。"
+  ],
+  "completed_at": "2026-05-19T21:48:02+08:00"
+}

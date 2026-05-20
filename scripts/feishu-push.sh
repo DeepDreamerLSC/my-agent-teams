@@ -107,6 +107,7 @@ python3 - <<'PYFEISHU'
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 msg = os.environ.get('FEISHU_MESSAGE', '').strip()
@@ -171,25 +172,57 @@ else:
 if message_uuid:
     payload['uuid'] = message_uuid
 
-req = urllib.request.Request(
-    'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id',
-    data=json.dumps(payload).encode('utf-8'),
-    headers={
-        'Authorization': f'Bearer {token}',
-        'Content-Type': 'application/json',
-    },
-)
+def send_payload(request_payload: dict) -> dict:
+    req = urllib.request.Request(
+        'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id',
+        data=json.dumps(request_payload).encode('utf-8'),
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+        },
+    )
+    resp = urllib.request.urlopen(req, timeout=int(os.environ.get('FEISHU_SEND_TIMEOUT', '10')))
+    return json.loads(resp.read().decode('utf-8'))
+
+
+def finish_success(note: str = '') -> None:
+    suffix = f' ({note})' if note else ''
+    print(f'Message sent successfully{suffix}')
+    if image_file and os.path.exists(image_file):
+        os.remove(image_file)
+    raise SystemExit(0)
+
 
 try:
-    resp = urllib.request.urlopen(req, timeout=int(os.environ.get('FEISHU_SEND_TIMEOUT', '10')))
-    data = json.loads(resp.read().decode('utf-8'))
+    data = send_payload(payload)
     if data.get('code') == 0:
-        print('Message sent successfully')
-        if image_file and os.path.exists(image_file):
-            os.remove(image_file)
-    else:
-        print(f'ERROR: {json.dumps(data, ensure_ascii=False)}', file=sys.stderr)
-        sys.exit(1)
+        finish_success()
+    print(f'ERROR: {json.dumps(data, ensure_ascii=False)}', file=sys.stderr)
+    sys.exit(1)
+except urllib.error.HTTPError as exc:
+    response_body = ''
+    try:
+        response_body = exc.read().decode('utf-8', errors='replace')
+    except Exception:
+        response_body = ''
+
+    if payload.get('uuid') and exc.code == 400:
+        retry_payload = dict(payload)
+        retry_payload.pop('uuid', None)
+        try:
+            retry_data = send_payload(retry_payload)
+            if retry_data.get('code') == 0:
+                print('WARN: Feishu rejected message uuid; retried without uuid', file=sys.stderr)
+                finish_success('retried without uuid')
+            print(f'ERROR: {json.dumps(retry_data, ensure_ascii=False)}', file=sys.stderr)
+            sys.exit(1)
+        except Exception as retry_exc:
+            print(f'ERROR: retry without uuid failed after HTTP 400: {retry_exc}', file=sys.stderr)
+            sys.exit(1)
+
+    detail = response_body or getattr(exc, 'reason', '') or str(exc)
+    print(f'ERROR: HTTP Error {exc.code}: {detail}', file=sys.stderr)
+    sys.exit(1)
 except Exception as exc:
     print(f'ERROR: {exc}', file=sys.stderr)
     sys.exit(1)

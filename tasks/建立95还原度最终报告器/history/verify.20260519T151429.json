@@ -1,0 +1,20 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T14:56:27+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 复验通过：最终报告器可基于结构化输入生成 fidelity_metrics.json / fidelity_report.md，正确输出 overall_score、tables.has_table_xml、blocking_failures，并对“表格失败”和“缺少未接入分项”两类场景显式失败。",
+  "test_commands": [
+    "PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache python3 -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/app/services/pdf_to_word/model_eval_runner.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/fidelity-report-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_fidelity_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-fidelity-report --basetemp=/private/tmp/chiralium-pytest-temp-fidelity-report",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/95-424f239f diff --check -- backend/app/services/pdf_to_word/model_eval_runner.py backend/tests/test_pdf_to_word_fidelity_report.py backend/tests/fixtures/pdf_to_word/fidelity_report/pass_input.json backend/tests/fixtures/pdf_to_word/fidelity_report/table_blocker_input.json backend/tests/fixtures/pdf_to_word/fidelity_report/missing_dimension_input.json"
+  ],
+  "scenarios_verified": [
+    "pass fixture：overall_score=0.9785，tables.has_table_xml=true，blocking_failures=[]，报告可写出 metrics/report 两份产物。",
+    "table blocker fixture：tables.has_table_xml=false 且 image_fallback_table_count=2，会触发 table_gate_failed 相关 blocker。",
+    "missing dimension fixture：visual_similarity 被显式标记为 missing_dimension，不会被假装为通过。"
+  ],
+  "regressions_found": []
+}

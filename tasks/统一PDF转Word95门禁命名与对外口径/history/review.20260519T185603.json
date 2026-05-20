@@ -1,0 +1,59 @@
+{
+  "task_id": "统一PDF转Word95门禁命名与对外口径",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T18:53:13+08:00",
+  "status": "request_changes",
+  "summary": "本轮主方向正确：已把工程 95 与人工视觉 95 的边界写进正式说明、final acceptance report 与 summary，并覆盖科学/数学/语文/英语全学科。但当前仍有两处阻塞问题：其一，口径文档与 summary 对外话术字段名不一致（`public_claim_policy` vs `claim_policy`），与本任务“统一命名”目标直接冲突；其二，提交 `04d9cbd` 未通过 `git show --check`，口径说明文档第 3-5 行存在 trailing whitespace，且与 result.json 中“git diff --check 通过”的验证描述不一致。请先修正这两点，再回提做快速复审。",
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-archive/reports/PDF转Word95门禁口径与对外说明.md",
+      "finding": "第 6.1 节把对外话术字段定义为 `public_claim_policy`，但第 8 节又要求 QA 重跑输出 `claim_policy.allowed_claims[]` / `claim_policy.disallowed_claims[]`；与此同时，final_acceptance_summary.json 实际只落了 `public_claim_policy`。当前 canonical 名称没有统一，PM/QA/后续实现会拿到两套口径。",
+      "recommendation": "统一为单一字段名，并同步修正文档说明、QA 重跑要求与 final_acceptance_summary.json，确保下游只会沿一套 contract 实施。"
+    },
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-archive/reports/PDF转Word95门禁口径与对外说明.md",
+      "finding": "提交 `04d9cbd` 未通过 `git show --check`：第 3-5 行存在 trailing whitespace。当前 result.json 中“git diff --check -- 三个允许文件通过”的验证结论，与 reviewer 实际复核结果不一致。",
+      "recommendation": "清理第 3-5 行尾随空格（若需要 Markdown 强制换行，请改用不会触发 whitespace check 的写法），并补一条可复现的 check 证据后再回提。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "note",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/统一PDF转Word95门禁命名与对外口径/verify.json",
+      "finding": "当前任务目录无 verify.json。",
+      "recommendation": "本轮先修阻塞项；后续若 watcher/QA 能补 verify 留痕，会更利于 PM 追溯。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/统一PDF转Word95门禁命名与对外口径/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/统一PDF转Word95门禁命名与对外口径/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/统一PDF转Word95门禁命名与对外口径/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/统一PDF转Word95门禁命名与对外口径/artifacts/PDF-Word95-7ddfafff.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-archive/reports/PDF转Word95门禁口径与对外说明.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-acceptance/final_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/制定PDF转Word视觉门禁整改意见/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word-205980b6/artifacts/pdf2word/final-archive/reports/PDF转Word视觉门禁全学科整改意见.md"
+  ],
+  "test_evidence": [
+    {
+      "command": "python3 -m json.tool /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+      "result": "通过，summary JSON 语法合法。"
+    },
+    {
+      "command": "静态复核口径文档 / final_acceptance_report.md / final_acceptance_summary.json",
+      "result": "确认三份交付都已明确区分 engineering 95 与 human visual 95，并覆盖科学、数学、语文、英语全学科边界与对外话术。"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff show --check --stat --oneline HEAD -- artifacts/pdf2word/final-archive/reports/PDF转Word95门禁口径与对外说明.md artifacts/pdf2word/final-acceptance/final_acceptance_report.md artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+      "result": "失败：`PDF转Word95门禁口径与对外说明.md` 第 3-5 行存在 trailing whitespace。"
+    },
+    {
+      "command": "行号 spot check：口径文档第 85-90 行 / 第 141-144 行，对照 final_acceptance_summary.json 第 219-231 行",
+      "result": "确认文档第 6.1 节定义 `public_claim_policy`，第 8 节却改写为 `claim_policy.allowed_claims[]` / `claim_policy.disallowed_claims[]`，而 summary JSON 实际只提供 `public_claim_policy`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

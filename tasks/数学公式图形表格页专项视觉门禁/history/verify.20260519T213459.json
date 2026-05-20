@@ -1,0 +1,55 @@
+{
+  "task_id": "数学公式图形表格页专项视觉门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T21:30:07+0800",
+  "status": "fail",
+  "pass": false,
+  "summary": "QA 未通过。math_visual_gate 的显式失败路径、fixture 与定向 pytest 本身可运行，但我复现了 review-1 指出的两个阻塞 contract 缺口：当 focus page 漏传 formula/graphic region payload，或图形-题干 binding_pairs / binding_iou 证据被整体省略时，report 仍会返回 status=ready 且 artifact_ready_for_scoring=true。也就是说，上游可通过漏传专项证据直接绕过数学专项 gate，这与任务要求“必须同时考虑公式/图形/表格/题块顺序”“图形与题干绑定异常要能显式暴露”不一致。",
+  "acceptance_criteria": [
+    {
+      "criterion": "数学八年级/数学试卷类样例可识别公式图形关键失真",
+      "result": "pass",
+      "evidence": "定向 pytest 9 passed，已覆盖 formula audit-only 不可替代视觉分、graphic/question binding 回退、question order 回退、table 低分 veto 等显式失败路径。"
+    },
+    {
+      "criterion": "题块顺序与图文绑定异常不会被总分掩盖",
+      "result": "partial",
+      "evidence": "当 binding_pairs 已提供且 binding_iou / bound 异常时，测试可触发 graphic_question_binding_below_threshold 与 question_order_* veto；但如果上游把 binding_pairs 直接留空，当前实现会静默通过。"
+    },
+    {
+      "criterion": "focus page 与绑定证据缺失时不能静默通过",
+      "result": "fail",
+      "evidence": "我基于 fixture 复现了 4 组最小案例：pages[0].formula_regions=[]、pages[1].graphic_regions=[]、pages[1].question_order.binding_pairs=[]、以及 graphic_regions[0].binding_iou 缺失且 binding_pairs=[]。四种情况下 report 都返回 status=ready、artifact_ready_for_scoring=true、vetoes=[]，说明缺失专项 payload / binding evidence 会被绕过。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取 instruction.md、result.json、review.json/review.md，确认本任务目标是数学公式/图形/表格/题块顺序四类专项视觉门禁，并且 review-1 已提出 payload 缺失绕过的阻塞问题。",
+    "静态复核 backend/app/services/pdf_to_word/math_visual_gate.py，确认默认路径已覆盖 formula audit-only、区域低分、题块顺序低分与 graphic binding 低 IoU 等 veto。",
+    "执行 py_compile、git diff --check、fixture JSON 语法校验与 pytest，确认当前提交可编译、补丁无格式问题、原有 9 条测试通过。",
+    "使用基于现有 fixture 的最小复现实验，验证 focus page 缺失 formula/graphic payload 与缺失 binding_pairs / binding_iou 时仍会误判 ready。"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/math_visual_gate.py backend/tests/test_pdf_to_word_math_visual_gate.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_math_visual_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-math-visual-qa --basetemp=/private/tmp/chiralium-pytest-temp-math-visual-qa -> 9 passed, 4 warnings in 0.08s",
+    "git diff --check -- backend/app/services/pdf_to_word/math_visual_gate.py backend/tests/test_pdf_to_word_math_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/math -> passed",
+    "python3 -m json.tool backend/tests/fixtures/pdf_to_word/visual_similarity/math/math_visual_contract.json && python3 -m json.tool backend/tests/fixtures/pdf_to_word/visual_similarity/math/math_render_pair.json -> passed",
+    "最小复现（基于 fixture materialize_contract 后重跑 build_math_visual_gate_report）: formula_regions=[] / graphic_regions=[] / binding_pairs=[] / binding_iou missing + binding_pairs=[] -> 四种情况均返回 status=ready, artifact_ready_for_scoring=true, vetoes=[]"
+  ],
+  "regressions_found": [
+    {
+      "severity": "high",
+      "area": "math focus payload contract",
+      "finding": "focus_tags 已声明 formula 或 graphic 的页面在专项 region list 为空时不会进入 artifact_not_ready。"
+    },
+    {
+      "severity": "high",
+      "area": "graphic-question binding contract",
+      "finding": "question_order / graphic focus 页面缺失 binding_pairs 或 binding_iou 证据时不会显式失败。"
+    }
+  ],
+  "non_blocking_observations": [
+    "review-1 的 request_changes 结论与本轮 QA 复现结果一致；需要 dev 侧补 contract 与 pytest 后再复验。",
+    "pytest 的 4 条 warning 均为既有 FastAPI on_event deprecation warning，与本轮 fail 结论无直接关系。"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "task_id": "补齐表格样例与验收夹具",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T14:36:30+08:00",
+  "status": "approve",
+  "summary": "审查通过。已补齐 2 组表格通过样例（英语八年级、五下科学）与 1 组结构缺失失败样例；fixture 字段包含 `has_table_xml` / `image_fallback_table_count` / `required_cell_texts`，测试会实际生成 DOCX 并断言 `<w:tbl>` 通过与 fallback 失败语义。我补充复跑 pytest、py_compile 与 staged diff --check，均通过。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具",
+      "finding": "任务目录下暂无 verify.json；本次审查主要依据 instruction/result、fixture/test 静态复核与补充复跑测试。",
+      "recommendation": "后续若进入最终 95% 报告器链路，建议补写 verify.json 便于流程留痕。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81/backend/tests/test_pdf_to_word_table_fixtures.py",
+      "finding": "当前测试使用 gate 等价信号（`<w:tbl>` 存在性、fallback 文本出现次数、关键 cell 文本）做断言，而不是直接 import 上游 DOCX gate 模块。",
+      "recommendation": "待 integration 合流后，建议把这组 goldens 再接到最终 gate / 95% 报告器链路做一次端到端复验，确保 fixture 与最终门禁实现持续同口径。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐表格样例与验收夹具/artifacts/task-b7b65b81.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81/backend/tests/fixtures/pdf_to_word/table_goldens/cases.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81/backend/tests/test_pdf_to_word_table_fixtures.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/table-golden-review-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_table_fixtures.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-table-golden-review --basetemp=/private/tmp/chiralium-pytest-temp-table-golden-review",
+      "result": "4 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本任务结论。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81 && PYTHONPYCACHEPREFIX=/private/tmp/table-golden-review-pycache python3 -m py_compile backend/tests/test_pdf_to_word_table_fixtures.py",
+      "result": "通过。测试文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-b7b65b81 && git diff --cached --check -- backend/tests/fixtures/pdf_to_word/table_goldens/cases.json backend/tests/test_pdf_to_word_table_fixtures.py",
+      "result": "通过。staged 新增文件未发现空白或 patch 格式问题。"
+    },
+    {
+      "command": "静态复核 cases.json / test_pdf_to_word_table_fixtures.py",
+      "result": "确认 fixture 至少覆盖 1 组通过 + 1 组失败，且当前已覆盖英语八年级、五下科学与结构缺失负样例；测试会基于 payload 生成 DOCX，并校验 `has_table_xml`、`image_fallback_table_count` 与 `required_cell_texts`。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

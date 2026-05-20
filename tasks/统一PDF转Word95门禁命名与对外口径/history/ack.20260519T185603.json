@@ -1,0 +1,9 @@
+{
+  "task_id": "统一PDF转Word95门禁命名与对外口径",
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T18:45:18+08:00",
+  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-7ddfafff",
+  "branch": "task/PDF-Word95-7ddfafff",
+  "notes": "已确认任务边界：仅修改指定口径说明文档、final_acceptance_report.md、final_acceptance_summary.json；只做命名/说明/对外口径，不改算法、不重跑样本。"
+}

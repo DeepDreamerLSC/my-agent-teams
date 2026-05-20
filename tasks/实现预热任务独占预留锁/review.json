@@ -1,0 +1,28 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T16:06:27+08:00",
+  "status": "approve",
+  "summary": "本轮返修已收敛到批准契约：pre_reserved_* 字段、reserve-task CLI（pending/pooled/dependency_wait、--force、--until）以及 watcher/view/claim/reassign/invariants/tests 现已一致。审查通过，可转 QA；qa_gate_state 仍 pending，暂不可直接收口。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "note",
+      "file": "tasks/实现预热任务独占预留锁/verify.json",
+      "message": "当前任务目录仍无 verify.json；本次审查结论基于 instruction/result、write_scope 代码复核，以及 reviewer 本地补跑 bash -n + pytest 的证据。"
+    }
+  ],
+  "files_reviewed": [
+    "scripts/claim-task.sh",
+    "scripts/lib/task_state_invariants.py",
+    "scripts/reassign-task.sh",
+    "scripts/reserve-task.sh",
+    "scripts/task-pool-view.py",
+    "scripts/task-watcher.sh",
+    "tests/test_claim_task_reserved.py",
+    "tests/test_reassign_task.py",
+    "tests/test_task_pool_and_queue_router.py",
+    "tests/test_task_watcher_push_reliability.py"
+  ],
+  "recommended_next_action": "qa"
+}

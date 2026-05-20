@@ -1,0 +1,7 @@
+{
+  "task_id": "冻结95还原度指标与样本清单",
+  "agent": "qa-1",
+  "claimed_at": "2026-05-19T08:38:21+08:00",
+  "claim_status": "requested",
+  "reason": "watcher 因未 ack 回退后重新认领；已读取 instruction.md，准备立即 ack 并开始冻结 fidelity manifest。"
+}

@@ -1,0 +1,12 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-19T12:36:52+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T12:38:34+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T13:13:18+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T13:22:55+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-19T13:23:48+08:00", "reason": "resume-task: review 返修：实现必须对齐已批准的 pre_reserved_* 契约，pooled/dependency_wait 阶段不得复用 reserved_by；同时将 scripts/reserve-task.sh 纳入正式版本控制与 patch artifact，确保 result.files_modified / patch / worktree 一致。", "actor": "pm-chief"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T13:25:40+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T14:42:48+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T14:58:54+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-19T15:04:20+08:00", "reason": "resume-task: review 二次返修：继续由 dev-2 收敛到已批准契约。必须把 pre_reserved_expires_at 统一改为 pre_reserved_until，并补齐 pre_reserved_by_actor / pre_reserved_origin；reserve-task.sh 需支持 pending/pooled/dependency_wait、--force、--until，并同步 watcher/view/invariant/tests 全口径一致。当前不改派，按契约补齐后再回审。", "actor": "pm-chief"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T15:06:28+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T16:00:05+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T16:24:21+08:00", "reason": "pm close: review and qa passed for prewarm exclusive reservation lock"}

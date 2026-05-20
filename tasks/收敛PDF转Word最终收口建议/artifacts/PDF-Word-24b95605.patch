@@ -1,0 +1,158 @@
+diff --git "a/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\346\234\200\347\273\210\346\224\266\345\217\243\345\273\272\350\256\256.md" "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\346\234\200\347\273\210\346\224\266\345\217\243\345\273\272\350\256\256.md"
+new file mode 100644
+index 0000000..62ef26e
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word\346\234\200\347\273\210\346\224\266\345\217\243\345\273\272\350\256\256.md"
+@@ -0,0 +1,152 @@
++# PDF 转 Word 最终收口建议
++
++> 项目：Chiralium / PDF 习题转 Word  
++> 生成时间：2026-05-19  
++> 用途：给 PM 做最终 go / no-go 决策与下一阶段拆任务使用。  
++> 范围：收敛当前收尾阶段事实，不新增代码、不重跑大样本、不改变默认同步发布口径。
++
++## 1. 结论先行
++
++当前建议采用 **“表格主链有条件收口；整体 95% 不宣称达成；下一阶段围绕 visual_similarity.json 与 quality/hybrid_async 继续推进”** 的口径。
++
++| 决策项 | 建议 | 原因 |
++|---|---|---|
++| 默认同步路径 | **不扩大发布口径** | 默认同步仍保持 `apple default`，不得引入 render diff、Paddle、慢 VLM 等分钟级能力。 |
++| 表格 / DOCX 主链 | **可按 quality/hybrid_async 边界有条件收口** | QA 收尾复验显示 5 个样例 DOCX 均可打开，含表格的 2 个样例已有真实 `<w:tbl>`，不存在 `table_detected_but_no_word_table`。 |
++| “95% 还原度已达成”宣称 | **no-go** | frozen manifest 采用 100 分制、阈值 95；visual similarity 权重 17 仍缺真实 `visual_similarity.json`，当前总分上限为 83。 |
++| 下一阶段重点 | **先补 visual similarity 真实产物链路，再考虑慢模型灰度扩面** | 视觉相似度 gate 已冻结 contract，但尚未接真实 render-pair / key-region score / slow-model review。 |
++
++PM 可直接采用的收口判断：
++
++```text
++可以收口：PDF→Word 表格结构化与 final DOCX source/table gate 主线。
++不能收口：整体 95% fidelity 对外达成声明。
++保持不变：默认同步仍为 apple default；hybrid_experimental 继续是 quality gray / async 路径。
++下一步：实现 canonical visual_similarity.json，并重新跑 95 fidelity gate。
++```
++
++## 2. 当前事实来源
++
++| 来源 | 当前状态 | 本文采用的关键事实 |
++|---|---|---|
++| `规划PDF转Word95还原与Word表格路线` | done / approved | 95% contract、表格硬门禁、默认同步 vs `quality/hybrid_async` 边界已冻结。 |
++| `冻结95还原度指标与样本清单` | done / approved | 8 个评分维度、100 分制 threshold=95、`visual_similarity` 权重 17、P0 blockers 已冻结。 |
++| `建立95还原度最终报告器` | done / approved | fidelity report 支持 100 分制、threshold=95、table blocker 与 `tables.has_table_xml` 稳定输出。 |
++| `补齐表格样例与验收夹具` | done / approved | 2 个正样例 + 1 个负样例覆盖 Word 表格通过与 fallback 失败语义。 |
++| `设计视觉相似度最终门禁与慢模型灰度` | done / approved | canonical required artifact 为 `visual_similarity.json`；active slow-model candidate 仅 `qwen3_vl_8b`；`glm_46v_flash` 仅 comparison/blocked。 |
++| `执行PDF转Word表格收尾复验与95判定` | result done；control-plane 当前 blocked / qa_failed | 表格 gate pass；整体 95 no-go；缺口为 `visual_similarity_missing`。 |
++
++> 注：`执行PDF转Word表格收尾复验与95判定` 的任务状态被控制面标为 `blocked / qa_failed`，并不表示表格 gate 失败；它阻塞在“整体 95% 宣称不可通过”。
++
++## 3. 已完成 / 进行中 / 待下一阶段状态矩阵
++
++| 模块 / 能力 | 状态 | 是否可作为当前收口事实 | 是否进入默认同步 | 证据 / 边界 |
++|---|---|---:|---:|---|
++| 默认同步 `apple` 路径 | 已稳定 | 是 | 是 | 现有路线继续以 apple default 为默认；不得引入高耗时增强。 |
++| `hybrid_experimental` 编排边界 | 已冻结 | 是 | 否 | 只允许显式 `quality` / gray / async；不替换默认同步。 |
++| 95 fidelity manifest | 已完成 | 是 | 不直接影响默认同步 | 100 分制、threshold=95、8 维度和 P0 blockers 已冻结。 |
++| 95 fidelity reporter | 已完成 | 是 | 不直接影响默认同步 | 支持 `overall_score`、dimension score、table blocker、missing dimension 语义。 |
++| NormalizedTableIR / Word 表格渲染路线 | 已完成 | 是 | 仅在已接链路范围内 | 表格结构化 IR 与 Word `<w:tbl>` 验收口径已冻结。 |
++| 表格样例与验收夹具 | 已完成 | 是 | 否 | `table_goldens/cases.json` 覆盖正/负样例，避免 image-only fallback 被误判成功。 |
++| Final DOCX source/table gate | 已完成并通过 | 是 | 否 | 5/5 DOCX openable；`sample_with_table_xml_count=2`；source/profile gate complete。 |
++| 表格收尾复验 | 当前结论已产出 | 是，限表格 gate | 否 | 表格 gate pass；含表格样例 `五下科学`、`数学八年级` 已有 `<w:tbl>`。 |
++| 整体 95% 达成 | **未达成 / no-go** | 是，作为 no-go 事实 | 否 | 缺 `visual_similarity.json`，`overall_score_upper_bound=83`。 |
++| Visual similarity contract | 已完成 | 是，作为下一阶段契约 | 否 | canonical artifact：`visual_similarity.json`；当前仅 contract/stub/fixture/test。 |
++| Visual similarity 真实评分 | 待下一阶段 | 否 | 否 | 未接 render pair、key-region score、真实 `visual_similarity.json`。 |
++| 慢模型灰度 | 契约完成；实现待下一阶段 | 否 | 否 | active candidate 仅 `qwen3_vl_8b` review worker；不进入默认同步。 |
++| `glm_46v_flash` | 暂缓 / comparison-only | 否 | 否 | 当前不作为 active gray candidate。 |
++| Paddle 选择性增强 | quality gray 边界内 | 不作为默认完成项 | 否 | 只能 selected pages/crops；不得整本同步跑。 |
++| 公式 | audit-only | 是，作为边界事实 | 否 | `formula_candidate` 仍 merge-disabled，不计入已上线编辑公式能力。 |
++| 答案区 / 教师版 | 未完成 | 否 | 否 | 当前 final gate 中 explicit answer area / answer section count 为 0。 |
++
++## 4. QA 最终复验挂点与决策条件
++
++### 4.1 当前 QA 落点
++
++`执行PDF转Word表格收尾复验与95判定` 已给出当前落点：
++
++```json
++{
++  "overall_verdict": "conditional_pass",
++  "go_no_go": "no_go_for_95_declaration",
++  "overall_score_upper_bound": 83.0,
++  "blocking_failures": [
++    "visual_similarity_missing",
++    "overall_score_below_threshold:max_possible_83_without_visual_similarity"
++  ],
++  "tables": {
++    "table_gate_passed": true,
++    "sample_with_table_xml_count": 2,
++    "samples_with_table_xml": ["五下科学", "数学八年级"],
++    "detected_table_without_word_table_samples": []
++  }
++}
++```
++
++### 4.2 PM 可选决策
++
++| 决策 | 条件 | 建议动作 |
++|---|---|---|
++| 表格主链收口 | 接受 QA 当前表格 gate pass 结论 | 将表格相关任务归档为当前阶段完成；不再追加表格主链阻塞任务。 |
++| 整体 95% 收口 | 需要真实 `visual_similarity.json` 且 score >= 95 | 当前不满足，不能宣称达成。 |
++| 默认同步发布 | 只能发布 apple default 当前能力 | 不把 hybrid/visual/slow-model 写入默认同步完成项。 |
++| 下一阶段继续 | PM 决定继续推进 95% | 先拆 visual similarity 真实产物链路，再重跑 fidelity gate。 |
++
++## 5. 当前可对外/对内表述边界
++
++### 5.1 可以说
++
++- PDF→Word 表格结构化路线已完成关键 contract 与样例验收。
++- Final DOCX source/table gate 当前通过：5 个样例 DOCX 可打开；含表格样例已有真实 Word 表格 XML。
++- 95 fidelity reporter 与 manifest 已冻结，可以作为后续统一门禁。
++- Visual similarity 与 slow-model gray 的接入边界已冻结，但只在 `quality/hybrid_async` 路径生效。
++
++### 5.2 不能说
++
++- 不能说“整体 95% 还原度已经达成”。
++- 不能说“视觉相似度已上线 / 已接入真实评分”。
++- 不能说“慢模型已进入默认同步”。
++- 不能说“Paddle / Qwen / GLM 已成为默认 PDF→Word 主链路”。
++- 不能把 `formula_candidate` audit-only 写成“公式可编辑能力已完成”。
++- 不能把 `visual_similarity_report.json` 当作 canonical required artifact；当前 canonical 名称是 `visual_similarity.json`。
++- 不能把 `glm_46v_flash` 写成 active slow-model gray candidate；当前仅 comparison-only / blocked。
++
++## 6. 下一阶段候选任务清单（建议顺序）
++
++| 顺序 | 候选任务 | 类型 | 目标 | 建议 write_scope | 验收条件 |
++|---:|---|---|---|---|---|
++| 1 | 实现 visual_similarity.json 真实产物链路 | dev + QA | 在 `quality/hybrid_async` 下生成 canonical `visual_similarity.json`，包含 page render pair、key-region score、blocking failures。 | `backend/app/services/pdf_to_word/visual_similarity_gate.py`、model eval runner、visual fixtures/tests | 缺失 visual similarity 不再触发 missing blocker；默认同步不变慢。 |
++| 2 | 接入 render-pair 生成与缓存 | dev | PDF source render 与 DOCX render 形成可复现图片对，输出到 artifact。 | page renderer / DOCX render adapter / artifact writer | 选定样例每页存在 source/docx render pair；失败有 reason。 |
++| 3 | 接入 key-region score | dev + QA | 表格、图片、题干、multi-column、answer-area 区域输出区域级相似度与 bbox IoU。 | visual gate、region detector artifact、fixture | key-region score 可定位具体样例/页/区域，低于阈值生成 blocker。 |
++| 4 | selective Qwen review worker 灰度 | dev + QA | 只对阈值附近或关键区域失败样例触发 `qwen3_vl_8b` review worker。 | VLM review adapter / visual gate / artifact | active candidate 仅 `qwen3_vl_8b`；默认同步 0 调用；无效 JSON 可回退。 |
++| 5 | 重跑 95 fidelity final gate | QA | 在 visual similarity artifact 真实存在后重新计算 100 分制总分。 | tests / artifacts only | `overall_score >= 95` 且 no P0 blocker 时，才允许 PM 宣称 95 达成。 |
++| 6 | 样本扩面：table-heavy / multi-column / answer-area | QA + dev | 把 frozen manifest planned extensions 变成正式样例。 | fixtures / reports / visual artifacts | 扩面样例进入 manifest；gate 能区分 pass/fail，不降低当前五样例。 |
++| 7 | 公式专项从 audit-only 进入可编辑链路评估 | research/dev | 评估公式 OCR / OMML / readable fallback，仍默认关闭。 | formula pipeline / fixtures | 单独 feature flag；不能影响当前 95 主线收口。 |
++
++建议 PM 拆分时保持以下顺序：
++
++```text
++visual_similarity.json canonical artifact
++-> render-pair generation
++-> key-region score
++-> selective qwen3_vl_8b review
++-> 95 fidelity rerun
++-> sample expansion
++-> formula/answer-area specialized lanes
++```
++
++## 7. 建议最终收口话术
++
++若 PM 需要在当前阶段对团队同步，可使用以下话术：
++
++> PDF→Word 当前阶段已完成表格结构化与 final DOCX source/table gate 主线收口。当前 5 个样例 DOCX 均可打开，含表格样例已产出真实 Word 表格 XML，表格硬门禁通过。  
++> 但整体 95% fidelity 不能宣称达成，因为 frozen 100 分制 contract 中 visual similarity 权重 17 分仍缺真实 `visual_similarity.json` 产物，当前总分上限为 83。默认同步路径保持 apple default，不引入慢模型或 render diff。下一阶段若继续冲 95%，优先实现 `quality/hybrid_async` 下的 canonical visual similarity artifact，再重跑最终 fidelity gate。
++
++## 8. 最终建议
++
++1. **本阶段收口**：表格主链 / DOCX source-table gate 可以收口。
++2. **本阶段不收口**：整体 95% fidelity 宣称不收口。
++3. **默认同步**：继续保持现状，不因本阶段收尾扩大能力声明。
++4. **下一阶段 P0**：实现 `visual_similarity.json` 真实门禁产物。
++5. **下一阶段 P1**：在 visual similarity 基础上选择性接入 `qwen3_vl_8b` review worker。
++6. **下一阶段暂缓**：`glm_46v_flash`、公式可编辑、答案区教师版和样本扩面，均不得抢在 visual similarity canonical artifact 前作为主线。

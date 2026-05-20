@@ -1,0 +1,29 @@
+{
+  "task_id": "收敛PDF转Word最终收口建议",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "已完成 PDF 转 Word 最终收口建议文档：收敛已完成事项、QA 表格复验落点、整体 95% no-go 原因、默认同步边界、visual_similarity/slow model gray 当前状态，以及下一阶段可拆任务顺序。结论口径为：表格主链可按 quality/hybrid_async 边界有条件收口；整体 95% fidelity 不宣称达成；下一阶段优先实现 canonical visual_similarity.json 后重跑 95 gate。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word最终收口建议.md"
+  ],
+  "tests": [
+    "PASS: wc -l artifacts/pdf2word/final-archive/reports/PDF转Word最终收口建议.md -> 152 lines",
+    "PASS: grep 校验覆盖 visual_similarity.json、overall_score_upper_bound=83、no-go、qwen3_vl_8b、glm_46v_flash、table_detected_but_no_word_table、默认同步、下一阶段",
+    "PASS: git diff --check -- artifacts/pdf2word/final-archive/reports/PDF转Word最终收口建议.md",
+    "PASS: 生成补丁 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/收敛PDF转Word最终收口建议/artifacts/PDF-Word-24b95605.patch（158 lines）",
+    "PASS: git status --short --branch -> clean on task/PDF-Word-24b95605"
+  ],
+  "commit_hash": "b7cc0191b171f1c7f1d20634f47d5fcc9685eb9e",
+  "patch_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/收敛PDF转Word最终收口建议/artifacts/PDF-Word-24b95605.patch",
+  "decision_summary": {
+    "table_chain": "conditional_close_under_quality_hybrid_async_boundary",
+    "overall_95": "no_go_until_real_visual_similarity_json",
+    "default_sync": "keep_apple_default_no_slow_models_no_render_diff",
+    "next_p0": "implement_canonical_visual_similarity_json_and_rerun_95_gate"
+  },
+  "risks": [
+    "本任务未重跑大样本，结论基于已完成任务 result/review、final acceptance 报告和 QA 收尾复验结果汇总。",
+    "文档明确不宣称整体 95% 已达成；PM 若要对外发布，应等待 visual_similarity.json 真实接入和 95 gate 复验。"
+  ],
+  "completed_at": "2026-05-19T16:24:52+08:00"
+}

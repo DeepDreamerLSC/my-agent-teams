@@ -1,0 +1,44 @@
+{
+  "task_id": "科学实验页表格与图片区关键区域视觉门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T21:30:07+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。science_visual_gate 已对科学实验混合页建立可复用的关键区域视觉门禁：能稳定输出表格区、图片区、实验记录区以及题干/表格/图片/记录区邻接关系分数；当表格行列观感、图片区与题干绑定或实验记录区邻接关系严重失真时，会返回明确 veto，并附 recommended_common_code 供后续公共 fidelity_veto 链路统一收口。当前未发现独立 review.json/review.md，本轮 QA 基于 instruction、result、patch、worktree 实现与定向测试完成验证。",
+  "acceptance_criteria": [
+    {
+      "criterion": "五下科学类样例可产出关键区域分",
+      "result": "pass",
+      "evidence": "happy fixture 通过后，summary 输出 sample_name=五下科学、document_page_type=science_experiment_table_and_image_mixed、overall_score>=0.9，且 key_region_scores 中 table/image/experiment_record 最低分分别达到任务约定的高相似区间。"
+    },
+    {
+      "criterion": "实验表格/图片区关键失败会被识别",
+      "result": "pass",
+      "evidence": "定向测试覆盖表格失败样例与图片区绑定失败样例：前者触发 science_table_region_critical_distortion 与 science_experiment_record_adjacency_broken，后者触发 science_image_prompt_binding_broken；同时 recommended_common_code 会映射到 table_visual_adjacency_severe_misalignment 或 critical_page_reading_order_break。"
+    },
+    {
+      "criterion": "实现可复用于更多科学页型，并可对接公共 visual_similarity / veto",
+      "result": "pass",
+      "evidence": "science_visual_gate 不写死某一页坐标，而是基于 source_regions/output_regions、区域类别和相对关系计算 region_scores/relation_scores；summary.integration 明确给出 pages[].region_scores + pages[].relation_scores、vetoes 与 recommended_common_code 的下游消费接口。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取 instruction.md 与 result.json，确认本任务聚焦科学实验页表格区、图片区、实验记录区及关键邻接关系门禁，不替代共性 visual_similarity。",
+    "静态复核 science_visual_gate.py，确认 SCIENCE_VETO_CODE_MAP 已覆盖 table/image/experiment_record 以及 image_prompt_binding、table_prompt_adjacency、experiment_record_adjacency 等关键关系，并能输出 recommended_common_code。",
+    "静态复核 science fixtures，确认覆盖 happy、表格失败、图片区绑定失败三类核心科学页场景。",
+    "执行 py_compile、pytest、git diff --check 与 fixture JSON 语法校验，确认当前提交可编译、补丁无格式问题、4 条测试全部通过。"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_science_visual_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-science-visual-qa --basetemp=/private/tmp/chiralium-pytest-temp-science-visual-qa -> 4 passed, 4 warnings in 0.03s",
+    "git diff --check -- backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/science -> passed",
+    "for f in backend/tests/fixtures/pdf_to_word/visual_similarity/science/*.json; do python3 -m json.tool \"$f\" >/dev/null; done -> passed"
+  ],
+  "non_blocking_observations": [
+    "当前 science 专项 gate 仍未在公共 visual_similarity / final reporter 中正式接线；本任务通过的是专项模块本身的契约与测试，不等于全链路科学样例已完成最终人工视觉复验。",
+    "pytest 的 4 条 warning 均为既有 FastAPI on_event deprecation warning，与本轮通过结论无直接关系。",
+    "任务目录下当前未发现独立 review.json / review.md；本轮 QA 以现有实现、patch 与测试为准完成验证。"
+  ],
+  "regressions_found": []
+}

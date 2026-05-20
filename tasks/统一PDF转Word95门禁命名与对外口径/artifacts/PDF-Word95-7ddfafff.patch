@@ -1,0 +1,536 @@
+diff --git a/artifacts/pdf2word/final-acceptance/final_acceptance_report.md b/artifacts/pdf2word/final-acceptance/final_acceptance_report.md
+new file mode 100644
+index 0000000..f1b274f
+--- /dev/null
++++ b/artifacts/pdf2word/final-acceptance/final_acceptance_report.md
+@@ -0,0 +1,83 @@
++# PDF→Word 工程 95 门禁报告（非人工视觉 95）
++
++- Generated at: `2026-05-18T07:20:15+08:00`
++- Run label: `20260518-072100`
++- Engineering gate name: `quality_hybrid_async_engineering_95_gate`
++- Engineering gate passed: `true`
++- Human visual gate name: `human_visual_95_gate`
++- Human visual gate status: `pending_remediation`
++- Release policy: `apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled`
++
++## 0. 口径声明
++
++本报告中的 `gate_passed=true` 仅表示 **quality/hybrid_async 工程 95 门禁** 通过。
++
++它可以证明：DOCX 可打开、source/profile gate 可审计、表格结构与 canonical artifact 消费链路按当前 contract 成立。
++
++它不能证明：科学、数学、语文、英语全学科已经达到人工逐页视觉对照意义上的 95% 还原度。
++
++```text
++可继续宣称：quality/hybrid_async 工程 95 门禁通过。
++暂不可宣称：全学科人工视觉 95% 已达成。
++```
++
++## 1. Aggregate（工程门禁）
++
++- Samples: `5`
++- Openable DOCX: `5`
++- Samples with word/media: `4`
++- Samples with table XML: `2`
++- Document fallback samples: `1`
++
++这些指标是工程交付与结构可审计指标，不应单独解释为人工视觉相似度。
++
++## 2. Source-Aware Checks（工程门禁）
++
++- Strategy matrix matched samples: `5`
++- Source-profile matched samples: `5`
++- Paddle restricted to selected pages samples: `5`
++- Negative baseline-only samples: `1`
++- Formula audit-only samples: `5`
++
++这些指标证明来源和补源策略符合当前灰度边界；它们不替代真实 PDF/DOCX render pair 视觉比较。
++
++## 3. 全学科样例边界
++
++| Sample | Subject/Page Type | Current Engineering Meaning | Human Visual 95 Claim |
++| --- | --- | --- | --- |
++| `五下科学` | 科学：实验 + 表格 + 图片混合 | 有 media、`w:tbl`、source gate 证据；fallback_pages=`[1]` | 不可宣称实验区/表格区/图片区已人工视觉 95%，需真实区域评分。 |
++| `数学八年级` | 数学：稀疏图片 + 表格 + 公式 | 有 media、`w:tbl`、source gate 证据；fallback_pages=`[5]` | 不可宣称公式、图形、表格视觉均已人工视觉 95%。 |
++| `数学试卷` | 数学：图像密集试卷 | media 多、source gate 通过 | 不可把 media 数量解释成图像位置/题块顺序已人工视觉 95%。 |
++| `英语八年级` | 英语：阅读/选项/材料块 | source gate 通过；存在多页 fallback | 不可宣称阅读段落、选项缩进和 fallback 页已人工视觉 95%。 |
++| `语文五年级` | 语文：negative/baseline/document_fallback | 作为 negative/baseline 样例通过工程 source gate | 不可宣称语文正向 final-gated fidelity 已人工视觉 95%。 |
++
++## 4. 原工程样例明细
++
++| Sample | Page Type | Default | Supplemental | Selected Pages | Fallback Pages | word/media | table XML | Formula Audit | Negative Guard | Engineering Gate |
++| --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- |
++| `五下科学` | `science_experiment_table_and_image_mixed` | `mineru_full` | `paddleocr_vl` | `[4, 5, 6]` | `[1]` | 4 | true | true | true | true |
++| `数学八年级` | `math_exercise_with_sparse_image_and_table` | `mineru_full` | `paddleocr_vl` | `[1, 3, 4, 6, 7, 8]` | `[5]` | 2 | true | true | true | true |
++| `数学试卷` | `math_exam_image_dense` | `mineru_full` | `paddleocr_vl` | `[1, 3, 4, 6, 8, 9, 11]` | `[]` | 20 | false | true | true | true |
++| `英语八年级` | `language_exercise_sparse_media_with_fallback_pages` | `mineru_full` | `paddleocr_vl` | `[1, 4, 5, 7, 9]` | `[3, 8, 11, 12]` | 1 | false | true | true | true |
++| `语文五年级` | `negative_non_exercise_or_question_region_unresolvable` | `baseline_only` | `None` | `[]` | `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]` | 0 | false | true | true | true |
++
++## 5. Notes
++
++- `语文五年级` 继续按 `baseline_only / document_fallback` 处理，不得被误读为语文正向人工视觉 95 样例。
++- `formula_candidate` 继续只保留 `audit-only / merge-disabled` 事实，不得被误读为公式视觉还原达成。
++- Paddle 价值只按 final DOCX 与 per-source audit 判断，不按单次候选量放大。
++- `visual_similarity` 当前在工程门禁中表示 canonical artifact 消费链路和结构化事实 contract；在真实 render pair 与区域 veto 完成前，不得解释为人工视觉 95 已通过。
++
++## 6. PM/QA 可复用结论
++
++```text
++本轮 final acceptance 结论：quality/hybrid_async 工程 95 门禁通过；
++但 human_visual_95_gate 仍处于 pending_remediation。
++因此可保留工程链路通过结论，暂停全学科人工逐页视觉 95% 达成声明。
++```
++
++## Repro
++
++```bash
++python -m app.services.pdf_to_word.model_eval_runner --final-docx-gate --archive-root "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive" --output-dir "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance" --run-label "20260518-072100"
++```
+diff --git a/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json b/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json
+new file mode 100644
+index 0000000..c08589f
+--- /dev/null
++++ b/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json
+@@ -0,0 +1,280 @@
++{
++  "report_type": "pdf2word_quality_hybrid_async_engineering_95_gate_summary",
++  "generated_at": "2026-05-18T07:20:15+08:00",
++  "run_label": "20260518-072100",
++  "gate_passed": true,
++  "blocking_failures": [],
++  "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++  "release_boundary_changed": false,
++  "aggregate": {
++    "sample_count": 5,
++    "authoritative_docx_sample_count": 5,
++    "openable_docx_sample_count": 5,
++    "sample_with_word_media_count": 4,
++    "sample_with_table_xml_count": 2,
++    "pages_provenance_match_sample_count": 5,
++    "source_manifest_ok_sample_count": 5,
++    "sample_with_fallback_count": 3,
++    "document_fallback_sample_count": 1,
++    "explicit_answer_area_materialized_sample_count": 0,
++    "answer_section_materialized_sample_count": 0
++  },
++  "source_profile_gate": {
++    "strategy_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json",
++    "phase3_paddle_quality_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
++    "available": true,
++    "sample_with_source_selection_count": 5,
++    "sample_with_strategy_matrix_count": 5,
++    "sample_with_profile_audits_count": 5,
++    "strategy_matrix_match_sample_count": 5,
++    "source_profile_match_sample_count": 5,
++    "paddle_selected_only_sample_count": 5,
++    "fallback_guard_sample_count": 5,
++    "negative_baseline_only_sample_count": 1,
++    "formula_audit_only_sample_count": 5,
++    "sample_with_source_gate_pass_count": 5,
++    "samples_with_paddle_selected_pages_count": 4,
++    "samples_with_paddle_final_accepted_signal_count": 3
++  },
++  "metadata_checks": {
++    "archive_manifest_exists": true,
++    "profile_manifest_exists": true,
++    "profile_indexed_in_archive_manifest": true,
++    "profile_manifest_sample_count_matches_aggregate": true,
++    "reports_index_complete": true,
++    "readme_mentions_archive_generated_hybrid": true,
++    "readme_no_longer_copy_only_overclaim": true,
++    "phase3_paddle_quality_report_exists": true,
++    "source_selection_strategy_exists": true,
++    "source_profile_gate_complete": true
++  },
++  "evidence_paths": {
++    "archive_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/archive_manifest.json",
++    "profile_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/profile_manifest.json",
++    "authoritative_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/hybrid_experimental_authoritative_archive_report.json",
++    "readme": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/README.md",
++    "phase3_paddle_quality_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
++    "source_selection_strategy": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-source-selection/source_selection_strategy.json"
++  },
++  "samples": [
++    {
++      "sample_name": "五下科学",
++      "word_media_count": 4,
++      "table_xml_present": true,
++      "fallback_pages": [
++        1
++      ],
++      "document_fallback": false,
++      "document_page_type": "science_experiment_table_and_image_mixed",
++      "default_source_profile": "mineru_full",
++      "supplemental_source_profile": "paddleocr_vl",
++      "selected_pages_or_crops": [
++        4,
++        5,
++        6
++      ],
++      "paddle_noise_interpretation": "paddle_contributed_to_final_output",
++      "formula_audit_only": true,
++      "negative_sample_guard": true,
++      "source_gate_ok": true,
++      "sample_gate_ok": true
++    },
++    {
++      "sample_name": "数学八年级",
++      "word_media_count": 2,
++      "table_xml_present": true,
++      "fallback_pages": [
++        5
++      ],
++      "document_fallback": false,
++      "document_page_type": "math_exercise_with_sparse_image_and_table",
++      "default_source_profile": "mineru_full",
++      "supplemental_source_profile": "paddleocr_vl",
++      "selected_pages_or_crops": [
++        1,
++        3,
++        4,
++        6,
++        7,
++        8
++      ],
++      "paddle_noise_interpretation": "paddle_contributed_to_final_output",
++      "formula_audit_only": true,
++      "negative_sample_guard": true,
++      "source_gate_ok": true,
++      "sample_gate_ok": true
++    },
++    {
++      "sample_name": "数学试卷",
++      "word_media_count": 20,
++      "table_xml_present": false,
++      "fallback_pages": [],
++      "document_fallback": false,
++      "document_page_type": "math_exam_image_dense",
++      "default_source_profile": "mineru_full",
++      "supplemental_source_profile": "paddleocr_vl",
++      "selected_pages_or_crops": [
++        1,
++        3,
++        4,
++        6,
++        8,
++        9,
++        11
++      ],
++      "paddle_noise_interpretation": "paddle_contributed_to_final_output",
++      "formula_audit_only": true,
++      "negative_sample_guard": true,
++      "source_gate_ok": true,
++      "sample_gate_ok": true
++    },
++    {
++      "sample_name": "英语八年级",
++      "word_media_count": 1,
++      "table_xml_present": false,
++      "fallback_pages": [
++        3,
++        8,
++        11,
++        12
++      ],
++      "document_fallback": false,
++      "document_page_type": "language_exercise_sparse_media_with_fallback_pages",
++      "default_source_profile": "mineru_full",
++      "supplemental_source_profile": "paddleocr_vl",
++      "selected_pages_or_crops": [
++        1,
++        4,
++        5,
++        7,
++        9
++      ],
++      "paddle_noise_interpretation": "no_paddle_candidates",
++      "formula_audit_only": true,
++      "negative_sample_guard": true,
++      "source_gate_ok": true,
++      "sample_gate_ok": true
++    },
++    {
++      "sample_name": "语文五年级",
++      "word_media_count": 0,
++      "table_xml_present": false,
++      "fallback_pages": [
++        1,
++        2,
++        3,
++        4,
++        5,
++        6,
++        7,
++        8,
++        9,
++        10,
++        11,
++        12,
++        13
++      ],
++      "document_fallback": true,
++      "document_page_type": "negative_non_exercise_or_question_region_unresolvable",
++      "default_source_profile": "baseline_only",
++      "supplemental_source_profile": null,
++      "selected_pages_or_crops": [],
++      "paddle_noise_interpretation": "no_paddle_candidates",
++      "formula_audit_only": true,
++      "negative_sample_guard": true,
++      "source_gate_ok": true,
++      "sample_gate_ok": true
++    }
++  ],
++  "gate_name": "quality_hybrid_async_engineering_95_gate",
++  "gate_passed_meaning": "Engineering gate passed under current quality/hybrid_async contract; this is not a human page-by-page visual 95% verdict.",
++  "engineering_95_gate": {
++    "name": "quality_hybrid_async_engineering_95_gate",
++    "status": "pass",
++    "passed": true,
++    "allowed_claim": "quality/hybrid_async 工程 95 门禁通过",
++    "meaning": [
++      "DOCX openability, source/profile audit, table XML presence and canonical artifact consumer chain satisfy the current engineering contract.",
++      "The result may be used as engineering delivery evidence only."
++    ]
++  },
++  "human_visual_95_gate": {
++    "name": "human_visual_95_gate",
++    "status": "pending_remediation",
++    "passed": false,
++    "claim_allowed": false,
++    "disallowed_claim": "科学、数学、语文、英语全学科人工逐页视觉 95% 已达成",
++    "reason": [
++      "真实 PDF/DOCX render pair 尚未成为最终视觉分的强制证据。",
++      "关键区域评分、局部 veto、全学科人工 rubric 和样例分层治理仍待完成。",
++      "当前 visual_similarity 不能解释为完整人工视觉 95 结论。"
++    ],
++    "required_before_claim": [
++      "final-gated 样例 manifest 与 variant/debug 样例分层治理完成",
++      "PDF 页渲染图与 DOCX 页渲染图逐页配对生成",
++      "科学/数学/语文/英语关键区域相似度与 P0 veto 完成",
++      "QA 按 human_visual_95_gate 重新复验并给出 pass"
++    ]
++  },
++  "public_claim_policy": {
++    "one_sentence": "当前可保留 quality/hybrid_async 工程 95 门禁通过；不可宣称全学科人工逐页视觉 95% 已达成。",
++    "allowed_claims": [
++      "quality/hybrid_async 工程 95 门禁当前按既定 contract 通过。",
++      "当前报告证明工程交付链路、source/profile gate、表格结构与 canonical artifact 消费链路可审计。",
++      "默认同步路径仍保持 apple default，未因工程门禁通过而扩大发布边界。"
++    ],
++    "disallowed_claims": [
++      "PDF→Word 已全学科达到人工视觉 95%。",
++      "overall_score=97.8 代表人工视觉相似度 97.8。",
++      "科学、数学、语文、英语所有页型均已肉眼 95% 高还原。",
++      "student/teacher/authoritative/debug 变体样例可作为 final 95 门禁展示样例。"
++    ],
++    "canonical_name": "public_claim_policy",
++    "canonicalized": true
++  },
++  "subject_scope": {
++    "scope_statement": "本口径覆盖科学、数学、语文、英语全学科，不是五下科学单样例纠偏。",
++    "subjects": [
++      {
++        "subject": "science",
++        "representative_samples": [
++          "五下科学"
++        ],
++        "human_visual_claim_allowed": false,
++        "risk": "实验区、表格区、图片区和 OCR 噪声需要真实区域评分。"
++      },
++      {
++        "subject": "math",
++        "representative_samples": [
++          "数学八年级",
++          "数学试卷"
++        ],
++        "human_visual_claim_allowed": false,
++        "risk": "公式、图形、表格和图像密集题块顺序需要专项视觉门禁。"
++      },
++      {
++        "subject": "english",
++        "representative_samples": [
++          "英语八年级"
++        ],
++        "human_visual_claim_allowed": false,
++        "risk": "阅读段落、选项缩进、题干-选项距离和 fallback 页需要专项复核。"
++      },
++      {
++        "subject": "chinese",
++        "representative_samples": [
++          "语文五年级"
++        ],
++        "human_visual_claim_allowed": false,
++        "risk": "当前语文样例是 negative/baseline/document_fallback，不可代表语文正向人工视觉 95。"
++      }
++    ]
++  },
++  "sample_tier_policy": {
++    "final_gated": "Only source/output pairs listed in final-gated manifest may be used for future human visual 95 claims after render-pair evidence exists.",
++    "variant_samples": "student/teacher/review/answer variants must not be used as final 95 gate evidence.",
++    "debug_or_authoritative_probes": "authoritative/debug intermediate outputs are engineering probes, not public 95% evidence."
++  },
++  "visual_similarity_meaning": "In this summary, visual_similarity belongs to the engineering contract/artifact-consumer chain unless explicitly backed by real PDF/DOCX render pairs, key-region scores and veto results.",
++  "terminology_version": "pdf2word_95_gate_terminology/v1"
++}
+diff --git "a/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word95\351\227\250\347\246\201\345\217\243\345\276\204\344\270\216\345\257\271\345\244\226\350\257\264\346\230\216.md" "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word95\351\227\250\347\246\201\345\217\243\345\276\204\344\270\216\345\257\271\345\244\226\350\257\264\346\230\216.md"
+new file mode 100644
+index 0000000..8ae80d4
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/PDF\350\275\254Word95\351\227\250\347\246\201\345\217\243\345\276\204\344\270\216\345\257\271\345\244\226\350\257\264\346\230\216.md"
+@@ -0,0 +1,155 @@
++# PDF 转 Word 95 门禁口径与对外说明
++
++> 任务：统一 PDF 转 Word 95 门禁命名与对外口径
++> 日期：2026-05-19
++> 范围：命名、注释、最终说明与对外话术；不改算法、不重跑样本。
++> 适用对象：PM、QA、架构师、对外展示材料编写者。
++
++## 1. 一句话版口径
++
++```text
++PDF→Word 当前可保留“quality/hybrid_async 工程 95 门禁通过”的结论；
++但不可继续宣称“科学、数学、语文、英语全学科人工逐页视觉 95% 已达成”。
++人工视觉 95 需要等真实 PDF/DOCX render pair、关键区域评分、局部 veto 和全学科样例治理完成后重新复验。
++```
++
++## 2. 两个 95 的正式命名
++
++| 旧混用说法 | 新标准命名 | 当前状态 | 是否可对外宣称 | 说明 |
++|---|---|---|---:|---|
++| 95% 门禁 / 95% fidelity | **工程 95 门禁** / `quality_hybrid_async_engineering_95_gate` | 已按当前 contract 通过 | 可以，但必须带边界 | 证明 DOCX 可打开、source/profile gate、表格结构、canonical artifact 消费链路等工程事实成立。 |
++| 人工视觉 95 / 逐页 95% 还原 | **人工视觉 95 门禁** / `human_visual_95_gate` | 尚未达成，不可宣称 | 不可以 | 需要真实 PDF 页渲染图 vs DOCX 页渲染图、关键区域相似度、学科专项 rubric、局部 veto。 |
++
++> 后续所有报告中，凡出现 `gate_passed=true` 或 `overall_score=97.8`，必须说明它指 **工程 95 门禁**，不是 **人工视觉 95 门禁**。
++
++## 3. 完整说明版口径
++
++当前 PDF→Word 的 `quality/hybrid_async` 工程门禁可以继续作为链路打通事实保留：
++
++- canonical `visual_similarity.json` 已进入 final report 消费链路；
++- 表格硬门禁能识别真实 Word 表格 `<w:tbl>`；
++- source/profile gate 能证明来源页、补源策略和 manifest 可审计；
++- final report 能输出 100 分制、threshold=95、overall score、blocking failures。
++
++但该结论只代表工程门禁，不代表人工逐页视觉观感。现阶段不得把 `overall_score=97.8` 写成：
++
++- “全学科人工视觉还原度 97.8”；
++- “PDF→Word 已达到人工逐页对照 95%”；
++- “科学、数学、语文、英语均已达到肉眼 95% 高相似”；
++- “默认同步路径已达到 95% 视觉还原”。
++
++正确写法是：
++
++```text
++在 quality/hybrid_async 工程门禁口径下，当前报告显示 engineering_gate_passed=true、engineering_overall_score=97.8。
++该结论证明工程交付链路和当前 contract 下的结构/来源/表格/visual artifact 消费成立；
++但 human_visual_95_gate 仍处于整改中，尚不能宣称全学科人工逐页视觉 95% 已达成。
++```
++
++## 4. 全学科统一边界
++
++本口径不是五下科学单样例纠偏，而适用于科学、数学、语文、英语全学科。
++
++| 学科 / 页型 | 当前可保留的工程事实 | 暂不可宣称的人工作业视觉结论 | 后续人工视觉门禁关注点 |
++|---|---|---|---|
++| 科学：实验、表格、图片混合 | 可说五下科学在工程 gate 中有 media、`w:tbl`、source gate 证据 | 不可说实验区、记录表、图片绑定已肉眼 95% | 实验区 crop、表格视觉、图文绑定、OCR 噪声 veto |
++| 数学：公式、图形、表格 / 图像密集试卷 | 可说数学样例参与工程 gate，表格样例已有真实 Word 表格 | 不可说公式、几何图、题块顺序、图文绑定均已肉眼 95% | 公式/图形 key-region、题块顺序、图像裁剪与密度 |
++| 英语：阅读、选项、听力/材料块 | 可说英语样例纳入 source/profile/fallback 审计 | 不可说阅读段落、选项缩进、题干-选项距离已肉眼 95% | 阅读块换行、选项缩进、关键 fallback 页 veto |
++| 语文：长文、作文、负样例 / fallback | 可说当前语文五年级在工程 gate 中是 negative/baseline/document_fallback 样例 | 不可说语文正向 final-gated fidelity 已达成人工视觉 95% | 语文正样例重建、长文版式、作文格 / 作答空间 |
++| 答案区 / 教师版 / 解析区 | 可说当前 final gate 中 answer area / answer section 不属于已达成范围 | 不可拿 student/teacher/authoritative 变体证明最终 95 | 独立答案区门禁、解析 cue、题号映射 |
++
++## 5. 可继续宣称与暂停宣称清单
++
++### 5.1 可以继续宣称
++
++1. `quality/hybrid_async` 工程 95 门禁当前按既定 contract 通过。
++2. 当前工程门禁可证明 final DOCX 可打开、source/profile manifest 可审计。
++3. 当前工程门禁可证明含表格样例已出现真实 Word 表格 XML，而不是单纯图片 fallback。
++4. canonical `visual_similarity.json` 与 final report consumer 链路已经接通。
++5. 默认同步路径仍保持 `apple default`，没有因为工程门禁通过而扩大发布边界。
++
++### 5.2 必须暂停宣称
++
++1. 暂停宣称“PDF→Word 已全学科达到人工视觉 95%”。
++2. 暂停宣称“科学、数学、语文、英语所有代表页型肉眼观感都已接近原 PDF 95%”。
++3. 暂停把 `overall_score=97.8` 称为“人工视觉相似度 97.8”。
++4. 暂停把 `visual_similarity.status=pass` 解释为“真实 render-pair 人眼评测已通过”。
++5. 暂停使用 student/teacher/authoritative/debug 变体样例作为 final 95 门禁展示样例。
++
++## 6. final report / summary 命名规范
++
++### 6.1 字段与标题建议
++
++| 原字段 / 标题 | 新解释或新增字段 | 目的 |
++|---|---|---|
++| `gate_passed` | 保留，但新增 `gate_passed_meaning` | 明确只代表工程 gate。 |
++| `overall_score` | 如存在应写为 `engineering_overall_score` | 避免被读成人工视觉分。 |
++| `visual_similarity` | 必须带 `visual_similarity_meaning` | 明确当前不是完整 render-pair 人工视觉证据。 |
++| `human_visual_95` | 新增 | 明确 `claim_allowed=false`、整改中。 |
++| `subject_scope` | 新增 | 明确科学/数学/语文/英语均纳入口径。 |
++| `public_claim_policy` | 新增 | 给 PM/QA 直接复用对外话术；为本文唯一 canonical 对外口径字段名。 |
++
++### 6.2 报告标题建议
++
++旧标题如 `Final DOCX Source Gate Baseline` 容易被理解为最终视觉 95。建议改为：
++
++```text
++PDF→Word 工程 95 门禁报告（非人工视觉 95）
++```
++
++副标题固定为：
++
++```text
++quality/hybrid_async engineering gate passed; human_visual_95_gate pending remediation
++```
++
++## 7. PM / QA / 架构师可复用模板
++
++### 7.1 PM 一句话模板
++
++```text
++当前 PDF→Word 可以保留 quality/hybrid_async 工程 95 门禁通过的结论，但人工逐页视觉 95 尚未达成；我们已暂停全学科人工视觉 95 宣称，正在按科学/数学/语文/英语全样本补真实视觉门禁。
++```
++
++### 7.2 QA 复验模板
++
++```text
++本次复验只判定 engineering_95_gate，不判定 human_visual_95_gate。
++若报告出现 gate_passed=true 或 overall_score>=95，仅表示工程门禁通过；
++除非 visual_similarity.json 来自真实 PDF/DOCX render pair，并通过页级/区域级阈值和 veto，否则不得给出“人工视觉 95 达成”。
++```
++
++### 7.3 架构师说明模板
++
++```text
++工程 95 门禁覆盖 L0/L1：DOCX 健康、source/profile、表格结构、artifact 消费；
++人工视觉 95 门禁还需要 L2/L3：真实 render pair、关键区域相似度、局部 veto、学科专项 rubric。
++两者是递进关系，不是同一个指标的不同叫法。
++```
++
++### 7.4 对外展示模板
++
++```text
++当前演示样例仅展示 quality/hybrid_async 工程交付能力：可打开 DOCX、可编辑表格、来源审计与灰度链路。
++视觉还原度方面，我们正在建设全学科人工视觉 95 门禁；在完成真实逐页渲染对比前，不把该演示表述为“全学科人工视觉 95% 已达成”。
++```
++
++## 8. 后续 QA 重跑必须满足的口径条件
++
++下一次 QA 重跑 final acceptance 时，报告必须同时输出：
++
++1. `engineering_95_gate.status`：工程门禁是否通过；
++2. `human_visual_95_gate.status`：人工视觉门禁是否通过，当前可为 `pending_remediation`；
++3. `public_claim_policy.allowed_claims[]`：允许对外宣称的句子；
++4. `public_claim_policy.disallowed_claims[]`：禁止对外宣称的句子；
++5. `subject_scope`：科学、数学、语文、英语的覆盖与例外；
++6. `sample_tier_policy`：final-gated、variant、debug/authoritative 样例分层。
++
++只有当 `human_visual_95_gate.status=pass` 且没有 P0 veto 时，才可恢复“全学科人工视觉 95% 已达成”的声明。
++
++## 9. 最终结论
++
++- **继续保留**：`quality/hybrid_async` 工程 95 门禁通过。
++- **立即暂停**：全学科人工逐页视觉 95 已达成的宣称。
++- **立即修订**：final acceptance 报告标题、summary 字段、对外话术。
++- **后续推进**：样例分层、真实 render pair、关键区域评分、局部 veto、科学/数学/语文/英语全学科复验。

@@ -1,0 +1,43 @@
+{
+  "task_id": "慢模型复核灰度接入低置信视觉页",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T23:44:33+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 复验通过。慢模型复核被严格限制在 quality/hybrid_async 且 artifact_ready_for_scoring 的 low-confidence visual pages：default sync 不触发慢模型，active candidate model 被强约束为 qwen3_vl_8b，并为每页稳定输出 triggered/executed/review_status/decision_reason/fallback_action/error 等审计字段。rollout_disabled、artifact_not_ready、worker 缺失/失败等回退语义均可追踪。",
+  "acceptance_criteria": [
+    {
+      "criterion": "default sync 不受影响",
+      "result": "pass",
+      "evidence": "resolve_visual_gate_mode() 会把 fast/balanced/default_sync 收敛到 default_sync；_validate_contract() 强制 slow_model_policy.disallowed_modes 至少包含 fast/balanced/default_sync。复跑测试确认 default sync 下 slow review pages[*].decision_reason=default_sync_disabled，且 score_awarded=0。"
+    },
+    {
+      "criterion": "仅 low-confidence pages 触发 qwen3_vl_8b，且有审计痕迹",
+      "result": "pass",
+      "evidence": "build_visual_similarity_slow_review_audit() 仅在 gate_enabled=true、artifact_ready_for_scoring=true、rollout_enabled=true 且页面/关键区域命中 near-threshold 或 review_reasons 时调度；candidate_models 被 contract 校验为唯一 [qwen3_vl_8b]。报告会输出每页 triggered、executed、model_profile、trigger_reasons、decision_reason、review_status、fallback_action、error。"
+    },
+    {
+      "criterion": "触发 / 不触发 / 回退场景有覆盖",
+      "result": "pass",
+      "evidence": "复跑 pytest 共 16 条用例通过，覆盖 confident page skip、review_budget_exhausted、rollout_disabled、artifact_not_ready、worker_not_configured、worker_failed、candidate model 非 qwen3_vl_8b 校验失败等场景。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取 instruction.md、task.json、result.json 与 patch，确认任务目标是只在 low-confidence visual pages 灰度接入慢模型，且不得改变 default sync 时延边界。",
+    "静态复核 visual_similarity_slow_review.py，确认只有 gate_enabled + artifact_ready_for_scoring + rollout_enabled + trigger_reasons 命中时才会调度 reviewer，其余情况均以 disabled/not_requested/fallback_skipped 落盘。",
+    "静态复核 visual_similarity_gate.py，确认 slow_model_policy/disallowed_modes/candidate_models 被纳入 contract 校验，并把 slow_review_triggered/completed/fallback 原因汇总进 human_review_reasons。",
+    "复跑 py_compile、pytest 与 diff --check，验证实现与测试文件可通过基础语法检查、回归测试与 diff hygiene 检查。"
+  ],
+  "test_commands": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-qa-slow-review-rerun /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_gate.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-slow-review-qa-r2 --basetemp=/private/tmp/chiralium-pytest-temp-visual-slow-review-qa-r2 -> 16 passed, 4 warnings in 0.08s",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e diff --check -- backend/app/services/pdf_to_word/visual_similarity_slow_review.py backend/app/services/pdf_to_word/visual_similarity_gate.py backend/tests/test_pdf_to_word_visual_similarity_slow_review.py backend/tests/test_pdf_to_word_visual_similarity_gate.py -> passed"
+  ],
+  "non_blocking_observations": [
+    "当前任务目录先前缺少顶层 verify.json；本轮已根据复跑结果补写正式 verify 留痕。",
+    "pytest 的 4 条 warning 为既有 FastAPI on_event deprecation warning，与本轮通过结论无直接冲突。",
+    "本轮通过的是灰度接入、审计与回退语义；线上真实慢模型 worker 的成本与时延采样仍需后续预算门禁任务继续观察。"
+  ],
+  "regressions_found": []
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "建立HybridAsync成本预算与慢模型灰度门禁",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-20T08:12:25+08:00",
+  "summary": "dev-2 已读取 instruction.md 与 task.json，将在 HybridAsync-e8442bf8 worktree 内按 write_scope 实施 HybridAsync 成本预算与慢模型灰度门禁，重点收敛 Paddle/Qwen 成本、触发页比例、缓存命中与超时熔断，并保持 apple_baseline 默认同步边界不放宽。"
+}

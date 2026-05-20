@@ -1,0 +1,30 @@
+{
+  "task_id": "重跑全学科人工视觉95判定",
+  "agent": "qa-1",
+  "status": "done",
+  "summary": "已基于 2026-05-19 最新已放行产物完成最终全学科人工视觉95复验定稿：工程门禁 PASS 可保留，但全学科人工视觉95 仍为 NO-GO。数学/科学专项已正式收口，当前不再是专项 contract 阻塞；最终 no-go 的核心原因是主工作区 final-archive 尚未沉淀正向样例的 sample-level render_pair / visual_similarity / fidelity_veto / human_review 证据链，且语文当前仅为 negative_guard、没有可计入正向95的语文正样例。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全样本人工视觉95判定结论.md"
+  ],
+  "tests": [
+    "静态核对 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json -> gate_passed=true, sample_count=5, release boundary unchanged",
+    "静态核对 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/数学公式图形表格页专项视觉门禁/task.json 与 verify.json -> review_gate_state=approved, qa_gate_state=passed",
+    "静态核对 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/task.json 与 verify.json -> review_gate_state=approved, qa_gate_state=passed",
+    "静态核对 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/语文长文作文负样例口径重建/task.json 与 result.json -> canonical sample_key=chinese_grade5, current role=negative_guard",
+    "静态核对 final-gated-manifest / chinese-samples-manifest / Rubric / baseline report -> 当前正向样例=4、语文不计入正向95",
+    "python3 existence check -> 主工作区 final-archive/profiles/hybrid_experimental/* 下 render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 均不存在",
+    "python3 -m json.tool /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json -> passed",
+    "git -C /Users/linsuchang/Desktop/work/chiralium diff --check -- artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json artifacts/pdf2word/final-archive/reports/PDF转Word全样本人工视觉95判定结论.md -> passed"
+  ],
+  "risks": [
+    "若后续补齐正向样例的 sample-level render pair / visual_similarity / fidelity_veto / human_review 终态文件，需要重新执行同一任务再定稿。",
+    "当前英语 fallback 页事实仍有 residual mismatch（summary=3,8,11,12；authoritative residual limitation=3,11），建议在下一轮正向收口前统一。",
+    "答案区/教师版/authoritative 变体仍不在本轮主线95口径内。"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/重跑全学科人工视觉95判定/artifacts/95-414c4425.patch"
+  ],
+  "completed_at": "2026-05-19T22:34:43+08:00"
+}

@@ -1,0 +1,501 @@
+diff --git "a/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.md" "b/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.md"
+new file mode 100644
+index 0000000..de7e1e6
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.md"
+@@ -0,0 +1,163 @@
++# 公式 AuditOnly 风险标注与阶段拆分方案
++
++- 生成时间：`2026-05-20T08:15:11+08:00`
++- 产出人：`arch-1`
++- 结论口径：**公式/符号链路阶段设计**，不是当前全学科95恢复 GO 依据
++- 当前决策：**继续 `audit-only / merge-disabled`，公式不计入当前人工视觉95恢复主口径**
++
++## 1. 结论摘要
++
++当前公式链路只能承担“候选审计 + 风险标注 + 后续实验输入”职责，不能进入当前 DOCX merge，也不能作为全学科人工视觉95的加分项或 GO 依据。
++
++关键证据：
++
++- `phase4-formula-baseline` 显示公式候选 `18` 个，覆盖 `3` 个样例、`9` 个 focus pages，且全部来自 `mineru_full`。
++- 默认开关：`default_enabled=false`、`merge_enabled_by_default=false`、过滤原因 `formula_candidate_rejected_audit_only`。
++- crop 级实验最佳 runnable profile 为 `qwen3_vl_8b`，但 exact success 仅 `2/17 (11.8%)`，仍有 `12` 个 alignment failed、`3` 个 format failed。
++- baseline 侧仍有 `1` 个 formula candidate 未进入 crop manifest，说明素材化数据面尚未闭环。
++- 当前全学科95恢复主线 P0 仍是正向样例视觉证据链与语文正向样例；公式专项应后续解锁，但不阻塞当前95主线。
++
++## 2. 为什么当前不能把公式计入恢复95主口径
++
++1. 当前公式 lane 默认 merge-disabled；final DOCX 未证明可编辑公式输出，也没有公式区域 human review 终态证据。
++2. 18 个公式候选全部来自 MinerU 系列，候选数只能证明风险存在，不能证明还原成功。
++3. crop 实验最佳 runnable profile qwen3_vl_8b exact success 仅 2/17(11.8%)，且存在 alignment_failed=12、format_failed=3。
++4. baseline 侧仍有 1 个公式候选未进入 crop manifest，数据面尚未完全闭环。
++5. 当前全学科95恢复主线的 P0 阻断是 sample-level 视觉证据链与语文正向样例；公式专项应解锁后续实验，但不阻塞当前主线。
++
++结论：**公式候选存在 = 风险可见；不等于公式还原可用，更不等于人工视觉95达标。**
++
++## 3. 当前 AuditOnly 策略
++
++| 项 | 当前策略 |
++| --- | --- |
++| 默认启用 | `False` |
++| 默认 merge | `False` |
++| 候选抽取 | `True` |
++| 过滤原因 | `formula_candidate_rejected_audit_only` |
++| 对当前95口径影响 | 当前公式/符号不得计入全学科人工视觉95恢复主口径，也不得作为工程门禁加分项；只允许作为候选审计、风险标注和后续实验输入。 |
++
++允许做：候选抽取、candidate/crop 风险标注、失败归因、离线 A/B、人工复核提示。
++
++禁止做：默认同步开启、写入正式 DOCX 主链、用公式候选数加分、对外宣称公式生产闭环、把公式实验阻塞当前95恢复主线。
++
++## 4. 风险标注 taxonomy
++
++| 风险码 | 严重度 | 范围 | 含义 | 触发条件 | 当前处理 |
++| --- | --- | --- | --- | --- | --- |
++| `FORMULA_AUDIT_ONLY_NOT_MERGED` | `info` | suite/sample/page/candidate | 公式候选存在但被默认过滤，未写入最终 DOCX 可编辑公式链路。 | formula_candidate_extracted=true 且 formula_candidate_merge_default=false | 记录 candidate_id、source_profile、bbox/page，并在 final evidence index 标记 audit_only。 |
++| `FORMULA_VISUAL_FIDELITY_UNKNOWN` | `p1` | positive_candidate sample/page | 当前人工视觉证据链没有对公式区域形成可计分复核，不能说明公式视觉还原达到95。 | positive_candidate 样例含公式/符号风险页，但缺公式区域 render_pair / visual_similarity / human_review 记录。 | 在 human review 报告中以 risk_annotation 呈现，不计入 GO 加分；若公式区域为关键教学内容，可触发 page/region veto。 |
++| `FORMULA_CANDIDATE_MATERIALIZATION_MISSING` | `p1` | candidate/crop | baseline formula candidate 未进入 crop manifest 或缺渲染素材，后续模型无法稳定评估。 | candidate 无 crop/image_path/render bbox 或 formula_crop_failure_summary 记录未 materialize。 | 阻断进入可编辑公式实验；优先补 bbox/render/materialization，而不是先换模型。 |
++| `FORMULA_ALIGNMENT_FAILED` | `p1` | candidate/crop/model_output | 模型输出与目标公式区域不对齐，属于当前 crop 实验主瓶颈。 | crop eval bucket=alignment_failed；当前 qwen3_vl_8b=12、paddleocr_vl=14。 | 只能做实验失败归因；禁止 merge；下一阶段需做 crop 级 A/B 与对齐评分。 |
++| `FORMULA_FORMAT_OR_CONVERSION_FAILED` | `p1` | model_output/omml | 模型能识别部分内容但输出格式、LaTeX/OMML 清洗或转换不稳定。 | format_failed > 0 或 OMML conversion failed；当前 qwen3_vl_8b format_failed=3。 | 禁止进入 DOCX merge；先做 schema/cleanup/OMML conversion A/B。 |
++| `FORMULA_EDITABLE_OUTPUT_NOT_PROVEN` | `p0_for_next_phase_go` | docx/final_output | 尚未证明公式可以以可编辑 Word 公式稳定输出并通过人工复核。 | 没有 DOCX OMML roundtrip、可编辑性检查、人工区域复核。 | 作为下一阶段 GO 阻断项；当前阶段保持 audit-only。 |
++
++## 5. 建议风险标注契约
++
++- 建议 artifact：`formula_audit_risks.json`
++- 落点：建议后续落在 sample/page/candidate 旁路 evidence index；本设计任务只定义契约，不修改代码。
++- 必填字段：
++  - `sample_key`
++  - `sample_name`
++  - `page_number`
++  - `candidate_id`
++  - `source_profile`
++  - `bbox`
++  - `risk_codes`
++  - `audit_only_reason`
++  - `merge_allowed`
++  - `human_visual_claim_effect`
++  - `next_phase_blockers`
++
++示例：
++
++```json
++{
++  "sample_key": "math_grade8",
++  "sample_name": "数学八年级",
++  "page_number": 3,
++  "candidate_id": "mineru_full:数学八年级:p3:c2",
++  "source_profile": "mineru_full",
++  "bbox": "source_candidate_bbox_or_null",
++  "risk_codes": [
++    "FORMULA_AUDIT_ONLY_NOT_MERGED",
++    "FORMULA_FORMAT_OR_CONVERSION_FAILED"
++  ],
++  "audit_only_reason": "formula_candidate_rejected_audit_only",
++  "merge_allowed": false,
++  "human_visual_claim_effect": "excluded_from_current_95_restore_claim",
++  "next_phase_blockers": [
++    "needs_clean_latex_or_omml",
++    "needs_docx_roundtrip_check"
++  ]
++}
++```
++
++## 6. 进入下一阶段的门禁条件
++
++| Gate | 用途 | 条件 | 当前状态 |
++| --- | --- | --- | --- |
++| `G1_candidate_inventory_complete` | 进入公式素材化/清理实验 | 所有 baseline formula candidates 均有 sample/page/candidate_id/source_profile/bbox/crop_path；未 materialized 数量=0。 | not_met: formula_crop_failure_summary 仍记录 1 个 baseline formula candidate 未进入 crop manifest。 |
++| `G2_crop_model_accuracy_floor` | 进入可编辑公式实验灰度 | 选定 runnable profile 在固定 crop 集 exact_success_rate >=80%，alignment_failed <=5%，empty=0；且至少覆盖数学、科学、英语中出现的公式/符号候选。 | not_met: 当前 qwen3_vl_8b exact_success=2/17(11.8%)，alignment_failed=12。 |
++| `G3_structured_output_and_conversion` | 进入 DOCX OMML 输出实验 | 模型输出严格 JSON/LaTeX schema valid_rate >=98%；LaTeX->OMML conversion success >=95%；format_failed=0。 | not_met: 当前 qwen3_vl_8b format_failed=3，尚未证明 OMML roundtrip。 |
++| `G4_docx_editability_roundtrip` | 进入人工视觉/编辑性复验 | 生成 DOCX 中公式为可编辑 OMML，不是不可编辑截图；打开/保存 roundtrip 不丢失；与题干/选项绑定位置稳定。 | not_started: 当前 merge 默认关闭。 |
++| `G5_region_visual_and_human_review` | 进入公式能力 GO 评估 | 公式区域 render_pair、visual_similarity、fidelity_veto、human_review_report 均落盘；关键公式区域无 P0 veto，人工区域分 >=90。 | not_started: 当前全学科正向样例视觉证据链本身仍缺失。 |
++| `G6_cost_and_fallback_guard` | 进入 quality/hybrid_async 公式灰度 | 公式处理只在 quality 模式按页/crop 触发；失败回退 audit-only；默认同步 0 回归；慢模型成本有超时/缓存/熔断。 | partial: 已有 quality/hybrid_async 边界共识，但公式专项成本门禁未定义落地。 |
++
++硬性规则：任一 G1-G6 未达标时，公式能力只能维持 audit-only；即使局部 crop 成功，也不能进入主链 merge 或当前95 GO 口径。
++
++## 7. 阶段拆分
++
++### 7.1 Phase 0 当前阶段：AuditOnly 风险标注
++
++- 目标：保留公式候选作为审计证据和后续实验输入，不进入当前 DOCX merge 和全学科95主口径。
++- 允许：extract formula candidates；record risk annotations；human reviewer see risk hints；crop/materialization experiment input
++- 禁止：merge formula into production DOCX；raise human_visual_score by candidate count；claim formula production closed-loop；block current 95 restoration mainline
++- 退出条件：G1 candidate inventory complete，且风险标注能被 final evidence index 消费。
++
++### 7.2 Phase 1 素材化与输出清洗实验
++
++- 目标：补齐 crop/materialization、schema 清洗、LaTeX/OMML 转换实验，解决 1 个未 materialize 与 format_failed 问题。
++- 允许：offline crop eval；qwen3_vl_8b / paddleocr_vl A/B；schema cleanup；OMML conversion sandbox
++- 禁止：写入正式 DOCX 主链；对外宣称可编辑公式
++- 退出条件：G1/G3 达标，且 exact_success_rate 趋势足以进入可编辑实验门槛。
++
++### 7.3 Phase 2 可编辑公式灰度实验
++
++- 目标：在 quality/hybrid_async 下对少量页/crop 写入可编辑 OMML，并完成 DOCX roundtrip 与区域复核。
++- 允许：feature-flagged OMML merge；sample-level formula editability check；region visual veto；manual review
++- 禁止：默认同步开启；无回退地覆盖 baseline 文本；未复核即计入95
++- 退出条件：G2/G4/G5/G6 达标；失败自动回退 audit-only。
++
++### 7.4 Phase 3 公式能力进入阶段性 GO 评估
++
++- 目标：仅当公式区域准确、可编辑、可复验、成本可控时，才讨论是否纳入后续人工视觉目标。
++- 允许：公式专项 GO/NO-GO report；扩大到更多数学/科学公式样例；PM/owner 决策是否进入主目标
++- 禁止：与当前全学科95恢复任务混为一谈；用局部 crop success 替代 DOCX 终态证据
++- 退出条件：owner/PM 基于专项报告决定是否纳入新的全学科质量目标。
++
++## 8. 建议下游任务
++
++| 任务名 | 优先级 | 负责人建议 | write_scope 建议 | 工时 | 依赖 | 验收 |
++| --- | --- | --- | --- | --- | --- | --- |
++| 实验公式Candidate素材化完整性与风险标注落盘 | `P1` | dev-2 | `artifacts/pdf2word/**/formula*`<br>`src/pdf_to_word/**/formula*`<br>`tests/pdf_to_word/**/formula*` | 1d | 无 | 未 materialized formula candidate=0；每个 candidate 均有 formula_audit_risks.json 记录；merge_allowed=false。 |
++| 实验公式输出清洗与OMML转换A/B | `P1` | dev-2 | `src/pdf_to_word/**/formula*`<br>`tests/pdf_to_word/**/formula*`<br>`artifacts/pdf2word/**/formula-cleanup*` | 1-2d | 实验公式Candidate素材化完整性与风险标注落盘 | format_failed=0；schema valid_rate >=98%；conversion success >=95% 才能进入可编辑 DOCX 实验。 |
++| 设计并实现可编辑公式DOCX灰度门禁 | `P2` | arch-1 方案 + dev-1/dev-2 实现 + qa-1 验证 | `src/pdf_to_word/**/docx*`<br>`src/pdf_to_word/**/formula*`<br>`tests/pdf_to_word/**/docx_formula*`<br>`artifacts/pdf2word/**/formula-docx*` | 2-3d | 实验公式输出清洗与OMML转换A/B；正向样例视觉证据链 | 公式以可编辑 OMML 写入 quality 模式 DOCX；roundtrip 通过；失败回退 audit-only；默认同步 0 回归。 |
++| 公式区域人工视觉复核Rubric补充 | `P2` | qa-1 + arch-1 | `artifacts/pdf2word/final-archive/reports/*Rubric*`<br>`artifacts/pdf2word/**/human_review*formula*` | 1d | 可编辑公式 DOCX 灰度样例 | 公式区域具备 page/region veto 与人工分阈值；不得只用模型 exact_success 作为 GO 依据。 |
++
++## 9. 与当前95恢复主线的关系
++
++- 当前95恢复主线：优先补正向样例视觉证据链、语文正向样例、FinalAcceptance 强依赖门禁。
++- 公式专项：只解锁后续实验，不作为当前95主线阻塞项。
++- 如果人审发现公式区域构成关键教学内容且明显错误，应以 `FORMULA_VISUAL_FIDELITY_UNKNOWN` / `FORMULA_ALIGNMENT_FAILED` 触发页级或区域级风险提示；但这仍是 NO-GO 风险标注，不是公式能力 GO。
++
++## 10. 风险与依赖
++
++- 如果提前把公式 candidate count 作为质量加分，会掩盖 alignment/format/docx editability 未闭环的事实。
++- 数学样例中公式/符号是人工视觉高敏区域，错误公式比缺公式更危险，必须支持 P0 region veto。
++- 公式实验依赖全样例 render_pair/human review 主链；该主链未补齐前，公式只能作为旁路实验。
++- 慢模型成本不可忽视：qwen3_vl_8b 与 paddleocr_vl 只能按 crop/page 触发并有缓存/超时。
++
++## 11. 最终建议
++
++维持当前公式 `audit-only / merge-disabled` 策略。下一步可以启动公式素材化完整性、输出清洗/OMML 转换、可编辑 DOCX 灰度门禁等实验任务；但在 G1-G6 未全部达标前，公式不得进入默认同步链路，不得进入当前全学科人工视觉95恢复主口径，也不得作为工程门禁加分项。
+diff --git "a/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.json" "b/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.json"
+new file mode 100644
+index 0000000..b710aea
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/\345\205\254\345\274\217AuditOnly\351\243\216\351\231\251\346\240\207\346\263\250\344\270\216\351\230\266\346\256\265\346\213\206\345\210\206\346\226\271\346\241\210.json"
+@@ -0,0 +1,326 @@
++{
++  "report_type": "pdf2word_formula_audit_only_risk_and_phase_split/v1",
++  "generated_at": "2026-05-20T08:15:11+08:00",
++  "generated_by": "arch-1",
++  "status": "done",
++  "current_policy": {
++    "status": "audit_only_merge_disabled",
++    "formula_candidate_extracted": true,
++    "merge_enabled_by_default": false,
++    "default_enabled": false,
++    "filter_reason": "formula_candidate_rejected_audit_only",
++    "release_claim_rule": "当前公式/符号不得计入全学科人工视觉95恢复主口径，也不得作为工程门禁加分项；只允许作为候选审计、风险标注和后续实验输入。"
++  },
++  "evidence": {
++    "phase4_formula_baseline": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/summary.json",
++    "formula_crop_failure_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-formula-crop/formula_crop_failure_summary.md",
++    "stage_diff_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
++    "gap_plan": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word当前阶段与目标差距及优化计划.md",
++    "final_acceptance_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
++    "final_human_visual_acceptance_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md"
++  },
++  "metrics": {
++    "formula_candidate_count": 18,
++    "samples_with_formula_candidates": 3,
++    "focus_page_count": 9,
++    "counts_by_profile": {
++      "mineru_full": 18,
++      "paddleocr_vl": 0
++    },
++    "counts_by_sample": {
++      "mineru_full/五下科学": 3,
++      "mineru_full/数学 八年级下册pdf": 14,
++      "mineru_full/数学试卷": 0,
++      "mineru_full/英语 八年级下册": 1,
++      "mineru_full/语文五年级": 0,
++      "paddleocr_vl/五下科学": 0,
++      "paddleocr_vl/数学 八年级下册pdf": 0,
++      "paddleocr_vl/英语 八年级下册": 0,
++      "paddleocr_vl/语文五年级": 0
++    },
++    "crop_eval": {
++      "qwen3_vl_8b_exact_success": "2/17",
++      "qwen3_vl_8b_exact_success_rate": 0.118,
++      "qwen3_vl_8b_alignment_failed": 12,
++      "qwen3_vl_8b_format_failed": 3,
++      "paddleocr_vl_exact_success": "1/17",
++      "selected_profiles_blocked": 3,
++      "baseline_candidates_not_materialized": 1,
++      "merge_decision": "keep_audit_only_merge_disabled"
++    },
++    "human_visual_status": "no-go",
++    "engineering_formula_gate": 5
++  },
++  "why_not_in_current_95_claim": [
++    "当前公式 lane 默认 merge-disabled；final DOCX 未证明可编辑公式输出，也没有公式区域 human review 终态证据。",
++    "18 个公式候选全部来自 MinerU 系列，候选数只能证明风险存在，不能证明还原成功。",
++    "crop 实验最佳 runnable profile qwen3_vl_8b exact success 仅 2/17(11.8%)，且存在 alignment_failed=12、format_failed=3。",
++    "baseline 侧仍有 1 个公式候选未进入 crop manifest，数据面尚未完全闭环。",
++    "当前全学科95恢复主线的 P0 阻断是 sample-level 视觉证据链与语文正向样例；公式专项应解锁后续实验，但不阻塞当前主线。"
++  ],
++  "risk_taxonomy": [
++    {
++      "code": "FORMULA_AUDIT_ONLY_NOT_MERGED",
++      "severity": "info",
++      "scope": "suite/sample/page/candidate",
++      "meaning": "公式候选存在但被默认过滤，未写入最终 DOCX 可编辑公式链路。",
++      "trigger": "formula_candidate_extracted=true 且 formula_candidate_merge_default=false",
++      "current_handling": "记录 candidate_id、source_profile、bbox/page，并在 final evidence index 标记 audit_only。"
++    },
++    {
++      "code": "FORMULA_VISUAL_FIDELITY_UNKNOWN",
++      "severity": "p1",
++      "scope": "positive_candidate sample/page",
++      "meaning": "当前人工视觉证据链没有对公式区域形成可计分复核，不能说明公式视觉还原达到95。",
++      "trigger": "positive_candidate 样例含公式/符号风险页，但缺公式区域 render_pair / visual_similarity / human_review 记录。",
++      "current_handling": "在 human review 报告中以 risk_annotation 呈现，不计入 GO 加分；若公式区域为关键教学内容，可触发 page/region veto。"
++    },
++    {
++      "code": "FORMULA_CANDIDATE_MATERIALIZATION_MISSING",
++      "severity": "p1",
++      "scope": "candidate/crop",
++      "meaning": "baseline formula candidate 未进入 crop manifest 或缺渲染素材，后续模型无法稳定评估。",
++      "trigger": "candidate 无 crop/image_path/render bbox 或 formula_crop_failure_summary 记录未 materialize。",
++      "current_handling": "阻断进入可编辑公式实验；优先补 bbox/render/materialization，而不是先换模型。"
++    },
++    {
++      "code": "FORMULA_ALIGNMENT_FAILED",
++      "severity": "p1",
++      "scope": "candidate/crop/model_output",
++      "meaning": "模型输出与目标公式区域不对齐，属于当前 crop 实验主瓶颈。",
++      "trigger": "crop eval bucket=alignment_failed；当前 qwen3_vl_8b=12、paddleocr_vl=14。",
++      "current_handling": "只能做实验失败归因；禁止 merge；下一阶段需做 crop 级 A/B 与对齐评分。"
++    },
++    {
++      "code": "FORMULA_FORMAT_OR_CONVERSION_FAILED",
++      "severity": "p1",
++      "scope": "model_output/omml",
++      "meaning": "模型能识别部分内容但输出格式、LaTeX/OMML 清洗或转换不稳定。",
++      "trigger": "format_failed > 0 或 OMML conversion failed；当前 qwen3_vl_8b format_failed=3。",
++      "current_handling": "禁止进入 DOCX merge；先做 schema/cleanup/OMML conversion A/B。"
++    },
++    {
++      "code": "FORMULA_EDITABLE_OUTPUT_NOT_PROVEN",
++      "severity": "p0_for_next_phase_go",
++      "scope": "docx/final_output",
++      "meaning": "尚未证明公式可以以可编辑 Word 公式稳定输出并通过人工复核。",
++      "trigger": "没有 DOCX OMML roundtrip、可编辑性检查、人工区域复核。",
++      "current_handling": "作为下一阶段 GO 阻断项；当前阶段保持 audit-only。"
++    }
++  ],
++  "annotation_contract": {
++    "artifact_name": "formula_audit_risks.json",
++    "placement": "建议后续落在 sample/page/candidate 旁路 evidence index；本设计任务只定义契约，不修改代码。",
++    "required_fields": [
++      "sample_key",
++      "sample_name",
++      "page_number",
++      "candidate_id",
++      "source_profile",
++      "bbox",
++      "risk_codes",
++      "audit_only_reason",
++      "merge_allowed",
++      "human_visual_claim_effect",
++      "next_phase_blockers"
++    ],
++    "canonical_values": {
++      "merge_allowed": false,
++      "human_visual_claim_effect": "excluded_from_current_95_restore_claim",
++      "audit_only_reason": "formula_candidate_rejected_audit_only"
++    },
++    "example": {
++      "sample_key": "math_grade8",
++      "sample_name": "数学八年级",
++      "page_number": 3,
++      "candidate_id": "mineru_full:数学八年级:p3:c2",
++      "source_profile": "mineru_full",
++      "bbox": "source_candidate_bbox_or_null",
++      "risk_codes": [
++        "FORMULA_AUDIT_ONLY_NOT_MERGED",
++        "FORMULA_FORMAT_OR_CONVERSION_FAILED"
++      ],
++      "audit_only_reason": "formula_candidate_rejected_audit_only",
++      "merge_allowed": false,
++      "human_visual_claim_effect": "excluded_from_current_95_restore_claim",
++      "next_phase_blockers": [
++        "needs_clean_latex_or_omml",
++        "needs_docx_roundtrip_check"
++      ]
++    }
++  },
++  "next_phase_entry_gates": [
++    {
++      "gate": "G1_candidate_inventory_complete",
++      "required_for": "进入公式素材化/清理实验",
++      "condition": "所有 baseline formula candidates 均有 sample/page/candidate_id/source_profile/bbox/crop_path；未 materialized 数量=0。",
++      "current_status": "not_met: formula_crop_failure_summary 仍记录 1 个 baseline formula candidate 未进入 crop manifest。"
++    },
++    {
++      "gate": "G2_crop_model_accuracy_floor",
++      "required_for": "进入可编辑公式实验灰度",
++      "condition": "选定 runnable profile 在固定 crop 集 exact_success_rate >=80%，alignment_failed <=5%，empty=0；且至少覆盖数学、科学、英语中出现的公式/符号候选。",
++      "current_status": "not_met: 当前 qwen3_vl_8b exact_success=2/17(11.8%)，alignment_failed=12。"
++    },
++    {
++      "gate": "G3_structured_output_and_conversion",
++      "required_for": "进入 DOCX OMML 输出实验",
++      "condition": "模型输出严格 JSON/LaTeX schema valid_rate >=98%；LaTeX->OMML conversion success >=95%；format_failed=0。",
++      "current_status": "not_met: 当前 qwen3_vl_8b format_failed=3，尚未证明 OMML roundtrip。"
++    },
++    {
++      "gate": "G4_docx_editability_roundtrip",
++      "required_for": "进入人工视觉/编辑性复验",
++      "condition": "生成 DOCX 中公式为可编辑 OMML，不是不可编辑截图；打开/保存 roundtrip 不丢失；与题干/选项绑定位置稳定。",
++      "current_status": "not_started: 当前 merge 默认关闭。"
++    },
++    {
++      "gate": "G5_region_visual_and_human_review",
++      "required_for": "进入公式能力 GO 评估",
++      "condition": "公式区域 render_pair、visual_similarity、fidelity_veto、human_review_report 均落盘；关键公式区域无 P0 veto，人工区域分 >=90。",
++      "current_status": "not_started: 当前全学科正向样例视觉证据链本身仍缺失。"
++    },
++    {
++      "gate": "G6_cost_and_fallback_guard",
++      "required_for": "进入 quality/hybrid_async 公式灰度",
++      "condition": "公式处理只在 quality 模式按页/crop 触发；失败回退 audit-only；默认同步 0 回归；慢模型成本有超时/缓存/熔断。",
++      "current_status": "partial: 已有 quality/hybrid_async 边界共识，但公式专项成本门禁未定义落地。"
++    }
++  ],
++  "phase_split": [
++    {
++      "phase": "Phase 0 当前阶段：AuditOnly 风险标注",
++      "goal": "保留公式候选作为审计证据和后续实验输入，不进入当前 DOCX merge 和全学科95主口径。",
++      "allowed": [
++        "extract formula candidates",
++        "record risk annotations",
++        "human reviewer see risk hints",
++        "crop/materialization experiment input"
++      ],
++      "forbidden": [
++        "merge formula into production DOCX",
++        "raise human_visual_score by candidate count",
++        "claim formula production closed-loop",
++        "block current 95 restoration mainline"
++      ],
++      "exit_condition": "G1 candidate inventory complete，且风险标注能被 final evidence index 消费。"
++    },
++    {
++      "phase": "Phase 1 素材化与输出清洗实验",
++      "goal": "补齐 crop/materialization、schema 清洗、LaTeX/OMML 转换实验，解决 1 个未 materialize 与 format_failed 问题。",
++      "allowed": [
++        "offline crop eval",
++        "qwen3_vl_8b / paddleocr_vl A/B",
++        "schema cleanup",
++        "OMML conversion sandbox"
++      ],
++      "forbidden": [
++        "写入正式 DOCX 主链",
++        "对外宣称可编辑公式"
++      ],
++      "exit_condition": "G1/G3 达标，且 exact_success_rate 趋势足以进入可编辑实验门槛。"
++    },
++    {
++      "phase": "Phase 2 可编辑公式灰度实验",
++      "goal": "在 quality/hybrid_async 下对少量页/crop 写入可编辑 OMML，并完成 DOCX roundtrip 与区域复核。",
++      "allowed": [
++        "feature-flagged OMML merge",
++        "sample-level formula editability check",
++        "region visual veto",
++        "manual review"
++      ],
++      "forbidden": [
++        "默认同步开启",
++        "无回退地覆盖 baseline 文本",
++        "未复核即计入95"
++      ],
++      "exit_condition": "G2/G4/G5/G6 达标；失败自动回退 audit-only。"
++    },
++    {
++      "phase": "Phase 3 公式能力进入阶段性 GO 评估",
++      "goal": "仅当公式区域准确、可编辑、可复验、成本可控时，才讨论是否纳入后续人工视觉目标。",
++      "allowed": [
++        "公式专项 GO/NO-GO report",
++        "扩大到更多数学/科学公式样例",
++        "PM/owner 决策是否进入主目标"
++      ],
++      "forbidden": [
++        "与当前全学科95恢复任务混为一谈",
++        "用局部 crop success 替代 DOCX 终态证据"
++      ],
++      "exit_condition": "owner/PM 基于专项报告决定是否纳入新的全学科质量目标。"
++    }
++  ],
++  "recommended_next_tasks": [
++    {
++      "task_name": "实验公式Candidate素材化完整性与风险标注落盘",
++      "priority": "P1",
++      "owner_suggestion": "dev-2",
++      "write_scope": [
++        "artifacts/pdf2word/**/formula*",
++        "src/pdf_to_word/**/formula*",
++        "tests/pdf_to_word/**/formula*"
++      ],
++      "effort": "1d",
++      "dependencies": [],
++      "acceptance": "未 materialized formula candidate=0；每个 candidate 均有 formula_audit_risks.json 记录；merge_allowed=false。"
++    },
++    {
++      "task_name": "实验公式输出清洗与OMML转换A/B",
++      "priority": "P1",
++      "owner_suggestion": "dev-2",
++      "write_scope": [
++        "src/pdf_to_word/**/formula*",
++        "tests/pdf_to_word/**/formula*",
++        "artifacts/pdf2word/**/formula-cleanup*"
++      ],
++      "effort": "1-2d",
++      "dependencies": [
++        "实验公式Candidate素材化完整性与风险标注落盘"
++      ],
++      "acceptance": "format_failed=0；schema valid_rate >=98%；conversion success >=95% 才能进入可编辑 DOCX 实验。"
++    },
++    {
++      "task_name": "设计并实现可编辑公式DOCX灰度门禁",
++      "priority": "P2",
++      "owner_suggestion": "arch-1 方案 + dev-1/dev-2 实现 + qa-1 验证",
++      "write_scope": [
++        "src/pdf_to_word/**/docx*",
++        "src/pdf_to_word/**/formula*",
++        "tests/pdf_to_word/**/docx_formula*",
++        "artifacts/pdf2word/**/formula-docx*"
++      ],
++      "effort": "2-3d",
++      "dependencies": [
++        "实验公式输出清洗与OMML转换A/B",
++        "正向样例视觉证据链"
++      ],
++      "acceptance": "公式以可编辑 OMML 写入 quality 模式 DOCX；roundtrip 通过；失败回退 audit-only；默认同步 0 回归。"
++    },
++    {
++      "task_name": "公式区域人工视觉复核Rubric补充",
++      "priority": "P2",
++      "owner_suggestion": "qa-1 + arch-1",
++      "write_scope": [
++        "artifacts/pdf2word/final-archive/reports/*Rubric*",
++        "artifacts/pdf2word/**/human_review*formula*"
++      ],
++      "effort": "1d",
++      "dependencies": [
++        "可编辑公式 DOCX 灰度样例"
++      ],
++      "acceptance": "公式区域具备 page/region veto 与人工分阈值；不得只用模型 exact_success 作为 GO 依据。"
++    }
++  ],
++  "risks_and_dependencies": [
++    "如果提前把公式 candidate count 作为质量加分，会掩盖 alignment/format/docx editability 未闭环的事实。",
++    "数学样例中公式/符号是人工视觉高敏区域，错误公式比缺公式更危险，必须支持 P0 region veto。",
++    "公式实验依赖全样例 render_pair/human review 主链；该主链未补齐前，公式只能作为旁路实验。",
++    "慢模型成本不可忽视：qwen3_vl_8b 与 paddleocr_vl 只能按 crop/page 触发并有缓存/超时。"
++  ],
++  "decision": {
++    "current_formula_decision": "keep_audit_only_merge_disabled",
++    "current_95_claim_effect": "excluded_from_current_all_subject_human_visual_95_restore_claim",
++    "unlock_downstream": "允许创建公式素材化、输出清洗、OMML转换、可编辑DOCX灰度等实验任务；不得把这些任务作为当前95恢复主线阻塞项。"
++  }
++}

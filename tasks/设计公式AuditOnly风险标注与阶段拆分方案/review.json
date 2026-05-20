@@ -1,0 +1,42 @@
+{
+  "task_id": "设计公式AuditOnly风险标注与阶段拆分方案",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T08:18:01+08:00",
+  "status": "approve",
+  "summary": "审查通过。该设计产物已清楚回答为什么当前公式/符号链路必须继续维持 `audit-only / merge-disabled`，且不能计入当前全学科人工视觉95恢复主口径：因为公式候选只证明风险存在，不证明终态还原成功；crop 级实验当前最优 `qwen3_vl_8b` 也仅 `2/17` exact success，仍有显著 alignment / format 失败；同时 baseline 侧还有 1 个 candidate 未 materialize，公式区域的 render_pair / visual_similarity / human_review 终态证据也尚未建立。Markdown/JSON 同时给出了可执行的风险 taxonomy、`formula_audit_risks.json` 建议契约、G1-G6 下一阶段门禁、4 个 phase 的阶段拆分，以及 4 个可继续派发的后续实验任务。补充核对显示：JSON 可正常解析，证据路径全部存在，`risk_taxonomy=6`、`next_phase_entry_gates=6`、`phase_split=4`、`recommended_next_tasks=4`，并且关键数字 `18`、`2/17`、`1 个未 materialize` 与上游公式基线/失败摘要口径一致。可进入 PM 收口与后续任务拆分。",
+  "blocking_findings": [],
+  "non_blocking_findings": [],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计公式AuditOnly风险标注与阶段拆分方案/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计公式AuditOnly风险标注与阶段拆分方案/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计公式AuditOnly风险标注与阶段拆分方案/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/公式AuditOnly风险标注与阶段拆分方案.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/公式AuditOnly风险标注与阶段拆分方案.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word当前阶段与目标差距及优化计划.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase4-formula-baseline/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p1-formula-crop/formula_crop_failure_summary.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计公式AuditOnly风险标注与阶段拆分方案/artifacts/AuditOnly-ced06beb.patch"
+  ],
+  "test_evidence": [
+    {
+      "command": "python3 review check: parse 公式AuditOnly风险标注与阶段拆分方案.json and inspect structure",
+      "result": "JSON 报告可正常解析，`report_type=pdf2word_formula_audit_only_risk_and_phase_split/v1`，并包含 `current_policy`、`metrics`、`why_not_in_current_95_claim`、`risk_taxonomy`、`annotation_contract`、`next_phase_entry_gates`、`phase_split`、`recommended_next_tasks`、`risks_and_dependencies` 等核心字段。"
+    },
+    {
+      "command": "python3 review check: verify all evidence paths in 公式AuditOnly风险标注与阶段拆分方案.json exist on disk",
+      "result": "6/6 证据路径均存在：phase4_formula_baseline、formula_crop_failure_summary、stage_diff_report、gap_plan、final_acceptance_summary、final_human_visual_acceptance_report。"
+    },
+    {
+      "command": "python3 review check: validate counts for risk taxonomy / gates / phases / next tasks",
+      "result": "`risk_taxonomy=6`、`next_phase_entry_gates=6 (G1-G6)`、`phase_split=4`、`recommended_next_tasks=4`，结构完整且能支撑后续任务拆分。"
+    },
+    {
+      "command": "python3 review check + source text spot check against phase4-formula-baseline/summary.json and p1-formula-crop/formula_crop_failure_summary.md",
+      "result": "关键数字口径一致：报告引用的 `formula_candidate_count=18`、`qwen3_vl_8b exact success=2/17` 与 `1 个 baseline candidate 未 materialize` 均能在上游基线/失败摘要中对应到。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

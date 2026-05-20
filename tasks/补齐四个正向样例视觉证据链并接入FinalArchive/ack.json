@@ -1,0 +1,7 @@
+{
+  "task_id": "补齐四个正向样例视觉证据链并接入FinalArchive",
+  "agent": "dev-1",
+  "status": "working",
+  "summary": "已确认 4 个正向样例、write_scope 与 FinalArchive 接线边界，开始补齐 canonical visual evidence artifacts 并核对汇总链路。",
+  "started_at": "2026-05-20T08:18:00+08:00"
+}

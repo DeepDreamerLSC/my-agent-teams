@@ -1,0 +1,33 @@
+{
+  "task_id": "制定PDF转Word视觉门禁整改意见",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-19T18:21:34+08:00",
+  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word-205980b6",
+  "branch": "task/PDF-Word-205980b6",
+  "target_branch": "integration",
+  "summary": [
+    "已输出 PDF→Word 视觉门禁全学科整改意见，明确工程 95 与人工视觉 95 的边界，纠偏当前收口口径。",
+    "从科学、数学、语文、英语四类页型归因当前门禁高估点，并将整改拆成全学科共性项与专项项。",
+    "给出可直接派发的 P0/P1/P2 拆分表，覆盖样例治理、真实 render pair、visual_similarity.json、局部 veto 与慢模型灰度。"
+  ],
+  "modified_files": [
+    "artifacts/pdf2word/final-archive/reports/PDF转Word视觉门禁全学科整改意见.md"
+  ],
+  "artifacts": [
+    {
+      "path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/制定PDF转Word视觉门禁整改意见/artifacts/PDF-Word-205980b6.patch",
+      "bytes": 22835,
+      "lines": 297
+    }
+  ],
+  "validation": [
+    "读取 instruction.md 与 task.json，确认 write_scope 仅限 reports 目录。",
+    "新增整改文档包含科学、数学、语文、英语四类页型共性分析，以及全学科共性整改项 / 特定学科专项整改项拆分表。",
+    "git diff --check -- artifacts/pdf2word/final-archive/reports/PDF转Word视觉门禁全学科整改意见.md 通过。"
+  ],
+  "commit": "100d5742e623cd04c392eaddc60cbc23257f10ec",
+  "notes": "本任务仅输出整改意见与拆分，不改代码、不重跑大样本。",
+  "pushed_to": "origin/task/PDF-Word-205980b6",
+  "remote_pr_url": "https://gitee.com/lsc728512378/chiralium/pull/new/lsc728512378:task/PDF-Word-205980b6...lsc728512378:master"
+}

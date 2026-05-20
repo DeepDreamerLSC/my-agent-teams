@@ -1,0 +1,28 @@
+{
+  "task_id": "设计预热任务独占预留机制",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "已按 PM 仲裁的方案 A 完成返修：pre-reserve 从写入起计入 reserved slot；dependency_ready -> dispatched 明确为同一 slot 的继承转换；watcher/claim/router/view 的 capacity gate 均要求排除当前任务，避免 default_reserved_limit=1 场景因当前 pre-reserve 自锁。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/collaboration/预热任务独占预留机制.md"
+  ],
+  "tests": [
+    "PASS: wc -l design/collaboration/预热任务独占预留机制.md -> 496 lines",
+    "PASS: grep 校验覆盖 方案 A、写入即占用、继承转换不做 spare slot 检查、reserved_count_excluding_current_task、inherited_pre_reserved_slot、default_reserved_limit=1、reserved_limit_reached、预热就算接下任务",
+    "PASS: grep 确认旧冲突表述不存在：有 reserved slot 时 / reserved slot 已满 / when dev-2 has capacity / only dispatches-nudges dev-2 when / dev-2 有 reserved slot",
+    "PASS: git diff --check -- design/collaboration/预热任务独占预留机制.md",
+    "PASS: 重新生成完整补丁 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch（502 lines）",
+    "PASS: git status --short --branch -> clean on task/task-f2adfb6e"
+  ],
+  "commit_hash": "aaf739be318f84d3b4e9848d1c05ec60e30eae2f",
+  "patch_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch",
+  "rework_addressed": [
+    "pre-reserve 写入即占用 reserved slot，符合“预热就算接下任务”。",
+    "dependency_ready -> dispatched 是同一 slot 继承转换，watcher 对同一 pre_reserved agent 派发时不能再要求额外 spare reserved slot。",
+    "task-pool-view/task-watcher/task-pool-router/claim-task 口径统一为区分 new_slot_required 与 inherited_pre_reserved_slot，capacity gate 排除当前任务，避免 default_reserved_limit=1 自锁。"
+  ],
+  "risks": [
+    "本任务仍仅修改设计契约，未修改 watcher/claim/router/view 生产代码；下游实现需按新增容量语义补 helper 与回归测试。"
+  ],
+  "completed_at": "2026-05-19T12:59:45+08:00"
+}

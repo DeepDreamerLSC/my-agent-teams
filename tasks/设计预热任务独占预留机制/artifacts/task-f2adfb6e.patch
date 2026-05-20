@@ -1,0 +1,502 @@
+diff --git "a/design/collaboration/\351\242\204\347\203\255\344\273\273\345\212\241\347\213\254\345\215\240\351\242\204\347\225\231\346\234\272\345\210\266.md" "b/design/collaboration/\351\242\204\347\203\255\344\273\273\345\212\241\347\213\254\345\215\240\351\242\204\347\225\231\346\234\272\345\210\266.md"
+new file mode 100644
+index 0000000..6f1c511
+--- /dev/null
++++ "b/design/collaboration/\351\242\204\347\203\255\344\273\273\345\212\241\347\213\254\345\215\240\351\242\204\347\225\231\346\234\272\345\210\266.md"
+@@ -0,0 +1,496 @@
++# 预热任务独占预留机制设计
++
++> 任务：设计预热任务独占预留机制  
++> 类型：架构设计 / 控制面契约  
++> 目标：把“预热”从单纯消息提醒升级为可机读、带 TTL 的独占预留语义，避免被非预热 agent 抢认领。  
++> 范围：只冻结设计契约，不直接修改 `task-watcher.sh`、`claim-task.sh`、`task-pool-router.py`、`task-pool-view.py`。
++
++## 1. 背景与事故复盘
++
++本次事故链路：
++
++```text
++PM 将「实现可编辑Word表格渲染」预热给 dev-2
++-> 预热只是一条消息，没有写入 task.json
++-> 上游依赖「补齐表格样例与验收夹具」完成
++-> 任务池重新变为 claim-ready
++-> dev-1 的 auto-continue 在池中看到该任务可认领
++-> dev-1 抢先 claim / dispatched
++-> dev-2 的“接下下一条任务”语义失效
++```
++
++根因不是认领锁本身失效，而是**预热阶段没有任何排他状态**。当前 `claim.json / claimed_by / reserved_by` 只有在 claim 或 dispatched 后才具备独占能力；预热只发消息，所以 task-pool-router 和 claim-task 都无法知道“这条任务已经预留给 dev-2”。
++
++因此新规则必须明确：
++
++> **预热不是通知，而是带 TTL 的独占预留。**
++
++在预热锁有效期内，除预留 agent 外，其他 agent 不得 claim、不得被 watcher auto-continue、不得被 auto-reserve。只有预留超时、PM 释放、任务取消/转派，或预留 agent ack 超时回池后，任务才恢复普通池语义。
++
++## 2. 设计决策：新增 `pre_reserved_*`，不复用 `reserved_by`
++
++### 2.1 决策
++
++本机制**新增 `pre_reserved_*` 字段**，不复用 `reserved_by` 表达预热锁。
++
++### 2.2 原因
++
++`reserved_by` 在现有系统里已经有明确含义：
++
++- 通常与 `status=dispatched` 搭配；
++- 表达“已分配 / 已预留 / 未 ack”的 active slot；
++- 由 `claim-task.sh`、`task-watcher.sh`、`reassign-task.sh` 等路径在 claim 或 dispatch 后写入；
++- 现有 invariant 也隐含要求：在 `dispatched/working` 阶段 `assigned_agent / claimed_by / reserved_by` 应保持一致。
++
++预热锁的语义不同：
++
++- 可发生在 `pending`、`pooled`、`dependency_wait` 等**尚不能 ack**的阶段；
++- 目的是阻止其他 agent 未来抢认领，而不是表示当前已经进入 dispatched active slot；
++- 可能需要跨依赖等待继承；
++- 一旦真正派发，应转换成现有 `reserved_by / claimed_by` 语义。
++
++如果直接复用 `reserved_by`，会让 `pooled + reserved_by` 同时承担“未来独占”和“已派发未 ack”两种含义，容易破坏现有 claim / pool view / invariant 口径。因此采用新增字段，并在真正派发时显式继承到现有字段。
++
++## 3. 字段契约
++
++### 3.1 新增字段
++
++`task.json` 新增以下字段，均为顶层字段：
++
++```json
++{
++  "pre_reserved_by": "dev-2",
++  "pre_reserved_at": "2026-05-19T12:00:00+08:00",
++  "pre_reserved_until": "2026-05-19T18:00:00+08:00",
++  "pre_reserved_by_actor": "pm-chief",
++  "pre_reserved_reason": "PM 预热：表格主链下一条由 dev-2 执行",
++  "pre_reserved_origin": "manual_pm"
++}
++```
++
++字段含义：
++
++| 字段 | 必填 | 含义 |
++|---|---:|---|
++| `pre_reserved_by` | 是 | 被预热/独占预留的 agent id，例如 `dev-2`。 |
++| `pre_reserved_at` | 是 | 写入预热锁时间，ISO8601。 |
++| `pre_reserved_until` | 是 | 预热锁过期时间。过期后 watcher 可释放锁。 |
++| `pre_reserved_by_actor` | 是 | 写锁操作者，通常是 `pm-chief`，也可为 `task-watcher`。 |
++| `pre_reserved_reason` | 是 | 预热原因，必须人可读。 |
++| `pre_reserved_origin` | 是 | 来源枚举：`manual_pm` / `watcher_auto_preheat` / `handoff`。 |
++
++派生字段，不作为事实源：
++
++| 字段 | 含义 |
++|---|---|
++| `pre_reserved_active` | 不落盘，由 `pre_reserved_by` 存在且 `now < pre_reserved_until` 推导。 |
++| `pre_reserved_expired` | 不落盘，由 `now >= pre_reserved_until` 推导。 |
++
++### 3.2 历史字段
++
++释放、继承或超时后，保留审计字段：
++
++```json
++{
++  "last_pre_reserved_by": "dev-2",
++  "last_pre_reserved_at": "2026-05-19T12:00:00+08:00",
++  "last_pre_reserved_until": "2026-05-19T18:00:00+08:00",
++  "last_pre_reserved_released_at": "2026-05-19T18:00:05+08:00",
++  "last_pre_reserved_release_reason": "expired_before_dependency_ready"
++}
++```
++
++`last_pre_reserved_*` 只用于排查与看板展示，不参与 claim 判定。
++
++### 3.3 与现有字段关系
++
++| 阶段 | `pre_reserved_by` | `reserved_by` | `claimed_by` | `assigned_agent` |
++|---|---|---|---|---|
++| `pending` 预热 | 有 | 无 | 无 | 保持原值，可为 `auto` |
++| `pooled` / `dependency_wait` 预热 | 有 | 无 | 无 | 保持原值，可为 `auto` |
++| 预热 agent 被派发 | 清理为 `last_pre_reserved_*` | 写入同一 agent | 写入同一 agent | 写入同一 agent |
++| `working` | 无 | 可保留为 lineage，必须等于 `assigned_agent` | 可保留为 lineage，必须等于 `assigned_agent` | 执行 agent |
++
++结论：
++
++- `pre_reserved_*` 是**派发前独占权**；
++- `reserved_by / claimed_by` 是**派发后未 ack 的 active reservation**；
++- 二者不能长期并存。`pooled/dependency_wait` 中不得写 `reserved_by` 表达预热。
++
++### 3.4 容量与 reserved slot 契约（方案 A）
++
++本设计冻结采用 **方案 A**：`pre-reserve` 从写入起计入 `reserved slot`，但后续 `dependency_ready -> dispatched` 是同一 slot 的继承转换，不再额外要求 spare reserved slot。
++
++核心规则：
++
++1. **写入即占用**：active `pre_reserved_by=<agent>` 从写入 `task.json` 起就计入该 agent 的 `reserved_count`。这体现“预热就是接下任务”，避免 PM/自动预热在同一 agent 上堆积超过 `default_reserved_limit` 的未来任务。
++2. **同任务只占一个 slot**：同一任务从 `pending/pooled/dependency_wait + pre_reserved_by` 转为 `dispatched + reserved_by/claimed_by` 时，容量占用保持为 1，不允许把同一任务同时算成一个 pre-reserve slot 和一个 dispatched slot。
++3. **继承转换不做 spare slot 检查**：当 active `pre_reserved_by == target_agent` 且任务依赖/门禁已满足时，watcher 或同 agent claim 是“已有 slot 的状态转换”，必须允许转换，即使 `reserved_count(agent) == default_reserved_limit` 且该计数正是由当前任务的 pre-reserve 造成。
++4. **新增分配才检查 spare slot**：只有写入新的 pre-reserve、普通未预热任务 claim、或给非预留 agent 派发时，才要求 `reserved_count_excluding_current_task(agent, task_id) < reserved_limit`；同一任务的预热续期/释放/继承转换必须排除当前任务，避免自锁。
++5. **ack 后释放 reserved slot**：`working` 阶段可保留 `reserved_by/claimed_by` 作为 lineage，但 `reserved_count` 不再统计 `working` 任务；真正 active reserved slot 只统计 active pre-reserve 与 `dispatched` 未 ack。
++
++统一 helper 口径建议：
++
++```python
++def reserved_slot_count(agent, tasks, now):
++    return count_distinct_tasks(
++        task for task in tasks
++        if (is_active_pre_reserved_for(task, agent, now)
++            or is_dispatched_unacked_reserved_for(task, agent))
++    )
++
++def reserved_slot_count_excluding_task(agent, tasks, now, task_id):
++    return reserved_slot_count(agent, [t for t in tasks if t["id"] != task_id], now)
++
++def is_pre_reserved_slot_inheritance(task, agent, now):
++    return active_pre_reservation(task, now) and task.get("pre_reserved_by") == agent
++```
++
++`default_reserved_limit=1` 的标准场景必须成立：
++
++```text
++pre_reserved_by=dev-2 写入后：reserved_count(dev-2)=1
++依赖满足后派发给 dev-2：这是继承转换，允许 dispatched
++派发后：reserved_count(dev-2)=1，不是 2，也不因 count==limit 自锁
++```
++
++## 4. 状态机与规则
++
++本设计不新增独立 lifecycle status。`dependency_wait` 作为任务池的逻辑子状态：
++
++```text
++status=pooled 且 depends_on 未满足 => dependency_wait
++```
++
++如果后续实现显式引入 `status=dependency_wait`，必须按本节同名规则处理；但本轮兼容现有逻辑时，优先保持 `status=pooled`。
++
++### 4.1 状态迁移总览
++
++```text
++pending
++  ├─ reserve-task.sh 写 pre_reserved_*
++  └─ pool gate 通过
++        ↓
++pooled / dependency_wait + pre_reserved_by=dev-2
++  ├─ 非 dev-2 claim => reject: pre_reserved_for:dev-2
++  ├─ pre_reserved_until 到期 => 清理 pre_reserved_*，普通入池
++  ├─ 依赖未满足 => 继续等待，不允许其他 agent 抢占
++  └─ 依赖满足，继承 dev-2 已占用的 pre-reserve slot（不要求额外 spare slot）
++        ↓
++dispatched + assigned_agent=dev-2 + reserved_by=dev-2 + claimed_by=dev-2
++  ├─ dev-2 ack => working
++  └─ ack 超时 => pooled，清理 reserved/claimed/pre_reserved，普通回池或由 PM 重新预热
++        ↓
++working
++  └─ 正常 result/review/close 流程
++```
++
++### 4.2 各状态详细规则
++
++| 状态 / 子状态 | 允许写入预热锁 | 继承/清理规则 | 谁能 claim | 超时规则 |
++|---|---:|---|---|---|
++| `pending` | 允许 PM/脚本写 `pre_reserved_*` | Pool Gate 通过后保留锁进入 `pooled`；取消/删除/转派时清理。 | 不允许任何 claim。 | `pre_reserved_until` 到期可清理锁；任务仍为 pending。 |
++| `pooled` 且依赖满足 | 允许写锁；若已有 active 锁，只有 PM `--force` 可覆盖。 | watcher 只允许派给 `pre_reserved_by`；派发时将同一 reserved slot 继承转换到 `reserved_by/claimed_by` 并清理 `pre_reserved_*`，不额外要求 spare slot。 | 只有 `pre_reserved_by`。其他 agent reject；同 agent claim 属于继承转换。 | 预热锁过期前不得被其他人 claim；过期后清理并恢复普通池。 |
++| `dependency_wait` | 允许写锁，推荐用于“下一条任务”预热。 | 依赖未满足时锁持续阻止其他 claim；依赖满足后只派给 `pre_reserved_by`，并按同一 slot 继承转换，不额外检查 spare reserved slot。 | 依赖未满足时无人可 claim；依赖满足后只有 `pre_reserved_by`，且同 agent claim 排除当前任务容量占用。 | `pre_reserved_until` 过期则释放；若未过期，不因依赖等待本身回池。 |
++| `dispatched` | 不再写 `pre_reserved_*`；进入现有 reservation 语义。 | 从预热派发时：`pre_reserved_by -> reserved_by/claimed_by/assigned_agent`，并记录 `last_pre_reserved_*`；容量占用保持同一个 slot，不从 1 变 2。 | 不再接受 claim；只等待 `assigned_agent` ack。 | 未 ack 超过 `reserved_ack_timeout_seconds`：回到 `pooled`，清理 `reserved_by/claimed_by`，释放该 reserved slot，不自动保留旧预热锁。 |
++| `working` | 不允许写新的预热锁到当前任务。 | `pre_reserved_*` 必须为空；`reserved_by/claimed_by` 可作为 lineage 保留但必须等于 `assigned_agent`。 | 不允许 claim。 | 按 working timeout / result 流程处理，与预热无关。 |
++
++### 4.3 预热锁生效判定
++
++伪代码：
++
++```python
++def active_pre_reservation(task, now):
++    agent = str(task.get("pre_reserved_by") or "").strip()
++    until = parse_iso(task.get("pre_reserved_until"))
++    return bool(agent and until and now < until)
++```
++
++对所有候选选择、claim、nudge、auto-continue、auto-reserve 入口，必须先调用该判定。
++
++### 4.4 超时与释放
++
++预热有两个阶段的超时：
++
++1. **派发前锁 TTL**：由 `pre_reserved_until` 控制。  
++   - 用于防止一个永远未解锁的依赖任务永久占坑；
++   - 到期后 watcher 可清理 `pre_reserved_*`，写入 `last_pre_reserved_release_reason=pre_reserve_ttl_expired`。
++
++2. **派发后 ack TTL**：复用现有 dispatched reservation 超时。  
++   - 任务进入 `dispatched` 后，agent 必须在 `reserved_ack_timeout_seconds` 内写 `ack.json`；
++   - 超时则回到 `pooled`，清理 `reserved_by / claimed_by / pre_reserved_*`；
++   - 回池后默认不再保护原预热 agent，除非 PM 再次调用 `reserve-task.sh`。
++
++推荐默认值：
++
++| 配置 | 默认值 | 说明 |
++|---|---:|---|
++| `task_pool.default_pre_reserve_ttl_seconds` | `21600`（6 小时） | 适合跨一个主线阶段的预热。 |
++| `task_pool.reserved_ack_timeout_seconds` | 沿用现有 `DISPATCH_RESEND_AFTER_SECONDS` 或 300s | 派发后等待 ack。 |
++
++## 5. PM / 脚本操作入口
++
++### 5.1 新增 `reserve-task.sh`
++
++必须新增脚本入口，不能依赖人工改 JSON。
++
++建议命令：
++
++```bash
++scripts/reserve-task.sh <task-id> --agent <agent-id>   --ttl 6h   --reason "PM 预热：表格主链下一条由 dev-2 执行"
++```
++
++可选参数：
++
++```bash
++scripts/reserve-task.sh <task-id> --release --reason "PM 释放预热锁"
++scripts/reserve-task.sh <task-id> --agent dev-2 --force --reason "PM 覆盖旧预热锁"
++scripts/reserve-task.sh <task-id> --agent dev-2 --until 2026-05-19T18:00:00+08:00
++```
++
++### 5.2 `reserve-task.sh` 必须做的校验
++
++| 校验 | 规则 |
++|---|---|
++| 任务存在 | 必须存在 `tasks/<task-id>/task.json`。 |
++| 状态允许 | 只允许 `pending / pooled / dependency_wait`；不允许对 `dispatched / working / ready_for_merge / done / cancelled` 写预热锁。 |
++| agent 合法 | `agent` 必须存在于 `config.agents`。 |
++| claim_scope 兼容 | 若 `claim_scope` 非空，`agent` 必须在其中；若为空，按 `task_type/domain` 推导默认 scope 后验证。 |
++| active 锁冲突 | 已有未过期 `pre_reserved_by` 且不是同一 agent 时，默认拒绝；PM 可 `--force` 覆盖并记录历史。 |
++| 容量建议 | 预热锁从写入起计入 reserved slot；写入新预热锁时按 `reserved_count_excluding_current_task(agent, task_id) < default_reserved_limit` 校验，避免同一任务续期/继承自锁；超限默认拒绝，PM 可 `--force`。 |
++| 原子性 | 必须用任务级 `.pre-reserve.lock` 或同等 flock，避免并发写入。 |
++
++### 5.3 输出与通知
++
++成功写锁后：
++
++- 写 `task.json.pre_reserved_*`；
++- 追加 `transitions.jsonl`：`from=<old status>`、`to=<same status>`、`reason=pre_reserved_for:<agent>`；
++- 通过 `send-to-agent.sh` 通知预热 agent：
++
++```text
++你已被预热为任务 <task-id> 的独占预留执行者。该任务在锁有效期内不会被其他 agent 认领；依赖/门禁满足后 watcher 会只派发给你。请暂不 ack，待 watcher 提醒可开始后再 ack。
++```
++
++- 通过 chat/system 记录事件，便于 PM 和看板追踪。
++
++## 6. 与现有脚本的兼容要求
++
++### 6.1 `claim-task.sh`
++
++必须在 claim 原子锁内增加预热检查：
++
++```python
++if active_pre_reservation(task, now):
++    if task["pre_reserved_by"] != agent_id:
++        raise SystemExit(f"task pre-reserved for {task['pre_reserved_by']}")
++```
++
++同一 agent 在依赖/门禁满足后 claim 时允许继续，且该 claim 属于 pre-reserve slot 的继承转换；capacity gate 必须排除当前任务，不能因 `reserved_count` 已包含该 pre-reserve 而拒绝。其他 agent 必须被拒绝，不能覆盖 `claim.json`。
++
++如果锁已过期，`claim-task.sh` 可以先触发清理或返回 `pre_reservation_expired` 让 watcher 清理后重试；推荐由 watcher 统一清理，claim-task 只拒绝/允许。
++
++### 6.2 `task-pool-router.py`
++
++候选选择必须遵守：
++
++- 若任务存在 active `pre_reserved_by` 且 agent != pre_reserved_by：该任务对该 agent 不可见或标记不可 claim；
++- 若 agent == pre_reserved_by：该任务在依赖满足后应排在该 agent 的可选候选中，优先级可按原规则排序；
++- 若 agent == pre_reserved_by 且 `reserved_count` 达到上限的原因是当前任务自己的 pre-reserve，router 不得把它当作 `reserved_limit_reached` 隐藏；
++- 不允许其他 agent 因 priority 更高而抢占预热任务。
++
++事故防复发的关键断言：
++
++```text
++task.pre_reserved_by = dev-2
++agent = dev-1
++=> task-pool-router --agent dev-1 --next 绝不能返回该 task
++```
++
++### 6.3 `task-pool-view.py`
++
++看板/CLI 必须展示预热锁：
++
++```json
++{
++  "task_id": "实现可编辑Word表格渲染",
++  "gate_stage": "pre_reserved_dependency_wait",
++  "pre_reserved_by": "dev-2",
++  "pre_reserved_until": "2026-05-19T18:00:00+08:00",
++  "eligible_agents": ["dev-2"],
++  "blocked_reasons": ["pre_reserved_for:dev-2"]
++}
++```
++
++汇总口径：
++
++- `reserved_count` 应包含：
++  - `status=dispatched` 且未 ack 的任务；
++  - active `pre_reserved_by` 的任务；
++  - 同一任务在继承转换期间只能统计一次。
++- 新增 `pre_reserved_count` 更清晰；
++- 对非预留 agent 的 reason 使用 `pre_reserved_for:<agent>`；
++- 对预留 agent 本人展示 capacity 时必须区分 `new_slot_required` 与 `inherited_pre_reserved_slot`：若 blocked 只来自当前任务已占用的 pre-reserve slot，不得展示 `reserved_limit_reached`，应展示 `capacity_decision=inherited_pre_reserved_slot`。
++
++### 6.4 `task-watcher.sh`
++
++watcher 必须新增四类规则：
++
++1. **清理过期预热锁**  
++   每轮扫描 `pending/pooled/dependency_wait` 时，如果 `pre_reserved_until <= now`，将 `pre_reserved_*` 归档为 `last_pre_reserved_*` 并清理。
++
++2. **依赖满足后的独占派发**  
++   当任务从 dependency_wait 变为 claim-ready，若 active `pre_reserved_by=dev-2`：
++   - 只考虑 dev-2；
++   - 将当前任务已占用的 pre-reserve slot 继承转换为 `dispatched`，不再额外要求 dev-2 还有 spare reserved slot；
++   - 若 `reserved_count(dev-2) == default_reserved_limit` 仅由当前 pre-reserve 造成，必须派发，不能保持 pooled 自锁；
++   - 只有在 dev-2 会话不可投递、任务锁冲突、或独立于 reserved slot 的其他门禁失败时，才保持 `pooled + pre_reserved`，且不得通知其他 agent。
++
++3. **auto-continue / auto-reserve 跳过非预留任务**  
++   `auto_push_next_task_for_agent(dev-1)` 不得返回 `pre_reserved_by=dev-2` 的任务。
++
++4. **派发继承**  
++   从预热锁派发时，必须写：
++
++```json
++{
++  "assigned_agent": "dev-2",
++  "claimed_by": "dev-2",
++  "reserved_by": "dev-2",
++  "claim_reason": "inherited from pre_reservation",
++  "reserved_reason": "inherited from pre_reservation"
++}
++```
++
++并清理 `pre_reserved_*` 到 `last_pre_reserved_*`。
++
++### 6.5 `reassign-task.sh / resume-task.sh / pool-task.sh`
++
++这些脚本必须清理预热锁，避免旧锁污染新一轮：
++
++| 脚本 | 规则 |
++|---|---|
++| `reassign-task.sh` | 转派到明确 agent 后清理 `pre_reserved_*`；如需要保留，必须重新写锁。 |
++| `resume-task.sh` | 新执行轮次开始前清理 `pre_reserved_*`、旧 `claim.json`、旧 `ack.json`。 |
++| `pool-task.sh` | 将任务重新入池时默认清理 `pre_reserved_*`，除非显式 `--keep-pre-reserve`。 |
++
++## 7. 防复发场景规则
++
++以事故任务为例：
++
++```json
++{
++  "id": "实现可编辑Word表格渲染",
++  "status": "pooled",
++  "depends_on": ["补齐表格样例与验收夹具"],
++  "claim_scope": ["dev-1", "dev-2"],
++  "pre_reserved_by": "dev-2",
++  "pre_reserved_until": "2026-05-19T18:00:00+08:00"
++}
++```
++
++在依赖未完成时：
++
++- `task-pool-view --agent dev-1` 显示 blocked：`dependency_not_ready` + `pre_reserved_for:dev-2`；
++- `task-pool-router --agent dev-1 --next` 不能返回该任务；
++- `claim-task.sh` 若由 dev-1 调用，必须拒绝。
++
++依赖完成后：
++
++- 若锁未过期，仍只有 dev-2 可 claim；
++- dev-1 的 auto-continue 必须跳过；
++- 即使 `default_reserved_limit=1` 且当前 pre-reserve 已让 `reserved_count(dev-2)=1`，watcher 也必须把它视为同 slot 继承并派发给 dev-2；
++- watcher 如果续推，只能向 dev-2 投递；
++- dev-2 未 ack 超时后，任务才回到普通 pooled，并清理预热锁。
++
++这条规则直接覆盖并阻断本次事故链路。
++
++## 8. 实现顺序建议
++
++下游 `实现预热任务独占预留锁` 建议按以下顺序落地：
++
++1. 新增 `scripts/reserve-task.sh`：写入/释放 `pre_reserved_*`，包含 TTL、force、release，并在写入新锁时执行 `reserved_count_excluding_current_task` 容量校验。
++2. 在 `task-pool-view.py` 增加 active pre-reserve 判定、展示与 `reserved_count/pre_reserved_count`，并区分 `new_slot_required` / `inherited_pre_reserved_slot`。
++3. 在 `task-pool-router.py` 继承 view 结果，确保非预留 agent 不会拿到该任务，预留 agent 不会因当前任务自己占满 slot 被隐藏。
++4. 在 `claim-task.sh` 原子 claim 区增加 pre-reserve 拒绝规则；同 agent claim 时按继承转换处理，不再额外要求 spare slot。
++5. 在 `task-watcher.sh` 增加：过期清理、依赖满足后独占派发、派发继承、ack 超时回池清理，并禁止 default_reserved_limit=1 场景因当前 pre-reserve 自锁。
++6. 在 `reassign/resume/pool` 相关脚本补清理规则。
++7. 增加回归测试：
++   - 非预留 agent claim 被拒；
++   - router 不返回预留给他人的任务；
++   - 依赖解锁后只派给预留 agent；
++   - ack 超时回池后普通 agent 可重新认领；
++   - `reserve-task.sh --release` 后恢复普通池。
++
++## 9. 验收断言
++
++下游实现必须满足以下断言：
++
++```text
++Given task.status=pooled, task.pre_reserved_by=dev-2, pre_reserved_until>now
++When task-pool-router --agent dev-1 --next
++Then task_id != this task
++```
++
++```text
++Given task.status=pooled, task.pre_reserved_by=dev-2, pre_reserved_until>now
++When CLAIM_AGENT_ID=dev-1 scripts/claim-task.sh <task-id>
++Then command fails and claim.json is not overwritten
++```
++
++```text
++Given task.status=pooled/dependency_wait, pre_reserved_by=dev-2, dependencies become ready
++When watcher auto-continue runs for dev-1
++Then watcher skips the task
++And watcher dispatches/nudges dev-2 by inheriting the existing pre-reserve slot without requiring an extra spare reserved slot
++```
++
++```text
++Given pre-reserved task is dispatched to dev-2
++When dev-2 does not write ack before reserved_ack_timeout_seconds
++Then watcher returns task to pooled
++And clears pre_reserved_by/reserved_by/claimed_by
++And records last_pre_reserved_release_reason=ack_timeout_after_pre_reserved_dispatch
++```
++
++```text
++Given default_reserved_limit=1
++And task.status=pooled/dependency_wait
++And task.pre_reserved_by=dev-2, pre_reserved_until>now
++And reserved_count(dev-2)=1 because of this same task
++When dependencies become ready
++Then watcher dispatches this task to dev-2
++And treats it as inherited_pre_reserved_slot
++And does not block on reserved_limit_reached
++And reserved_count(dev-2) remains 1 after dispatch, not 2
++```
++
++## 10. 非目标
++
++本设计不做以下扩展：
++
++- 不重构整个任务池优先级模型；
++- 不新增物理 `tasks/pool/` 目录；
++- 不改变 `ack.json -> working`、`result.json -> ready_for_merge` 的主链路；
++- 不允许手工编辑 JSON 作为正式操作入口；
++- 不把预热消息当作事实源，事实源只能是 `task.json` 与必要的审计记录。
++
++## 11. 最终结论
++
++预热独占预留采用新增 `pre_reserved_*` 字段：
++
++```text
++pre_reserved_*：派发前、跨 pending/pooled/dependency_wait 的独占未来权
++reserved_by/claimed_by：派发后、dispatched 未 ack 的 active reservation
++```
++
++系统规则必须保证：
++
++1. active `pre_reserved_by` 存在时，除该 agent 外无人可 claim；
++2. task-pool-router / watcher auto-continue 不得把预热任务分给其他 agent；
++3. pre-reserve 从写入起计入 reserved slot，表达“预热就算接下任务”；
++4. 依赖解锁后预热锁继承为现有 `reserved_by/claimed_by`，同一任务复用同一个 slot，不再要求额外 spare slot；
++5. ack 超时才回池并释放锁；
++6. PM 必须通过 `reserve-task.sh` 写入/释放锁，不依赖人工 JSON 修改。
++
++这能把“我先预热给你”变成控制面可执行的排他契约，避免同类抢认领事故复发。

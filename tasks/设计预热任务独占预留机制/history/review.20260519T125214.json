@@ -1,0 +1,48 @@
+{
+  "task_id": "设计预热任务独占预留机制",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T12:48:46+08:00",
+  "status": "request_changes",
+  "summary": "文档主体覆盖面较完整，但当前对 pre-reserve 与 reserved slot 容量的关系存在关键语义冲突：文档一方面规定 active pre-reserve 计入 reserved slot / reserved_count，另一方面又要求依赖解锁后只有在目标 agent“仍有 reserved slot”时才能派发。按现有 capacity gate，这会让 default_reserved_limit=1 的预热任务在依赖解锁后卡死在 pooled + pre_reserved，无法完成从预热到 dispatched 的继承，不满足“可直接指导 dev-2 落地实现、无关键语义空白”的验收标准。",
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e/design/collaboration/预热任务独占预留机制.md",
+      "finding": "第 5.2 节要求“预热锁计入 reserved slot”（第 223 行），第 6.3 节又要求 `reserved_count` 包含 active `pre_reserved_by`（第 289-291 行），但第 6.4 节同时规定依赖解锁后仅当目标 agent “有 reserved slot” 时才允许派发（第 303-306 行）。这与现有 capacity gate 的实现口径冲突：当前 `task-pool-view.py` / `task-watcher.sh` / `claim-task.sh` 都用 `reserved_count < reserved_limit` 作为可派发/可认领前提。若 `default_reserved_limit=1`，单个 pre-reserve 会先占满 slot，随后 watcher 将永远判定“无 reserved slot”，导致任务卡在 `pooled + pre_reserved`，无法继承到 `dispatched`。",
+      "recommendation": "请冻结单一且可执行的容量语义，并写进设计文档：要么明确“pre-reserve 占用 reserved slot，但 dependency-ready -> dispatched 属于同一 slot 的状态转换，不再额外检查 spare slot”；要么明确“pre-reserve 单独计数，不纳入 reserved_limit，只有 dispatch 后才占用 reserved slot”。同时同步修正文档中 `reserved_count`、capacity gate、watcher 派发条件与 `reserve-task.sh` 校验口径，避免 dev-2 落地时出现自锁。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制",
+      "finding": "任务目录下暂无 verify.json；本次审查以 instruction/result、设计文档静态复核及现有脚本兼容性检查作为主要证据。",
+      "recommendation": "后续若补 QA / watcher 验证，可追加 verify.json 便于流程留痕。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e/design/collaboration/预热任务独占预留机制.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-pool-view.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/claim-task.sh"
+  ],
+  "test_evidence": [
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e show --stat --format=fuller 9ccb3a83c6d8f83e5ad6632c49e3a31beb1372e9 -- design/collaboration/预热任务独占预留机制.md",
+      "result": "确认本任务提交仅新增 1 份设计文档，修改范围未越界。"
+    },
+    {
+      "command": "静态复核 预热任务独占预留机制.md（字段契约、状态机、脚本兼容章节）",
+      "result": "确认文档已覆盖 `pre_reserved_*` 字段、pending/pooled/dependency_wait/dispatched/working 规则、`reserve-task.sh` 入口、`claim-task.sh` / `task-pool-router.py` / `task-pool-view.py` / `task-watcher.sh` 兼容约束，以及事故复盘与防复发断言。"
+    },
+    {
+      "command": "交叉检查现有容量门禁实现：task-pool-view.py:192-198,279-295；task-watcher.sh:1450-1457,1634-1639；claim-task.sh:182-227",
+      "result": "确认当前脚本普遍使用 `reserved_count < reserved_limit` 作为可见/可派发/可认领前提，因此文档中“pre-reserve 先计入 reserved_count，同时 dispatch 还要求剩余 reserved slot”会形成实现级自锁。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

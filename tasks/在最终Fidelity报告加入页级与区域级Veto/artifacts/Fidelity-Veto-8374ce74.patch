@@ -1,0 +1,1175 @@
+diff --git a/backend/app/services/pdf_to_word/model_eval_runner.py b/backend/app/services/pdf_to_word/model_eval_runner.py
+index 559f067..8e4593e 100644
+--- a/backend/app/services/pdf_to_word/model_eval_runner.py
++++ b/backend/app/services/pdf_to_word/model_eval_runner.py
+@@ -13,6 +13,7 @@ from typing import Any, Callable, Sequence
+ from PIL import Image
+ 
+ from app.services.pdf_to_word.docx_assembler import assemble_docx_bytes
++from app.services.pdf_to_word.fidelity_veto import build_fidelity_veto_gate_summary, load_fidelity_veto_summary
+ from app.services.pdf_to_word.formula_pipeline import convert_latex_to_omml, normalize_latex
+ from app.services.pdf_to_word.models import PDFConversionDocument, PDFDocumentBlock, PDFSourceBlock
+ from app.services.pdf_to_word.parser_adapters import ADAPTER_REGISTRY, create_adapter
+@@ -97,6 +98,10 @@ FINAL_DOCX_SOURCE_RULE_KEY_BY_PAGE_TYPE = {
+     'negative_non_exercise_or_question_region_unresolvable': 'negative_non_exercise_or_question_region_unresolvable',
+     'formula_suspected': 'formula_suspected',
+ }
++REPORT_INDEX_IGNORED_SUFFIXES = (
++    '偏差说明.md',
++    '整改意见.md',
++)
+ 
+ 
+ def build_arg_parser() -> argparse.ArgumentParser:
+@@ -761,7 +766,16 @@ def _inspect_docx_release_evidence(path: str | Path) -> dict[str, Any]:
+ 
+ def _collect_report_file_index(archive_root: Path, archive_manifest: dict[str, Any]) -> dict[str, Any]:
+     reports_dir = archive_root / 'reports'
+-    actual_report_files = sorted(path for path in reports_dir.iterdir() if path.is_file()) if reports_dir.exists() else []
++    ignored_report_files: list[str] = []
++    actual_report_files: list[Path] = []
++    if reports_dir.exists():
++        for path in sorted(reports_dir.iterdir()):
++            if not path.is_file():
++                continue
++            if path.name.endswith(REPORT_INDEX_IGNORED_SUFFIXES):
++                ignored_report_files.append(path.name)
++                continue
++            actual_report_files.append(path)
+     reports_payload = archive_manifest.get('reports') if isinstance(archive_manifest.get('reports'), dict) else {}
+     indexed_report_names: set[str] = set()
+     extra_report_entries: list[str] = []
+@@ -793,6 +807,7 @@ def _collect_report_file_index(archive_root: Path, archive_manifest: dict[str, A
+             and not extra_report_entries
+             and manifest_count == expected_count
+         ),
++        'ignored_advisory_report_files': ignored_report_files,
+     }
+ 
+ 
+@@ -1109,6 +1124,12 @@ def build_final_docx_gate_summary(
+             and pages_provenance_ok
+             and source_manifest_ok
+         )
++        fidelity_veto = load_fidelity_veto_summary(
++            sample_name=sample_name,
++            sample_dir=sample_dir,
++            archive_root=resolved_archive_root,
++            source_manifest=source_manifest,
++        )
+         source_gate = _build_final_docx_source_gate_sample(
+             sample_name=sample_name,
+             docx=docx_evidence,
+@@ -1142,6 +1163,7 @@ def build_final_docx_gate_summary(
+                 'page_fallback_rate': validator_report.get('page_fallback_rate'),
+                 'document_fallback': bool(validator_report.get('document_fallback')),
+             },
++            'fidelity_veto': fidelity_veto,
+             'source_gate': source_gate,
+         })
+ 
+@@ -1155,6 +1177,12 @@ def build_final_docx_gate_summary(
+         'source_manifest_ok_sample_count': sum(1 for sample in sample_results if sample['source_manifest']['ok']),
+         'sample_with_fallback_count': sum(1 for sample in sample_results if int(sample['validator']['fallback_pages']) > 0),
+         'document_fallback_sample_count': sum(1 for sample in sample_results if sample['validator']['document_fallback']),
++        'sample_with_fidelity_veto_artifact_count': sum(
++            1 for sample in sample_results if str((sample.get('fidelity_veto') or {}).get('status') or '') == 'present'
++        ),
++        'sample_with_fidelity_p0_veto_count': sum(
++            1 for sample in sample_results if int((sample.get('fidelity_veto') or {}).get('p0_veto_count') or 0) > 0
++        ),
+         'explicit_answer_area_materialized_sample_count': int(report_aggregate.get('explicit_answer_area_materialized_sample_count') or 0),
+         'answer_section_materialized_sample_count': int(report_aggregate.get('answer_section_materialized_sample_count') or 0),
+     }
+@@ -1204,6 +1232,10 @@ def build_final_docx_gate_summary(
+             if str(sample['source_gate'].get('paddle_noise_interpretation') or '') == 'paddle_contributed_to_final_output'
+         ),
+     }
++    fidelity_veto_gate = build_fidelity_veto_gate_summary([
++        sample.get('fidelity_veto') or {}
++        for sample in sample_results
++    ])
+     expected_checks = {
+         key: {
+             'expected': int(value),
+@@ -1237,6 +1269,12 @@ def build_final_docx_gate_summary(
+             blocking_failures.append(f"sample_gate_failed:{sample['sample_name']}")
+         if not sample['source_gate']['ok']:
+             blocking_failures.append(f"source_gate_failed:{sample['sample_name']}")
++        fidelity_veto = sample.get('fidelity_veto') or {}
++        if str(fidelity_veto.get('status') or '') == 'invalid':
++            blocking_failures.append(f"fidelity_veto_invalid:{sample['sample_name']}")
++        for veto in fidelity_veto.get('p0_vetoes') or []:
++            code = str(veto.get('canonical_code') or veto.get('code') or 'unknown_veto')
++            blocking_failures.append(f"fidelity_veto_p0:{sample['sample_name']}:{code}")
+     for key, payload in expected_checks.items():
+         if not payload['ok']:
+             blocking_failures.append(f"expected_count_mismatch:{key}")
+@@ -1256,11 +1294,13 @@ def build_final_docx_gate_summary(
+         'profile_name': profile_name,
+         'archive_root': str(resolved_archive_root),
+         'gate_passed': gate_passed,
++        'final_release_decision': 'go' if gate_passed else 'no-go',
+         'blocking_failures': blocking_failures,
+         'release_boundary_changed': False,
+         'default_release_policy': 'apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled',
+         'aggregate': aggregate,
+         'source_profile_gate': source_profile_gate,
++        'fidelity_veto_gate': fidelity_veto_gate,
+         'expected_checks': expected_checks,
+         'metadata_checks': metadata_checks,
+         'report_index': report_index,
+@@ -1283,10 +1323,12 @@ def build_final_docx_gate_summary(
+ 
+ def _build_final_docx_gate_markdown(summary: dict[str, Any]) -> str:
+     aggregate = summary.get('aggregate') or {}
++    fidelity_veto_gate = summary.get('fidelity_veto_gate') or {}
+     lines = [
+         '# Hybrid Final DOCX Release Evidence Gate',
+         '',
+         f"- Gate passed: `{str(summary.get('gate_passed')).lower()}`",
++        f"- Final release decision: `{summary.get('final_release_decision')}`",
+         f"- Profile: `{summary.get('profile_name')}`",
+         f"- Archive root: `{summary.get('archive_root')}`",
+         f"- Release policy: `{summary.get('default_release_policy')}`",
+@@ -1299,6 +1341,8 @@ def _build_final_docx_gate_markdown(summary: dict[str, Any]) -> str:
+         f"- Samples with table XML: `{aggregate.get('sample_with_table_xml_count')}`",
+         f"- Pages provenance exact match: `{aggregate.get('pages_provenance_match_sample_count')}`",
+         f"- Source manifest OK: `{aggregate.get('source_manifest_ok_sample_count')}`",
++        f"- Samples with fidelity veto artifact: `{aggregate.get('sample_with_fidelity_veto_artifact_count')}`",
++        f"- Samples with fidelity P0 veto: `{aggregate.get('sample_with_fidelity_p0_veto_count')}`",
+         f"- Explicit answer area samples: `{aggregate.get('explicit_answer_area_materialized_sample_count')}`",
+         f"- Answer section samples: `{aggregate.get('answer_section_materialized_sample_count')}`",
+         '',
+@@ -1311,9 +1355,28 @@ def _build_final_docx_gate_markdown(summary: dict[str, Any]) -> str:
+         f"- Negative baseline-only samples: `{(summary.get('source_profile_gate') or {}).get('negative_baseline_only_sample_count')}`",
+         f"- Formula audit-only samples: `{(summary.get('source_profile_gate') or {}).get('formula_audit_only_sample_count')}`",
+         '',
++        '## Fidelity Veto Gate',
++        '',
++        f"- Status: `{fidelity_veto_gate.get('status')}`",
++        f"- Contract version: `{fidelity_veto_gate.get('contract_version')}`",
++        f"- Samples with artifact: `{fidelity_veto_gate.get('available_sample_count')}`",
++        f"- Samples waiting on upstream artifact: `{fidelity_veto_gate.get('missing_sample_count')}`",
++        f"- Invalid artifacts: `{fidelity_veto_gate.get('invalid_sample_count')}`",
++        f"- P0 triggered: `{str(fidelity_veto_gate.get('p0_triggered')).lower()}`",
++        f"- Page vetoes: `{fidelity_veto_gate.get('page_veto_count')}`",
++        f"- Region vetoes: `{fidelity_veto_gate.get('region_veto_count')}`",
++        '',
+         '## Blocking Failures',
+         '',
+     ]
++    taxonomy_counts = fidelity_veto_gate.get('taxonomy_counts') or {}
++    if taxonomy_counts:
++        lines.append(
++            '- P0 taxonomy counts: `'
++            + ', '.join(f'{name}:{count}' for name, count in sorted(taxonomy_counts.items()))
++            + '`'
++        )
++        lines.append('')
+     failures = summary.get('blocking_failures') or []
+     if failures:
+         lines.extend(f'- `{failure}`' for failure in failures)
+@@ -1322,12 +1385,16 @@ def _build_final_docx_gate_markdown(summary: dict[str, Any]) -> str:
+     lines.extend(['', '## Samples', ''])
+     for sample in summary.get('samples') or []:
+         source_gate = sample.get('source_gate') or {}
++        fidelity_veto = sample.get('fidelity_veto') or {}
+         lines.append(
+             f"- `{sample.get('sample_name')}`: page_type=`{source_gate.get('document_page_type')}`, "
+             f"default=`{source_gate.get('default_source_profile')}`, supplemental=`{source_gate.get('supplemental_source_profile')}`, "
+             f"selected={source_gate.get('selected_pages_or_crops')}, fallback_pages={source_gate.get('fallback_pages')}, "
+-            f"source_gate_ok=`{str(source_gate.get('ok')).lower()}`"
++            f"source_gate_ok=`{str(source_gate.get('ok')).lower()}`, fidelity_status=`{fidelity_veto.get('status')}`, "
++            f"fidelity_no_go=`{str(fidelity_veto.get('no_go')).lower()}`, fidelity_p0_veto_count=`{fidelity_veto.get('p0_veto_count')}`"
+         )
++        if fidelity_veto.get('failed_taxonomy'):
++            lines.append(f"  - fidelity vetoes: {', '.join(fidelity_veto.get('failed_taxonomy') or [])}")
+     lines.extend(['', '## Repro', '```bash', str((summary.get('repro') or {}).get('command') or ''), '```'])
+     return '\n'.join(lines) + '\n'
+ 
+diff --git a/backend/app/services/pdf_to_word/fidelity_veto.py b/backend/app/services/pdf_to_word/fidelity_veto.py
+new file mode 100644
+index 0000000..0e4988b
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/fidelity_veto.py
+@@ -0,0 +1,429 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++from typing import Any, Sequence
++
++
++FIDELITY_VETO_CONTRACT_VERSION = 'pdf_to_word_fidelity_veto/v1'
++FIDELITY_VETO_TAXONOMY: dict[str, dict[str, Any]] = {
++    'critical_page_reading_order_break': {
++        'severity': 'p0',
++        'scope': 'page',
++        'category': 'reading_order',
++        'label': '关键页读序崩坏',
++        'subject_scope': ['science', 'math', 'chinese', 'english', 'general'],
++    },
++    'table_visual_adjacency_severe_misalignment': {
++        'severity': 'p0',
++        'scope': 'region',
++        'category': 'table_visual_adjacency',
++        'label': '表格视觉邻接严重错位',
++        'subject_scope': ['science', 'math', 'general'],
++    },
++    'formula_or_graphic_region_critical_distortion': {
++        'severity': 'p0',
++        'scope': 'region',
++        'category': 'formula_or_graphic',
++        'label': '公式/图形区关键失真',
++        'subject_scope': ['math', 'science', 'general'],
++    },
++    'english_reading_or_option_region_critical_distortion': {
++        'severity': 'p0',
++        'scope': 'region',
++        'category': 'english_reading_or_option',
++        'label': '英语阅读/选项区关键失真',
++        'subject_scope': ['english', 'general'],
++    },
++    'critical_fallback_not_visually_close_to_source': {
++        'severity': 'p0',
++        'scope': 'page',
++        'category': 'fallback_gap',
++        'label': '关键页 fallback 无法接近原 PDF',
++        'subject_scope': ['science', 'math', 'chinese', 'english', 'general'],
++    },
++}
++FIDELITY_VETO_CODE_ALIASES = {
++    'page_reading_order_break': 'critical_page_reading_order_break',
++    'reading_order_break': 'critical_page_reading_order_break',
++    'table_visual_adjacency_misaligned': 'table_visual_adjacency_severe_misalignment',
++    'table_adjacency_misaligned': 'table_visual_adjacency_severe_misalignment',
++    'formula_graphic_critical_distortion': 'formula_or_graphic_region_critical_distortion',
++    'formula_critical_distortion': 'formula_or_graphic_region_critical_distortion',
++    'graphic_critical_distortion': 'formula_or_graphic_region_critical_distortion',
++    'english_reading_option_critical_distortion': 'english_reading_or_option_region_critical_distortion',
++    'english_option_critical_distortion': 'english_reading_or_option_region_critical_distortion',
++    'fallback_page_not_visually_close': 'critical_fallback_not_visually_close_to_source',
++    'key_page_fallback_not_close': 'critical_fallback_not_visually_close_to_source',
++}
++FIDELITY_VETO_ARTIFACT_FIELDS = (
++    'fidelity_veto_path',
++    'visual_similarity_path',
++    'fidelity_report_path',
++)
++
++
++def _coerce_int(value: Any) -> int | None:
++    try:
++        return int(value)
++    except (TypeError, ValueError):
++        return None
++
++
++def _coerce_float(value: Any) -> float | None:
++    try:
++        return float(value)
++    except (TypeError, ValueError):
++        return None
++
++
++def _str_or_none(value: Any) -> str | None:
++    text = str(value or '').strip()
++    return text or None
++
++
++def _dedupe_paths(paths: Sequence[Path]) -> list[Path]:
++    result: list[Path] = []
++    seen: set[Path] = set()
++    for raw_path in paths:
++        path = raw_path.expanduser().resolve()
++        if path in seen:
++            continue
++        seen.add(path)
++        result.append(path)
++    return result
++
++
++def _normalize_evidence_paths(value: Any) -> list[str]:
++    if isinstance(value, list):
++        return [text for item in value if (text := _str_or_none(item))]
++    if isinstance(value, dict):
++        return [text for item in value.values() if (text := _str_or_none(item))]
++    if isinstance(value, str):
++        text = _str_or_none(value)
++        return [text] if text else []
++    return []
++
++
++def _canonicalize_veto_code(raw_code: str | None) -> str:
++    normalized = str(raw_code or '').strip()
++    return FIDELITY_VETO_CODE_ALIASES.get(normalized, normalized or 'unknown_veto')
++
++
++def _infer_scope(entry: dict[str, Any], *, default_scope: str | None = None) -> str:
++    explicit = _str_or_none(entry.get('scope'))
++    if explicit in {'page', 'region'}:
++        return explicit
++    if default_scope in {'page', 'region'}:
++        return str(default_scope)
++    if any(entry.get(key) is not None for key in ('region_id', 'region_kind', 'region_label', 'key_region_kind')):
++        return 'region'
++    return 'page'
++
++
++def _normalize_veto_entry(entry: dict[str, Any], *, default_scope: str | None = None) -> dict[str, Any]:
++    raw_code = _str_or_none(entry.get('code') or entry.get('reason_code') or entry.get('kind'))
++    canonical_code = _canonicalize_veto_code(raw_code)
++    taxonomy = FIDELITY_VETO_TAXONOMY.get(canonical_code) or {}
++    scope = _infer_scope(entry, default_scope=default_scope or _str_or_none(taxonomy.get('scope')))
++    summary = (
++        _str_or_none(entry.get('summary'))
++        or _str_or_none(entry.get('reason'))
++        or _str_or_none(entry.get('message'))
++        or _str_or_none(taxonomy.get('label'))
++        or canonical_code
++    )
++    severity = str(entry.get('severity') or taxonomy.get('severity') or 'p1').strip().lower()
++    return {
++        'code': raw_code or canonical_code,
++        'canonical_code': canonical_code,
++        'severity': severity,
++        'scope': scope,
++        'page_index': _coerce_int(entry.get('page_index') or entry.get('page')),
++        'region_kind': (
++            _str_or_none(entry.get('region_kind'))
++            or _str_or_none(entry.get('key_region_kind'))
++            or _str_or_none(entry.get('region_type'))
++        ),
++        'region_id': (
++            _str_or_none(entry.get('region_id'))
++            or _str_or_none(entry.get('region_label'))
++            or _str_or_none(entry.get('key_region_id'))
++        ),
++        'summary': summary,
++        'category': _str_or_none(taxonomy.get('category')),
++        'label': _str_or_none(taxonomy.get('label')),
++        'subject_scope': list(taxonomy.get('subject_scope') or []),
++        'triggered': bool(entry.get('triggered', True)),
++        'evidence_paths': _normalize_evidence_paths(
++            entry.get('evidence_paths') or entry.get('evidence') or entry.get('artifacts')
++        ),
++    }
++
++
++def _normalize_page_scores(payload: Any) -> list[float]:
++    if not isinstance(payload, list):
++        return []
++    scores: list[float] = []
++    for item in payload:
++        if not isinstance(item, dict):
++            continue
++        value = _coerce_float(item.get('score') if item.get('score') is not None else item.get('similarity_score'))
++        if value is not None:
++            scores.append(value)
++    return scores
++
++
++def _collect_raw_vetoes(payload: dict[str, Any]) -> list[dict[str, Any]]:
++    vetoes: list[dict[str, Any]] = []
++    for field_name, default_scope in (
++        ('vetoes', None),
++        ('page_vetoes', 'page'),
++        ('region_vetoes', 'region'),
++    ):
++        items = payload.get(field_name)
++        if not isinstance(items, list):
++            continue
++        for item in items:
++            if isinstance(item, dict):
++                vetoes.append(_normalize_veto_entry(item, default_scope=default_scope))
++    deduped: list[dict[str, Any]] = []
++    seen: set[tuple[Any, ...]] = set()
++    for item in vetoes:
++        if not item.get('triggered'):
++            continue
++        key = (
++            item.get('canonical_code'),
++            item.get('scope'),
++            item.get('page_index'),
++            item.get('region_kind'),
++            item.get('region_id'),
++            item.get('summary'),
++        )
++        if key in seen:
++            continue
++        seen.add(key)
++        deduped.append(item)
++    return deduped
++
++
++def _empty_summary(
++    *,
++    sample_name: str,
++    status: str,
++    artifact_candidates: list[Path],
++    artifact_path: Path | None = None,
++    error: str | None = None,
++) -> dict[str, Any]:
++    return {
++        'contract_version': FIDELITY_VETO_CONTRACT_VERSION,
++        'status': status,
++        'artifact_path': str(artifact_path) if artifact_path else None,
++        'artifact_candidates': [str(path) for path in artifact_candidates],
++        'sample_name': sample_name,
++        'subject': None,
++        'document_page_type': None,
++        'overall_score': None,
++        'human_review_required': False,
++        'page_score_count': 0,
++        'min_page_score': None,
++        'render_pair_count': 0,
++        'veto_count': 0,
++        'p0_veto_count': 0,
++        'page_veto_count': 0,
++        'region_veto_count': 0,
++        'taxonomy_counts': {},
++        'failed_taxonomy': [],
++        'vetoes': [],
++        'p0_vetoes': [],
++        'no_go': False,
++        'error': error,
++    }
++
++
++def summarize_fidelity_veto_payload(
++    payload: dict[str, Any],
++    *,
++    sample_name: str,
++    artifact_candidates: Sequence[Path] | None = None,
++    artifact_path: str | Path | None = None,
++) -> dict[str, Any]:
++    page_scores = _normalize_page_scores(payload.get('page_scores'))
++    render_pairs = payload.get('render_pairs') if isinstance(payload.get('render_pairs'), list) else []
++    vetoes = _collect_raw_vetoes(payload)
++    vetoes.sort(
++        key=lambda item: (
++            0 if str(item.get('severity')) == 'p0' else 1,
++            int(item.get('page_index') or 0),
++            str(item.get('scope') or ''),
++            str(item.get('canonical_code') or ''),
++        )
++    )
++    p0_vetoes = [item for item in vetoes if str(item.get('severity') or '').lower() == 'p0']
++    taxonomy_counts: dict[str, int] = {}
++    for item in p0_vetoes:
++        key = str(item.get('canonical_code') or 'unknown_veto')
++        taxonomy_counts[key] = int(taxonomy_counts.get(key, 0)) + 1
++
++    return {
++        'contract_version': (
++            _str_or_none(payload.get('contract_version'))
++            or _str_or_none(payload.get('report_type'))
++            or FIDELITY_VETO_CONTRACT_VERSION
++        ),
++        'status': 'present',
++        'artifact_path': str(Path(artifact_path).expanduser().resolve()) if artifact_path else None,
++        'artifact_candidates': [str(path) for path in (artifact_candidates or [])],
++        'sample_name': _str_or_none(payload.get('sample_name')) or sample_name,
++        'subject': _str_or_none(payload.get('subject')),
++        'document_page_type': _str_or_none(payload.get('document_page_type') or payload.get('page_type')),
++        'overall_score': _coerce_float(payload.get('overall_score') if payload.get('overall_score') is not None else payload.get('score')),
++        'human_review_required': bool(payload.get('human_review_required')),
++        'page_score_count': len(page_scores),
++        'min_page_score': min(page_scores) if page_scores else None,
++        'render_pair_count': len(render_pairs),
++        'veto_count': len(vetoes),
++        'p0_veto_count': len(p0_vetoes),
++        'page_veto_count': sum(1 for item in vetoes if item.get('scope') == 'page'),
++        'region_veto_count': sum(1 for item in vetoes if item.get('scope') == 'region'),
++        'taxonomy_counts': taxonomy_counts,
++        'failed_taxonomy': sorted(taxonomy_counts),
++        'vetoes': vetoes,
++        'p0_vetoes': p0_vetoes,
++        'no_go': bool(p0_vetoes),
++        'error': None,
++    }
++
++
++def _candidate_artifact_paths(
++    *,
++    sample_name: str,
++    sample_dir: str | Path,
++    archive_root: str | Path,
++    source_manifest: dict[str, Any] | None = None,
++) -> list[Path]:
++    sample_root = Path(sample_dir).expanduser().resolve()
++    archive_path = Path(archive_root).expanduser().resolve()
++    source_artifacts = (
++        source_manifest.get('source_artifacts')
++        if isinstance(source_manifest, dict) and isinstance(source_manifest.get('source_artifacts'), dict)
++        else {}
++    )
++    candidates: list[Path] = []
++    for field_name in FIDELITY_VETO_ARTIFACT_FIELDS:
++        path_value = source_artifacts.get(field_name) if isinstance(source_artifacts, dict) else None
++        if path_value:
++            candidates.append(Path(str(path_value)))
++    candidates.extend([
++        sample_root / 'fidelity_veto.json',
++        sample_root / 'visual_similarity.json',
++        archive_path / 'reports' / 'fidelity-veto' / f'{sample_name}.json',
++        archive_path / 'reports' / 'visual_similarity' / f'{sample_name}.json',
++    ])
++    return _dedupe_paths(candidates)
++
++
++def load_fidelity_veto_summary(
++    *,
++    sample_name: str,
++    sample_dir: str | Path,
++    archive_root: str | Path,
++    source_manifest: dict[str, Any] | None = None,
++) -> dict[str, Any]:
++    candidates = _candidate_artifact_paths(
++        sample_name=sample_name,
++        sample_dir=sample_dir,
++        archive_root=archive_root,
++        source_manifest=source_manifest,
++    )
++    artifact_path = next((path for path in candidates if path.exists() and path.is_file()), None)
++    if artifact_path is None:
++        return _empty_summary(sample_name=sample_name, status='missing', artifact_candidates=candidates)
++    try:
++        payload = json.loads(artifact_path.read_text(encoding='utf-8'))
++    except Exception as exc:
++        return _empty_summary(
++            sample_name=sample_name,
++            status='invalid',
++            artifact_candidates=candidates,
++            artifact_path=artifact_path,
++            error=str(exc),
++        )
++    if not isinstance(payload, dict):
++        return _empty_summary(
++            sample_name=sample_name,
++            status='invalid',
++            artifact_candidates=candidates,
++            artifact_path=artifact_path,
++            error='fidelity_veto_payload_not_object',
++        )
++    return summarize_fidelity_veto_payload(
++        payload,
++        sample_name=sample_name,
++        artifact_candidates=candidates,
++        artifact_path=artifact_path,
++    )
++
++
++def build_fidelity_veto_gate_summary(sample_summaries: Sequence[dict[str, Any]]) -> dict[str, Any]:
++    samples: list[dict[str, Any]] = [dict(item) for item in sample_summaries if isinstance(item, dict)]
++    available_sample_count = sum(1 for sample in samples if sample.get('status') == 'present')
++    missing_sample_count = sum(1 for sample in samples if sample.get('status') == 'missing')
++    invalid_sample_count = sum(1 for sample in samples if sample.get('status') == 'invalid')
++    page_veto_count = sum(int(sample.get('page_veto_count') or 0) for sample in samples)
++    region_veto_count = sum(int(sample.get('region_veto_count') or 0) for sample in samples)
++    p0_veto_count = sum(int(sample.get('p0_veto_count') or 0) for sample in samples)
++    sample_with_any_veto_count = sum(1 for sample in samples if int(sample.get('veto_count') or 0) > 0)
++    sample_with_p0_veto_count = sum(1 for sample in samples if int(sample.get('p0_veto_count') or 0) > 0)
++    samples_requiring_human_review = sorted({
++        str(sample.get('sample_name') or '')
++        for sample in samples
++        if sample.get('human_review_required')
++    })
++    taxonomy_counts: dict[str, int] = {}
++    for sample in samples:
++        for key, value in (sample.get('taxonomy_counts') or {}).items():
++            taxonomy_counts[str(key)] = int(taxonomy_counts.get(str(key), 0)) + int(value or 0)
++
++    if invalid_sample_count:
++        status = 'invalid_artifact_present'
++    elif available_sample_count == 0:
++        status = 'waiting_for_upstream_artifact'
++    elif missing_sample_count:
++        status = 'partial_coverage'
++    else:
++        status = 'active'
++
++    return {
++        'status': status,
++        'contract_version': FIDELITY_VETO_CONTRACT_VERSION,
++        'supported_p0_veto_codes': sorted(FIDELITY_VETO_TAXONOMY),
++        'available_sample_count': available_sample_count,
++        'missing_sample_count': missing_sample_count,
++        'invalid_sample_count': invalid_sample_count,
++        'sample_with_any_veto_count': sample_with_any_veto_count,
++        'sample_with_p0_veto_count': sample_with_p0_veto_count,
++        'page_veto_count': page_veto_count,
++        'region_veto_count': region_veto_count,
++        'p0_veto_count': p0_veto_count,
++        'p0_triggered': p0_veto_count > 0,
++        'taxonomy_counts': dict(sorted(taxonomy_counts.items())),
++        'triggered_sample_names': sorted(
++            str(sample.get('sample_name') or '')
++            for sample in samples
++            if int(sample.get('p0_veto_count') or 0) > 0
++        ),
++        'samples_requiring_human_review': samples_requiring_human_review,
++        'samples': [
++            {
++                'sample_name': str(sample.get('sample_name') or ''),
++                'status': sample.get('status'),
++                'overall_score': sample.get('overall_score'),
++                'veto_count': int(sample.get('veto_count') or 0),
++                'p0_veto_count': int(sample.get('p0_veto_count') or 0),
++                'failed_taxonomy': list(sample.get('failed_taxonomy') or []),
++                'no_go': bool(sample.get('no_go')),
++            }
++            for sample in samples
++        ],
++    }
+diff --git a/backend/tests/test_pdf_to_word_fidelity_report.py b/backend/tests/test_pdf_to_word_fidelity_report.py
+new file mode 100644
+index 0000000..bb3ab9c
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_fidelity_report.py
+@@ -0,0 +1,385 @@
++from __future__ import annotations
++
++import json
++from pathlib import Path
++import zipfile
++
++from app.services.pdf_to_word.fidelity_veto import load_fidelity_veto_summary
++from app.services.pdf_to_word.model_eval_runner import build_final_docx_gate_summary, write_final_docx_gate_artifacts
++
++
++FIXTURES_ROOT = Path(__file__).resolve().parent / 'fixtures' / 'pdf_to_word' / 'fidelity' / 'veto'
++
++
++def _write_minimal_docx(path: Path, *, media_count: int = 0, include_table: bool = False) -> None:
++    document_xml = (
++        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
++        '<w:body>'
++        + ('<w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl>' if include_table else '<w:p/>')
++        + '</w:body></w:document>'
++    )
++    with zipfile.ZipFile(path, 'w') as archive:
++        archive.writestr('word/document.xml', document_xml)
++        for index in range(media_count):
++            archive.writestr(f'word/media/image{index + 1}.png', b'fake')
++
++
++def _strategy_rule_page_type(page_type: str) -> str:
++    return {
++        'science_experiment_table_and_image_mixed': 'science_or_math_table_heavy',
++        'math_exercise_with_sparse_image_and_table': 'science_or_math_table_heavy',
++    }.get(page_type, page_type)
++
++
++def _build_archive(
++    tmp_path: Path,
++    *,
++    sample_name: str,
++    page_type: str,
++    media_count: int,
++    include_table: bool,
++    fallback_pages: list[int],
++    document_fallback: bool,
++    fidelity_veto_fixture: str | None = None,
++) -> Path:
++    archive_root = tmp_path / 'final-archive'
++    profile_root = archive_root / 'profiles' / 'hybrid_experimental'
++    reports_root = archive_root / 'reports'
++    source_root = tmp_path / 'hybrid-e2e-validation'
++    phase3_root = tmp_path / 'phase3-paddle-quality'
++    strategy_root = tmp_path / 'p1-source-selection'
++    reports_root.mkdir(parents=True)
++    source_root.mkdir(parents=True)
++    phase3_root.mkdir(parents=True)
++    strategy_root.mkdir(parents=True)
++
++    report_files = {
++        'hybrid_experimental_authoritative_archive_report.json': reports_root / 'hybrid_experimental_authoritative_archive_report.json',
++        'hybrid_experimental_authoritative_archive_report.md': reports_root / 'hybrid_experimental_authoritative_archive_report.md',
++    }
++    report_files['hybrid_experimental_authoritative_archive_report.json'].write_text(
++        json.dumps(
++            {
++                'aggregate': {
++                    'explicit_answer_area_materialized_sample_count': 0,
++                    'answer_section_materialized_sample_count': 0,
++                }
++            }
++        )
++        + '\n',
++        encoding='utf-8',
++    )
++    report_files['hybrid_experimental_authoritative_archive_report.md'].write_text('# Gate\n', encoding='utf-8')
++    (archive_root / 'README.md').write_text(
++        'hybrid_experimental uses archive-generated output.docx / metrics.json / warnings.json.\n',
++        encoding='utf-8',
++    )
++
++    sample_dir = profile_root / sample_name
++    sample_dir.mkdir(parents=True)
++    source_dir = source_root / sample_name
++    source_dir.mkdir(parents=True)
++    hybrid_pages_path = source_dir / 'hybrid-pages.jsonl'
++    hybrid_pages_path.write_text('{"page_index":1,"blocks":[]}\n', encoding='utf-8')
++    validator_report = {
++        'fallback_pages': len(fallback_pages),
++        'page_fallback_rate': round(len(fallback_pages) / 1.0, 4) if fallback_pages else 0.0,
++        'document_fallback': document_fallback,
++    }
++    (source_dir / 'validator-report.json').write_text(json.dumps(validator_report) + '\n', encoding='utf-8')
++    (sample_dir / 'pages.jsonl').write_text(hybrid_pages_path.read_text(encoding='utf-8'), encoding='utf-8')
++    (sample_dir / 'metrics.json').write_text('{}\n', encoding='utf-8')
++    (sample_dir / 'warnings.json').write_text('[]\n', encoding='utf-8')
++    (sample_dir / 'validator-report.json').write_text(json.dumps(validator_report) + '\n', encoding='utf-8')
++    _write_minimal_docx(sample_dir / 'output.docx', media_count=media_count, include_table=include_table)
++
++    source_artifacts = {
++        'hybrid_pages_path': str(hybrid_pages_path),
++        'validator_report_path': str(source_dir / 'validator-report.json'),
++    }
++    if fidelity_veto_fixture:
++        source_artifacts['fidelity_veto_path'] = str(FIXTURES_ROOT / fidelity_veto_fixture)
++    (sample_dir / 'source_manifest.json').write_text(
++        json.dumps(
++            {
++                'source_dir': str(source_dir),
++                'copied_files': ['pages.jsonl', 'validator-report.json'],
++                'generated_files': ['output.docx', 'metrics.json', 'warnings.json'],
++                'missing_files': [],
++                'source_artifacts': source_artifacts,
++            }
++        )
++        + '\n',
++        encoding='utf-8',
++    )
++
++    profile_manifest = {
++        'profile_name': 'hybrid_experimental',
++        'sample_count': 1,
++        'samples': {
++            sample_name: {
++                'sample_name': sample_name,
++                'source_dir': str(source_dir),
++            }
++        },
++    }
++    (profile_root / 'profile_manifest.json').write_text(json.dumps(profile_manifest) + '\n', encoding='utf-8')
++    (archive_root / 'archive_manifest.json').write_text(
++        json.dumps(
++            {
++                'profiles': {'hybrid_experimental': profile_manifest},
++                'reports': {name: str(path) for name, path in report_files.items()},
++                'report_file_count': len(report_files),
++            }
++        )
++        + '\n',
++        encoding='utf-8',
++    )
++
++    phase3_sample_root = phase3_root / sample_name
++    phase3_sample_root.mkdir(parents=True)
++    per_source_merge_audit = {
++        'sample_name': sample_name,
++        'rows': [
++            {
++                'sample_name': sample_name,
++                'page_index': 1,
++                'page_type': page_type,
++                'candidate_kind': 'image',
++                'source_profile': 'paddleocr_vl',
++                'candidate_count': 1,
++                'accepted_count': 1,
++                'rejected_count': 0,
++                'ambiguous_count': 0,
++                'skipped_count': 0,
++                'fallback_count': 0,
++                'final_accepted_count': 1,
++                'decision_counts': {'accepted': 1},
++                'merge_reason_counts': {'accepted_into_final_output': 1},
++                'fallback_reason_counts': {},
++                'candidate_ids': ['paddleocr_vl:p1:b1'],
++            }
++        ],
++    }
++    profile_audits = {
++        'mineru_full': {
++            'candidate_count': 1,
++            'accepted_count': 1,
++            'rejected_count': 0,
++            'fallback_count': 0,
++            'final_accepted_count': 1,
++            'latency_seconds': 0.1,
++            'selected_pages_or_crops': [1],
++            'document_page_type': page_type,
++            'default_source_profile': 'mineru_full',
++        },
++        'paddleocr_vl': {
++            'candidate_count': 1,
++            'accepted_count': 1,
++            'rejected_count': 0,
++            'fallback_count': 0,
++            'final_accepted_count': 1,
++            'latency_seconds': 0.2,
++            'selected_pages_or_crops': [1],
++            'document_page_type': page_type,
++            'default_source_profile': 'mineru_full',
++        },
++    }
++    (phase3_sample_root / 'per-source-merge-audit.json').write_text(
++        json.dumps(per_source_merge_audit) + '\n',
++        encoding='utf-8',
++    )
++    (phase3_sample_root / 'profile-audits.json').write_text(json.dumps(profile_audits) + '\n', encoding='utf-8')
++    (phase3_root / 'report.json').write_text(
++        json.dumps(
++            {
++                'trigger_policy': {
++                    'mode': 'quality',
++                    'source_selection_required': True,
++                },
++                'samples': [
++                    {
++                        'sample_name': sample_name,
++                        'source_selection': {
++                            'document_page_type': page_type,
++                            'page_type': page_type,
++                            'default_source_profile': 'mineru_full',
++                            'supplemental_source_profile': 'paddleocr_vl',
++                            'enhancement_page_scope': [1],
++                            'selected_pages_or_crops': [1],
++                        },
++                        'selected_pages': [1],
++                        'page_scope': [1],
++                        'fallback_pages': fallback_pages,
++                        'document_fallback': document_fallback,
++                        'paddle_noise_interpretation': 'paddle_contributed_to_final_output',
++                        'per_source_merge_audit': per_source_merge_audit,
++                        'per_source_merge_audit_path': str(phase3_sample_root / 'per-source-merge-audit.json'),
++                        'profile_audits_path': str(phase3_sample_root / 'profile-audits.json'),
++                        'validator_report_path': str(sample_dir / 'validator-report.json'),
++                    }
++                ],
++            }
++        )
++        + '\n',
++        encoding='utf-8',
++    )
++    (strategy_root / 'source_selection_strategy.json').write_text(
++        json.dumps(
++            {
++                'release_policy': 'apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled',
++                'sample_page_type_matrix': [{'sample': sample_name, 'page_type': page_type}],
++                'source_selection_rules': [
++                    {
++                        'page_type': _strategy_rule_page_type(page_type),
++                        'default_source_profile': 'mineru_full',
++                        'supplemental_source_profile': 'paddleocr_vl',
++                    },
++                    {
++                        'page_type': 'formula_suspected',
++                        'default_source_profile': 'audit_only',
++                        'supplemental_source_profile': None,
++                    },
++                ],
++            }
++        )
++        + '\n',
++        encoding='utf-8',
++    )
++    return archive_root
++
++
++def test_final_fidelity_report_turns_high_score_p0_veto_into_no_go(tmp_path: Path):
++    archive_root = _build_archive(
++        tmp_path,
++        sample_name='五下科学',
++        page_type='science_experiment_table_and_image_mixed',
++        media_count=2,
++        include_table=True,
++        fallback_pages=[],
++        document_fallback=False,
++        fidelity_veto_fixture='science_table_region_p0.json',
++    )
++
++    summary = build_final_docx_gate_summary(
++        output_dir=tmp_path / 'final-docx-gate',
++        run_label='fidelity-veto-no-go',
++        archive_root=archive_root,
++        expected={
++            'sample_count': 1,
++            'authoritative_docx_sample_count': 1,
++            'openable_docx_sample_count': 1,
++            'sample_with_word_media_count': 1,
++            'sample_with_table_xml_count': 1,
++            'explicit_answer_area_materialized_sample_count': 0,
++            'answer_section_materialized_sample_count': 0,
++        },
++    )
++
++    assert summary['gate_passed'] is False
++    assert summary['final_release_decision'] == 'no-go'
++    assert summary['fidelity_veto_gate']['p0_triggered'] is True
++    assert summary['fidelity_veto_gate']['sample_with_p0_veto_count'] == 1
++    assert summary['fidelity_veto_gate']['page_veto_count'] == 1
++    assert summary['fidelity_veto_gate']['region_veto_count'] == 1
++    assert summary['fidelity_veto_gate']['samples_requiring_human_review'] == ['五下科学']
++    assert 'fidelity_veto_p0:五下科学:critical_page_reading_order_break' in summary['blocking_failures']
++    assert 'fidelity_veto_p0:五下科学:table_visual_adjacency_severe_misalignment' in summary['blocking_failures']
++
++    sample = summary['samples'][0]
++    assert sample['fidelity_veto']['status'] == 'present'
++    assert sample['fidelity_veto']['overall_score'] == 97.8
++    assert sample['fidelity_veto']['no_go'] is True
++    assert set(sample['fidelity_veto']['failed_taxonomy']) == {
++        'critical_page_reading_order_break',
++        'table_visual_adjacency_severe_misalignment',
++    }
++
++    output_dir = tmp_path / 'fidelity-report'
++    write_final_docx_gate_artifacts(summary, output_dir)
++    markdown = (output_dir / 'final_docx_gate_report.md').read_text(encoding='utf-8')
++    assert '## Fidelity Veto Gate' in markdown
++    assert 'critical_page_reading_order_break' in markdown
++    assert 'table_visual_adjacency_severe_misalignment' in markdown
++
++
++def test_fidelity_veto_contract_normalizes_cross_subject_taxonomy():
++    cases = [
++        (
++            'science_table_region_p0.json',
++            'science',
++            {'critical_page_reading_order_break', 'table_visual_adjacency_severe_misalignment'},
++        ),
++        (
++            'math_formula_region_p0.json',
++            'math',
++            {'formula_or_graphic_region_critical_distortion'},
++        ),
++        (
++            'english_reading_region_p0.json',
++            'english',
++            {'english_reading_or_option_region_critical_distortion'},
++        ),
++        (
++            'chinese_reading_order_p0.json',
++            'chinese',
++            {'critical_page_reading_order_break'},
++        ),
++        (
++            'fallback_page_p0.json',
++            'general',
++            {'critical_fallback_not_visually_close_to_source'},
++        ),
++    ]
++
++    for fixture_name, subject, expected_taxonomy in cases:
++        summary = load_fidelity_veto_summary(
++            sample_name='fixture-sample',
++            sample_dir=FIXTURES_ROOT,
++            archive_root=FIXTURES_ROOT,
++            source_manifest={
++                'source_artifacts': {
++                    'fidelity_veto_path': str(FIXTURES_ROOT / fixture_name),
++                }
++            },
++        )
++        assert summary['status'] == 'present'
++        assert summary['subject'] == subject
++        assert summary['no_go'] is True
++        assert expected_taxonomy.issubset(set(summary['failed_taxonomy']))
++
++
++def test_final_fidelity_report_allows_missing_veto_artifact_until_upstream_arrives(tmp_path: Path):
++    archive_root = _build_archive(
++        tmp_path,
++        sample_name='数学试卷',
++        page_type='math_exam_image_dense',
++        media_count=1,
++        include_table=False,
++        fallback_pages=[],
++        document_fallback=False,
++        fidelity_veto_fixture=None,
++    )
++
++    summary = build_final_docx_gate_summary(
++        output_dir=tmp_path / 'final-docx-gate',
++        run_label='fidelity-veto-pending',
++        archive_root=archive_root,
++        expected={
++            'sample_count': 1,
++            'authoritative_docx_sample_count': 1,
++            'openable_docx_sample_count': 1,
++            'sample_with_word_media_count': 1,
++            'sample_with_table_xml_count': 0,
++            'explicit_answer_area_materialized_sample_count': 0,
++            'answer_section_materialized_sample_count': 0,
++        },
++    )
++
++    assert summary['gate_passed'] is True
++    assert summary['final_release_decision'] == 'go'
++    assert summary['fidelity_veto_gate']['status'] == 'waiting_for_upstream_artifact'
++    assert summary['fidelity_veto_gate']['available_sample_count'] == 0
++    assert summary['fidelity_veto_gate']['missing_sample_count'] == 1
++    assert summary['samples'][0]['fidelity_veto']['status'] == 'missing'
++    assert not any(item.startswith('fidelity_veto_p0:') for item in summary['blocking_failures'])
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/veto/science_table_region_p0.json b/backend/tests/fixtures/pdf_to_word/fidelity/veto/science_table_region_p0.json
+new file mode 100644
+index 0000000..f7f56eb
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/veto/science_table_region_p0.json
+@@ -0,0 +1,44 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto/v1",
++  "sample_name": "五下科学",
++  "subject": "science",
++  "document_page_type": "science_experiment_table_and_image_mixed",
++  "overall_score": 97.8,
++  "page_scores": [
++    {
++      "page_index": 3,
++      "score": 0.97
++    },
++    {
++      "page_index": 4,
++      "score": 0.96
++    }
++  ],
++  "render_pairs": [
++    {
++      "page_index": 4,
++      "pdf_render_path": "renders/source-p4.png",
++      "docx_render_path": "renders/docx-p4.png"
++    }
++  ],
++  "human_review_required": true,
++  "page_vetoes": [
++    {
++      "code": "critical_page_reading_order_break",
++      "page_index": 4,
++      "summary": "实验步骤与观察记录串文，关键页读序崩坏。"
++    }
++  ],
++  "region_vetoes": [
++    {
++      "code": "table_visual_adjacency_severe_misalignment",
++      "page_index": 4,
++      "region_kind": "table",
++      "region_id": "experiment-table",
++      "summary": "实验记录表与题干/图片邻接关系严重错位。",
++      "evidence_paths": [
++        "diffs/science-table-overlay.png"
++      ]
++    }
++  ]
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/veto/math_formula_region_p0.json b/backend/tests/fixtures/pdf_to_word/fidelity/veto/math_formula_region_p0.json
+new file mode 100644
+index 0000000..5d86be6
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/veto/math_formula_region_p0.json
+@@ -0,0 +1,23 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto/v1",
++  "sample_name": "数学八年级",
++  "subject": "math",
++  "document_page_type": "math_exercise_with_sparse_image_and_table",
++  "overall_score": 96.4,
++  "page_scores": [
++    {
++      "page_index": 6,
++      "score": 0.94
++    }
++  ],
++  "vetoes": [
++    {
++      "code": "formula_graphic_critical_distortion",
++      "scope": "region",
++      "page_index": 6,
++      "region_kind": "formula",
++      "region_id": "formula-q12",
++      "summary": "公式与几何图组合区域关键失真。"
++    }
++  ]
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/veto/english_reading_region_p0.json b/backend/tests/fixtures/pdf_to_word/fidelity/veto/english_reading_region_p0.json
+new file mode 100644
+index 0000000..f018a40
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/veto/english_reading_region_p0.json
+@@ -0,0 +1,22 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto/v1",
++  "sample_name": "英语八年级",
++  "subject": "english",
++  "document_page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "overall_score": 95.9,
++  "page_scores": [
++    {
++      "page_index": 8,
++      "score": 0.93
++    }
++  ],
++  "region_vetoes": [
++    {
++      "code": "english_reading_option_critical_distortion",
++      "page_index": 8,
++      "region_kind": "reading_options",
++      "region_id": "reading-section-b",
++      "summary": "阅读材料与选项缩进/间距严重失真。"
++    }
++  ]
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/veto/chinese_reading_order_p0.json b/backend/tests/fixtures/pdf_to_word/fidelity/veto/chinese_reading_order_p0.json
+new file mode 100644
+index 0000000..276ab32
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/veto/chinese_reading_order_p0.json
+@@ -0,0 +1,20 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto/v1",
++  "sample_name": "语文六年级",
++  "subject": "chinese",
++  "document_page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "overall_score": 96.8,
++  "page_scores": [
++    {
++      "page_index": 2,
++      "score": 0.95
++    }
++  ],
++  "vetoes": [
++    {
++      "code": "page_reading_order_break",
++      "page_index": 2,
++      "summary": "长文与题目区换行/段序错乱，人工阅读顺序崩坏。"
++    }
++  ]
++}
+diff --git a/backend/tests/fixtures/pdf_to_word/fidelity/veto/fallback_page_p0.json b/backend/tests/fixtures/pdf_to_word/fidelity/veto/fallback_page_p0.json
+new file mode 100644
+index 0000000..9baa07f
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/fidelity/veto/fallback_page_p0.json
+@@ -0,0 +1,20 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto/v1",
++  "sample_name": "通用样例",
++  "subject": "general",
++  "document_page_type": "language_exercise_sparse_media_with_fallback_pages",
++  "overall_score": 97.1,
++  "page_scores": [
++    {
++      "page_index": 11,
++      "score": 0.91
++    }
++  ],
++  "page_vetoes": [
++    {
++      "code": "fallback_page_not_visually_close",
++      "page_index": 11,
++      "summary": "关键页 fallback 输出无法在视觉上接近原 PDF。"
++    }
++  ]
++}

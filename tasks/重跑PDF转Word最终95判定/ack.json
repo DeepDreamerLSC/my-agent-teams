@@ -1,0 +1,7 @@
+{
+  "task_id": "重跑PDF转Word最终95判定",
+  "agent": "qa-1",
+  "status": "acknowledged",
+  "summary": "已读取 instruction.md，开始执行 PDF→Word 最终 95% 只读复验。",
+  "acknowledged_at": "2026-05-19T17:25:50+08:00"
+}

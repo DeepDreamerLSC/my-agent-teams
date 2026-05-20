@@ -1,0 +1,46 @@
+{
+  "task_id": "科学实验页表格与图片区关键区域视觉门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T22:16:09+08:00",
+  "status": "approve",
+  "summary": "审查通过。上一轮阻塞项已被正确修复：science mixed page 现在对关键 source region（至少 `table` / `image` / `experiment_record` / `question_stem`）和必要关系定义（至少 image-question、table-question、record-table）建立了强 contract。缺失关键 region 或缺失关键 relation 时，summary/page 都会进入 `status=not_ready`，并产出 `science_required_region_missing` / `science_required_relation_missing` blocker，不再出现 relation_scores 整体消失却高分静默通过的情况。原有表格失真、图片区绑定断裂、实验记录区邻接异常等 veto 语义保持有效。由于 `qa_gate_state` 仍为 pending，当前建议进入 QA，而不是直接最终收口。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "note",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/verify.json",
+      "finding": "当前任务目录仍无 verify.json，且 task.json 中 `qa_gate_state=pending`。",
+      "recommendation": "本轮 review 仅表示代码审查通过；请尽快由 qa-1 将科学实验页结果并入全学科人工视觉复验，确认公共 visual_similarity / fidelity_veto 链路对 `status=not_ready`、`blockers[]`、`recommended_common_code` 的消费与本轮 contract 一致。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/artifacts/task-c1c89373.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/app/services/pdf_to_word/science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/test_pdf_to_word_science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_happy.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_table_fail.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_image_binding_fail.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/science-visual-rereview-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_science_visual_gate.py -q -o cache_dir=/private/tmp/science-visual-rereview-cache --basetemp=/private/tmp/science-visual-rereview-tmp",
+      "result": "6 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本轮结论。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && git diff --check -- backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/science",
+      "result": "通过，未发现 patch / whitespace 问题。"
+    },
+    {
+      "command": "最小复现：基于 happy fixture 分别删除 `table` source region、删除全部 `source_regions`、以及把所有 `adjacent_to` 清空后重跑 `evaluate_science_visual_gate()`",
+      "result": "三种情况下均返回 `status=not_ready`；分别触发 `science_required_region_missing` 或 `science_required_relation_missing` blocker，且 `overall_score` 被压到 0.0、`human_review_required=true`，证明上一轮 contract 缺口已被封住。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

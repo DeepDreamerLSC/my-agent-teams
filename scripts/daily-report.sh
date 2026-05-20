@@ -7,7 +7,31 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TASKS_ROOT="$WORKSPACE_ROOT/tasks"
-PUSH_SCRIPT="$SCRIPT_DIR/feishu-push.sh"
+CONFIG_FILE="${FEISHU_CONFIG_PATH:-$WORKSPACE_ROOT/config.local.json}"
+
+load_push_script_from_config() {
+  python3 - "$CONFIG_FILE" <<'PYCONFIG'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1]).expanduser()
+if not path.exists():
+    raise SystemExit(0)
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+notifications = payload.get('notifications') or {}
+print(str(notifications.get('push_script') or ''))
+PYCONFIG
+}
+
+PUSH_SCRIPT="${PUSH_SCRIPT:-}"
+if [ -z "$PUSH_SCRIPT" ]; then
+  PUSH_SCRIPT="$(load_push_script_from_config 2>/dev/null || true)"
+fi
+PUSH_SCRIPT="${PUSH_SCRIPT:-$SCRIPT_DIR/alert-card.sh}"
+TODAY=$(date +%F)
 
 REPORT=$(python3 << 'PYREPORT'
 import json
@@ -132,5 +156,29 @@ print("\n".join(lines))
 PYREPORT
 )
 
-# 推送到飞书
-echo "$REPORT" | "$PUSH_SCRIPT"
+SUMMARY=$(REPORT_BODY="$REPORT" python3 - <<'PYSUMMARY'
+import os
+import re
+
+text = os.environ.get("REPORT_BODY", "")
+done_active = re.search(r"完成:\s*(\d+)\s*\|\s*在途:\s*(\d+)", text)
+online = re.search(r"在线 Agent:\s*(\d+)/(\d+)", text)
+parts = []
+if done_active:
+    parts.append(f"完成 {done_active.group(1)}")
+    parts.append(f"在途 {done_active.group(2)}")
+if online:
+    parts.append(f"在线 {online.group(1)}/{online.group(2)}")
+print(" | ".join(parts) if parts else "已生成当日任务进展摘要")
+PYSUMMARY
+)
+
+NOTIFY_PAYLOAD=$(cat <<EOF
+【小秘日报已生成】
+任务：daily-report-${TODAY}
+摘要：${SUMMARY}
+下一步：查看日报全文并优先处理阻塞项
+EOF
+)
+
+printf '%s\n\n%s\n' "$NOTIFY_PAYLOAD" "$REPORT" | "$PUSH_SCRIPT"

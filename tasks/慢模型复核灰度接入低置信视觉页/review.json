@@ -1,0 +1,46 @@
+{
+  "task_id": "慢模型复核灰度接入低置信视觉页",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T23:05:39+08:00",
+  "status": "approve",
+  "summary": "审查通过。dev-2 已按上一轮 review 的最小返修口径完成修复：near-threshold 判定现已收紧为闭开区间 [threshold, threshold+review_band)，页级/区域级 hard-fail 会在 slow review 前被短路为 `hard_fail_page_or_region`，不再触发 qwen3_vl_8b；同时已补齐 3 条回归测试覆盖 lower-bound、hard-fail page、hard-fail region 集成跳过。默认同步路径仍保持完全禁用，quality/hybrid_async 下仅 low-confidence 且非 hard-fail 页面允许灰度触发慢模型。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页",
+      "finding": "当前任务目录里仍没有新的顶层 `verify.json`；现有 `history/verify.20260519T224247.json` 还是返修前旧校验记录，仍写着 13 条用例通过。",
+      "recommendation": "进入 QA 门禁时建议补一份与本轮返修一致的最新 verify 产物，明确记录 16 条用例通过及 hard-fail / lower-bound 回归场景。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/artifacts/task-2d70ea1e.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/history/verify.20260519T224247.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider tests/test_pdf_to_word_visual_similarity_slow_review.py tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-slow-review-review-r2 --basetemp=/private/tmp/chiralium-pytest-temp-visual-slow-review-review-r2",
+      "result": "16 passed, 4 warnings。确认新增 3 条返修回归测试已通过。"
+    },
+    {
+      "command": "人工复现 lower-bound 窗口：page_render_similarity=0.92 / threshold=0.92 与 page_render_similarity=0.919 / threshold=0.92",
+      "result": "前者命中 slow review（decision_reason=slow_review_worker_not_configured），后者不再触发（decision_reason=page_confident_no_slow_review），证明 near-threshold 已收紧为 [threshold, threshold+review_band)。"
+    },
+    {
+      "command": "人工复现 gate hard-fail 场景：将 key_region bbox_iou 降到 0.70 后调用 build_visual_similarity_gate_report(..., requested_mode='quality')",
+      "result": "slow_model_review.pages[0] 返回 triggered=false、decision_reason=hard_fail_page_or_region，且整体 report.status=failed / failure_code=visual_similarity_veto_triggered，证明 hard-fail region 不会再送入慢模型灰度路径。"
+    },
+    {
+      "command": "静态审阅 visual_similarity_slow_review.py 与 visual_similarity_gate.py",
+      "result": "确认 slow review 调度顺序已调整为：default_sync / artifact_not_ready / rollout_disabled -> hard_fail_page_or_region -> low-confidence trigger -> budget / fallback / completed；`_is_near_threshold()` 显式采用 `minimum <= value < minimum + review_band`。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

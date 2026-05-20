@@ -1,0 +1,708 @@
+diff --git a/backend/app/services/pdf_to_word/exercise_detector.py b/backend/app/services/pdf_to_word/exercise_detector.py
+index 45a052f..9d6afa9 100644
+--- a/backend/app/services/pdf_to_word/exercise_detector.py
++++ b/backend/app/services/pdf_to_word/exercise_detector.py
+@@ -73,6 +73,7 @@ def detect_exercise_document(
+                     current_item,
+                     block,
+                     pending_visuals_by_question=pending_visuals_by_question,
++                    warnings=warnings,
+                 )
+                 if handled:
+                     continue
+@@ -95,6 +96,7 @@ def detect_exercise_document(
+                 current_item,
+                 block,
+                 pending_visuals_by_question=pending_visuals_by_question,
++                warnings=warnings,
+             )
+             if handled:
+                 continue
+@@ -321,6 +323,7 @@ def _attach_visual_block(
+     block: PDFSourceBlock,
+     *,
+     pending_visuals_by_question: dict[tuple[int, str], list[ContentBlock]],
++    warnings: list[str],
+ ) -> tuple[ExerciseSection, ExerciseItem | None, dict[tuple[int, str], list[ContentBlock]], bool]:
+     content = _block_to_content(block)
+     assigned_ref = _assigned_question_ref(block)
+@@ -339,12 +342,57 @@ def _attach_visual_block(
+             True,
+         )
+ 
++    if block.kind == 'table':
++        if _table_routes_to_materials(block):
++            return _append_material_block(section, content, block), current_item, pending_visuals_by_question, True
++        if current_item is not None:
++            return section, _append_visual_block_to_item(current_item, content, block), pending_visuals_by_question, True
++        for warning in _table_document_warnings(block, content):
++            _append_document_warning(warnings, warning)
++        _append_document_warning(warnings, _format_table_assignment_warning(block))
++        return section, current_item, pending_visuals_by_question, True
++
+     if current_item is not None:
+         return section, _append_visual_block_to_item(current_item, content, block), pending_visuals_by_question, True
+ 
+     return _append_material_block(section, content, block), current_item, pending_visuals_by_question, True
+ 
+ 
++def _table_routes_to_materials(block: PDFSourceBlock) -> bool:
++    if not isinstance(block.meta, dict):
++        return False
++    assignment_status = str(block.meta.get('assignment_status') or '').strip().lower()
++    assignment_target = str(
++        block.meta.get('assignment_target')
++        or block.meta.get('target_container')
++        or ''
++    ).strip().lower()
++    return assignment_status in {'material', 'section_material'} or assignment_target in {'material', 'materials', 'section_material'} or bool(block.meta.get('belongs_to_material'))
++
++
++def _format_table_assignment_warning(block: PDFSourceBlock) -> str:
++    reason = ''
++    if isinstance(block.meta, dict):
++        reason = str(block.meta.get('merge_reason') or block.meta.get('reason') or '').strip()
++    normalized_reason = reason or 'table_assignment_ambiguous'
++    return f'table_assignment_unresolved:p{int(block.page)}:{normalized_reason}'
++
++
++def _table_document_warnings(block: PDFSourceBlock, content: ContentBlock) -> list[str]:
++    if block.kind != 'table':
++        return []
++    return [
++        f'table_payload_warning:p{int(block.page)}:{warning}'
++        for warning in list(dict.fromkeys(str(item) for item in content.warnings if str(item)))
++    ]
++
++
++def _append_document_warning(warnings: list[str], value: str) -> None:
++    normalized = str(value or '').strip()
++    if normalized and normalized not in warnings:
++        warnings.append(normalized)
++
++
+ def _block_to_content(block: PDFSourceBlock, *, override_text: str | None = None) -> ContentBlock:
+     text = (override_text if override_text is not None else block.text).strip()
+     if block.kind == 'formula_candidate':
+@@ -581,9 +629,11 @@ def _is_inline_analysis_heading(text: str) -> bool:
+ 
+ 
+ def _extract_answer_area_from_visual_block(block: PDFSourceBlock) -> AnswerArea | None:
++    meta = dict(block.meta) if isinstance(block.meta, dict) else {}
+     candidates = [
+         block.text,
+-        *((dict(block.meta).get(key) for key in ('table_html', 'html', 'markdown', 'table_markdown', 'fallback_text')) if isinstance(block.meta, dict) else ()),
++        *(meta.get(key) for key in ('table_html', 'html', 'markdown', 'table_markdown', 'fallback_text')),
++        *_table_text_candidates_from_meta(meta),
+     ]
+     for candidate in candidates:
+         plain_text = _normalize_visual_answer_area_text(candidate)
+@@ -598,6 +648,57 @@ def _extract_answer_area_from_visual_block(block: PDFSourceBlock) -> AnswerArea
+     return None
+ 
+ 
++def _table_text_candidates_from_meta(meta: dict[str, object]) -> list[str]:
++    candidates: list[str] = []
++    for key in ('table_rows', 'rows', 'cells', 'data'):
++        text = _flatten_table_rows_text(meta.get(key))
++        if text:
++            candidates.append(text)
++    text = _flatten_table_ir_text(meta.get('table_ir'))
++    if text:
++        candidates.append(text)
++    return candidates
++
++
++def _flatten_table_rows_text(value: object) -> str:
++    if not isinstance(value, list):
++        return ''
++    normalized_rows: list[str] = []
++    for row in value:
++        if not isinstance(row, list):
++            return ''
++        cells: list[str] = []
++        for cell in row:
++            if isinstance(cell, dict):
++                cells.append(str(cell.get('text') or cell.get('content') or '').strip())
++            else:
++                cells.append(str(cell or '').strip())
++        normalized_rows.append(' '.join(cell for cell in cells if cell))
++    return '\n'.join(row for row in normalized_rows if row)
++
++
++def _flatten_table_ir_text(value: object) -> str:
++    if not isinstance(value, dict):
++        return ''
++    cells = value.get('cells')
++    row_count = int(value.get('row_count') or 0)
++    column_count = int(value.get('column_count') or 0)
++    if not isinstance(cells, list) or row_count <= 0 or column_count <= 0:
++        return ''
++    grid = [["" for _ in range(column_count)] for _ in range(row_count)]
++    for cell in cells:
++        if not isinstance(cell, dict):
++            continue
++        try:
++            row_index = int(cell.get('row_index') or 0)
++            column_index = int(cell.get('column_index') or 0)
++        except Exception:
++            continue
++        if 0 <= row_index < row_count and 0 <= column_index < column_count:
++            grid[row_index][column_index] = str(cell.get('text') or '').strip()
++    return '\n'.join(' '.join(item for item in row if item) for row in grid if any(item for item in row))
++
++
+ def _normalize_visual_answer_area_text(text: object) -> str:
+     raw = str(text or '').strip()
+     if not raw:
+diff --git a/backend/app/services/pdf_to_word/exercise_ir.py b/backend/app/services/pdf_to_word/exercise_ir.py
+index f9dfb71..b269c20 100644
+--- a/backend/app/services/pdf_to_word/exercise_ir.py
++++ b/backend/app/services/pdf_to_word/exercise_ir.py
+@@ -6,6 +6,13 @@ import json
+ from typing import Any, Literal, cast
+ 
+ from .models import PDFSourceBlock, PageBox
++from .table_ir import (
++    NormalizedTableIR,
++    WARN_TABLE_DIMENSION_MISMATCH,
++    WARN_TABLE_GRID_INCOMPLETE,
++    WARN_TABLE_STRUCTURE_MISSING,
++    validate_normalized_table_ir,
++)
+ 
+ 
+ ExerciseKind = Literal["single_choice", "multiple_choice", "fill_blank", "subjective", "unknown"]
+@@ -44,11 +51,16 @@ class ContentBlock:
+         if isinstance(image_path, str) and image_path.strip():
+             object.__setattr__(self, "image_path", image_path.strip())
+ 
+-        warnings = list(self.warnings)
++        warnings = [str(item) for item in self.warnings if str(item)]
++        warnings.extend(_normalize_warning_values(payload.get("warnings")))
+         if source_kind == "image" and not image_path:
+             warnings.append("image_path_missing")
+-        if source_kind == "table" and not payload.get("table_html") and not payload.get("table_rows"):
+-            warnings.append("table_structure_missing")
++        if source_kind == "table":
++            if not _has_table_structure(payload):
++                warnings.append(WARN_TABLE_STRUCTURE_MISSING)
++            reason = str(payload.get("reason") or "").strip()
++            if reason.startswith("table_"):
++                warnings.append(reason)
+         if warnings:
+             object.__setattr__(self, "warnings", list(dict.fromkeys(warnings)))
+ 
+@@ -130,18 +142,129 @@ def _build_visual_payload(source_block: PDFSourceBlock, *, fallback_bbox: PageBo
+         payload["caption"] = caption
+ 
+     if source_block.kind == "table":
++        payload.update(_build_table_visual_payload(source_block, meta=meta))
++    return payload
++
++
++def _build_table_visual_payload(source_block: PDFSourceBlock, *, meta: dict[str, Any]) -> dict[str, Any]:
++    payload: dict[str, Any] = {}
++    reason = _first_non_empty(meta.get("merge_reason"), meta.get("reason"))
++    if reason is not None:
++        payload["reason"] = reason
++
++    assigned_question_id = _first_non_empty(meta.get("assigned_question_id"))
++    assigned_region_id = _first_non_empty(meta.get("assigned_region_id"))
++    if assigned_question_id is not None:
++        payload["assigned_question_id"] = assigned_question_id
++    if assigned_region_id is not None:
++        payload["assigned_region_id"] = assigned_region_id
++
++    assignment_status = _first_non_empty(meta.get("assignment_status"))
++    if assignment_status is not None:
++        payload["assignment_status"] = assignment_status
++    assignment_score = _coerce_optional_float(meta.get("assignment_score"))
++    if assignment_score is not None:
++        payload["assignment_score"] = assignment_score
++
++    table_ir, validation_report, validation_warnings = _coerce_normalized_table_ir(meta.get("table_ir"))
++    warnings = list(_normalize_warning_values(meta.get("warnings")))
++    warnings.extend(validation_warnings)
++
++    if table_ir is not None and validation_report is not None:
++        payload["version"] = 2
++        payload["table_id"] = table_ir.table_id
++        payload["source_candidate_id"] = table_ir.source_candidate_id
++        payload["table_ir"] = table_ir.to_dict()
++        payload["cell_styles"] = []
++        derived_rows = _table_rows_from_ir(table_ir)
++        if derived_rows is not None:
++            payload["table_rows"] = derived_rows
++        if table_ir.raw.html is not None:
++            payload["table_html"] = table_ir.raw.html
++        if table_ir.raw.markdown is not None:
++            payload["table_markdown"] = table_ir.raw.markdown
++        if table_ir.raw.image_path is not None and "image_path" not in payload:
++            payload["image_path"] = table_ir.raw.image_path
++        if table_ir.assigned_question_id is not None and "assigned_question_id" not in payload:
++            payload["assigned_question_id"] = table_ir.assigned_question_id
++        if table_ir.assigned_region_id is not None and "assigned_region_id" not in payload:
++            payload["assigned_region_id"] = table_ir.assigned_region_id
++        warnings.extend(list(table_ir.warnings))
++        warnings.extend(list(validation_report.warnings))
++        payload["table_validation_status"] = validation_report.status
++        if validation_report.errors:
++            payload["table_validation_errors"] = list(validation_report.errors)
++        if validation_report.warnings:
++            payload["table_validation_warnings"] = list(validation_report.warnings)
++        payload.setdefault("reason", _table_reason_from_report(validation_report))
++
++    if "table_html" not in payload:
+         table_html = _extract_table_html(source_block.text, meta=meta)
+         if table_html is not None:
+             payload["table_html"] = table_html
++    if "table_rows" not in payload:
+         table_rows = _extract_table_rows(meta)
+         if table_rows is not None:
+             payload["table_rows"] = table_rows
+-        fallback_text = _normalize_fallback_text(source_block.text)
+-        if fallback_text is not None:
+-            payload["fallback_text"] = fallback_text
++
++    fallback_text = _normalize_fallback_text(source_block.text)
++    if fallback_text is not None:
++        payload["fallback_text"] = fallback_text
++
++    if warnings:
++        payload["warnings"] = list(dict.fromkeys(str(item) for item in warnings if str(item)))
+     return payload
+ 
+ 
++def _coerce_normalized_table_ir(value: Any) -> tuple[NormalizedTableIR | None, Any | None, list[str]]:
++    if not isinstance(value, dict):
++        return None, None, []
++    try:
++        table_ir = NormalizedTableIR.from_dict(value)
++    except Exception:
++        return None, None, ["table_ir_invalid"]
++    return table_ir, validate_normalized_table_ir(table_ir), []
++
++
++def _table_rows_from_ir(table_ir: NormalizedTableIR) -> list[list[str]] | None:
++    if table_ir.row_count <= 0 or table_ir.column_count <= 0:
++        return None
++    rows = [["" for _ in range(table_ir.column_count)] for _ in range(table_ir.row_count)]
++    for cell in table_ir.cells:
++        if 0 <= cell.row_index < table_ir.row_count and 0 <= cell.column_index < table_ir.column_count:
++            rows[cell.row_index][cell.column_index] = cell.text
++    return rows
++
++
++def _table_reason_from_report(report: Any) -> str:
++    if report.status == "pass":
++        return "ok"
++    if WARN_TABLE_STRUCTURE_MISSING in report.warnings:
++        return WARN_TABLE_STRUCTURE_MISSING
++    if report.errors or WARN_TABLE_DIMENSION_MISMATCH in report.warnings or WARN_TABLE_GRID_INCOMPLETE in report.warnings:
++        return "table_grid_inconsistent"
++    return "table_review_required"
++
++
++def _normalize_warning_values(value: Any) -> list[str]:
++    if not isinstance(value, list):
++        return []
++    return [str(item) for item in value if str(item)]
++
++
++def _has_table_structure(payload: dict[str, Any]) -> bool:
++    return bool(payload.get("table_ir") or payload.get("table_html") or payload.get("table_rows"))
++
++
++def _coerce_optional_float(value: Any) -> float | None:
++    try:
++        if value in (None, ""):
++            return None
++        return float(value)
++    except Exception:
++        return None
++
++
+ def _bbox_to_dict(bbox: PageBox | None) -> dict[str, Any] | None:
+     if bbox is None:
+         return None
+diff --git a/backend/tests/test_pdf_exercise_detector.py b/backend/tests/test_pdf_exercise_detector.py
+index 87a18bb..9275eac 100644
+--- a/backend/tests/test_pdf_exercise_detector.py
++++ b/backend/tests/test_pdf_exercise_detector.py
+@@ -1,7 +1,9 @@
+ from __future__ import annotations
+ 
+ from app.services.pdf_to_word.exercise_detector import detect_exercise_document
++from app.services.pdf_to_word.exercise_ir import decode_docx_visual_payload
+ from app.services.pdf_to_word.models import PDFSourceBlock, PageBox
++from app.services.pdf_to_word.table_ir import NORMALIZED_TABLE_IR_VERSION
+ 
+ 
+ def _block(*, text: str, page: int, x0: float, y0: float, column: int = 0, kind: str = 'text', order: int = 0):
+@@ -37,6 +39,72 @@ def _visual_block(
+     )
+ 
+ 
++def _table_ir_payload(
++    rows: list[list[str]] | None = None,
++    *,
++    table_id: str = 'table:p1:candidate-001',
++    source_candidate_id: str = 'mineru_full:p1:b7',
++    assigned_question_id: str | None = '1',
++    assigned_region_id: str | None = 'p1:q1:1',
++    image_path: str | None = 'crops/page-1/table-001.png',
++    warnings: list[str] | None = None,
++) -> dict:
++    rows = rows or [['项目', '结果'], ['温度', '20℃']]
++    cells: list[dict] = []
++    for row_index, row in enumerate(rows):
++        for column_index, value in enumerate(row):
++            cells.append(
++                {
++                    'row_index': row_index,
++                    'column_index': column_index,
++                    'row_span': 1,
++                    'column_span': 1,
++                    'text': value,
++                    'runs': [
++                        {
++                            'text': value,
++                            'style': {
++                                'bold': False,
++                                'italic': False,
++                                'underline': False,
++                                'font_name': 'SimSun',
++                                'font_size': 10.5,
++                                'color': '000000',
++                            },
++                        }
++                    ],
++                    'bbox': {
++                        'page': 1,
++                        'x0': 80.0 + column_index * 90.0,
++                        'y0': 120.0 + row_index * 28.0,
++                        'x1': 160.0 + column_index * 90.0,
++                        'y1': 144.0 + row_index * 28.0,
++                    },
++                    'confidence': 0.95,
++                    'warnings': [],
++                }
++            )
++    return {
++        'version': NORMALIZED_TABLE_IR_VERSION,
++        'table_id': table_id,
++        'source_candidate_id': source_candidate_id,
++        'assigned_question_id': assigned_question_id,
++        'assigned_region_id': assigned_region_id,
++        'row_count': len(rows),
++        'column_count': max((len(row) for row in rows), default=0),
++        'cells': cells,
++        'bbox': {'page': 1, 'x0': 80.0, 'y0': 120.0, 'x1': 300.0, 'y1': 220.0},
++        'metrics': {
++            'structure_confidence': 0.95,
++            'text_coverage': 1.0,
++            'cell_count': len(cells),
++            'source': 'table_rows',
++        },
++        'warnings': list(warnings or []),
++        'raw': {'image_path': image_path, 'html': None, 'markdown': None},
++    }
++
++
+ def test_detector_resolves_question_option_and_answer_area_structure():
+     document = detect_exercise_document([
+         _block(text='1. [A] Which fraction is correct?', page=1, x0=10, y0=10),
+@@ -202,3 +270,145 @@ def test_detector_closes_analysis_heading_when_next_question_starts():
+         '下一题',
+         '这一段应留在第19题正文，不再挂回第18题解析。',
+     ]
++
++
++def test_detector_embeds_v2_table_payload_for_assigned_question_block():
++    document = detect_exercise_document([
++        _block(text='1. 观察表格并回答问题', page=1, x0=10, y0=10),
++        _visual_block(
++            text='实验记录表',
++            page=1,
++            x0=12,
++            y0=20,
++            meta={
++                'assigned_question_id': '1',
++                'assigned_region_id': 'p1:q1:1',
++                'assignment_status': 'assigned',
++                'assignment_score': 0.93,
++                'merge_reason': 'ok',
++                'table_ir': _table_ir_payload(),
++            },
++        ),
++    ])
++
++    item = document.sections[0].items[0]
++    assert len(item.stem_blocks) == 2
++    table_block = item.stem_blocks[1]
++    assert table_block.kind == 'table'
++    payload = decode_docx_visual_payload(table_block.text)
++    assert payload is not None
++    assert payload['version'] == 2
++    assert payload['table_id'] == 'table:p1:candidate-001'
++    assert payload['assigned_question_id'] == '1'
++    assert payload['assigned_region_id'] == 'p1:q1:1'
++    assert payload['table_ir']['row_count'] == 2
++    assert payload['table_rows'] == [['项目', '结果'], ['温度', '20℃']]
++
++
++def test_detector_marks_assigned_v2_table_blank_as_answer_area():
++    document = detect_exercise_document([
++        _block(text='1. 根据实验填写结论', page=1, x0=10, y0=10),
++        _visual_block(
++            text='表格区域',
++            page=1,
++            x0=12,
++            y0=20,
++            meta={
++                'assigned_question_id': '1',
++                'assigned_region_id': 'p1:q1:1',
++                'table_ir': _table_ir_payload(rows=[['实验结论：光照___(填“是”或“不是”)种子发芽必需的条件。']]),
++            },
++        ),
++    ])
++
++    item = document.sections[0].items[0]
++    assert item.answer_area is not None
++    assert '实验结论：光照___' in item.answer_area.raw_text
++
++
++def test_detector_routes_explicit_material_table_into_section_materials():
++    document = detect_exercise_document([
++        _visual_block(
++            text='阅读材料表格',
++            page=1,
++            x0=12,
++            y0=10,
++            meta={
++                'assignment_status': 'section_material',
++                'assignment_target': 'materials',
++                'table_ir': _table_ir_payload(assigned_question_id=None, assigned_region_id=None),
++            },
++        ),
++        _block(text='1. 根据上表回答问题', page=1, x0=10, y0=60),
++    ])
++
++    assert len(document.sections[0].materials) == 1
++    payload = decode_docx_visual_payload(document.sections[0].materials[0].text)
++    assert payload is not None
++    assert payload['version'] == 2
++    assert payload['table_rows'][0] == ['项目', '结果']
++    assert [item.number for item in document.sections[0].items] == ['1']
++
++
++def test_detector_preserves_ambiguous_unassigned_table_on_current_question_with_warnings():
++    document = detect_exercise_document([
++        _block(text='1. 根据表格回答问题', page=1, x0=10, y0=10),
++        _visual_block(
++            text='表格区域',
++            page=1,
++            x0=12,
++            y0=20,
++            meta={
++                'image_path': 'crops/page-1/table-like-001.png',
++                'merge_reason': 'table_assignment_ambiguous',
++            },
++        ),
++    ])
++
++    item = document.sections[0].items[0]
++    assert len(item.stem_blocks) == 2
++    table_block = item.stem_blocks[1]
++    assert table_block.kind == 'table'
++    assert 'table_structure_missing' in table_block.warnings
++    assert 'table_assignment_ambiguous' in table_block.warnings
++    assert document.sections[0].materials == []
++    assert not any(warning.startswith('table_assignment_unresolved:') for warning in document.warnings)
++
++
++def test_detector_warns_when_unassigned_table_appears_before_any_question():
++    document = detect_exercise_document([
++        _visual_block(
++            text='表格区域',
++            page=1,
++            x0=12,
++            y0=20,
++            meta={
++                'image_path': 'crops/page-1/table-like-001.png',
++                'merge_reason': 'table_assignment_ambiguous',
++            },
++        ),
++        _block(text='1. 后续题目', page=1, x0=10, y0=80),
++    ])
++
++    assert document.sections[0].materials == []
++    assert 'table_assignment_unresolved:p1:table_assignment_ambiguous' in document.warnings
++    assert 'table_payload_warning:p1:table_structure_missing' in document.warnings
++
++
++def test_detector_keeps_unassigned_answer_area_like_table_on_current_question():
++    document = detect_exercise_document([
++        _block(text='1. 根据实验填写结论', page=1, x0=10, y0=10),
++        _visual_block(
++            text='表格区域',
++            page=1,
++            x0=12,
++            y0=20,
++            meta={
++                'table_ir': _table_ir_payload(rows=[['实验结论：光照___(填“是”或“不是”)种子发芽必需的条件。']], assigned_question_id=None, assigned_region_id=None),
++            },
++        ),
++    ])
++
++    item = document.sections[0].items[0]
++    assert item.answer_area is not None
++    assert '实验结论：光照___' in item.answer_area.raw_text
+diff --git a/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py b/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py
+index 3e6e434..e16498f 100644
+--- a/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py
++++ b/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py
+@@ -541,3 +541,142 @@ async def test_conversion_service_replays_real_authoritative_pages_into_answer_v
+ 
+     assert answer_area_samples == 1
+     assert answer_section_samples == 2
++
++
++async def test_conversion_service_round_trips_v2_table_payload_into_exercise_pipeline(monkeypatch, tmp_path: Path):
++    pdf_path = write_pdf(tmp_path / "exercise-table.pdf", page_count=1)
++    settings = PDFToWordSettings(
++        work_root=tmp_path / "workspace",
++        mock_enabled=True,
++        default_mode="balanced",
++        parser_backend="hybrid_experimental",
++        apple_worker_mode="cli",
++        apple_worker_path=Path("/Users/lin/Desktop/work/chiralium/workers/apple_pdf_worker/worker.py"),
++        apple_worker_url="http://127.0.0.1:7010",
++        apple_render_dpi=220,
++        apple_ocr_languages=("zh-Hans", "en-US"),
++        apple_ocr_level="accurate",
++        preserve_color_images=True,
++        max_file_mb=50,
++        max_pages=100,
++        job_timeout_seconds=900,
++    )
++    service = PDFConversionService(settings)
++
++    def _table_ir_payload() -> dict:
++        def _cell(text: str, row_index: int, column_index: int) -> dict:
++            return {
++                "row_index": row_index,
++                "column_index": column_index,
++                "row_span": 1,
++                "column_span": 1,
++                "text": text,
++                "runs": [
++                    {
++                        "text": text,
++                        "style": {
++                            "bold": False,
++                            "italic": False,
++                            "underline": False,
++                            "font_name": "SimSun",
++                            "font_size": 10.5,
++                            "color": "000000",
++                        },
++                    }
++                ],
++                "bbox": {
++                    "page": 1,
++                    "x0": 80.0 + column_index * 90.0,
++                    "y0": 120.0 + row_index * 28.0,
++                    "x1": 160.0 + column_index * 90.0,
++                    "y1": 144.0 + row_index * 28.0,
++                },
++                "confidence": 0.95,
++                "warnings": [],
++            }
++
++        cells = [
++            _cell("项目", 0, 0),
++            _cell("结果", 0, 1),
++            _cell("温度", 1, 0),
++            _cell("20℃", 1, 1),
++        ]
++        return {
++            "version": "normalized_table_ir/v1",
++            "table_id": "table:p1:candidate-001",
++            "source_candidate_id": "mineru_full:p1:b7",
++            "assigned_question_id": "1",
++            "assigned_region_id": "p1:q1:1",
++            "row_count": 2,
++            "column_count": 2,
++            "cells": cells,
++            "bbox": {"page": 1, "x0": 80.0, "y0": 120.0, "x1": 300.0, "y1": 220.0},
++            "metrics": {
++                "structure_confidence": 0.95,
++                "text_coverage": 1.0,
++                "cell_count": len(cells),
++                "source": "table_rows",
++            },
++            "warnings": [],
++            "raw": {
++                "image_path": "crops/page-1/table-001.png",
++                "html": None,
++                "markdown": None,
++            },
++        }
++
++    def _fake_parser_response(*args, **kwargs):
++        return {
++            "schema_version": 1,
++            "parser_backend": "hybrid_experimental",
++            "worker_mode": "pipeline",
++            "source_name": "exercise-table.pdf",
++            "page_count": 1,
++            "blocks": [
++                {"kind": "paragraph", "page": 1, "text": "1. 根据表格回答问题"},
++                {
++                    "kind": "table",
++                    "page": 1,
++                    "text": "实验记录表",
++                    "bbox": {"page": 1, "x0": 80.0, "y0": 120.0, "x1": 300.0, "y1": 220.0},
++                    "assigned_question_id": "1",
++                    "assigned_region_id": "p1:q1:1",
++                    "assignment_status": "assigned",
++                    "merge_reason": "ok",
++                    "table_ir": _table_ir_payload(),
++                },
++            ],
++            "warnings": [],
++            "meta": {
++                "worker_contract": "hybrid_pipeline/v1",
++                "question_count": 1,
++                "table_count": 1,
++                "hybrid_pipeline": {
++                    "path": "authoritative_pages_replay",
++                    "enable_enhancement": True,
++                    "candidate_profiles": ["mineru_full"],
++                    "fallback_page_count": 0,
++                },
++            },
++        }
++
++    monkeypatch.setattr(pdf_to_word_module.conversion_service, "parse_with_backend", _fake_parser_response)
++
++    result = await service.convert(
++        pdf_path,
++        source_name="exercise-table.pdf",
++        parser_backend="hybrid_experimental",
++    )
++    meta = service.extract_result_meta(result)
++
++    assert meta["question_count"] == 1
++    assert meta["table_count"] == 1
++    with zipfile.ZipFile(result.path) as archive:
++        document_xml = archive.read("word/document.xml").decode("utf-8")
++
++    assert "1. 根据表格回答问题" in document_xml
++    assert "<w:tbl>" in document_xml
++    assert "项目" in document_xml
++    assert "结果" in document_xml
++    assert "温度" in document_xml
++    assert "20℃" in document_xml

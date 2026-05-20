@@ -1,0 +1,7 @@
+{
+  "task_id": "建立95还原度最终报告器",
+  "agent": "qa-1",
+  "claimed_at": "2026-05-19T14:40:51+08:00",
+  "claim_status": "requested",
+  "reason": "watcher auto-continued after idle sweep"
+}

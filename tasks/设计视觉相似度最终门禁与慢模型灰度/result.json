@@ -1,0 +1,32 @@
+{
+  "task_id": "设计视觉相似度最终门禁与慢模型灰度",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "已按 PM/owner 仲裁完成返修：canonical required artifact 统一为 visual_similarity.json，visual_similarity_report.json / visual_similarity_debug.json 仅作为 optional/debug artifact；active slow-model candidate 只保留 qwen3_vl_8b，glm_46v_flash 降级到 blocked_candidates/comparison_only_models 非激活字段。默认同步边界和 quality/hybrid_async 主方向保持不变。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json"
+  ],
+  "tests": [
+    "PASS: PYTHONPYCACHEPREFIX=/private/tmp/visual-gate-pycache python3 -m py_compile backend/app/services/pdf_to_word/visual_similarity_gate.py backend/tests/test_pdf_to_word_visual_similarity_gate.py",
+    "PASS: cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-11eaf3b2 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/visual-gate-pycache PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-gate --basetemp=/private/tmp/chiralium-pytest-temp-visual-gate  # 7 passed, 4 FastAPI on_event deprecation warnings",
+    "PASS: fixture 自检 required_artifacts 包含 visual_similarity.json 且不包含 visual_similarity_report.json；candidate_models == [qwen3_vl_8b]；glm_46v_flash 位于 comparison_only_models/blocked_candidates",
+    "PASS: git diff --check -- backend/app/services/pdf_to_word/visual_similarity_gate.py backend/tests/test_pdf_to_word_visual_similarity_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/visual_similarity_contract.json",
+    "PASS: 重新生成完整补丁 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计视觉相似度最终门禁与慢模型灰度/artifacts/task-11eaf3b2.patch（793 lines）",
+    "PASS: git status --short --branch -> clean on task/task-11eaf3b2"
+  ],
+  "commit_hash": "fb25c4101076f79069cd565dc3e71bffa86d2bde",
+  "patch_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计视觉相似度最终门禁与慢模型灰度/artifacts/task-11eaf3b2.patch",
+  "rework_addressed": [
+    "required artifact canonical name: visual_similarity.json",
+    "optional/debug artifacts: visual_similarity_report.json, visual_similarity_debug.json",
+    "active slow-model candidate_models: [qwen3_vl_8b]",
+    "glm_46v_flash moved to blocked_candidates and comparison_only_models, not active gray path"
+  ],
+  "risks": [
+    "本轮仍按任务边界只冻结 contract/stub/fixture/test，未接入真实 PDF/DOCX render-pair 生成、像素/结构相似度算法或慢模型调用。",
+    "后续实现需把 canonical visual_similarity.json 接入 quality/hybrid_async artifact 链路，并把 optional debug/report 产物作为辅助而非门禁事实源。"
+  ],
+  "completed_at": "2026-05-19T15:45:51+08:00"
+}

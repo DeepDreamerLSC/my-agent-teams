@@ -771,7 +771,7 @@ my-agent-teams/
   "protected_paths": ["tasks/**", "scripts/**", "prompts/**", "config.json"],
   "notifications": {
     "feishu_open_id": "ou_xxx",
-    "push_script": "/path/to/feishu-push.sh"
+    "push_script": "/path/to/alert-card.sh"
   }
 }
 ```

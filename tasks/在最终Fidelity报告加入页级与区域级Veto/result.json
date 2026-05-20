@@ -1,0 +1,21 @@
+{
+  "task_id": "在最终Fidelity报告加入页级与区域级Veto",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已在 final DOCX gate reporter 接入 fidelity veto 消费：新增页级/区域级 P0 veto taxonomy 与 artifact loader，任一关键页/关键区域 P0 veto 会把最终决策改为 no-go；同时补齐跨科学/数学/语文/英语的 fixture 与测试。QA 后续可直接查看 final_docx_gate_report.json 的 blocking_failures、fidelity_veto_gate，以及 samples[].fidelity_veto 来定位 no-go 原因。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/fidelity_veto.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/fidelity/veto"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider tests/test_pdf_to_word_fidelity_report.py tests/test_model_eval_runner.py::test_final_docx_gate_summary_and_artifacts tests/test_hybrid_e2e.py::test_hybrid_final_docx_release_gate_passes_current_archive",
+    "PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python (py_compile -> /private/tmp/pdf2word-fidelity-veto-pyc for model_eval_runner.py, fidelity_veto.py, test_pdf_to_word_fidelity_report.py)"
+  ],
+  "risks": [
+    "上游真实 render-pair / visual_similarity artifact 仍未落地到当前 archive 时，reporter 会把 fidelity veto 标记为 waiting_for_upstream_artifact，并保持非阻塞；待 C-04 接线后需用真实产物再跑一轮全学科回归。",
+    "当前 taxonomy 冻结了关键页读序、表格邻接、公式/图形、英语阅读/选项、fallback 五类 P0 veto；如果后续新增 veto code，需要同步扩展 fidelity_veto.py 的 alias/taxonomy。"
+  ],
+  "completed_at": "2026-05-19T19:16:03+08:00"
+}

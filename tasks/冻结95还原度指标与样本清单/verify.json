@@ -1,0 +1,19 @@
+{
+  "task_id": "冻结95还原度指标与样本清单",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T09:14:16+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "机读 fidelity manifest、schema fixture 与结构化测试已就位；8 个主维度、权重总和、P0 阻断项、当前样本集与 planned extension 槽位均已冻结。",
+  "test_commands": [
+    "python3 - <<'PY'  # importlib 加载 backend/tests/test_pdf_to_word_fidelity_manifest.py 并逐个调用 test_* 函数\n...\nPY"
+  ],
+  "scenarios_verified": [
+    "manifest 顶层结构与 schema required 字段一致",
+    "8 个评分维度顺序固定且权重总和为 100",
+    "P0 blockers 与 quality/hybrid_async 目标口径已冻结",
+    "当前 4 个正/混合样例 + 1 个负样例的 gate 事实与 planned extension 槽位一致"
+  ],
+  "regressions_found": []
+}

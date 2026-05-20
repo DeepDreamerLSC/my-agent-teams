@@ -1,0 +1,50 @@
+{
+  "task_id": "慢模型复核灰度接入低置信视觉页",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T22:38:05+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。当前慢模型灰度实现会把明显低于阈值的硬失败页/区域也误判为 low-confidence，从而在 quality/hybrid_async 下触发 qwen3_vl_8b（或触发 fallback 审计）。这违反了 instruction 中“仅允许 low-confidence pages 触发 qwen3_vl_8b”的边界；现有 13 个单测虽全部通过，但没有覆盖该 hard-fail negative case。",
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py",
+      "finding": "`_collect_low_confidence_reasons()` 仅判断 `similarity < threshold + review_band` / `region_similarity < threshold + review_band`，缺少 `>= threshold` 的下界，因此明显低于阈值的页或关键区域也会被追加 `near_threshold_*` 原因并进入 slow review 选择逻辑。这样会把本应直接 veto 的 hard-fail 页面当成低置信页处理，错误消耗灰度预算，也与“只允许 low-confidence pages 触发 qwen3_vl_8b”不一致。",
+      "recommendation": "将 near-threshold 判定收紧为 `[threshold, threshold + review_band)`（页级与区域级都要改），或直接复用上游 page/key-region 已产出的 near-threshold `review_reasons`；同时补两类回归测试：1) 明显低于页阈值的 page 不得 `triggered=true`；2) 明显低于区域阈值的 region 不得单独把页面送入 slow review。gate 侧也要补一条 quality 模式下 hard-fail 页面不会出现 `slow_review_triggered:*` 的回归。",
+      "evidence": "visual_similarity_slow_review.py:132-146。复现：page_render_similarity=0.50 (threshold 0.92)、region_similarity=0.40 (threshold 0.90) 时，`build_visual_similarity_slow_review_audit()` 仍返回 `triggered=True`，`trigger_reasons=['near_threshold_key_region_similarity:math:p1:table-01','near_threshold_page_render_similarity']`。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页",
+      "finding": "任务目录下当前没有 `verify.json`，本轮只能以 reviewer 本地复跑与静态审阅作为补充证据。",
+      "recommendation": "返修回提时如 watcher/QA 已生成 verify 产物，建议一并补齐，便于门禁链路留痕。",
+      "evidence": "任务目录现有文件仅包含 ack.json / instruction.md / result.json / task.json / transitions.jsonl / patch artifact。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/慢模型复核灰度接入低置信视觉页/artifacts/task-2d70ea1e.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_slow_review.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend/tests/test_pdf_to_word_visual_similarity_gate.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-2d70ea1e/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider tests/test_pdf_to_word_visual_similarity_slow_review.py tests/test_pdf_to_word_visual_similarity_gate.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-slow-review-review --basetemp=/private/tmp/chiralium-pytest-temp-slow-review-review",
+      "result": "13 passed, 4 warnings。现有测试通过，但未覆盖 hard-fail 页面/区域不应触发 slow review 的负样例。"
+    },
+    {
+      "command": "人工复现 `build_visual_similarity_slow_review_audit()`：page_render_similarity=0.50 / threshold=0.92，region_similarity=0.40 / threshold=0.90，gate_enabled=True，artifact_ready_for_scoring=True，reviewer=None",
+      "result": "返回页面记录 `triggered=True`、`decision_reason=slow_review_worker_not_configured`，并附带 `near_threshold_page_render_similarity` / `near_threshold_key_region_similarity:*` 触发原因，证明当前实现会误把 hard-fail 页/区域送入慢模型灰度路径。"
+    },
+    {
+      "command": "静态审阅 `visual_similarity_slow_review.py` 与 `visual_similarity_gate.py`",
+      "result": "确认 slow review 调度完全依赖 `_collect_low_confidence_reasons()` 的输出；因此页级/区域级 near-threshold 判定缺少下界会直接影响 gate 侧 `slow_review_triggered:*` / fallback 审计与预算统计。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

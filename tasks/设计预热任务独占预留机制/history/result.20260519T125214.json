@@ -1,0 +1,21 @@
+{
+  "task_id": "设计预热任务独占预留机制",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "已完成预热任务独占预留机制设计：明确采用新增 pre_reserved_* 字段而非复用 reserved_by，定义 pending/pooled/dependency_wait/dispatched/working 全状态规则、派发前 TTL 与派发后 ack 超时回退、reserve-task.sh 操作入口、claim/router/view/watcher 兼容约束，并覆盖“实现可编辑Word表格渲染”被 dev-1 抢认领事故的防复发断言。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/design/collaboration/预热任务独占预留机制.md"
+  ],
+  "tests": [
+    "PASS: wc -l design/collaboration/预热任务独占预留机制.md -> 441 lines",
+    "PASS: grep 校验覆盖 pre_reserved_by、reserve-task.sh、pending、pooled、dependency_wait、dispatched、working、预热不是通知",
+    "PASS: 已生成补丁 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch（447 lines）",
+    "PASS: git status --short --branch -> clean on task/task-f2adfb6e"
+  ],
+  "commit_hash": "9ccb3a83c6d8f83e5ad6632c49e3a31beb1372e9",
+  "patch_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/设计预热任务独占预留机制/artifacts/task-f2adfb6e.patch",
+  "risks": [
+    "本任务仅冻结设计契约，未修改 watcher/claim/router/view 生产代码；需下游“实现预热任务独占预留锁”按本文档落地脚本与回归测试。"
+  ],
+  "completed_at": "2026-05-19T12:45:46+08:00"
+}

@@ -1,0 +1,86 @@
+{
+  "task_id": "执行PDF转Word表格收尾复验与95判定",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T16:14:39+08:00",
+  "status": "fail",
+  "pass": false,
+  "summary": "最终复验结论：表格 gate 通过，但 95% fidelity 宣称暂不通过。五样例 final DOCX gate 已通过，且有结构化表格的样例均产出真实 Word table XML；但 final archive 中仍无 visual_similarity.json，冻结 manifest 中 17 分的 visual_similarity 维度无法计入，按 100 分制 threshold=95 计算，当前整体分数上限仅 83 分，因此当前版本不应被判定为“已达到 95% 目标”。",
+  "acceptance_criteria": {
+    "1_reaches_95_target": {
+      "status": "fail",
+      "evidence": "fidelity_manifest.json 定义 score_threshold=95、score_scale=100，visual_similarity 权重=17 且 gate_checks=[visual_similarity_missing]；当前 artifacts/pdf2word 下不存在 visual_similarity.json，因此缺失该 17 分维度时整体分数上限仅 83，无法达到 95。"
+    },
+    "2_table_gate_real_word_table_passes": {
+      "status": "pass",
+      "evidence": "final_docx_gate_report.json 显示 gate_passed=true、blocking_failures=[]、sample_with_table_xml_count=2；authoritative archive report 显示 structured_table_count>0 仅出现在 五下科学(3) 与 数学八年级(2)，且二者 table_entered_final_word=true，不存在 detected table 却无 <w:tbl> 的样例。"
+    },
+    "3_blockers_are_specific": {
+      "status": "pass",
+      "evidence": "当前 blocker 已可明确定位为 visual_similarity_missing / overall_score_below_threshold:max_possible_83_without_visual_similarity，而不是笼统“质量不足”。"
+    },
+    "4_release_boundary_consistent": {
+      "status": "pass",
+      "evidence": "final_docx_gate_report.json default_release_policy 仍为 apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled；release_boundary_changed=false，未出现提前放宽 default sync 的情况。"
+    }
+  },
+  "fidelity_summary": {
+    "threshold": 95,
+    "score_scale": 100,
+    "overall_score": null,
+    "overall_score_upper_bound": 83.0,
+    "missing_dimensions": [
+      "visual_similarity"
+    ],
+    "blocking_failures": [
+      "visual_similarity_missing",
+      "overall_score_below_threshold:max_possible_83_without_visual_similarity"
+    ]
+  },
+  "tables": {
+    "table_gate_passed": true,
+    "sample_with_table_xml_count": 2,
+    "openable_docx_sample_count": 5,
+    "samples": [
+      {
+        "sample_name": "五下科学",
+        "table_xml_present": true,
+        "document_fallback": false
+      },
+      {
+        "sample_name": "数学八年级",
+        "table_xml_present": true,
+        "document_fallback": false
+      },
+      {
+        "sample_name": "数学试卷",
+        "table_xml_present": false,
+        "document_fallback": false
+      },
+      {
+        "sample_name": "英语八年级",
+        "table_xml_present": false,
+        "document_fallback": false
+      },
+      {
+        "sample_name": "语文五年级",
+        "table_xml_present": false,
+        "document_fallback": true
+      }
+    ],
+    "detected_table_without_word_table_samples": []
+  },
+  "test_commands": [
+    "python3 evidence summary loader over final_docx_gate_report.json + hybrid_experimental_authoritative_archive_report.json + fidelity_manifest.json",
+    "find /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word -name visual_similarity.json -o -name visual_similarity_report.json -o -name visual_similarity_debug.json",
+    "static review of upstream task outputs: 补齐表格样例与验收夹具 / 建立95还原度最终报告器 / 设计视觉相似度最终门禁与慢模型灰度"
+  ],
+  "regressions_found": [
+    "visual_similarity artifact chain not integrated into final archive; 95% final declaration remains blocked."
+  ],
+  "recommendations": [
+    "可以判定表格主链（renderer + fixture + DOCX gate）已达成收尾目标。",
+    "不要宣称 quality/hybrid_async 已正式达到 95% fidelity，需先把 visual_similarity.json 真实接入最终 artifact 链路并再跑一次最终报告。",
+    "继续保持 default sync 不触发慢模型、不放宽默认发布边界。"
+  ]
+}

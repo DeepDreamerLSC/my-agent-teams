@@ -1,0 +1,8 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-19T18:44:55+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T18:46:33+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T18:57:22+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T19:03:49+08:00", "reason": "watcher observed review fail"}
+{"from": "blocked", "to": "dispatched", "at": "2026-05-19T19:05:02+08:00", "reason": "resume-task: review rework: 收敛 DOCX->PDF 转换 timeout 为显式 PageRenderError，并稳定产出 failed artifact/summary", "actor": "pm-chief"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T19:06:53+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T19:10:03+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T19:16:17+08:00", "reason": "pm acceptance after review+qa approval; render-pair generator baseline closed"}

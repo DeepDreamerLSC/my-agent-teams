@@ -1,0 +1,22 @@
+{
+  "task_id": "规划PDF转Word95还原与Word表格路线",
+  "agent": "arch-1",
+  "status": "done",
+  "summary": "完成 PDF 转 Word 95% 还原度路线重规划：将表格结构化 Word 呈现提升为 P0 主线，定义 NormalizedTableIR、DOCX 可编辑表格渲染、final fidelity gate、默认同步与 quality/async 模式边界，并给出 PM 可直接派发的阶段任务清单。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-Word-8c140ca9/artifacts/pdf2word/final-archive/reports/后续技术路线.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-Word-8c140ca9/artifacts/pdf2word/final-archive/reports/端到端技术链路.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-Word95-Word-8c140ca9/artifacts/pdf2word/final-archive/reports/95还原度与Word表格验收路线.md"
+  ],
+  "patch_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/规划PDF转Word95还原与Word表格路线/artifacts/PDF-Word95-Word-8c140ca9.patch",
+  "tests": [
+    "文档存在性与关键字段检查：3 个交付文档均包含 has_table_xml 与 NormalizedTableIR；补丁文件已生成，共 960 行。",
+    "grep 校验关键结论：95% 还原度、quality/hybrid_async、table_detected_but_no_word_table、Word 表格硬门禁均已写入文档。",
+    "未运行代码测试：本任务类型为 design，且未修改生产代码。"
+  ],
+  "risks": [
+    "任务 worktree 原本未包含 artifacts/pdf2word/final-archive/reports 目录，因此本次在 worktree 中以同相对路径新增/重写交付文档；补丁以新增文件形式捕获。",
+    "95% 指标和 NormalizedTableIR 是设计契约，仍需后续 dev/qa 任务实现 gate、normalizer、DOCX renderer 与样本 manifest。"
+  ],
+  "completed_at": "2026-05-18T23:00:35.210047+08:00"
+}

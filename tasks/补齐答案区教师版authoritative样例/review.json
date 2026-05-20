@@ -1,0 +1,24 @@
+{
+  "task_id": "补齐答案区教师版authoritative样例",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T08:41:00+08:00",
+  "status": "approve",
+  "summary": "审查通过。实现与任务目标一致：conversion_service 已补齐答案链路 meta、保留 standalone `解：` cue，authoritative 样例报告与 evidence 对齐；复跑相关 pytest 30 项全部通过，student 默认输出未见答案标题回归，teacher/review 已补出 2 个 answer_section 与 1 个 answer_area 实证样例。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    "任务目录下暂无 verify.json；本次审查已通过本地复跑 pytest 作为补充验证证据。",
+    "英语八年级、语文五年级、五下科学的剩余未命中样例已在 report.md / summary.json 中逐样例说明，属于后续补样与规则增强项，不阻塞本轮收口。"
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/conversion_service.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_exercise_pipeline_integration.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/evidence.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/evidence.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/evidence.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/evidence.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/evidence.json"
+  ],
+  "recommended_next_action": "qa"
+}

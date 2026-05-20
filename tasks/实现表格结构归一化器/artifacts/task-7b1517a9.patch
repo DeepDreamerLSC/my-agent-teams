@@ -1,0 +1,887 @@
+diff --git a/backend/app/services/pdf_to_word/parser_adapters/table_structure_normalizer.py b/backend/app/services/pdf_to_word/parser_adapters/table_structure_normalizer.py
+new file mode 100644
+index 0000000..5498ca8
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/parser_adapters/table_structure_normalizer.py
+@@ -0,0 +1,743 @@
++from __future__ import annotations
++
++from collections import defaultdict
++from collections.abc import Mapping, Sequence
++from dataclasses import dataclass
++from html import unescape
++from html.parser import HTMLParser
++import re
++from statistics import median
++from typing import Any
++
++from app.services.pdf_to_word.models import PageBox
++from app.services.pdf_to_word.table_ir import (
++    WARN_IMAGE_ONLY_FALLBACK,
++    WARN_TABLE_CELL_OVERLAP,
++    WARN_TABLE_DIMENSION_MISMATCH,
++    WARN_TABLE_GRID_INCOMPLETE,
++    WARN_TABLE_SPAN_OUT_OF_BOUNDS,
++    WARN_TABLE_STRUCTURE_MISSING,
++    NormalizedTableIR,
++    TableCellIR,
++    TableIRValidationResult,
++    TableMetrics,
++    TableRawInput,
++    TableRunStyle,
++    TableTextRun,
++    validate_normalized_table_ir,
++)
++
++REASON_OK = "ok"
++REASON_TABLE_STRUCTURE_MISSING = WARN_TABLE_STRUCTURE_MISSING
++REASON_TABLE_GRID_INCONSISTENT = "table_grid_inconsistent"
++REASON_INVALID_INPUT = "invalid_input"
++
++
++@dataclass(frozen=True)
++class TableNormalizationResult:
++    table_ir: NormalizedTableIR
++    report: TableIRValidationResult
++    source: str | None
++    reason: str
++
++    @property
++    def status(self) -> str:
++        return self.report.status
++
++    @property
++    def warnings(self) -> tuple[str, ...]:
++        return self.report.warnings
++
++    @property
++    def errors(self) -> tuple[str, ...]:
++        return self.report.errors
++
++
++@dataclass(frozen=True)
++class _StructuredCellSpec:
++    text: str
++    row_span: int = 1
++    column_span: int = 1
++    runs: tuple[TableTextRun, ...] = ()
++    bbox: PageBox | None = None
++    confidence: float = 1.0
++    warnings: tuple[str, ...] = ()
++
++
++@dataclass(frozen=True)
++class _StructuredSource:
++    source: str
++    cells: tuple[TableCellIR, ...]
++    row_count: int
++    column_count: int
++
++
++@dataclass(frozen=True)
++class _CellBoxEntry:
++    text: str
++    bbox: PageBox
++    confidence: float
++    runs: tuple[TableTextRun, ...] = ()
++    warnings: tuple[str, ...] = ()
++
++    @property
++    def center_x(self) -> float:
++        return (self.bbox.x0 + self.bbox.x1) / 2.0
++
++    @property
++    def center_y(self) -> float:
++        return (self.bbox.y0 + self.bbox.y1) / 2.0
++
++
++@dataclass(frozen=True)
++class _HTMLCellToken:
++    text: str
++    row_span: int = 1
++    column_span: int = 1
++
++
++class _HTMLTableParser(HTMLParser):
++    def __init__(self) -> None:
++        super().__init__(convert_charrefs=True)
++        self._table_depth = 0
++        self._active_table = False
++        self._current_row: list[_HTMLCellToken] | None = None
++        self._rows: list[list[_HTMLCellToken]] = []
++        self._current_cell_text: list[str] | None = None
++        self._current_cell_row_span = 1
++        self._current_cell_column_span = 1
++
++    @property
++    def rows(self) -> list[list[_HTMLCellToken]]:
++        return self._rows
++
++    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
++        normalized_tag = tag.lower()
++        if normalized_tag == "table":
++            self._table_depth += 1
++            if self._table_depth == 1:
++                self._active_table = True
++            return
++        if not self._active_table:
++            return
++        if normalized_tag == "tr":
++            self._current_row = []
++            return
++        if normalized_tag in {"td", "th"} and self._current_row is not None:
++            attributes = {key.lower(): value for key, value in attrs}
++            self._current_cell_text = []
++            self._current_cell_row_span = _safe_positive_int(attributes.get("rowspan"), default=1)
++            self._current_cell_column_span = _safe_positive_int(attributes.get("colspan"), default=1)
++            return
++        if normalized_tag == "br" and self._current_cell_text is not None:
++            self._current_cell_text.append("\n")
++
++    def handle_endtag(self, tag: str) -> None:
++        normalized_tag = tag.lower()
++        if normalized_tag == "table":
++            if self._table_depth == 1:
++                self._active_table = False
++            self._table_depth = max(self._table_depth - 1, 0)
++            return
++        if not self._active_table:
++            return
++        if normalized_tag in {"td", "th"} and self._current_row is not None and self._current_cell_text is not None:
++            text = _normalize_text("".join(self._current_cell_text))
++            self._current_row.append(
++                _HTMLCellToken(
++                    text=text,
++                    row_span=self._current_cell_row_span,
++                    column_span=self._current_cell_column_span,
++                )
++            )
++            self._current_cell_text = None
++            self._current_cell_row_span = 1
++            self._current_cell_column_span = 1
++            return
++        if normalized_tag == "tr" and self._current_row is not None:
++            if self._current_row:
++                self._rows.append(self._current_row)
++            self._current_row = None
++
++    def handle_data(self, data: str) -> None:
++        if self._active_table and self._current_cell_text is not None:
++            self._current_cell_text.append(data)
++
++
++class TableStructureNormalizer:
++    """Normalize heterogeneous table payloads into NormalizedTableIR.
++
++    Priority: table_html -> table_rows -> markdown table -> cell_boxes -> image-only review.
++    """
++
++    def normalize(self, candidate: Mapping[str, Any]) -> TableNormalizationResult:
++        if not isinstance(candidate, Mapping):
++            raise ValueError("table candidate must be a mapping")
++
++        payload = dict(candidate)
++        meta = dict(payload.get("meta")) if isinstance(payload.get("meta"), Mapping) else {}
++        default_page = _default_page(payload)
++
++        raw_html = _extract_table_html(payload, meta=meta)
++        raw_rows = _extract_table_rows(payload, meta=meta)
++        raw_markdown = _extract_table_markdown(payload, meta=meta)
++        cell_boxes = _extract_cell_boxes(payload, meta=meta)
++        image_path = _extract_image_path(payload, meta=meta)
++
++        structured = (
++            _normalize_html_source(raw_html, default_page=default_page)
++            or _normalize_rows_source(raw_rows, default_page=default_page)
++            or _normalize_markdown_source(raw_markdown, default_page=default_page)
++            or _normalize_cell_box_source(cell_boxes, default_page=default_page)
++        )
++
++        table_ir = NormalizedTableIR(
++            table_id=_derive_table_id(payload),
++            source_candidate_id=_derive_source_candidate_id(payload),
++            assigned_question_id=_first_non_empty(
++                payload.get("assigned_question_id"),
++                payload.get("question_id"),
++                meta.get("assigned_question_id"),
++                meta.get("question_id"),
++            ),
++            assigned_region_id=_first_non_empty(
++                payload.get("assigned_region_id"),
++                payload.get("region_id"),
++                meta.get("assigned_region_id"),
++                meta.get("region_id"),
++            ),
++            row_count=structured.row_count if structured is not None else 0,
++            column_count=structured.column_count if structured is not None else 0,
++            cells=structured.cells if structured is not None else (),
++            bbox=_coerce_bbox(payload.get("bbox"), default_page=default_page),
++            metrics=TableMetrics(
++                structure_confidence=_coerce_confidence(
++                    payload.get("structure_confidence"),
++                    default=1.0 if structured is not None else (0.0 if image_path else None),
++                ),
++                text_coverage=_coerce_optional_float(payload.get("text_coverage")),
++                cell_count=len(structured.cells) if structured is not None else 0,
++                source=structured.source if structured is not None else ("image_only" if image_path else None),
++            ),
++            warnings=tuple(_normalize_warning_bucket(payload.get("warnings"))),
++            raw=TableRawInput(
++                image_path=image_path,
++                html=raw_html,
++                markdown=raw_markdown,
++            ),
++        )
++        report = validate_normalized_table_ir(table_ir)
++        reason = _reason_from_report(report)
++        return TableNormalizationResult(
++            table_ir=table_ir,
++            report=report,
++            source=structured.source if structured is not None else ("image_only" if image_path else None),
++            reason=reason,
++        )
++
++
++def normalize_table_structure(candidate: Mapping[str, Any]) -> TableNormalizationResult:
++    return TableStructureNormalizer().normalize(candidate)
++
++
++def _normalize_html_source(table_html: str | None, *, default_page: int) -> _StructuredSource | None:
++    if not table_html:
++        return None
++    parser = _HTMLTableParser()
++    parser.feed(table_html)
++    parser.close()
++    if not parser.rows:
++        return None
++    row_specs = [
++        [
++            _StructuredCellSpec(
++                text=cell.text,
++                row_span=cell.row_span,
++                column_span=cell.column_span,
++                runs=_build_runs(cell.text),
++            )
++            for cell in row
++        ]
++        for row in parser.rows
++    ]
++    cells, row_count, column_count = _materialize_row_specs(row_specs)
++    if not cells:
++        return None
++    return _StructuredSource(source="table_html", cells=cells, row_count=row_count, column_count=column_count)
++
++
++def _normalize_rows_source(raw_rows: Any, *, default_page: int) -> _StructuredSource | None:
++    if not _is_row_sequence(raw_rows):
++        return None
++    row_specs: list[list[_StructuredCellSpec]] = []
++    for raw_row in raw_rows:
++        if not _is_row_sequence(raw_row):
++            return None
++        row_specs.append([_coerce_structured_cell(cell, default_page=default_page) for cell in raw_row])
++    cells, row_count, column_count = _materialize_row_specs(row_specs)
++    if not cells:
++        return None
++    return _StructuredSource(source="table_rows", cells=cells, row_count=row_count, column_count=column_count)
++
++
++def _normalize_markdown_source(markdown: str | None, *, default_page: int) -> _StructuredSource | None:
++    if not markdown:
++        return None
++    rows = _parse_markdown_rows(markdown)
++    if not rows:
++        return None
++    row_specs = [[_StructuredCellSpec(text=cell, runs=_build_runs(cell)) for cell in row] for row in rows]
++    cells, row_count, column_count = _materialize_row_specs(row_specs)
++    if not cells:
++        return None
++    return _StructuredSource(source="markdown", cells=cells, row_count=row_count, column_count=column_count)
++
++
++def _normalize_cell_box_source(raw_cell_boxes: Any, *, default_page: int) -> _StructuredSource | None:
++    if not isinstance(raw_cell_boxes, list) or not raw_cell_boxes:
++        return None
++
++    explicit = _normalize_explicit_cell_boxes(raw_cell_boxes, default_page=default_page)
++    if explicit is not None:
++        return explicit
++
++    entries: list[_CellBoxEntry] = []
++    for item in raw_cell_boxes:
++        if not isinstance(item, Mapping):
++            continue
++        bbox = _coerce_bbox(item.get("bbox"), default_page=default_page)
++        if bbox is None:
++            continue
++        text = _coerce_cell_text(item)
++        entries.append(
++            _CellBoxEntry(
++                text=text,
++                bbox=bbox,
++                confidence=_coerce_confidence(item.get("confidence"), default=1.0) or 1.0,
++                runs=_coerce_runs(text, item.get("runs"), style=item.get("style")),
++                warnings=tuple(_normalize_warning_bucket(item.get("warnings"))),
++            )
++        )
++    if not entries:
++        return None
++
++    row_groups = _cluster_values([entry.center_y for entry in entries], _cluster_tolerance([entry.bbox.height for entry in entries]))
++    column_groups = _cluster_values([entry.center_x for entry in entries], _cluster_tolerance([entry.bbox.width for entry in entries]))
++    buckets: dict[tuple[int, int], list[_CellBoxEntry]] = defaultdict(list)
++    for entry in entries:
++        row_index = _nearest_group(entry.center_y, row_groups)
++        column_index = _nearest_group(entry.center_x, column_groups)
++        buckets[(row_index, column_index)].append(entry)
++
++    cells: list[TableCellIR] = []
++    for (row_index, column_index), grouped_entries in sorted(buckets.items()):
++        ordered = sorted(grouped_entries, key=lambda item: (item.bbox.y0, item.bbox.x0))
++        text = _normalize_text(" ".join(filter(None, (_normalize_text(item.text) for item in ordered))))
++        merged_runs = tuple(run for item in ordered for run in (item.runs or _build_runs(item.text)))
++        merged_bbox = _merge_bboxes([item.bbox for item in ordered])
++        confidence = sum(item.confidence for item in ordered) / max(len(ordered), 1)
++        warnings = tuple(value for item in ordered for value in item.warnings)
++        cells.append(
++            TableCellIR(
++                row_index=row_index,
++                column_index=column_index,
++                text=text,
++                runs=merged_runs if merged_runs else _build_runs(text),
++                bbox=merged_bbox,
++                confidence=confidence,
++                warnings=warnings,
++            )
++        )
++    return _StructuredSource(
++        source="cell_boxes",
++        cells=tuple(cells),
++        row_count=len(row_groups),
++        column_count=len(column_groups),
++    )
++
++
++def _normalize_explicit_cell_boxes(raw_cell_boxes: list[Any], *, default_page: int) -> _StructuredSource | None:
++    explicit_cells: list[TableCellIR] = []
++    row_count = 0
++    column_count = 0
++    for item in raw_cell_boxes:
++        if not isinstance(item, Mapping):
++            return None
++        row_index = _coerce_optional_int(item.get("row_index"))
++        if row_index is None:
++            row_index = _coerce_optional_int(item.get("row"))
++        column_index = _coerce_optional_int(item.get("column_index"))
++        if column_index is None:
++            column_index = _coerce_optional_int(item.get("column"))
++        if row_index is None or column_index is None:
++            return None
++        row_span = _safe_positive_int(item.get("row_span"), default=1)
++        column_span = _safe_positive_int(item.get("column_span"), default=1)
++        bbox = _coerce_bbox(item.get("bbox"), default_page=default_page)
++        text = _coerce_cell_text(item)
++        explicit_cells.append(
++            TableCellIR(
++                row_index=row_index,
++                column_index=column_index,
++                row_span=row_span,
++                column_span=column_span,
++                text=text,
++                runs=_coerce_runs(text, item.get("runs"), style=item.get("style")),
++                bbox=bbox,
++                confidence=_coerce_confidence(item.get("confidence"), default=1.0) or 1.0,
++                warnings=tuple(_normalize_warning_bucket(item.get("warnings"))),
++            )
++        )
++        row_count = max(row_count, row_index + row_span)
++        column_count = max(column_count, column_index + column_span)
++    if not explicit_cells:
++        return None
++    return _StructuredSource(
++        source="cell_boxes",
++        cells=tuple(sorted(explicit_cells, key=lambda cell: (cell.row_index, cell.column_index))),
++        row_count=row_count,
++        column_count=column_count,
++    )
++
++
++def _materialize_row_specs(rows: Sequence[Sequence[_StructuredCellSpec]]) -> tuple[tuple[TableCellIR, ...], int, int]:
++    occupied: set[tuple[int, int]] = set()
++    cells: list[TableCellIR] = []
++    row_count = 0
++    column_count = 0
++    for row_index, row in enumerate(rows):
++        column_cursor = 0
++        for spec in row:
++            while (row_index, column_cursor) in occupied:
++                column_cursor += 1
++            cells.append(
++                TableCellIR(
++                    row_index=row_index,
++                    column_index=column_cursor,
++                    row_span=max(spec.row_span, 1),
++                    column_span=max(spec.column_span, 1),
++                    text=spec.text,
++                    runs=spec.runs or _build_runs(spec.text),
++                    bbox=spec.bbox,
++                    confidence=spec.confidence,
++                    warnings=spec.warnings,
++                )
++            )
++            for covered_row in range(row_index, row_index + max(spec.row_span, 1)):
++                for covered_column in range(column_cursor, column_cursor + max(spec.column_span, 1)):
++                    occupied.add((covered_row, covered_column))
++            row_count = max(row_count, row_index + max(spec.row_span, 1))
++            column_count = max(column_count, column_cursor + max(spec.column_span, 1))
++            column_cursor += max(spec.column_span, 1)
++        row_count = max(row_count, row_index + 1)
++    return tuple(cells), row_count, column_count
++
++
++def _coerce_structured_cell(value: Any, *, default_page: int) -> _StructuredCellSpec:
++    if isinstance(value, Mapping):
++        text = _coerce_cell_text(value)
++        return _StructuredCellSpec(
++            text=text,
++            row_span=_safe_positive_int(value.get("row_span"), default=1),
++            column_span=_safe_positive_int(value.get("column_span"), default=1),
++            runs=_coerce_runs(text, value.get("runs"), style=value.get("style")),
++            bbox=_coerce_bbox(value.get("bbox"), default_page=default_page),
++            confidence=_coerce_confidence(value.get("confidence"), default=1.0) or 1.0,
++            warnings=tuple(_normalize_warning_bucket(value.get("warnings"))),
++        )
++    text = _normalize_text(str(value or ""))
++    return _StructuredCellSpec(text=text, runs=_build_runs(text))
++
++
++def _coerce_runs(text: str, runs_payload: Any, *, style: Any = None) -> tuple[TableTextRun, ...]:
++    runs: list[TableTextRun] = []
++    if isinstance(runs_payload, Sequence) and not isinstance(runs_payload, (str, bytes, bytearray)):
++        for item in runs_payload:
++            if not isinstance(item, Mapping):
++                continue
++            run_text = _normalize_text(str(item.get("text") or ""))
++            runs.append(TableTextRun(text=run_text, style=TableRunStyle.from_dict(item.get("style"))))
++    if runs:
++        return tuple(runs)
++    normalized_text = _normalize_text(text)
++    if not normalized_text:
++        return ()
++    return (TableTextRun(text=normalized_text, style=TableRunStyle.from_dict(style if isinstance(style, Mapping) else None)),)
++
++
++def _build_runs(text: str) -> tuple[TableTextRun, ...]:
++    normalized = _normalize_text(text)
++    if not normalized:
++        return ()
++    return (TableTextRun(text=normalized, style=TableRunStyle()),)
++
++
++def _parse_markdown_rows(markdown: str) -> list[list[str]]:
++    lines = [line.rstrip() for line in str(markdown or "").splitlines()]
++    block: list[str] = []
++    current: list[str] = []
++    for line in lines:
++        if "|" in line:
++            current.append(line)
++            continue
++        if len(current) >= 2 and not block:
++            block = current[:]
++        current = []
++    if not block and len(current) >= 2:
++        block = current[:]
++    if not block:
++        return []
++
++    rows = [_split_markdown_row(line) for line in block if _split_markdown_row(line)]
++    if len(rows) >= 2 and _is_markdown_separator_row(rows[1]):
++        rows.pop(1)
++    return rows
++
++
++def _split_markdown_row(line: str) -> list[str]:
++    stripped = line.strip()
++    if stripped.startswith("|"):
++        stripped = stripped[1:]
++    if stripped.endswith("|"):
++        stripped = stripped[:-1]
++    parts = re.split(r"(?<!\\)\|", stripped)
++    return [_normalize_text(part.replace("\\|", "|")) for part in parts]
++
++
++def _is_markdown_separator_row(cells: Sequence[str]) -> bool:
++    if not cells:
++        return False
++    return all(bool(re.fullmatch(r":?-{3,}:?", cell or "")) for cell in cells)
++
++
++def _reason_from_report(report: TableIRValidationResult) -> str:
++    if report.status == "pass":
++        return REASON_OK
++    if WARN_TABLE_STRUCTURE_MISSING in report.warnings:
++        return REASON_TABLE_STRUCTURE_MISSING
++    if (
++        WARN_TABLE_GRID_INCOMPLETE in report.warnings
++        or WARN_TABLE_DIMENSION_MISMATCH in report.warnings
++        or any(
++            WARN_TABLE_SPAN_OUT_OF_BOUNDS in error
++            or WARN_TABLE_CELL_OVERLAP in error
++            or "invalid_span" in error
++            or "negative_origin" in error
++            for error in report.errors
++        )
++    ):
++        return REASON_TABLE_GRID_INCONSISTENT
++    return REASON_INVALID_INPUT if report.errors else REASON_TABLE_STRUCTURE_MISSING
++
++
++def _extract_table_html(payload: Mapping[str, Any], *, meta: Mapping[str, Any]) -> str | None:
++    for value in (
++        payload.get("table_html"),
++        payload.get("html"),
++        payload.get("text"),
++        meta.get("table_html"),
++        meta.get("html"),
++    ):
++        normalized = _normalize_text(value)
++        if normalized.lower().startswith("<table"):
++            return normalized
++    return None
++
++
++def _extract_table_rows(payload: Mapping[str, Any], *, meta: Mapping[str, Any]) -> Any:
++    for value in (
++        payload.get("table_rows"),
++        payload.get("rows"),
++        meta.get("table_rows"),
++        meta.get("rows"),
++        meta.get("data"),
++    ):
++        if value is not None:
++            return value
++    return None
++
++
++def _extract_table_markdown(payload: Mapping[str, Any], *, meta: Mapping[str, Any]) -> str | None:
++    for value in (
++        payload.get("table_markdown"),
++        payload.get("markdown"),
++        meta.get("table_markdown"),
++        meta.get("markdown"),
++        payload.get("text"),
++    ):
++        normalized = str(value or "").strip()
++        if normalized and "|" in normalized and "\n" in normalized:
++            return normalized
++    return None
++
++
++def _extract_cell_boxes(payload: Mapping[str, Any], *, meta: Mapping[str, Any]) -> Any:
++    for value in (payload.get("cell_boxes"), meta.get("cell_boxes"), meta.get("cells")):
++        if value is not None:
++            return value
++    return None
++
++
++def _extract_image_path(payload: Mapping[str, Any], *, meta: Mapping[str, Any]) -> str | None:
++    return _first_non_empty(payload.get("image_path"), payload.get("img_path"), meta.get("image_path"), meta.get("img_path"))
++
++
++def _derive_source_candidate_id(payload: Mapping[str, Any]) -> str:
++    explicit = _first_non_empty(payload.get("source_candidate_id"), payload.get("candidate_id"))
++    if explicit is not None:
++        return explicit
++    page_index = _default_page(payload)
++    source_profile = _first_non_empty(payload.get("source_profile"), payload.get("source_name"), "unknown") or "unknown"
++    order = _coerce_optional_int(payload.get("block_index"))
++    if order is None:
++        order = _coerce_optional_int(payload.get("order"))
++    suffix = f"b{order}" if order is not None else "table"
++    return f"{source_profile}:p{page_index}:{suffix}"
++
++
++def _derive_table_id(payload: Mapping[str, Any]) -> str:
++    explicit = _first_non_empty(payload.get("table_id"))
++    if explicit is not None:
++        return explicit
++    return f"table:{_derive_source_candidate_id(payload)}"
++
++
++def _default_page(payload: Mapping[str, Any]) -> int:
++    direct = _coerce_optional_int(payload.get("page_index"))
++    if direct is None:
++        direct = _coerce_optional_int(payload.get("page"))
++    if direct is not None and direct > 0:
++        return direct
++    bbox = _coerce_bbox(payload.get("bbox"), default_page=1)
++    return bbox.page if bbox is not None else 1
++
++
++def _coerce_bbox(value: Any, *, default_page: int) -> PageBox | None:
++    if isinstance(value, PageBox):
++        return value
++    if not isinstance(value, Mapping):
++        return None
++    page = _coerce_optional_int(value.get("page")) or default_page
++    x0 = _coerce_optional_float(value.get("x0"))
++    y0 = _coerce_optional_float(value.get("y0"))
++    x1 = _coerce_optional_float(value.get("x1"))
++    y1 = _coerce_optional_float(value.get("y1"))
++    if None in {x0, y0, x1, y1}:
++        return None
++    return PageBox(page=page, x0=x0 or 0.0, y0=y0 or 0.0, x1=x1 or 0.0, y1=y1 or 0.0)
++
++
++def _merge_bboxes(boxes: Sequence[PageBox]) -> PageBox | None:
++    if not boxes:
++        return None
++    return PageBox(
++        page=boxes[0].page,
++        x0=min(box.x0 for box in boxes),
++        y0=min(box.y0 for box in boxes),
++        x1=max(box.x1 for box in boxes),
++        y1=max(box.y1 for box in boxes),
++    )
++
++
++def _cluster_values(values: Sequence[float], tolerance: float) -> list[float]:
++    if not values:
++        return []
++    sorted_values = sorted(values)
++    groups: list[list[float]] = [[sorted_values[0]]]
++    for value in sorted_values[1:]:
++        current = groups[-1]
++        current_center = sum(current) / len(current)
++        if abs(value - current_center) <= tolerance:
++            current.append(value)
++        else:
++            groups.append([value])
++    return [sum(group) / len(group) for group in groups]
++
++
++def _nearest_group(value: float, groups: Sequence[float]) -> int:
++    if not groups:
++        return 0
++    return min(range(len(groups)), key=lambda index: abs(groups[index] - value))
++
++
++def _cluster_tolerance(values: Sequence[float]) -> float:
++    positive = [value for value in values if value and value > 0]
++    if not positive:
++        return 6.0
++    return max(median(positive) * 0.6, 6.0)
++
++
++def _normalize_warning_bucket(value: Any) -> list[str]:
++    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
++        return []
++    return list(dict.fromkeys(str(item) for item in value if str(item)))
++
++
++def _coerce_cell_text(value: Mapping[str, Any]) -> str:
++    for key in ("text", "content", "ocr_text", "value", "label"):
++        candidate = _normalize_text(value.get(key))
++        if candidate:
++            return candidate
++    return ""
++
++
++def _normalize_text(value: Any) -> str:
++    raw = unescape(str(value or ""))
++    if not raw:
++        return ""
++    return re.sub(r"\s+", " ", raw).strip()
++
++
++def _first_non_empty(*values: Any) -> str | None:
++    for value in values:
++        candidate = str(value or "").strip()
++        if candidate:
++            return candidate
++    return None
++
++
++def _is_row_sequence(value: Any) -> bool:
++    return isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray, Mapping))
++
++
++def _coerce_optional_int(value: Any) -> int | None:
++    try:
++        if value is None or value == "":
++            return None
++        return int(value)
++    except Exception:
++        return None
++
++
++def _coerce_optional_float(value: Any) -> float | None:
++    try:
++        if value is None or value == "":
++            return None
++        return float(value)
++    except Exception:
++        return None
++
++
++def _coerce_confidence(value: Any, *, default: float | None) -> float | None:
++    parsed = _coerce_optional_float(value)
++    if parsed is None:
++        return default
++    return max(0.0, min(1.0, parsed))
++
++
++def _safe_positive_int(value: Any, *, default: int) -> int:
++    parsed = _coerce_optional_int(value)
++    if parsed is None or parsed < 1:
++        return default
++    return parsed
++
++
++__all__ = [
++    "REASON_INVALID_INPUT",
++    "REASON_OK",
++    "REASON_TABLE_GRID_INCONSISTENT",
++    "REASON_TABLE_STRUCTURE_MISSING",
++    "TableNormalizationResult",
++    "TableStructureNormalizer",
++    "normalize_table_structure",
++]
+diff --git a/backend/tests/test_pdf_to_word_table_structure_normalizer.py b/backend/tests/test_pdf_to_word_table_structure_normalizer.py
+new file mode 100644
+index 0000000..3df1194
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_table_structure_normalizer.py
+@@ -0,0 +1,132 @@
++from __future__ import annotations
++
++from app.services.pdf_to_word.parser_adapters.table_structure_normalizer import (
++    REASON_OK,
++    REASON_TABLE_GRID_INCONSISTENT,
++    REASON_TABLE_STRUCTURE_MISSING,
++    TableStructureNormalizer,
++    normalize_table_structure,
++)
++from app.services.pdf_to_word.table_ir import (
++    WARN_IMAGE_ONLY_FALLBACK,
++    WARN_TABLE_GRID_INCOMPLETE,
++    WARN_TABLE_STRUCTURE_MISSING,
++)
++
++
++def _base_payload(**overrides):
++    payload = {
++        "table_id": "table:p1:candidate-001",
++        "source_candidate_id": "mineru_full:p1:b7",
++        "assigned_question_id": "q-1",
++        "assigned_region_id": "region:p1:q1",
++        "page_index": 1,
++        "bbox": {"page": 1, "x0": 80.0, "y0": 120.0, "x1": 480.0, "y1": 300.0},
++    }
++    payload.update(overrides)
++    return payload
++
++
++def test_html_source_has_highest_priority_and_preserves_spans():
++    payload = _base_payload(
++        table_html=(
++            "<table>"
++            "<tr><th colspan='2'>实验记录</th></tr>"
++            "<tr><td>项目</td><td>结果</td></tr>"
++            "</table>"
++        ),
++        table_rows=[["should", "not"], ["win", "priority"]],
++        markdown="| ignored | value |\n| --- | --- |\n| no | use |",
++    )
++
++    result = normalize_table_structure(payload)
++
++    assert result.source == "table_html"
++    assert result.status == "pass"
++    assert result.reason == REASON_OK
++    assert result.table_ir.row_count == 2
++    assert result.table_ir.column_count == 2
++    assert result.table_ir.cells[0].text == "实验记录"
++    assert result.table_ir.cells[0].column_span == 2
++
++
++def test_table_rows_source_supports_dict_cells_and_spans():
++    payload = _base_payload(
++        table_rows=[
++            [{"text": "实验记录", "column_span": 2}],
++            [
++                {"text": "项目", "style": {"bold": True}},
++                {"text": "结果", "confidence": 0.82},
++            ],
++        ]
++    )
++
++    result = TableStructureNormalizer().normalize(payload)
++
++    assert result.source == "table_rows"
++    assert result.status == "pass"
++    assert result.table_ir.row_count == 2
++    assert result.table_ir.column_count == 2
++    assert result.table_ir.cells[0].column_span == 2
++    assert result.table_ir.cells[1].runs[0].style.bold is True
++    assert result.table_ir.cells[2].confidence == 0.82
++
++
++def test_markdown_source_parses_pipe_table_when_html_and_rows_absent():
++    payload = _base_payload(
++        markdown="说明\n\n| 项目 | 结果 |\n| --- | --- |\n| 温度 | 20℃ |\n| 湿度 | 60% |"
++    )
++
++    result = normalize_table_structure(payload)
++
++    assert result.source == "markdown"
++    assert result.status == "pass"
++    assert result.table_ir.row_count == 3
++    assert result.table_ir.column_count == 2
++    assert [cell.text for cell in result.table_ir.cells[:2]] == ["项目", "结果"]
++
++
++def test_cell_boxes_source_clusters_geometry_and_merges_slot_text():
++    payload = _base_payload(
++        cell_boxes=[
++            {"bbox": {"page": 1, "x0": 80, "y0": 120, "x1": 180, "y1": 150}, "text": "项目"},
++            {"bbox": {"page": 1, "x0": 190, "y0": 120, "x1": 300, "y1": 150}, "text": "结果"},
++            {"bbox": {"page": 1, "x0": 80, "y0": 160, "x1": 180, "y1": 190}, "text": "温度"},
++            {"bbox": {"page": 1, "x0": 190, "y0": 160, "x1": 300, "y1": 174}, "text": "20"},
++            {"bbox": {"page": 1, "x0": 190, "y0": 176, "x1": 300, "y1": 190}, "text": "℃"},
++        ]
++    )
++
++    result = normalize_table_structure(payload)
++
++    assert result.source == "cell_boxes"
++    assert result.status == "pass"
++    assert result.table_ir.row_count == 2
++    assert result.table_ir.column_count == 2
++    assert result.table_ir.cells[-1].text == "20 ℃"
++
++
++def test_image_only_fallback_stays_review_and_never_fakes_structure():
++    payload = _base_payload(image_path="crops/page-1/table-like-001.png")
++
++    result = normalize_table_structure(payload)
++
++    assert result.source == "image_only"
++    assert result.status == "review"
++    assert result.reason == REASON_TABLE_STRUCTURE_MISSING
++    assert result.table_ir.cells == ()
++    assert WARN_TABLE_STRUCTURE_MISSING in result.warnings
++    assert WARN_IMAGE_ONLY_FALLBACK in result.warnings
++
++
++def test_irregular_rows_report_grid_inconsistency_instead_of_false_success():
++    payload = _base_payload(table_rows=[["项目", "结果"], ["温度"]])
++
++    result = normalize_table_structure(payload)
++
++    assert result.source == "table_rows"
++    assert result.status == "review"
++    assert result.reason == REASON_TABLE_GRID_INCONSISTENT
++    assert WARN_TABLE_GRID_INCOMPLETE in result.warnings
++    assert result.table_ir.row_count == 2
++    assert result.table_ir.column_count == 2

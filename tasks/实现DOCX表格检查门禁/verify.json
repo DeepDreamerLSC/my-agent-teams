@@ -1,0 +1,20 @@
+{
+  "task_id": "实现DOCX表格检查门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T09:48:43+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "DOCX inspect / table gate 已可机读输出，并已覆盖 pass/fail/invalid/关系缺失等关键场景；“检测到表格但没有 <w:tbl>”会稳定触发 blocker。",
+  "test_commands": [
+    "python3 - <<'PY'  # importlib 加载 backend/tests/test_pdf_to_word_fidelity_gate.py 并逐个执行 test_*\n...\nPY",
+    "python3 - <<'PY'  # importlib 加载 fidelity_gate.py，对 5 个 fixture 调用 inspect_docx_package / evaluate_docx_table_gate\n...\nPY"
+  ],
+  "scenarios_verified": [
+    "valid_table: docx_valid=true，w_tbl_count=1，w_tr_count=2，w_tc_count=6，has_table_xml=true",
+    "image_fallback_only: word_media_count=1，has_table_xml=false，image_fallback_table_count=1，blocker=table_detected_but_no_word_table",
+    "missing_document_relationships: 可区分 document relationships 缺失场景并给出 blocker",
+    "missing_word_document 与 invalid_zip: 均能给出 fail / invalid 结论而非静默通过"
+  ],
+  "regressions_found": []
+}

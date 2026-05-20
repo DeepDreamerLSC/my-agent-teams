@@ -1,0 +1,29 @@
+{
+  "task_id": "视觉差异Debug报告与HTML对照页",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已完成本轮最小返修：1）build_visual_diff_report 现在在缺少自定义 pages[] 时，会直接归一 canonical visual_similarity 载荷，按页聚合 render_pairs/page_scores/key_regions/vetoes，确保 quality_ready_contract.json 这类真实视觉证据不再生成空报告；2）_normalize_key_regions 已兼容 docx_crop_path -> output_crop_path、diff_image_path -> diff_crop_path，同时保留既有 output_crop_path/diff_crop_path；3）补了 2 条回归测试，分别覆盖 canonical fixture 消费与 docx/diff crop 字段不丢失。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/app/services/pdf_to_word/visual_diff_report.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/tests/test_pdf_to_word_visual_diff_report.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/index.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/visual_diff_report.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/pages/page-001.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/pages/page-002.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/pages/page-003.html",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/artifacts/pdf2word/final-acceptance/debug-html/demo-cross-subject/pages/page-004.html"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/app/services/pdf_to_word/visual_diff_report.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/tests/test_pdf_to_word_visual_diff_report.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Debug-HTML-e493dd9b/backend/tests/test_pdf_to_word_visual_diff_report.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-visual-diff-report --basetemp=/private/tmp/chiralium-pytest-temp-visual-diff-report -> 5 passed, 4 existing FastAPI deprecation warnings",
+    "canonical smoke now covered in pytest: quality_ready_contract-derived payload no longer yields empty report, and generated canonical debug HTML/report artifacts are non-empty -> passed"
+  ],
+  "risks": [
+    "本轮只补 canonical visual_similarity 归一化与 crop 字段兼容，未扩改最终门禁阈值或主流程自动挂接。",
+    "当前 patch artifact 仍保留上一轮 demo-cross-subject 静态产物；本轮返修重点在代码/测试契约，若后续需要真实 no-go 样例 demo，可再单独重生 debug-html。"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/视觉差异Debug报告与HTML对照页/artifacts/Debug-HTML-e493dd9b.patch"
+  ],
+  "completed_at": "2026-05-20T00:10:08+08:00"
+}

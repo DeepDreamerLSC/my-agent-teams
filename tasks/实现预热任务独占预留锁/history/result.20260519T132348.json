@@ -1,0 +1,28 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已落地 pre-reserve 独占预留锁：新增 reserve-task.sh 正式入口，预热锁在 pooled 阶段即占 reserved slot；dependency_ready -> dispatched 按同一 slot 继承转换，不再额外要求 spare reserved slot；同时补齐 claim/view/watcher/reassign/invariant 与回归测试。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/claim-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-watcher.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/task-pool-view.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/reassign-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/reserve-task.sh",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/lib/task_state_invariants.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_claim_task_reserved.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_task_pool_and_queue_router.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_reassign_task.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tests/test_task_watcher_push_reliability.py"
+  ],
+  "tests": [
+    ".venv/bin/python -m pytest tests/test_claim_task_reserved.py tests/test_task_pool_and_queue_router.py tests/test_reassign_task.py tests/test_task_watcher_push_reliability.py  # 47 passed in 20.07s"
+  ],
+  "risks": [
+    "arch-1 文档返修后，若字段命名最终定稿与当前 reservation_expires_at / reserve-task.sh 入口不同，需做一次轻量字段收敛。"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现预热任务独占预留锁/artifacts/task-e9dcc5f6.patch"
+  ],
+  "completed_at": "2026-05-19T13:13:13+08:00"
+}

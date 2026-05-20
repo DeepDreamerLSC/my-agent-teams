@@ -1,0 +1,7 @@
+{
+  "task_id": "冻结95还原度指标与样本清单",
+  "agent": "qa-1",
+  "claimed_at": "2026-05-19T08:22:55+08:00",
+  "claim_status": "requested",
+  "reason": "watcher auto-continued after idle sweep"
+}

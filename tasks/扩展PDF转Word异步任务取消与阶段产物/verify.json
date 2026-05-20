@@ -1,0 +1,51 @@
+{
+  "task_id": "扩展PDF转Word异步任务取消与阶段产物",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-18T21:35:48+0800",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 验证通过。PDF→Word 异步 job 已补齐取消接口与阶段产物暴露：`queued` 可直接取消，`running` 进入诚实的 best-effort `cancel_requested` 语义，若 worker 未及时停下则会保留取消历史并最终回落到 `succeeded/failed`；状态查询同时返回 `stage`、`cancellation`、`history` 与更完整的 artifact 路径。同步 `/api/pdf-to-word/convert` 路径回归测试通过。",
+  "acceptance_criteria": [
+    {
+      "criterion": "API 层可对 job 发起取消，并能查询到诚实的状态结果",
+      "result": "pass",
+      "evidence": "`tests/test_pdf_to_word_async_jobs.py` 已覆盖 queued cancel、running cancel、worker ignore cancel 与 completed job 409；本地复跑 `tests/test_pdf_to_word_api.py + tests/test_pdf_to_word_async_jobs.py` 得到 `17 passed`。另以一次性脚本手动验证 `cancelled` job 再次取消仍返回当前 `cancelled` 状态，结果 PASS。"
+    },
+    {
+      "criterion": "阶段产物/历史信息足够支撑排查，不再只有最终 output 路径",
+      "result": "pass",
+      "evidence": "静态复核 `backend/app/services/pdf_to_word/job_service.py` 与 `artifacts/pdf2word/p2-productization/async_job_api_summary.md`：`job.json`、`stage.json`、`history.jsonl`、`input_pdf_path`、`output_docx_path`、`job_dir` / `output_dir` 均已进入状态查询结构，且 `history` 会记录 queued/running/cancel_requested/cancelled/succeeded/failed 流转。"
+    },
+    {
+      "criterion": "同步 `/api/pdf-to-word/convert` 不回归，现有 create/status 用例不被破坏",
+      "result": "pass",
+      "evidence": "`tests/test_pdf_to_word_api.py` 覆盖同步下载流、默认参数、hybrid 参数透传、非 PDF 拒绝、缺文件 `422` 与未登录 `401`；同组 pytest 复跑通过，说明异步 job 扩展未破坏同步接口。"
+    },
+    {
+      "criterion": "测试通过，并对暂未覆盖的复杂场景明确列出边界",
+      "result": "pass",
+      "evidence": "本地执行 reviewer 同组 pytest 通过：`17 passed, 4 warnings in 0.24s`。`result.json` 与 `async_job_api_summary.md` 已明确写出单进程 `asyncio.create_task()`、running cancel 仅 best-effort、未覆盖超时治理/进程重启恢复/多机调度/统一清理策略等边界。"
+    }
+  ],
+  "scenarios_verified": [
+    "读取并复核任务 `instruction.md`、`result.json`、`review.json`、`review.md`、`task.json`，确认当前 review 已 approve，QA gate 仍待补 `verify.json`",
+    "复跑 `backend/tests/test_pdf_to_word_api.py` 与 `backend/tests/test_pdf_to_word_async_jobs.py`，验证同步 convert、create/query/cancel job、404/409 分支与取消语义回归",
+    "静态审阅 `backend/app/api/pdf_to_word.py`，确认新增 `POST /api/pdf-to-word/jobs/{job_id}/cancel`，且 create/get/cancel 都会补充 `status_url`/`cancel_url`",
+    "静态审阅 `backend/app/services/pdf_to_word/job_service.py`，确认状态机扩展为 `queued/running/cancel_requested/cancelled/succeeded/failed`，并在 manifest/stage/history 中持久化 cancellation 与 artifact 信息",
+    "复核 `artifacts/pdf2word/p2-productization/async_job_api_summary.md`，确认当前状态机、artifact 结构与已知限制说明一致",
+    "一次性手动验证：queued job 首次 cancel 后进入 `cancelled`，再次 cancel 保持幂等返回当前状态"
+  ],
+  "test_commands": [
+    "`PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m pytest tests/test_pdf_to_word_api.py tests/test_pdf_to_word_async_jobs.py -o cache_dir=/private/tmp/chiralium-pytest-pdf-job-cancel-cache --basetemp=/private/tmp/chiralium-pytest-pdf-job-cancel-tmp -q` -> `17 passed, 4 warnings in 0.24s`",
+    "`PYTHONDONTWRITEBYTECODE=1 .venv/bin/python - <<'PY' ... PDFToWordJobService.create_job/cancel_job/cancel_job ... PY` -> `manual_cancelled_idempotency=PASS`",
+    "`sed -n '1,260p' backend/app/api/pdf_to_word.py` / `sed -n '120,520p' backend/app/services/pdf_to_word/job_service.py` -> 复核 cancel API、状态机、history/stage/artifacts 落盘逻辑",
+    "`sed -n '1,260p' artifacts/pdf2word/p2-productization/async_job_api_summary.md` -> 复核文档口径与实现一致"
+  ],
+  "non_blocking_observations": [
+    "review 已指出：目前没有单独的 pytest 用例覆盖“已 cancelled job 再次取消保持幂等返回当前状态”；本次 QA 已用一次性脚本手动验证通过，后续仍建议补成自动化回归测试。",
+    "pytest 的 4 条 warning 为现有 FastAPI `on_event` deprecation warning，与本轮 PDF→Word 异步 job 取消/产物增强验收无直接阻塞关系。",
+    "当前实现仍是单进程、本地磁盘版后台任务；进程在 `queued/running` 阶段退出后不会自动恢复未完成 job。该边界已在 `result.json` 与摘要文档中明确披露。"
+  ],
+  "regressions_found": []
+}

@@ -1,0 +1,14 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "resumed_at": "2026-05-19T13:23:48+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "review 返修：实现必须对齐已批准的 pre_reserved_* 契约，pooled/dependency_wait 阶段不得复用 reserved_by；同时将 scripts/reserve-task.sh 纳入正式版本控制与 patch artifact，确保 result.files_modified / patch / worktree 一致。",
+  "archived_files": [
+    "ack.20260519T132348.json",
+    "review.20260519T132348.json",
+    "review.20260519T132348.md",
+    "verify.20260519T132348.json",
+    "result.20260519T132348.json"
+  ]
+}

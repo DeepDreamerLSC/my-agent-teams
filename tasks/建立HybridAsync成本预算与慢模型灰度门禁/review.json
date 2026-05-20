@@ -1,0 +1,51 @@
+{
+  "task_id": "建立HybridAsync成本预算与慢模型灰度门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T08:54:32+08:00",
+  "status": "approve",
+  "summary": "审查通过。`visual_gate_budget.py` 已把 default sync 边界、全学科覆盖、Paddle selected_ratio/cache 与 Qwen 慢模型 candidate/scheduled/timeout/cost 约束收敛为可审计 contract；`hybrid_pipeline.py` 也保留了 qwen/paddle profile audit 所需的 `page_scope`、`selected_pages`、`latency_seconds`、`skipped_reason` 等事实。reviewer 补跑 py_compile、定向 pytest，并用 authoritative `phase3-paddle-quality/report.json` + `final_acceptance_summary.json` smoke 复核，得到 `status=manual_review`、`selected_ratio=0.6562`、`cache_hit_rate=1.0`，与 result.json 一致。未发现阻塞问题，可交 PM 收口。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立HybridAsync成本预算与慢模型灰度门禁",
+      "finding": "任务目录当前没有 verify.json，且 task.json 标记 `qa_gate_state=skipped`。",
+      "recommendation": "本轮不阻塞；如后续 watcher/QA 需要完整留痕，可补写 verify.json。",
+      "evidence": "reviewer 审查时任务目录仅见 ack/result/task/transitions/artifacts，无 verify.json。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word视觉门禁成本预算报告.md",
+      "finding": "预算报告正文已补入 Paddle/Qwen 灰度阈值与 authoritative snapshot 说明，但文档头部元数据仍沿用上一轮“成本与耗时预算门禁 / 2026-05-19”的标识。",
+      "recommendation": "若该报告继续作为对外归档口径，建议后续顺手把任务名/日期与本轮 HybridAsync 灰度预算上下文对齐。",
+      "evidence": "报告头部仍写 `日期：2026-05-19`、`任务：成本与耗时预算门禁`；新增 HybridAsync/Paddle/Qwen 阈值出现在第 2 节表格和 snapshot 说明中。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立HybridAsync成本预算与慢模型灰度门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立HybridAsync成本预算与慢模型灰度门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/建立HybridAsync成本预算与慢模型灰度门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/app/services/pdf_to_word/visual_gate_budget.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_hybrid_pipeline.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_pdf_to_word_visual_gate_budget.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word视觉门禁成本预算报告.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/phase3-paddle-quality/report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-hybrid-budget-review /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/app/services/pdf_to_word/parser_adapters/hybrid_pipeline.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/app/services/pdf_to_word/visual_gate_budget.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_pdf_to_word_visual_gate_budget.py",
+      "result": "passed"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/private/tmp PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_hybrid_pipeline.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend/tests/test_pdf_to_word_visual_gate_budget.py -p no:cacheprovider -q",
+      "result": "16 passed, 4 warnings（既有 FastAPI `on_event` deprecation warnings，与本任务无关）"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/private/tmp PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/HybridAsync-e8442bf8/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<'PY' ... build_visual_gate_budget_summary(phase3_report, final_acceptance_summary=final_acceptance) ... PY",
+      "result": "passed：authoritative artifact 复核得到 `status=manual_review`、`gate_passed=false`、`failure_codes=[paddle_selected_ratio_per_sample_over_budget,paddle_selected_ratio_over_budget]`、`paddle_selected_ratio=0.6562`、`paddle_cache_hit_rate_second_run=1.0`；当前 snapshot 的 slow-model totals 为 0，符合现有 phase3 profile-audits 未触发 qwen review 的事实。"
+    }
+  ],
+  "recommended_next_action": "pm"
+}

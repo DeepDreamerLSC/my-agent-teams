@@ -1,0 +1,7 @@
+{"from": "pending", "to": "pooled", "at": "2026-05-20T08:09:55+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-20T08:20:58+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-20T08:26:30+08:00", "reason": "reserved task timed out without ack; returned to pool from dev-1"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-20T08:27:10+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-20T08:32:17+08:00", "reason": "reserved task timed out without ack; returned to pool from dev-1"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-20T08:32:56+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "pooled", "at": "2026-05-20T08:33:58+08:00", "reason": "pm queued task into claim pool"}

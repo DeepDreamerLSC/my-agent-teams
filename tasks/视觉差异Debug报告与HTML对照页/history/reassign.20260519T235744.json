@@ -1,0 +1,15 @@
+{
+  "task_id": "视觉差异Debug报告与HTML对照页",
+  "reassigned_at": "2026-05-19T23:57:44+08:00",
+  "reassigned_by": "task-watcher",
+  "from_agent": "dev-1",
+  "to_agent": "dev-2",
+  "reason": "review 驳回：需补 canonical visual_similarity artifact 归一化与 key-region crop 字段兼容。考虑 dev-1 正在推进 成本与耗时预算门禁，而 dev-2 刚处理英语/visual_similarity 相关返修，现将 visual diff 返修改由 dev-2 接手，以尽快解锁 图像密集试卷题块顺序与图文绑定专项。",
+  "archived_files": [
+    "ack.20260519T235744.json",
+    "review.20260519T235744.json",
+    "review.20260519T235744.md",
+    "verify.20260519T235744.json",
+    "result.20260519T235744.json"
+  ]
+}

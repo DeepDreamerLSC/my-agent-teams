@@ -1,0 +1,20 @@
+{
+  "task_id": "实现表格结构归一化器",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-19T11:38:34+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "已完成表格结构归一化器 QA：在当前 staged TableIR 契约环境下 6 个 pytest 用例全部通过，并额外通过 git diff --check；html/rows/markdown/cell_boxes/image_only/irregular-grid 场景均被覆盖，image-only 与网格不一致场景会输出 review/fail，而非伪造结构化成功。",
+  "test_commands": [
+    "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-7b1517a9 && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/private/tmp/table-normalizer-stage/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /private/tmp/table-normalizer-stage/backend/tests/test_pdf_to_word_table_structure_normalizer.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-table-normalizer --basetemp=/private/tmp/chiralium-pytest-temp-table-normalizer",
+    "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-7b1517a9 diff --check -- backend/app/services/pdf_to_word/parser_adapters/table_structure_normalizer.py backend/tests/test_pdf_to_word_table_structure_normalizer.py"
+  ],
+  "scenarios_verified": [
+    "pytest 结果：6 passed，4 warnings（FastAPI on_event deprecation）。",
+    "source priority 已覆盖：table_html > table_rows > markdown > cell_boxes > image_only。",
+    "image-only 场景保持 review/fail，不伪造 NormalizedTableIR 结构化成功。",
+    "irregular rows 场景会报告 grid inconsistency，而不是静默通过。"
+  ],
+  "regressions_found": []
+}

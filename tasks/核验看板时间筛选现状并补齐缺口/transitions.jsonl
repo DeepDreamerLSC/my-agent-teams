@@ -1,0 +1,4 @@
+{"from": "pending", "to": "dispatched", "at": "2026-05-19T16:13:22+08:00", "reason": "pm dispatch"}
+{"from": "dispatched", "to": "working", "at": "2026-05-19T16:19:59+08:00", "reason": "watcher observed ack.json"}
+{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T16:52:39+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T17:02:12+08:00", "reason": "pm close: review and qa passed for dashboard time-range filter absorption"}

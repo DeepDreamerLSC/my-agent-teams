@@ -1,0 +1,25 @@
+{
+  "task_id": "实现PDF与DOCX渲染对生成器",
+  "agent": "dev-2",
+  "status": "done",
+  "summary": "已实现真实 PDF/DOCX render pair 生成器：page_renderer 现可统一输出页级 PNG、hash、页尺寸、像素尺寸、rotation 与渲染 metadata，并新增 DOCX→PDF→PNG 渲染链路；render_pair_generator 可为 source PDF 与 output DOCX 生成 page-index 对齐的 render_pairs[] 与 render_pair.json，显式区分 success / failed / page_count_mismatch，确保后续 visual_similarity 直接消费真实渲染证据而不是静态占位数据。新增 fixture 冻结下游 contract，并补齐成功、DOCX 转换失败、页数不一致与 parser 兼容回归测试。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-DOCX-3c065d39/backend/app/services/pdf_to_word/page_renderer.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-DOCX-3c065d39/backend/app/services/pdf_to_word/render_pair_generator.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-DOCX-3c065d39/backend/tests/test_pdf_to_word_render_pair.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/PDF-DOCX-3c065d39/backend/tests/fixtures/pdf_to_word/render_pair/render_pair_contract.json"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/page_renderer.py backend/app/services/pdf_to_word/render_pair_generator.py backend/tests/test_pdf_to_word_render_pair.py -> passed",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_render_pair.py -q -o cache_dir=/private/tmp/chiralium-pytest-cache-render-pair-only --basetemp=/private/tmp/chiralium-pytest-temp-render-pair-only -> 5 passed, 4 existing FastAPI deprecation warnings",
+    "git diff --check -- backend/app/services/pdf_to_word/page_renderer.py backend/app/services/pdf_to_word/render_pair_generator.py backend/tests/test_pdf_to_word_render_pair.py backend/tests/fixtures/pdf_to_word/render_pair -> passed"
+  ],
+  "risks": [
+    "默认 DOCX 渲染依赖本机 soffice/libreoffice；本轮测试通过注入 converter 固化 contract，但集成环境仍需保证 DOCX→PDF 工具可用。",
+    "本地额外联跑 test_pdf_to_word_apple_parser.py 时暴露的 Apple worker 路径缺失属于既有环境问题，不是本任务 write_scope 内 blocker，也未影响本任务定向回归。"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现PDF与DOCX渲染对生成器/artifacts/PDF-DOCX-3c065d39.patch"
+  ],
+  "completed_at": "2026-05-19T18:57:15+08:00"
+}

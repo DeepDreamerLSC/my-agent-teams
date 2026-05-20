@@ -1,0 +1,29 @@
+{
+  "task_id": "图像密集试卷题块顺序与图文绑定专项",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "verified_at": "2026-05-20T00:53:12+08:00",
+  "status": "pass",
+  "pass": true,
+  "summary": "QA 通过：image-dense 专项门禁已复用 render pair/visual diff 证据，能识别题块错序、图像裁剪/位置偏差与图文绑定异常，并向 downstream visual similarity contract 透传关键区域与 veto。",
+  "test_commands": [
+    "grep -n 'math-dense\\|五下科学\\|science' /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-989897c8/backend/app/services/pdf_to_word/image_dense_visual_gate.py",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-image-dense-qa /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-989897c8/backend/app/services/pdf_to_word/image_dense_visual_gate.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-989897c8/backend/tests/test_pdf_to_word_image_dense_visual_gate.py",
+    "git diff --check -- backend/app/services/pdf_to_word/image_dense_visual_gate.py backend/tests/test_pdf_to_word_image_dense_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/image_dense/image_dense_visual_contract.json backend/tests/fixtures/pdf_to_word/visual_similarity/image_dense/image_dense_render_pair.json",
+    "PYTHONDONTWRITEBYTECODE=1 TMPDIR=/private/tmp /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_image_dense_visual_gate.py -p no:cacheprovider",
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-989897c8/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python - <<'PY' # smoke build_image_dense_visual_gate_report ready/binding-missing\n...\nPY"
+  ],
+  "scenarios_verified": [
+    "default sync 不计入 image-dense 视觉分，保持主线路由边界不变",
+    "quality/hybrid_async 就绪样例可产出 render_pairs、image_dense_key_regions、question_order_checks 与 downstream_visual_similarity_contract",
+    "题块顺序回归会触发 blocking veto 与 failed",
+    "binding_pairs 缺失会触发 artifact_not_ready，避免伪造可评分状态",
+    "图像裁剪/位置相似度回归会触发 image_region_similarity_below_threshold veto",
+    "实现逻辑未硬编码 science/单样例规则，夹具通过占位根目录 materialize 生成可移植测试数据"
+  ],
+  "regressions_found": [],
+  "notes": [
+    "任务目录下未发现独立 review artifact；本次 QA 基于 instruction/result、代码、fixtures、pytest 与 smoke 结果完成验证。",
+    "pytest 仍有 4 条既有 FastAPI on_event deprecation warnings，与本任务 image-dense gate 逻辑无关。"
+  ]
+}

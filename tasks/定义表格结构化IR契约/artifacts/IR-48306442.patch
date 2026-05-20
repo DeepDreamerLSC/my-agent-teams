@@ -1,0 +1,883 @@
+diff --git a/backend/app/services/pdf_to_word/table_ir.py b/backend/app/services/pdf_to_word/table_ir.py
+new file mode 100644
+index 0000000..9e49c5f
+--- /dev/null
++++ b/backend/app/services/pdf_to_word/table_ir.py
+@@ -0,0 +1,496 @@
++from __future__ import annotations
++
++from collections.abc import Mapping, Sequence
++from dataclasses import dataclass, field
++from pathlib import Path
++from typing import Any, Literal
++
++from .models import PageBox
++
++
++NORMALIZED_TABLE_IR_VERSION = "normalized_table_ir/v1"
++
++TableIRContractStatus = Literal["pass", "review", "fail"]
++
++WARN_TABLE_STRUCTURE_MISSING = "table_structure_missing"
++WARN_IMAGE_ONLY_FALLBACK = "image_only_fallback"
++WARN_TABLE_DIMENSION_MISMATCH = "table_dimension_mismatch"
++WARN_TABLE_GRID_INCOMPLETE = "table_grid_incomplete"
++WARN_TABLE_SPAN_OUT_OF_BOUNDS = "table_span_out_of_bounds"
++WARN_TABLE_CELL_OVERLAP = "table_cell_overlap"
++
++REQUIRED_TABLE_IR_FIELDS = frozenset(
++    {
++        "version",
++        "table_id",
++        "source_candidate_id",
++        "assigned_question_id",
++        "assigned_region_id",
++        "row_count",
++        "column_count",
++        "cells",
++        "bbox",
++        "metrics",
++        "warnings",
++        "raw",
++    }
++)
++REQUIRED_CELL_FIELDS = frozenset(
++    {"row_index", "column_index", "row_span", "column_span", "text", "runs", "bbox"}
++)
++REQUIRED_RAW_FIELDS = frozenset({"image_path", "html", "markdown"})
++STRUCTURAL_REVIEW_WARNINGS = frozenset(
++    {
++        WARN_TABLE_STRUCTURE_MISSING,
++        WARN_IMAGE_ONLY_FALLBACK,
++        WARN_TABLE_DIMENSION_MISMATCH,
++        WARN_TABLE_GRID_INCOMPLETE,
++    }
++)
++
++
++@dataclass(frozen=True)
++class TableRunStyle:
++    """Inline style carried by a normalized table text run."""
++
++    bold: bool = False
++    italic: bool = False
++    underline: bool = False
++    font_name: str | None = None
++    font_size: float | None = None
++    color: str | None = None
++    extra: dict[str, Any] = field(default_factory=dict)
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any] | None) -> "TableRunStyle":
++        if payload is None:
++            return cls()
++        if not isinstance(payload, Mapping):
++            raise ValueError("run style must be an object")
++        known = {"bold", "italic", "underline", "font_name", "font_size", "color"}
++        return cls(
++            bold=bool(payload.get("bold", False)),
++            italic=bool(payload.get("italic", False)),
++            underline=bool(payload.get("underline", False)),
++            font_name=_optional_str(payload.get("font_name")),
++            font_size=_optional_float(payload.get("font_size")),
++            color=_optional_str(payload.get("color")),
++            extra={str(key): value for key, value in payload.items() if str(key) not in known},
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        payload: dict[str, Any] = {
++            "bold": self.bold,
++            "italic": self.italic,
++            "underline": self.underline,
++            "font_name": self.font_name,
++            "font_size": self.font_size,
++            "color": self.color,
++        }
++        payload.update(dict(self.extra))
++        return payload
++
++
++@dataclass(frozen=True)
++class TableTextRun:
++    """Text span inside a table cell, preserving renderer-relevant style."""
++
++    text: str
++    style: TableRunStyle = field(default_factory=TableRunStyle)
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any]) -> "TableTextRun":
++        _require_mapping(payload, "run")
++        _require_keys(payload, {"text", "style"}, "run")
++        return cls(
++            text=str(payload.get("text") or ""),
++            style=TableRunStyle.from_dict(payload.get("style")),
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        return {"text": self.text, "style": self.style.to_dict()}
++
++
++@dataclass(frozen=True)
++class TableCellIR:
++    """A normalized table cell using zero-based grid coordinates."""
++
++    row_index: int
++    column_index: int
++    row_span: int = 1
++    column_span: int = 1
++    text: str = ""
++    runs: tuple[TableTextRun, ...] = field(default_factory=tuple)
++    bbox: PageBox | None = None
++    confidence: float = 1.0
++    warnings: tuple[str, ...] = field(default_factory=tuple)
++
++    def __post_init__(self) -> None:
++        object.__setattr__(self, "runs", tuple(self.runs))
++        object.__setattr__(self, "warnings", tuple(str(item) for item in self.warnings if str(item)))
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any]) -> "TableCellIR":
++        _require_mapping(payload, "cell")
++        _require_keys(payload, REQUIRED_CELL_FIELDS, "cell")
++        return cls(
++            row_index=_int_value(payload.get("row_index")),
++            column_index=_int_value(payload.get("column_index")),
++            row_span=_int_value(payload.get("row_span"), default=1),
++            column_span=_int_value(payload.get("column_span"), default=1),
++            text=str(payload.get("text") or ""),
++            runs=tuple(TableTextRun.from_dict(item) for item in _sequence(payload.get("runs"), "cell.runs")),
++            bbox=_page_box_from_dict(payload.get("bbox")),
++            confidence=_float_value(payload.get("confidence", 1.0), default=1.0),
++            warnings=tuple(str(item) for item in _sequence(payload.get("warnings", ()), "cell.warnings")),
++        )
++
++    def covered_slots(self) -> tuple[tuple[int, int], ...]:
++        """Return every grid slot covered by this cell's span."""
++
++        if self.row_span < 1 or self.column_span < 1:
++            return ()
++        return tuple(
++            (row, column)
++            for row in range(self.row_index, self.row_index + self.row_span)
++            for column in range(self.column_index, self.column_index + self.column_span)
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        return {
++            "row_index": self.row_index,
++            "column_index": self.column_index,
++            "row_span": self.row_span,
++            "column_span": self.column_span,
++            "text": self.text,
++            "runs": [run.to_dict() for run in self.runs],
++            "bbox": self.bbox.to_dict() if self.bbox is not None else None,
++            "confidence": self.confidence,
++            "warnings": list(self.warnings),
++        }
++
++
++@dataclass(frozen=True)
++class TableRawInput:
++    """Raw parser payload retained only for traceability, never as pass evidence."""
++
++    image_path: str | None = None
++    html: str | None = None
++    markdown: str | None = None
++
++    @property
++    def has_visual_fallback(self) -> bool:
++        return bool(self.image_path)
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any]) -> "TableRawInput":
++        _require_mapping(payload, "raw")
++        _require_keys(payload, REQUIRED_RAW_FIELDS, "raw")
++        return cls(
++            image_path=_optional_str(payload.get("image_path")),
++            html=_optional_str(payload.get("html")),
++            markdown=_optional_str(payload.get("markdown")),
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        return {"image_path": self.image_path, "html": self.html, "markdown": self.markdown}
++
++
++@dataclass(frozen=True)
++class TableMetrics:
++    """Quality metrics used by later normalizer/review/rendering gates."""
++
++    structure_confidence: float | None = None
++    text_coverage: float | None = None
++    cell_count: int | None = None
++    source: str | None = None
++    extra: dict[str, Any] = field(default_factory=dict)
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any] | None) -> "TableMetrics":
++        if payload is None:
++            return cls()
++        _require_mapping(payload, "metrics")
++        known = {"structure_confidence", "text_coverage", "cell_count", "source"}
++        return cls(
++            structure_confidence=_optional_float(payload.get("structure_confidence")),
++            text_coverage=_optional_float(payload.get("text_coverage")),
++            cell_count=_optional_int(payload.get("cell_count")),
++            source=_optional_str(payload.get("source")),
++            extra={str(key): value for key, value in payload.items() if str(key) not in known},
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        payload: dict[str, Any] = {
++            "structure_confidence": self.structure_confidence,
++            "text_coverage": self.text_coverage,
++            "cell_count": self.cell_count,
++            "source": self.source,
++        }
++        payload.update(dict(self.extra))
++        return payload
++
++
++@dataclass(frozen=True)
++class NormalizedTableIR:
++    """Frozen v1 contract shared by table normalizer, ExerciseIR and DOCX rendering.
++
++    A table is passable only when it has explicit structured cells whose spans fit
++    the declared grid. Raw image/html/markdown is trace data and does not by itself
++    make an image-only candidate a successful table extraction.
++    """
++
++    table_id: str
++    source_candidate_id: str
++    assigned_question_id: str | None
++    assigned_region_id: str | None
++    row_count: int
++    column_count: int
++    cells: tuple[TableCellIR, ...] = field(default_factory=tuple)
++    bbox: PageBox | None = None
++    metrics: TableMetrics = field(default_factory=TableMetrics)
++    warnings: tuple[str, ...] = field(default_factory=tuple)
++    raw: TableRawInput = field(default_factory=TableRawInput)
++    version: str = NORMALIZED_TABLE_IR_VERSION
++
++    def __post_init__(self) -> None:
++        object.__setattr__(self, "cells", tuple(self.cells))
++        object.__setattr__(self, "warnings", tuple(str(item) for item in self.warnings if str(item)))
++
++    @classmethod
++    def from_dict(cls, payload: Mapping[str, Any]) -> "NormalizedTableIR":
++        _require_mapping(payload, "normalized table IR")
++        _require_keys(payload, REQUIRED_TABLE_IR_FIELDS, "normalized table IR")
++        return cls(
++            version=str(payload.get("version") or NORMALIZED_TABLE_IR_VERSION),
++            table_id=str(payload.get("table_id") or ""),
++            source_candidate_id=str(payload.get("source_candidate_id") or ""),
++            assigned_question_id=_optional_str(payload.get("assigned_question_id")),
++            assigned_region_id=_optional_str(payload.get("assigned_region_id")),
++            row_count=_int_value(payload.get("row_count")),
++            column_count=_int_value(payload.get("column_count")),
++            cells=tuple(TableCellIR.from_dict(item) for item in _sequence(payload.get("cells"), "cells")),
++            bbox=_page_box_from_dict(payload.get("bbox")),
++            metrics=TableMetrics.from_dict(payload.get("metrics")),
++            warnings=tuple(str(item) for item in _sequence(payload.get("warnings"), "warnings")),
++            raw=TableRawInput.from_dict(payload.get("raw")),
++        )
++
++    @property
++    def has_structured_cells(self) -> bool:
++        return self.row_count > 0 and self.column_count > 0 and bool(self.cells)
++
++    def inferred_dimensions(self) -> tuple[int, int]:
++        if not self.cells:
++            return (0, 0)
++        return (
++            max(cell.row_index + max(cell.row_span, 0) for cell in self.cells),
++            max(cell.column_index + max(cell.column_span, 0) for cell in self.cells),
++        )
++
++    def to_dict(self) -> dict[str, Any]:
++        return {
++            "version": self.version,
++            "table_id": self.table_id,
++            "source_candidate_id": self.source_candidate_id,
++            "assigned_question_id": self.assigned_question_id,
++            "assigned_region_id": self.assigned_region_id,
++            "row_count": self.row_count,
++            "column_count": self.column_count,
++            "cells": [cell.to_dict() for cell in self.cells],
++            "bbox": self.bbox.to_dict() if self.bbox is not None else None,
++            "metrics": self.metrics.to_dict(),
++            "warnings": list(self.warnings),
++            "raw": self.raw.to_dict(),
++        }
++
++
++@dataclass(frozen=True)
++class TableIRValidationResult:
++    table_id: str
++    status: TableIRContractStatus
++    errors: tuple[str, ...]
++    warnings: tuple[str, ...]
++    inferred_row_count: int
++    inferred_column_count: int
++    has_structured_cells: bool
++
++    @property
++    def passable(self) -> bool:
++        return self.status == "pass"
++
++
++def load_normalized_table_ir(path: str | Path) -> NormalizedTableIR:
++    import json
++
++    payload = json.loads(Path(path).read_text(encoding="utf-8"))
++    return NormalizedTableIR.from_dict(payload)
++
++
++def validate_normalized_table_ir(table: NormalizedTableIR) -> TableIRValidationResult:
++    """Validate the structural contract without normalizing or rendering a table."""
++
++    errors: list[str] = []
++    warnings: list[str] = list(table.warnings)
++
++    if not table.table_id.strip():
++        errors.append("table_id_missing")
++    if not table.source_candidate_id.strip():
++        errors.append("source_candidate_id_missing")
++    if table.row_count < 0 or table.column_count < 0:
++        errors.append("table_dimensions_negative")
++
++    inferred_row_count, inferred_column_count = table.inferred_dimensions()
++    occupied: dict[tuple[int, int], str] = {}
++
++    if not table.cells:
++        _append_unique(warnings, WARN_TABLE_STRUCTURE_MISSING)
++        if table.raw.has_visual_fallback and not table.raw.html and not table.raw.markdown:
++            _append_unique(warnings, WARN_IMAGE_ONLY_FALLBACK)
++    else:
++        if table.row_count <= 0 or table.column_count <= 0:
++            errors.append("table_dimensions_missing")
++        for cell_index, cell in enumerate(table.cells):
++            cell_label = f"cell[{cell_index}]"
++            if cell.row_index < 0 or cell.column_index < 0:
++                errors.append(f"{cell_label}:negative_origin")
++                continue
++            if cell.row_span < 1 or cell.column_span < 1:
++                errors.append(f"{cell_label}:invalid_span")
++                continue
++            if cell.row_index + cell.row_span > table.row_count or cell.column_index + cell.column_span > table.column_count:
++                errors.append(f"{cell_label}:{WARN_TABLE_SPAN_OUT_OF_BOUNDS}")
++            for slot in cell.covered_slots():
++                previous = occupied.get(slot)
++                if previous is not None:
++                    errors.append(f"{cell_label}:{WARN_TABLE_CELL_OVERLAP}:{slot[0]},{slot[1]}")
++                    continue
++                occupied[slot] = cell_label
++
++        declared_dimensions = (table.row_count, table.column_count)
++        inferred_dimensions = (inferred_row_count, inferred_column_count)
++        if inferred_dimensions != declared_dimensions:
++            _append_unique(warnings, WARN_TABLE_DIMENSION_MISMATCH)
++
++        expected_slot_count = table.row_count * table.column_count
++        if expected_slot_count > 0 and len(occupied) < expected_slot_count:
++            _append_unique(warnings, WARN_TABLE_GRID_INCOMPLETE)
++
++    unique_errors = tuple(_unique(errors))
++    unique_warnings = tuple(_unique(warnings))
++    if unique_errors:
++        status: TableIRContractStatus = "fail"
++    elif any(warning in STRUCTURAL_REVIEW_WARNINGS for warning in unique_warnings):
++        status = "review"
++    else:
++        status = "pass"
++
++    return TableIRValidationResult(
++        table_id=table.table_id,
++        status=status,
++        errors=unique_errors,
++        warnings=unique_warnings,
++        inferred_row_count=inferred_row_count,
++        inferred_column_count=inferred_column_count,
++        has_structured_cells=table.has_structured_cells,
++    )
++
++
++def _append_unique(items: list[str], value: str) -> None:
++    if value not in items:
++        items.append(value)
++
++
++def _unique(items: Sequence[str]) -> list[str]:
++    return list(dict.fromkeys(str(item) for item in items if str(item)))
++
++
++def _require_mapping(payload: Any, context: str) -> None:
++    if not isinstance(payload, Mapping):
++        raise ValueError(f"{context} must be an object")
++
++
++def _require_keys(payload: Mapping[str, Any], keys: set[str] | frozenset[str], context: str) -> None:
++    missing = sorted(key for key in keys if key not in payload)
++    if missing:
++        raise ValueError(f"{context} missing required fields: {', '.join(missing)}")
++
++
++def _sequence(value: Any, context: str) -> Sequence[Any]:
++    if value is None:
++        return ()
++    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
++        raise ValueError(f"{context} must be a list")
++    return value
++
++
++def _page_box_from_dict(value: Any) -> PageBox | None:
++    if value is None:
++        return None
++    if isinstance(value, PageBox):
++        return value
++    _require_mapping(value, "bbox")
++    _require_keys(value, {"page", "x0", "y0", "x1", "y1"}, "bbox")
++    return PageBox(
++        page=_int_value(value.get("page")),
++        x0=_float_value(value.get("x0")),
++        y0=_float_value(value.get("y0")),
++        x1=_float_value(value.get("x1")),
++        y1=_float_value(value.get("y1")),
++    )
++
++
++def _int_value(value: Any, *, default: int = 0) -> int:
++    if value in (None, ""):
++        return default
++    return int(value)
++
++
++def _optional_int(value: Any) -> int | None:
++    if value in (None, ""):
++        return None
++    return int(value)
++
++
++def _float_value(value: Any, *, default: float = 0.0) -> float:
++    if value in (None, ""):
++        return default
++    return float(value)
++
++
++def _optional_float(value: Any) -> float | None:
++    if value in (None, ""):
++        return None
++    return float(value)
++
++
++def _optional_str(value: Any) -> str | None:
++    if value is None:
++        return None
++    normalized = str(value).strip()
++    return normalized or None
++
++
++__all__ = [
++    "NORMALIZED_TABLE_IR_VERSION",
++    "REQUIRED_CELL_FIELDS",
++    "REQUIRED_RAW_FIELDS",
++    "REQUIRED_TABLE_IR_FIELDS",
++    "STRUCTURAL_REVIEW_WARNINGS",
++    "TableCellIR",
++    "TableIRContractStatus",
++    "TableIRValidationResult",
++    "TableMetrics",
++    "TableRawInput",
++    "TableRunStyle",
++    "TableTextRun",
++    "NormalizedTableIR",
++    "WARN_IMAGE_ONLY_FALLBACK",
++    "WARN_TABLE_CELL_OVERLAP",
++    "WARN_TABLE_DIMENSION_MISMATCH",
++    "WARN_TABLE_GRID_INCOMPLETE",
++    "WARN_TABLE_SPAN_OUT_OF_BOUNDS",
++    "WARN_TABLE_STRUCTURE_MISSING",
++    "load_normalized_table_ir",
++    "validate_normalized_table_ir",
++]
+
+diff --git a/backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json b/backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json
+new file mode 100644
+index 0000000..271b2f0
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/table_ir/structured_table.json
+@@ -0,0 +1,185 @@
++{
++  "version": "normalized_table_ir/v1",
++  "table_id": "table:p1:candidate-0007",
++  "source_candidate_id": "mineru_full:p1:b7",
++  "assigned_question_id": "q-2026-math-01",
++  "assigned_region_id": "region:p1:q1",
++  "row_count": 3,
++  "column_count": 3,
++  "cells": [
++    {
++      "row_index": 0,
++      "column_index": 0,
++      "row_span": 1,
++      "column_span": 3,
++      "text": "成绩统计表",
++      "runs": [
++        {
++          "text": "成绩统计表",
++          "style": {
++            "bold": true,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 112.0, "y0": 220.0, "x1": 472.0, "y1": 246.0 },
++      "confidence": 0.97,
++      "warnings": []
++    },
++    {
++      "row_index": 1,
++      "column_index": 0,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "姓名",
++      "runs": [
++        {
++          "text": "姓名",
++          "style": {
++            "bold": true,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 112.0, "y0": 246.0, "x1": 232.0, "y1": 274.0 },
++      "confidence": 0.96,
++      "warnings": []
++    },
++    {
++      "row_index": 1,
++      "column_index": 1,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "数学",
++      "runs": [
++        {
++          "text": "数学",
++          "style": {
++            "bold": true,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 232.0, "y0": 246.0, "x1": 352.0, "y1": 274.0 },
++      "confidence": 0.96,
++      "warnings": []
++    },
++    {
++      "row_index": 1,
++      "column_index": 2,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "英语",
++      "runs": [
++        {
++          "text": "英语",
++          "style": {
++            "bold": true,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 352.0, "y0": 246.0, "x1": 472.0, "y1": 274.0 },
++      "confidence": 0.95,
++      "warnings": []
++    },
++    {
++      "row_index": 2,
++      "column_index": 0,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "小明",
++      "runs": [
++        {
++          "text": "小明",
++          "style": {
++            "bold": false,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 112.0, "y0": 274.0, "x1": 232.0, "y1": 302.0 },
++      "confidence": 0.95,
++      "warnings": []
++    },
++    {
++      "row_index": 2,
++      "column_index": 1,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "98",
++      "runs": [
++        {
++          "text": "98",
++          "style": {
++            "bold": false,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 232.0, "y0": 274.0, "x1": 352.0, "y1": 302.0 },
++      "confidence": 0.94,
++      "warnings": []
++    },
++    {
++      "row_index": 2,
++      "column_index": 2,
++      "row_span": 1,
++      "column_span": 1,
++      "text": "96",
++      "runs": [
++        {
++          "text": "96",
++          "style": {
++            "bold": false,
++            "italic": false,
++            "underline": false,
++            "font_name": "SimSun",
++            "font_size": 10.5,
++            "color": "000000"
++          }
++        }
++      ],
++      "bbox": { "page": 1, "x0": 352.0, "y0": 274.0, "x1": 472.0, "y1": 302.0 },
++      "confidence": 0.94,
++      "warnings": []
++    }
++  ],
++  "bbox": { "page": 1, "x0": 112.0, "y0": 220.0, "x1": 472.0, "y1": 302.0 },
++  "metrics": {
++    "structure_confidence": 0.94,
++    "text_coverage": 1.0,
++    "cell_count": 7,
++    "source": "mineru_full"
++  },
++  "warnings": [],
++  "raw": {
++    "image_path": "crops/page-1/table-0007.png",
++    "html": "<table><tr><th colspan=\"3\">成绩统计表</th></tr><tr><th>姓名</th><th>数学</th><th>英语</th></tr><tr><td>小明</td><td>98</td><td>96</td></tr></table>",
++    "markdown": "| 成绩统计表 |  |  |\n|---|---|---|\n| 姓名 | 数学 | 英语 |\n| 小明 | 98 | 96 |"
++  }
++}
+
+diff --git a/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json b/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json
+new file mode 100644
+index 0000000..b79bcf4
+--- /dev/null
++++ b/backend/tests/fixtures/pdf_to_word/table_ir/image_only_missing_structure.json
+@@ -0,0 +1,26 @@
++{
++  "version": "normalized_table_ir/v1",
++  "table_id": "table:p2:candidate-0019",
++  "source_candidate_id": "mineru_full:p2:b19",
++  "assigned_question_id": "q-2026-math-05",
++  "assigned_region_id": "region:p2:q5",
++  "row_count": 0,
++  "column_count": 0,
++  "cells": [],
++  "bbox": { "page": 2, "x0": 86.0, "y0": 338.0, "x1": 498.0, "y1": 426.0 },
++  "metrics": {
++    "structure_confidence": 0.0,
++    "text_coverage": 0.0,
++    "cell_count": 0,
++    "source": "mineru_full"
++  },
++  "warnings": [
++    "table_structure_missing",
++    "image_only_fallback"
++  ],
++  "raw": {
++    "image_path": "crops/page-2/table-like-image-0019.png",
++    "html": null,
++    "markdown": null
++  }
++}
+
+diff --git a/backend/tests/test_pdf_to_word_table_ir_contract.py b/backend/tests/test_pdf_to_word_table_ir_contract.py
+new file mode 100644
+index 0000000..9553711
+--- /dev/null
++++ b/backend/tests/test_pdf_to_word_table_ir_contract.py
+@@ -0,0 +1,148 @@
++from __future__ import annotations
++
++import copy
++import json
++from pathlib import Path
++
++import pytest
++
++from app.services.pdf_to_word.table_ir import (
++    NORMALIZED_TABLE_IR_VERSION,
++    REQUIRED_CELL_FIELDS,
++    REQUIRED_RAW_FIELDS,
++    REQUIRED_TABLE_IR_FIELDS,
++    NormalizedTableIR,
++    WARN_IMAGE_ONLY_FALLBACK,
++    WARN_TABLE_CELL_OVERLAP,
++    WARN_TABLE_DIMENSION_MISMATCH,
++    WARN_TABLE_SPAN_OUT_OF_BOUNDS,
++    WARN_TABLE_STRUCTURE_MISSING,
++    load_normalized_table_ir,
++    validate_normalized_table_ir,
++)
++
++FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "table_ir"
++
++
++def _load_payload(name: str) -> dict:
++    return json.loads((FIXTURE_DIR / name).read_text(encoding="utf-8"))
++
++
++def test_structured_fixture_freezes_required_fields_and_passes_contract():
++    payload = _load_payload("structured_table.json")
++
++    assert set(payload) == REQUIRED_TABLE_IR_FIELDS
++    assert payload["version"] == NORMALIZED_TABLE_IR_VERSION
++    assert set(payload["raw"]) == REQUIRED_RAW_FIELDS
++    for cell in payload["cells"]:
++        assert REQUIRED_CELL_FIELDS <= set(cell)
++        assert cell["runs"], "structured cell must preserve text runs"
++        for run in cell["runs"]:
++            assert set(run) == {"text", "style"}
++            assert {"bold", "italic", "underline", "font_name", "font_size", "color"} <= set(run["style"])
++
++    table = NormalizedTableIR.from_dict(payload)
++    report = validate_normalized_table_ir(table)
++
++    assert table.table_id == "table:p1:candidate-0007"
++    assert table.source_candidate_id == "mineru_full:p1:b7"
++    assert table.assigned_question_id == "q-2026-math-01"
++    assert table.assigned_region_id == "region:p1:q1"
++    assert table.inferred_dimensions() == (3, 3)
++    assert (report.inferred_row_count, report.inferred_column_count) == (table.row_count, table.column_count)
++    assert report.status == "pass"
++    assert report.passable is True
++    assert report.errors == ()
++    assert report.warnings == ()
++
++
++def test_span_semantics_use_zero_based_grid_and_cover_declared_slots():
++    table = load_normalized_table_ir(FIXTURE_DIR / "structured_table.json")
++
++    header = table.cells[0]
++    assert header.row_index == 0
++    assert header.column_index == 0
++    assert header.row_span == 1
++    assert header.column_span == 3
++    assert header.covered_slots() == ((0, 0), (0, 1), (0, 2))
++
++    covered_slots = {slot for cell in table.cells for slot in cell.covered_slots()}
++    assert covered_slots == {(row, column) for row in range(3) for column in range(3)}
++
++
++def test_image_only_fixture_is_review_only_and_never_counts_as_table_success():
++    table = load_normalized_table_ir(FIXTURE_DIR / "image_only_missing_structure.json")
++    report = validate_normalized_table_ir(table)
++
++    assert table.cells == ()
++    assert table.raw.image_path == "crops/page-2/table-like-image-0019.png"
++    assert table.raw.html is None
++    assert table.raw.markdown is None
++    assert report.has_structured_cells is False
++    assert report.status == "review"
++    assert report.passable is False
++    assert report.errors == ()
++    assert WARN_TABLE_STRUCTURE_MISSING in report.warnings
++    assert WARN_IMAGE_ONLY_FALLBACK in report.warnings
++
++
++def test_raw_html_or_markdown_alone_still_does_not_satisfy_structure_contract():
++    payload = _load_payload("image_only_missing_structure.json")
++    payload["raw"]["html"] = "<table><tr><td>untrusted raw only</td></tr></table>"
++    payload["raw"]["markdown"] = "| raw only |"
++    payload["warnings"] = []
++
++    table = NormalizedTableIR.from_dict(payload)
++    report = validate_normalized_table_ir(table)
++
++    assert report.status == "review"
++    assert report.passable is False
++    assert WARN_TABLE_STRUCTURE_MISSING in report.warnings
++    assert WARN_IMAGE_ONLY_FALLBACK not in report.warnings
++
++
++def test_validation_reports_span_overlap_and_out_of_bounds_as_contract_failure():
++    payload = _load_payload("structured_table.json")
++    payload["cells"] = copy.deepcopy(payload["cells"])
++    payload["cells"].append(
++        {
++            "row_index": 0,
++            "column_index": 2,
++            "row_span": 1,
++            "column_span": 2,
++            "text": "越界且重叠",
++            "runs": [
++                {
++                    "text": "越界且重叠",
++                    "style": {
++                        "bold": False,
++                        "italic": False,
++                        "underline": False,
++                        "font_name": "SimSun",
++                        "font_size": 10.5,
++                        "color": "000000",
++                    },
++                }
++            ],
++            "bbox": {"page": 1, "x0": 450.0, "y0": 220.0, "x1": 520.0, "y1": 246.0},
++            "confidence": 0.5,
++            "warnings": [],
++        }
++    )
++
++    table = NormalizedTableIR.from_dict(payload)
++    report = validate_normalized_table_ir(table)
++
++    assert report.status == "fail"
++    assert report.passable is False
++    assert any(WARN_TABLE_SPAN_OUT_OF_BOUNDS in error for error in report.errors)
++    assert any(WARN_TABLE_CELL_OVERLAP in error for error in report.errors)
++    assert WARN_TABLE_DIMENSION_MISMATCH in report.warnings
++
++
++def test_missing_required_contract_fields_fail_fast():
++    payload = _load_payload("structured_table.json")
++    payload.pop("source_candidate_id")
++
++    with pytest.raises(ValueError, match="source_candidate_id"):
++        NormalizedTableIR.from_dict(payload)
+

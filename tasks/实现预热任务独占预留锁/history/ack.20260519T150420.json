@@ -1,0 +1,8 @@
+{
+  "task_id": "实现预热任务独占预留锁",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T13:24:55+08:00",
+  "summary": "dev-2 已根据返修要求重新读取 instruction.md，开始按 pre_reserved_* 契约返修预热独占预留锁实现与测试。"
+}

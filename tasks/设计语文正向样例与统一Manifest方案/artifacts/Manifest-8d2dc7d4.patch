@@ -1,0 +1,544 @@
+diff --git "a/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.md" "b/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.md"
+new file mode 100644
+index 0000000..1ac6d77
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.md"
+@@ -0,0 +1,212 @@
++# 语文正向样例与统一 Manifest 方案
++
++- 生成时间：`2026-05-20T08:20:47+08:00`
++- 产出人：`arch-1`
++- 结论口径：**语文学科正向样例与全学科 manifest 设计**
++- 核心决策：**保留 `chinese_grade5` 为 negative_guard；新增独立语文正向样例 sample_key；不得用 negative_guard 替代语文正向95分母。**
++
++## 1. 结论摘要
++
++当前 `语文五年级 / chinese_grade5` 是已审定的 negative/document_fallback guard：它证明语文没有被治理套件忽略，但不能证明语文长文、阅读题、作文格或答题区达到人工视觉95。恢复“全学科人工视觉95”前，必须新增至少一个独立的语文正向样例，并按科学、数学、英语相同的 render pair、visual_similarity、fidelity_veto、human_review Rubric 完成复验。
++
++本方案建议 P0 新增 `chinese_long_reading_positive_v1`，P1/条件性新增 `chinese_composition_grid_positive_v1`；全学科 unified manifest 必须显式区分 `positive_candidate`、`negative_guard`、`excluded`，并用 `eligible_for_human_visual_95` 与 `count_in_positive_human_visual_95_average` 防止误算。
++
++## 2. 当前语文样例事实
++
++| 字段 | 当前值 |
++| --- | --- |
++| `sample_key` | `"chinese_grade5"` |
++| `sample_name` | `"语文五年级"` |
++| `subject` | `"chinese"` |
++| `evaluation_role` | `"negative_guard"` |
++| `eligible_for_human_visual_95` | `false` |
++| `document_fallback` | `true` |
++| `fallback_pages` | `[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]` |
++| `question_count` | `0` |
++| `option_count` | `0` |
++| `image_candidate_count` | `0` |
++| `formula_candidate_count` | `0` |
++| `table_block_count` | `0` |
++| `block_count` | `403` |
++| `source_profile_policy` | `"baseline_only / generic_fallback guard"` |
++| `must_keep_canonical_key` | `true` |
++| `do_not_repurpose_as_positive` | `true` |
++
++判定：`chinese_grade5` 必须保持 canonical negative_guard，不得原地改写为 positive_candidate。若需要表达当前 policy entry，可使用 `entry_id`、`record_role`、`sample_generation` 等附加字段，而不是改主键。
++
++## 3. 新增语文正向样例建议
++
++| sample_key | 样例名 | 角色 | 页型 | 最低数量 | 覆盖点 | 进入正向95条件 |
++| --- | --- | --- | --- | --- | --- | --- |
++| `chinese_long_reading_positive_v1` | 语文长文阅读正向样例 | `positive_candidate` | `chinese_long_reading` | 1 | dense_paragraphs；paragraph_indentation；line_breaks；punctuation_readability；reading_material_to_question_binding；options_or_short_answer_regions；page_margin_and_density | document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页；question_or_region_detection_available=true；render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘；human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto |
++| `chinese_composition_grid_positive_v1` | 语文作文/写作格正向样例 | `positive_candidate` | `chinese_composition_or_writing_grid` | 1 | composition_grid_or_writing_area_geometry；answer_space_boundaries；title_body_separation；blank_area_preservation；page_scale_and_margins | writing_area_geometry_detected=true；writing_grid_or_answer_space visual region review >=90；无 answer-space P0 veto；canonical artifacts 全量落盘 |
++| `chinese_answer_space_positive_v1` | 语文阅读答题区正向样例 | `positive_candidate` | `chinese_answer_space` | 0 | short_answer_lines；teacher/student answer_area boundaries；question_to_answer_space_binding | answer_area_materialized=true；question_answer_binding_review_pass=true；canonical artifacts 全量落盘 |
++
++P0 选择：先落 `chinese_long_reading_positive_v1`。它覆盖语文长文/阅读材料、题干绑定、段落缩进与标点可读性，是恢复“语文学科正向95”的最低代表样例。作文格/写作区若要对外宣称，则必须另纳入 `chinese_composition_grid_positive_v1`，否则作文页型应显式 out-of-scope。
++
++## 4. Positive Candidate 判定标准
++
++必须全部满足：
++- new sample_key distinct from chinese_grade5
++- evaluation_role=positive_candidate
++- eligible_for_human_visual_95=true
++- count_in_positive_human_visual_95_average=true
++- document_fallback=false or non-critical fallback only
++- render_pair.json
++- visual_similarity.json
++- fidelity_veto.json
++- human_review_report.json
++- no P0 veto
++- human_visual_score>=95
++- critical_page_score>=92
++- critical_region_score>=90
++
++不得出现：
++- dominant document_fallback
++- baseline_only/generic_fallback as proof
++- debug/authoritative/student/review variant
++- missing source_pdf/output_docx pair
++- missing page/region human review
++
++## 5. Unified Manifest 字段设计
++
++- manifest_version：`pdf2word_unified_sample_manifest/v2`
++- 顶层必填字段：
++  - `manifest_version`
++  - `generated_at`
++  - `suite_id`
++  - `claim_scope`
++  - `samples`
++  - `role_counts`
++  - `evidence_contract`
++- 样例必填字段：
++  - `sample_key`
++  - `entry_id`
++  - `subject`
++  - `sample_name`
++  - `tier`
++  - `evaluation_role`
++  - `record_role`
++  - `sample_family`
++  - `sample_generation`
++  - `eligible_for_human_visual_95`
++  - `count_in_positive_human_visual_95_average`
++  - `include_in_suite_for_guard`
++  - `source_pdf`
++  - `output_docx`
++  - `artifact_presence`
++  - `page_type`
++  - `fallback_policy`
++  - `positive_entry_criteria`
++  - `disallowed_uses`
++
++### 5.1 角色定义
++
++| role | 含义 |
++| --- | --- |
++| `positive_candidate` | 可计入正向95分母；必须满足全 artifact + human review + no P0 veto。 |
++| `negative_guard` | 治理/防误判样例；保留在 suite，但不得进入正向分母。 |
++| `excluded` | 存在但本轮不参与任何95计算，通常为 debug/authoritative/student/review 变体。 |
++| `supplemental_policy_entry` | 补充政策条目，不能覆盖 canonical sample_key。 |
++
++### 5.2 资格字段
++
++| 字段 | 规则 |
++| --- | --- |
++| `eligible_for_human_visual_95` | bool; 只有 positive_candidate 可为 true。 |
++| `count_in_positive_human_visual_95_average` | bool/conditional; negative_guard 必须 false。 |
++| `include_in_suite_for_guard` | bool; negative_guard 可为 true。 |
++| `sample_generation` | current_negative_document_fallback_baseline | proposed_positive_candidate | implemented_positive_candidate | archived_debug_variant |
++| `artifact_presence` | render_pair_exists / visual_similarity_exists / fidelity_veto_exists / human_review_report_exists |
++| `gate_status` | not_started | artifact_missing | ready_for_human_review | human_review_passed | human_review_failed | excluded |
++
++### 5.3 硬性不变量
++
++- sample_key=chinese_grade5 必须保持 negative_guard；不得原地改成 positive_candidate。
++- 新增语文正样例必须使用新的 sample_key，不得覆盖 chinese_grade5。
++- positive_candidate 缺任一 canonical artifact 时 eligible_for_human_visual_95 不能为 true。
++- student/teacher/review/authoritative/debug 变体不得混入主线95正向分母。
++
++## 6. Manifest 示例片段
++
++```json
++{
++  "manifest_version": "pdf2word_unified_sample_manifest/v2",
++  "samples": [
++    {
++      "sample_key": "chinese_grade5",
++      "entry_id": "chinese_grade5_current_policy",
++      "subject": "chinese",
++      "sample_name": "语文五年级",
++      "evaluation_role": "negative_guard",
++      "record_role": "canonical_negative_guard",
++      "sample_generation": "current_negative_document_fallback_baseline",
++      "eligible_for_human_visual_95": false,
++      "count_in_positive_human_visual_95_average": false,
++      "include_in_suite_for_guard": true,
++      "gate_status": "negative_guard_excluded"
++    },
++    {
++      "sample_key": "chinese_long_reading_positive_v1",
++      "entry_id": "chinese_long_reading_positive_v1_initial",
++      "subject": "chinese",
++      "sample_name": "语文长文阅读正向样例",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_generation": "proposed_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "gate_status": "not_started",
++      "artifact_presence": {
++        "render_pair_exists": false,
++        "visual_similarity_exists": false,
++        "fidelity_veto_exists": false,
++        "human_review_report_exists": false
++      }
++    }
++  ]
++}
++```
++
++## 7. 迁移策略
++
++| Step | 动作 | 验收 |
++| --- | --- | --- |
++| `M1_freeze_current_chinese_negative_guard` | 冻结 chinese_grade5 当前 canonical 行，补齐 entry_id/record_role/sample_generation 字段但不改 evaluation_role。 | chinese_grade5.evaluation_role=negative_guard 且 eligible_for_human_visual_95=false。 |
++| `M2_add_positive_chinese_sample_keys` | 新增 chinese_long_reading_positive_v1 作为 P0 正向样例；作文/写作格作为 conditional supplemental positive。 | 新 sample_key 与 source_pdf/output_docx/artifact paths 独立存在，不复用 chinese_grade5。 |
++| `M3_connect_final_acceptance` | FinalAcceptance 汇总按 evaluation_role 统计 positive/negative/excluded，并对语文学科要求至少一个 positive_candidate。 | 语文仍只有 negative_guard 时 human_visual_gate 必须 NO-GO。 |
++| `M4_rerun_artifact_chain` | 为语文正样例生成 render_pair、visual_similarity、fidelity_veto、human_review_report。 | 所有 canonical artifacts 落盘且无 P0 veto 后才允许进入人工95复验。 |
++| `M5_update_public_claim` | 只有 M1-M4 通过后，才允许把语文写入全学科正向95 claim。 | 报告中同时列出 chinese_grade5 negative_guard 与新增 positive sample 的不同角色。 |
++
++## 8. 建议下游任务
++
++| 任务名 | 优先级 | 负责人建议 | write_scope 建议 | 工时 | 依赖 | 验收 |
++| --- | --- | --- | --- | --- | --- | --- |
++| 实现语文正向样例Manifest与夹具 | `P0` | dev-2 | `artifacts/pdf2word/final-output-samples/**/unified-sample-manifest.json`<br>`tests/fixtures/pdf2word/chinese_positive/**` | 1d | 本方案 review 通过；owner/PM 确认具体语文 PDF 样本 | chinese_grade5 保持 negative_guard；新增 chinese_long_reading_positive_v1 且可被 manifest schema 校验。 |
++| 接入FinalAcceptance语文正向覆盖门禁 | `P0` | dev-1 | `src/pdf_to_word/**/final_acceptance*`<br>`tests/pdf_to_word/**/acceptance*`<br>`artifacts/pdf2word/final-acceptance/**` | 1d | 统一 manifest 落地 | 当语文没有 positive_candidate 或 artifact 缺失时，human_visual_gate 输出 chinese_positive_evidence_missing NO-GO。 |
++| 重跑语文正向样例视觉证据链 | `P0` | qa-1 + dev-1 | `artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向*/**`<br>`artifacts/pdf2word/final-acceptance/**` | 1-2d | render_pair/visual_similarity/fidelity_veto pipeline 可用；语文正向 source PDF 已确定 | 语文正向样例拥有 render_pair.json、visual_similarity.json、fidelity_veto.json、human_review_report.json，按统一 Rubric 通过或明确 NO-GO。 |
++| 语文作文格页型专项补充评估 | `P1` | arch-1 + qa-1 | `artifacts/pdf2word/final-archive/reports/*语文作文*`<br>`artifacts/pdf2word/**/chinese_composition*` | 0.5-1d 设计；后续实现另拆 | 长文阅读正向样例先落地 | 明确作文/写作格是否纳入本轮 claim；若纳入则新增 chinese_composition_grid_positive_v1。 |
++
++## 9. 对外口径
++
++允许说：
++- 语文已纳入治理，但当前 chinese_grade5 是 negative_guard；需新增正向语文样例后才能恢复全学科95宣称。
++- 语文正向样例必须与科学/数学/英语使用同一 render-pair 与人工复核 Rubric。
++
++禁止说：
++- 语文五年级已证明语文达到人工视觉95。
++- negative_guard 可计入正向95平均。
++- document_fallback pass 等于语文长文/作文高还原。
++
++## 10. 风险
++
++- 将 chinese_grade5 原地改成 positive_candidate 会破坏已审定 canonical key 与 negative_guard 口径。
++- 只新增 manifest 行但没有 render_pair / visual_similarity / fidelity_veto / human_review_report，会再次造成工程 PASS 与人工视觉 NO-GO 断层。
++- 语文页型差异大：长文阅读、作文格、答题区不能互相代表；对外 claim 必须与已覆盖页型一致。
++- 当前语文五年级 hybrid 是 document_fallback=true、fallback_pages=13/13，不能作为正向样例质量证据。
++- 若 final_acceptance 不按 role 统计，negative_guard 仍可能被误算入正向分母。
++
++## 11. 最终建议
++
++立即冻结 `chinese_grade5` 的 negative_guard 身份，并新增 `chinese_long_reading_positive_v1` 作为 P0 语文正向样例设计目标。FinalAcceptance 必须按 unified manifest 的 role 与资格字段统计：只要语文没有 `positive_candidate + canonical artifacts + human review pass`，全学科人工视觉95继续 NO-GO。
+diff --git "a/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.json" "b/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.json"
+new file mode 100644
+index 0000000..6556f61
+--- /dev/null
++++ "b/artifacts/pdf2word/final-archive/reports/\350\257\255\346\226\207\346\255\243\345\220\221\346\240\267\344\276\213\344\270\216\347\273\237\344\270\200Manifest\346\226\271\346\241\210.json"
+@@ -0,0 +1,320 @@
++{
++  "report_type": "pdf2word_chinese_positive_sample_and_unified_manifest_plan/v1",
++  "generated_at": "2026-05-20T08:20:47+08:00",
++  "generated_by": "arch-1",
++  "status": "done",
++  "current_decision": "keep_chinese_grade5_as_negative_guard_and_add_new_positive_chinese_sample_keys",
++  "source_reports": {
++    "stage_diff_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word阶段性生成样例与差异分析报告.md",
++    "gap_plan": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word当前阶段与目标差距及优化计划.md",
++    "final_acceptance_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
++    "final_human_visual_acceptance_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md",
++    "current_chinese_manifest": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-434cf84f/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
++    "apple_baseline_chinese_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级",
++    "hybrid_chinese_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级"
++  },
++  "current_chinese_facts": {
++    "sample_key": "chinese_grade5",
++    "sample_name": "语文五年级",
++    "subject": "chinese",
++    "evaluation_role": "negative_guard",
++    "eligible_for_human_visual_95": false,
++    "document_fallback": true,
++    "fallback_pages": [
++      1,
++      2,
++      3,
++      4,
++      5,
++      6,
++      7,
++      8,
++      9,
++      10,
++      11,
++      12,
++      13
++    ],
++    "question_count": 0,
++    "option_count": 0,
++    "image_candidate_count": 0,
++    "formula_candidate_count": 0,
++    "table_block_count": 0,
++    "block_count": 403,
++    "source_profile_policy": "baseline_only / generic_fallback guard",
++    "must_keep_canonical_key": true,
++    "do_not_repurpose_as_positive": true
++  },
++  "proposed_positive_chinese_samples": [
++    {
++      "sample_key": "chinese_long_reading_positive_v1",
++      "sample_name": "语文长文阅读正向样例",
++      "subject": "chinese",
++      "tier": "final_gated_candidate",
++      "evaluation_role": "positive_candidate",
++      "sample_family": "chinese_long_reading",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "minimum_count": 1,
++      "must_cover": [
++        "dense_paragraphs",
++        "paragraph_indentation",
++        "line_breaks",
++        "punctuation_readability",
++        "reading_material_to_question_binding",
++        "options_or_short_answer_regions",
++        "page_margin_and_density"
++      ],
++      "source_pdf_requirements": [
++        "真实语文阅读/长文题型 PDF，不是纯作文空白页或不可判定扫描噪声",
++        "不少于 2 页，至少 1 页长文材料 + 1 页题目/作答区域",
++        "允许 apple_baseline 形成稳定文本主干，不能全页 document_fallback 作为主路径"
++      ],
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "claim_unlocked_if_passed": "语文长文/阅读题型可进入全学科正向95分母。"
++    },
++    {
++      "sample_key": "chinese_composition_grid_positive_v1",
++      "sample_name": "语文作文/写作格正向样例",
++      "subject": "chinese",
++      "tier": "supplemental_positive_candidate",
++      "evaluation_role": "positive_candidate",
++      "sample_family": "chinese_composition_or_writing_grid",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": "conditional_after_owner_accepts_composition_claim",
++      "minimum_count": 1,
++      "must_cover": [
++        "composition_grid_or_writing_area_geometry",
++        "answer_space_boundaries",
++        "title_body_separation",
++        "blank_area_preservation",
++        "page_scale_and_margins"
++      ],
++      "source_pdf_requirements": [
++        "含作文格/写作区域或明确答题留白",
++        "不得只是普通长文阅读页",
++        "需能渲染 PDF 与 DOCX 页面对比"
++      ],
++      "positive_entry_criteria": [
++        "writing_area_geometry_detected=true",
++        "writing_grid_or_answer_space visual region review >=90",
++        "无 answer-space P0 veto",
++        "canonical artifacts 全量落盘"
++      ],
++      "claim_unlocked_if_passed": "如对外宣称覆盖作文/写作区域，必须纳入该类样例；若未纳入，则作文能力显式 out-of-scope。"
++    },
++    {
++      "sample_key": "chinese_answer_space_positive_v1",
++      "sample_name": "语文阅读答题区正向样例",
++      "subject": "chinese",
++      "tier": "optional_page_type_candidate",
++      "evaluation_role": "positive_candidate",
++      "sample_family": "chinese_answer_space",
++      "eligible_for_human_visual_95": "conditional",
++      "count_in_positive_human_visual_95_average": "conditional_after_page_type_selected",
++      "minimum_count": 0,
++      "must_cover": [
++        "short_answer_lines",
++        "teacher/student answer_area boundaries",
++        "question_to_answer_space_binding"
++      ],
++      "source_pdf_requirements": [
++        "如当前全学科口径包含答案区/教师版，才进入主分母；否则只做专项。"
++      ],
++      "positive_entry_criteria": [
++        "answer_area_materialized=true",
++        "question_answer_binding_review_pass=true",
++        "canonical artifacts 全量落盘"
++      ],
++      "claim_unlocked_if_passed": "只解锁语文答案区专项，不自动解锁主线95。"
++    }
++  ],
++  "unified_manifest_schema": {
++    "manifest_version": "pdf2word_unified_sample_manifest/v2",
++    "required_top_level_fields": [
++      "manifest_version",
++      "generated_at",
++      "suite_id",
++      "claim_scope",
++      "samples",
++      "role_counts",
++      "evidence_contract"
++    ],
++    "required_sample_fields": [
++      "sample_key",
++      "entry_id",
++      "subject",
++      "sample_name",
++      "tier",
++      "evaluation_role",
++      "record_role",
++      "sample_family",
++      "sample_generation",
++      "eligible_for_human_visual_95",
++      "count_in_positive_human_visual_95_average",
++      "include_in_suite_for_guard",
++      "source_pdf",
++      "output_docx",
++      "artifact_presence",
++      "page_type",
++      "fallback_policy",
++      "positive_entry_criteria",
++      "disallowed_uses"
++    ],
++    "canonical_roles": {
++      "positive_candidate": "可计入正向95分母；必须满足全 artifact + human review + no P0 veto。",
++      "negative_guard": "治理/防误判样例；保留在 suite，但不得进入正向分母。",
++      "excluded": "存在但本轮不参与任何95计算，通常为 debug/authoritative/student/review 变体。",
++      "supplemental_policy_entry": "补充政策条目，不能覆盖 canonical sample_key。"
++    },
++    "qualification_fields": {
++      "eligible_for_human_visual_95": "bool; 只有 positive_candidate 可为 true。",
++      "count_in_positive_human_visual_95_average": "bool/conditional; negative_guard 必须 false。",
++      "include_in_suite_for_guard": "bool; negative_guard 可为 true。",
++      "sample_generation": "current_negative_document_fallback_baseline | proposed_positive_candidate | implemented_positive_candidate | archived_debug_variant",
++      "artifact_presence": "render_pair_exists / visual_similarity_exists / fidelity_veto_exists / human_review_report_exists",
++      "gate_status": "not_started | artifact_missing | ready_for_human_review | human_review_passed | human_review_failed | excluded"
++    },
++    "hard_invariants": [
++      "sample_key=chinese_grade5 必须保持 negative_guard；不得原地改成 positive_candidate。",
++      "新增语文正样例必须使用新的 sample_key，不得覆盖 chinese_grade5。",
++      "positive_candidate 缺任一 canonical artifact 时 eligible_for_human_visual_95 不能为 true。",
++      "student/teacher/review/authoritative/debug 变体不得混入主线95正向分母。"
++    ]
++  },
++  "positive_candidate_criteria": {
++    "must_have": [
++      "new sample_key distinct from chinese_grade5",
++      "evaluation_role=positive_candidate",
++      "eligible_for_human_visual_95=true",
++      "count_in_positive_human_visual_95_average=true",
++      "document_fallback=false or non-critical fallback only",
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json",
++      "no P0 veto",
++      "human_visual_score>=95",
++      "critical_page_score>=92",
++      "critical_region_score>=90"
++    ],
++    "must_not_have": [
++      "dominant document_fallback",
++      "baseline_only/generic_fallback as proof",
++      "debug/authoritative/student/review variant",
++      "missing source_pdf/output_docx pair",
++      "missing page/region human review"
++    ]
++  },
++  "migration_strategy": [
++    {
++      "step": "M1_freeze_current_chinese_negative_guard",
++      "action": "冻结 chinese_grade5 当前 canonical 行，补齐 entry_id/record_role/sample_generation 字段但不改 evaluation_role。",
++      "acceptance": "chinese_grade5.evaluation_role=negative_guard 且 eligible_for_human_visual_95=false。"
++    },
++    {
++      "step": "M2_add_positive_chinese_sample_keys",
++      "action": "新增 chinese_long_reading_positive_v1 作为 P0 正向样例；作文/写作格作为 conditional supplemental positive。",
++      "acceptance": "新 sample_key 与 source_pdf/output_docx/artifact paths 独立存在，不复用 chinese_grade5。"
++    },
++    {
++      "step": "M3_connect_final_acceptance",
++      "action": "FinalAcceptance 汇总按 evaluation_role 统计 positive/negative/excluded，并对语文学科要求至少一个 positive_candidate。",
++      "acceptance": "语文仍只有 negative_guard 时 human_visual_gate 必须 NO-GO。"
++    },
++    {
++      "step": "M4_rerun_artifact_chain",
++      "action": "为语文正样例生成 render_pair、visual_similarity、fidelity_veto、human_review_report。",
++      "acceptance": "所有 canonical artifacts 落盘且无 P0 veto 后才允许进入人工95复验。"
++    },
++    {
++      "step": "M5_update_public_claim",
++      "action": "只有 M1-M4 通过后，才允许把语文写入全学科正向95 claim。",
++      "acceptance": "报告中同时列出 chinese_grade5 negative_guard 与新增 positive sample 的不同角色。"
++    }
++  ],
++  "recommended_next_tasks": [
++    {
++      "task_name": "实现语文正向样例Manifest与夹具",
++      "priority": "P0",
++      "owner_suggestion": "dev-2",
++      "write_scope": [
++        "artifacts/pdf2word/final-output-samples/**/unified-sample-manifest.json",
++        "tests/fixtures/pdf2word/chinese_positive/**"
++      ],
++      "effort": "1d",
++      "dependencies": [
++        "本方案 review 通过",
++        "owner/PM 确认具体语文 PDF 样本"
++      ],
++      "acceptance": "chinese_grade5 保持 negative_guard；新增 chinese_long_reading_positive_v1 且可被 manifest schema 校验。"
++    },
++    {
++      "task_name": "接入FinalAcceptance语文正向覆盖门禁",
++      "priority": "P0",
++      "owner_suggestion": "dev-1",
++      "write_scope": [
++        "src/pdf_to_word/**/final_acceptance*",
++        "tests/pdf_to_word/**/acceptance*",
++        "artifacts/pdf2word/final-acceptance/**"
++      ],
++      "effort": "1d",
++      "dependencies": [
++        "统一 manifest 落地"
++      ],
++      "acceptance": "当语文没有 positive_candidate 或 artifact 缺失时，human_visual_gate 输出 chinese_positive_evidence_missing NO-GO。"
++    },
++    {
++      "task_name": "重跑语文正向样例视觉证据链",
++      "priority": "P0",
++      "owner_suggestion": "qa-1 + dev-1",
++      "write_scope": [
++        "artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向*/**",
++        "artifacts/pdf2word/final-acceptance/**"
++      ],
++      "effort": "1-2d",
++      "dependencies": [
++        "render_pair/visual_similarity/fidelity_veto pipeline 可用",
++        "语文正向 source PDF 已确定"
++      ],
++      "acceptance": "语文正向样例拥有 render_pair.json、visual_similarity.json、fidelity_veto.json、human_review_report.json，按统一 Rubric 通过或明确 NO-GO。"
++    },
++    {
++      "task_name": "语文作文格页型专项补充评估",
++      "priority": "P1",
++      "owner_suggestion": "arch-1 + qa-1",
++      "write_scope": [
++        "artifacts/pdf2word/final-archive/reports/*语文作文*",
++        "artifacts/pdf2word/**/chinese_composition*"
++      ],
++      "effort": "0.5-1d 设计；后续实现另拆",
++      "dependencies": [
++        "长文阅读正向样例先落地"
++      ],
++      "acceptance": "明确作文/写作格是否纳入本轮 claim；若纳入则新增 chinese_composition_grid_positive_v1。"
++    }
++  ],
++  "risks_and_dependencies": [
++    "将 chinese_grade5 原地改成 positive_candidate 会破坏已审定 canonical key 与 negative_guard 口径。",
++    "只新增 manifest 行但没有 render_pair / visual_similarity / fidelity_veto / human_review_report，会再次造成工程 PASS 与人工视觉 NO-GO 断层。",
++    "语文页型差异大：长文阅读、作文格、答题区不能互相代表；对外 claim 必须与已覆盖页型一致。",
++    "当前语文五年级 hybrid 是 document_fallback=true、fallback_pages=13/13，不能作为正向样例质量证据。",
++    "若 final_acceptance 不按 role 统计，negative_guard 仍可能被误算入正向分母。"
++  ],
++  "claim_policy": {
++    "allowed_wording": [
++      "语文已纳入治理，但当前 chinese_grade5 是 negative_guard；需新增正向语文样例后才能恢复全学科95宣称。",
++      "语文正向样例必须与科学/数学/英语使用同一 render-pair 与人工复核 Rubric。"
++    ],
++    "disallowed_wording": [
++      "语文五年级已证明语文达到人工视觉95。",
++      "negative_guard 可计入正向95平均。",
++      "document_fallback pass 等于语文长文/作文高还原。"
++    ]
++  }
++}

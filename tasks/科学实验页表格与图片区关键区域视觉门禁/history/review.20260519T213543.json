@@ -1,0 +1,54 @@
+{
+  "task_id": "科学实验页表格与图片区关键区域视觉门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-19T21:31:00+08:00",
+  "status": "request_changes",
+  "summary": "本轮实现的方向是对的：已经把科学实验页的表格区、图片区、实验记录区和邻接关系独立建模，也补了 happy/table_fail/image_binding_fail 三组 fixture 与 pytest，表格失真、图片区绑定断裂、实验记录区邻接异常都能被显式打成 veto。但当前 contract 仍有两个阻塞缺口：一是关键 source region 可以被直接从 payload 中删掉而不触发 not-ready / veto；二是关系检查完全依赖 `adjacent_to`，只要把邻接声明省略，图-题绑定与实验记录区邻接就会整体消失且页面继续高分通过。这会让上游通过“漏传关键区域或关系元数据”的方式绕过科学专项 gate，不符合任务要求的‘必须覆盖表格外框/行列观感、图片与题干绑定、实验记录区邻接关系’。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/app/services/pdf_to_word/science_visual_gate.py",
+      "finding": "当前实现没有把关键 source region 缺失视为 contract 不完整。`_normalize_regions()` 把无效/缺失输入直接归一成 `{}`，`_evaluate_page()` 只遍历 `source_regions.values()`，因此如果上游漏传 `table` / `image` / `experiment_record` 任一关键 region，这些检查会整体消失，而不是进入 not-ready。最小复现中，把 happy fixture 的 `table` source region 删掉后，report 仍返回 `overall_score=0.9637`、`human_review_required=false`、`vetoes=[]`；更极端地，把 `source_regions=[]` 后，report 变成 `overall_score=0.0`，但依然 `human_review_required=false`、`vetoes=[]`。",
+      "recommendation": "把科学专项 gate 提升为强 contract：至少要求 source payload 中存在 `table` / `image` / `experiment_record` / `question_stem` 等关键 region；缺失任一必需 region 时，应显式进入 not-ready 或 blocker（例如 `science_required_region_missing:table`）。同时补 pytest 固化‘删掉关键 source region 不得继续通过’。",
+      "evidence": "代码路径：science_visual_gate.py:206-243、98-152。复现结果：删除 `table` source region 后仍 `overall_score=0.9637, human_review_required=false, vetoes=[]`；删除全部 `source_regions` 后仍 `human_review_required=false, vetoes=[]`。"
+    },
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/app/services/pdf_to_word/science_visual_gate.py",
+      "finding": "图-题绑定、表格-题干邻接、实验记录区邻接当前完全依赖 `source_regions[].adjacent_to`。`_collect_relations()` 只根据 source adjacency 生成 relation；如果上游直接把 `adjacent_to` 省略，关系检查会整体消失，而页面仍能凭剩余 region score 高分通过。最小复现中，把 happy fixture 所有 region 的 `adjacent_to=[]` 后，report 仍返回 `overall_score=0.9538`、`human_review_required=false`、`vetoes=[]`，且 `relation_scores=[]`。这意味着‘图片与题干绑定’、‘实验记录区邻接关系’可以被静默绕过。",
+      "recommendation": "对科学专项 payload 补强 relation contract：当页型声明为 science experiment mixed page 时，必须存在可核对的关系定义（至少 image-question/table-question/record-table 等必要关系）；关系缺失时应进入 not-ready 或 blocker，而不是把整组 relation score 省略。并补一条 pytest 覆盖 `adjacent_to` 缺失/清空的路径。",
+      "evidence": "代码路径：science_visual_gate.py:344-376、379-442。复现结果：把 happy fixture 全部 `adjacent_to` 清空后，report 仍 `overall_score=0.9538, human_review_required=false, vetoes=[]`，同时 `relation_kinds=[]`。"
+    }
+  ],
+  "non_blocking_findings": [],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/科学实验页表格与图片区关键区域视觉门禁/artifacts/task-c1c89373.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/app/services/pdf_to_word/science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/test_pdf_to_word_science_visual_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_happy.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_table_fail.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373/backend/tests/fixtures/pdf_to_word/visual_similarity/science/science_experiment_image_binding_fail.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/science-visual-review-pyc /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py",
+      "result": "通过。相关 Python 文件可编译。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest -p no:cacheprovider backend/tests/test_pdf_to_word_science_visual_gate.py -q -o cache_dir=/private/tmp/science-visual-review-cache --basetemp=/private/tmp/science-visual-review-tmp",
+      "result": "4 passed, 4 warnings。warnings 为既有 FastAPI `on_event` deprecation warnings，不阻塞本轮结论。"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/task-c1c89373 && git diff --check -- backend/app/services/pdf_to_word/science_visual_gate.py backend/tests/test_pdf_to_word_science_visual_gate.py backend/tests/fixtures/pdf_to_word/visual_similarity/science",
+      "result": "通过，未发现 patch / whitespace 问题。"
+    },
+    {
+      "command": "最小复现：基于 happy fixture 分别删除 `table` source region、删除全部 `source_regions`、以及把所有 `adjacent_to` 清空后重跑 `evaluate_science_visual_gate()`",
+      "result": "删除 `table` source region 后仍 `overall_score=0.9637, human_review_required=false, vetoes=[]`；删除全部 `source_regions` 后仍 `human_review_required=false, vetoes=[]`；清空全部 `adjacent_to` 后仍 `overall_score=0.9538, human_review_required=false, vetoes=[]`，且 `relation_scores=[]`。这证明关键区域与关系元数据缺失会被静默放过。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

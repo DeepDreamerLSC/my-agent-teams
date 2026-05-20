@@ -58,7 +58,7 @@
   "result_summary": "已按 review 驳回意见完成补修：rebuild_daily_metrics(project=...) 不再生成或覆盖 project='__all__' 的聚合行，因此 project 范围重建不会污染默认 API 的全局口径；同时补了自动化测试，验证 project 定向重建后 __all__ 仍保持全量聚合结果。（QA 已通过自动收口） QA 结论：QA PASS（本轮重验证）。此前 write_scope 越界阻塞已由 PM 扩容解除，review-1 复审 APPROVE。10 个 dashboard 测试全部通过。project 定向重建不再污染 __all__ 全局聚合，功能逻辑正确。",
   "last_error": null,
   "created_at": "2026-05-04T00:55:42+08:00",
-  "updated_at": "2026-05-18T18:52:59+08:00",
+  "updated_at": "2026-05-19T11:41:11+08:00",
   "claim_scope": [
     "dev-2"
   ],
@@ -67,5 +67,5 @@
   "merge_gate_state": "closed",
   "last_gate_actor": "pm-chief",
   "last_gate_decision_at": "2026-05-06T12:56:32+08:00",
-  "state_invariant_checked_at": "2026-05-18T18:52:59+08:00"
+  "state_invariant_checked_at": "2026-05-19T11:41:11+08:00"
 }

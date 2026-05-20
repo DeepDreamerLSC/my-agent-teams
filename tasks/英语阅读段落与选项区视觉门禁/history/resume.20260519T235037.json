@@ -1,0 +1,11 @@
+{
+  "task_id": "英语阅读段落与选项区视觉门禁",
+  "resumed_at": "2026-05-19T23:50:37+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "QA 未通过与 review 结论一致，属于同一返修点：补 english_visual_gate 顶层 pages contract。payload 缺少 pages 或 pages=[] 时必须返回 not_ready + blocker，并补 2 条回归测试；当前 verify 为返修前快照，归档后继续由 dev-2 修复。",
+  "archived_files": [
+    "ack.20260519T235037.json",
+    "verify.20260519T235037.json"
+  ]
+}

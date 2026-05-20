@@ -1,0 +1,8 @@
+{
+  "task_id": "慢模型复核灰度接入低置信视觉页",
+  "agent": "dev-2",
+  "agent_id": "dev-2",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-19T22:51:04+08:00",
+  "summary": "dev-2 已重新读取 instruction.md 并接收本轮 review 返修：收紧 near-threshold 判定为 [threshold, threshold+review_band)，禁止 hard-fail page/region 触发 slow review，并补齐对应回归测试。"
+}
