@@ -1,0 +1,13 @@
+{
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "task": "修正FinalAcceptance英语Fallback汇总口径",
+  "ack_at": "2026-05-20T12:57:00+08:00",
+  "workspace_path": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalAcceptance-Fallback-cc5b0072",
+  "branch": "task/FinalAcceptance-Fallback-cc5b0072",
+  "target_branch": "integration",
+  "notes": [
+    "已读取 instruction.md，确认仅修正 FinalAcceptance 英语八年级 fallback 口径与对应 human visual acceptance 报告。",
+    "将以 authoritative archive 中英语八年级 fallback_pages=3,11 为准，不改动其他学科样例结论。"
+  ]
+}

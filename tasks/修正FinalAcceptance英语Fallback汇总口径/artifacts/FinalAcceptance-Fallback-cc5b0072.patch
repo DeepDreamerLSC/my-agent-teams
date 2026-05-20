@@ -1,0 +1,32 @@
+--- /Users/linsuchang/.openclaw/tmp/tmpzllvemjo/old_summary.json	2026-05-20 12:53:44
++++ /Users/linsuchang/.openclaw/tmp/tmpzllvemjo/new_summary.json	2026-05-20 12:53:44
+@@ -114,9 +114,7 @@
+         "page_type": "language_exercise_sparse_media_with_fallback_pages",
+         "fallback_pages": [
+           3,
+-          8,
+-          11,
+-          12
++          11
+         ],
+         "selected_pages_or_crops": [
+           1,
+@@ -150,7 +148,7 @@
+         "human_visual_score": null,
+         "engineering_baseline_sample_present": true,
+         "notes": [
+-          "English fallback-page facts are not yet perfectly aligned between final_acceptance_summary and authoritative archive; rerun should normalize this before final human-visual declaration."
++          "English fallback-page facts are now aligned with the authoritative archive: fallback_pages=[3,11]."
+         ],
+         "disallowed_uses": [
+           "不得在 human_review_passed 之前对外宣称人工视觉95通过",
+--- /Users/linsuchang/.openclaw/tmp/tmpzllvemjo/old_report.md	2026-05-20 12:53:44
++++ /Users/linsuchang/.openclaw/tmp/tmpzllvemjo/new_report.md	2026-05-20 12:53:44
+@@ -9,6 +9,7 @@
+ - **工程门禁**：`pass`
+ - **全学科人工视觉95**：`NO-GO`
+ - **重点口径**：工程门禁 PASS 与 human visual 95 PASS 强隔离；缺真实视觉证据或任一样例 NO-GO 时，FinalAcceptance 也必须 NO-GO。
++- **英语八年级口径**：authoritative archive 的 fallback 页已统一为 `3, 11`；FinalAcceptance 汇总与 human visual 报告中的英语描述必须保持一致。
+ 
+ ## 2. 当前样例与门禁状态
+ 
