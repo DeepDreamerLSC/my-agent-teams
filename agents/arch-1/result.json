@@ -1,22 +1,48 @@
 {
-  "task": "林总工收尾：提交推送当前 agent 团队代码并写 result",
+  "task": "提交推送当前 agent 团队代码并继续 scripts 模块化优化",
   "agent": "arch-1",
   "status": "done",
-  "completed_at": "2026-05-20T11:29:34+08:00",
+  "completed_at": "2026-05-20T12:43:38+08:00",
   "summary": [
-    "已执行 git add -A，提交 my-agent-teams 当前所有未提交 task/runtime 修改。",
-    "已将最终 checkpoint commit 推送到 origin/main。",
-    "已补写本 result.json 作为收尾反馈。"
+    "已先按要求 checkpoint 当前 task/runtime 修改并推送，避免大量 task.json 长时间未提交。",
+    "已复查 scripts/ 目录功能分组与超大脚本现状，并继续执行低风险拆分。",
+    "已将 create-task.sh 中约 459 行内嵌 Python 任务 schema/校验实现迁入 scripts/lib/create_task_impl.py；顶层 create-task.sh 现在约 42 行，仅负责参数解析与调用。",
+    "已更新 scripts/README.md 与 scripts/lib/README.md，记录模块职责、当前仍超 500 行模块和后续拆分边界。",
+    "已提交并推送脚本优化结果到 origin/main。"
   ],
   "commits_pushed": [
     {
-      "sha": "302a3e1",
-      "message": "chore: final checkpoint task runtime state",
+      "sha": "adb25eb",
+      "message": "chore: checkpoint task runtime updates",
+      "pushed_to": "origin/main"
+    },
+    {
+      "sha": "a259ee2",
+      "message": "refactor(scripts): split create task implementation",
       "pushed_to": "origin/main"
     }
   ],
-  "notes": [
-    "本次 checkpoint 覆盖任务运行态、DOCX 返修结果、review/history/artifact 等当前未提交内容。",
-    "result.json 在 checkpoint push 后写入；随后会单独提交并推送该反馈文件。"
+  "script_changes": [
+    "scripts/create-task.sh",
+    "scripts/lib/create_task_impl.py",
+    "scripts/README.md",
+    "scripts/lib/README.md"
+  ],
+  "verification": [
+    "find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n -> passed",
+    "python3 -m py_compile $(find scripts -path '*/__pycache__' -prune -o -type f -name '*.py' -print) -> passed",
+    "TASKS_DIR=/private/tmp/my-agent-teams-create-task-refactor-test/tasks scripts/create-task.sh 测试脚本拆分任务 ... -> create-task smoke passed"
+  ],
+  "line_count_after": {
+    "scripts/create-task.sh": 42,
+    "scripts/lib/create_task_impl.py": 459,
+    "scripts/teamctl.sh": 362,
+    "scripts/task-watcher.sh": 3758,
+    "scripts/lib/task_artifacts.py": 628
+  },
+  "remaining_notes": [
+    "task-watcher.sh 仍为最大入口脚本；已拆出 runtime 与 notifications，后续建议按 routing/gate/queue 分阶段拆，不在本次紧急收尾中做高风险搬迁。",
+    "scripts/lib/task_artifacts.py 仍超过 500 行，但已是共享库；后续建议按 schema 读写、摘要提取、原子写入继续拆分。",
+    "提交 a259ee2 同时包含 watcher 刷新的 task.json/review 运行态和当时工作区已有的 dev-2 行为准则、sync-gantt 分批同步修改；按林总工‘所有当前未提交修改’要求一并 checkpoint。"
   ]
 }
