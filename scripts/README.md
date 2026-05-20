@@ -15,8 +15,9 @@
 
 ### Watcher 与运行时控制面
 
-- `task-watcher.sh`：任务状态机主循环，保留为兼容入口。
+- `task-watcher.sh`：任务状态机主循环，保留为兼容入口；runtime/logging 与通知函数已下沉到 `scripts/lib/`。
 - `task-watcher-watchdog.sh` / `tmux-watcher.sh`：常驻进程与 tmux 会话守护。
+- `teamctl.sh`：团队控制入口；watcher/dashboard/Codex gateway 服务管理函数已下沉到 `scripts/lib/teamctl_services.sh`。
 - `task-state-reducer.py` / `task-board-sync.py` / `task-board-governance.py`：状态归约与看板同步。
 - `task-pool-router.py` / `task-queue-router.py` / `task-pool-view.py` / `task-inbox.py`：任务池、队列与收件箱视图。
 
@@ -53,10 +54,10 @@
 
 | 脚本 | 当前策略 |
 | --- | --- |
-| `task-watcher.sh` | 已先抽出通知/系统 chat 事件到 `scripts/lib/task_watcher_notifications.sh`；后续可继续按 runtime、routing、gate、queue 四个模块拆分。 |
-| `teamctl.sh` | 仍作为团队控制入口；建议下一步拆出 agent/session 管理库。 |
+| `task-watcher.sh` | 已抽出 runtime/logging/singleton 到 `scripts/lib/task_watcher_runtime.sh`，通知/系统 chat 事件到 `scripts/lib/task_watcher_notifications.sh`；后续继续按 routing、gate、queue 拆分。 |
+| `teamctl.sh` | 已抽出 watcher/dashboard/Codex gateway 服务管理到 `scripts/lib/teamctl_services.sh`，顶层保留 bootstrap/doctor/agent 编排入口。 |
 | `scripts/lib/task_artifacts.py` | 已是共享库；建议下一步按 schema 读写、摘要提取、原子写入拆分。 |
-| `create-task.sh` | 接近边界；建议后续拆出 task.json schema 构造与 worktree 初始化。 |
+| `create-task.sh` | 当前接近 500 行边界；后续应将内嵌 Python task schema 构造迁入 `scripts/lib/create_task_impl.py`。 |
 
 ## 变更准则
 

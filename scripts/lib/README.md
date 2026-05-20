@@ -12,7 +12,9 @@
 
 ## Bash 模块
 
+- `task_watcher_runtime.sh`：`task-watcher.sh` 的 runtime 迁移、日志轮转、heartbeat、单实例守护和 PID 清理函数。
 - `task_watcher_notifications.sh`：`task-watcher.sh` 的 PM/agent 通知、飞书推送与系统 chat 事件函数。
+- `teamctl_services.sh`：`teamctl.sh` 的 runtime 命令解析、PID 判活、watcher/dashboard/Codex gateway 启停与重启函数。
 
 ## 维护约定
 
