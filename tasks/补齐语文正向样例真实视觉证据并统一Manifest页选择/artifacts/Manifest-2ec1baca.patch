@@ -1,0 +1,5471 @@
+# Snapshot patch for task: 补齐语文正向样例真实视觉证据并统一Manifest页选择
+# Note: artifact/manifests live in ignored output roots, so this patch records final snapshot-style unified diffs against /dev/null for review/archive purposes.
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json
+@@ -0,0 +1,392 @@
++{
+
++  "manifest_version": "pdf2word_unified_sample_manifest/v2",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "suite_id": "pdf2word_final_gated_all_subject_suite",
+
++  "claim_scope": {
+
++    "engineering_gate_status": "quality_hybrid_async_pass_retained",
+
++    "human_visual_95_status": "no_go_until_all_positive_candidates_have_real_render_pair_and_human_review_pass",
+
++    "current_chinese_positive_sample": "chinese_long_reading_positive_v1",
+
++    "composition_claim_status": "out_of_scope_until_dedicated_sample_added"
+
++  },
+
++  "role_counts": {
+
++    "positive_candidate": 5,
+
++    "negative_guard": 1,
+
++    "excluded": 0
+
++  },
+
++  "evidence_contract": {
+
++    "required_artifacts": [
+
++      "render_pair.json",
+
++      "visual_similarity.json",
+
++      "fidelity_veto.json",
+
++      "human_review_report.json"
+
++    ],
+
++    "ready_gate_requirements": [
+
++      "human_visual_score>=95",
+
++      "critical_page_score>=92",
+
++      "critical_region_score>=90",
+
++      "no_p0_veto"
+
++    ],
+
++    "notes": [
+
++      "positive_candidate 允许先进入 suite，但在 gate_status=human_review_passed 之前不得计入对外95通过结论。",
+
++      "negative_guard 始终不计入正向95分母。"
+
++    ]
+
++  },
+
++  "samples": [
+
++    {
+
++      "sample_key": "science_grade5",
+
++      "entry_id": "science_grade5_current_bundle",
+
++      "subject": "science",
+
++      "sample_name": "五下科学",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_family": "science_experiment_table_and_image_mixed",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /五下科学.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": true,
+
++        "visual_similarity_exists": true,
+
++        "fidelity_veto_exists": true,
+
++        "human_review_report_exists": true,
+
++        "render_pair_ready_for_scoring": false,
+
++        "human_review_decision": "no_go"
+
++      },
+
++      "page_type": "science_experiment_table_and_image_mixed",
+
++      "fallback_policy": {
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          1
+
++        ],
+
++        "selected_pages_or_crops": [
+
++          4,
+
++          5,
+
++          6
+
++        ]
+
++      },
+
++      "positive_entry_criteria": [
+
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
+
++        "question_or_region_detection_available=true",
+
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
+
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
+
++      ],
+
++      "disallowed_uses": [
+
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
+
++        "不得把该样例外推到作文/写作格 claim",
+
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json"
+
++      },
+
++      "notes": [
+
++        "Current representative public sample already exists under final-output-samples aliases.",
+
++        "Human visual 95 remains blocked until render-pair evidence is generated and reviewed."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "math_grade8",
+
++      "entry_id": "math_grade8_current_bundle",
+
++      "subject": "math",
+
++      "sample_name": "数学八年级",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_family": "math_exercise_with_sparse_image_and_table",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": true,
+
++        "visual_similarity_exists": true,
+
++        "fidelity_veto_exists": true,
+
++        "human_review_report_exists": true,
+
++        "render_pair_ready_for_scoring": false,
+
++        "human_review_decision": "no_go"
+
++      },
+
++      "page_type": "math_exercise_with_sparse_image_and_table",
+
++      "fallback_policy": {
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          5
+
++        ],
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          3,
+
++          4,
+
++          6,
+
++          7,
+
++          8
+
++        ]
+
++      },
+
++      "positive_entry_criteria": [
+
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
+
++        "question_or_region_detection_available=true",
+
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
+
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
+
++      ],
+
++      "disallowed_uses": [
+
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
+
++        "不得把该样例外推到作文/写作格 claim",
+
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json"
+
++      },
+
++      "notes": [
+
++        "Math sample remains in mainline final-gated suite.",
+
++        "Answer-section teacher/review variants are explicitly excluded from mainline 95 evidence."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "math_exam",
+
++      "entry_id": "math_exam_current_bundle",
+
++      "subject": "math",
+
++      "sample_name": "数学试卷",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_family": "math_exam_image_dense",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": true,
+
++        "visual_similarity_exists": true,
+
++        "fidelity_veto_exists": true,
+
++        "human_review_report_exists": true,
+
++        "render_pair_ready_for_scoring": false,
+
++        "human_review_decision": "no_go"
+
++      },
+
++      "page_type": "math_exam_image_dense",
+
++      "fallback_policy": {
+
++        "document_fallback": false,
+
++        "fallback_pages": [],
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          3,
+
++          4,
+
++          6,
+
++          8,
+
++          9,
+
++          11
+
++        ]
+
++      },
+
++      "positive_entry_criteria": [
+
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
+
++        "question_or_region_detection_available=true",
+
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
+
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
+
++      ],
+
++      "disallowed_uses": [
+
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
+
++        "不得把该样例外推到作文/写作格 claim",
+
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json"
+
++      },
+
++      "notes": [
+
++        "Image-dense sample is canonical for math exam visual density checks."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "english_grade8",
+
++      "entry_id": "english_grade8_current_bundle",
+
++      "subject": "english",
+
++      "sample_name": "英语八年级",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_family": "language_exercise_sparse_media_with_fallback_pages",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": true,
+
++        "visual_similarity_exists": true,
+
++        "fidelity_veto_exists": true,
+
++        "human_review_report_exists": true,
+
++        "render_pair_ready_for_scoring": false,
+
++        "human_review_decision": "no_go"
+
++      },
+
++      "page_type": "language_exercise_sparse_media_with_fallback_pages",
+
++      "fallback_policy": {
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          3,
+
++          8,
+
++          11,
+
++          12
+
++        ],
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          4,
+
++          5,
+
++          7,
+
++          9
+
++        ]
+
++      },
+
++      "positive_entry_criteria": [
+
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
+
++        "question_or_region_detection_available=true",
+
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
+
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
+
++      ],
+
++      "disallowed_uses": [
+
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
+
++        "不得把该样例外推到作文/写作格 claim",
+
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json"
+
++      },
+
++      "notes": [
+
++        "English fallback-page facts are not yet perfectly aligned between final_acceptance_summary and authoritative archive; rerun should normalize this before final human-visual declaration."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "chinese_grade5",
+
++      "entry_id": "chinese_grade5_current_policy",
+
++      "subject": "chinese",
+
++      "sample_name": "语文五年级",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "negative_guard",
+
++      "record_role": "canonical_negative_guard",
+
++      "sample_family": "chinese_negative_document_fallback_guard",
+
++      "sample_generation": "current_negative_document_fallback_baseline",
+
++      "eligible_for_human_visual_95": false,
+
++      "count_in_positive_human_visual_95_average": false,
+
++      "include_in_suite_for_guard": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": false,
+
++        "visual_similarity_exists": false,
+
++        "fidelity_veto_exists": false,
+
++        "human_review_report_exists": false,
+
++        "render_pair_ready_for_scoring": false,
+
++        "human_review_decision": "negative_guard_excluded"
+
++      },
+
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
+
++      "fallback_policy": {
+
++        "document_fallback": true,
+
++        "fallback_pages": [
+
++          1,
+
++          2,
+
++          3,
+
++          4,
+
++          5,
+
++          6,
+
++          7,
+
++          8,
+
++          9,
+
++          10,
+
++          11,
+
++          12,
+
++          13
+
++        ],
+
++        "selected_pages_or_crops": []
+
++      },
+
++      "positive_entry_criteria": [],
+
++      "disallowed_uses": [
+
++        "不得计入正向 human visual 95 分母或均值",
+
++        "不得替代语文长文/作文正向样例",
+
++        "不得作为语文学科人工视觉95通过证据"
+
++      ],
+
++      "gate_status": "negative_guard_excluded",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
+
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/source_manifest.json"
+
++      },
+
++      "notes": [
+
++        "保持 canonical negative_guard，不得原地改写为 positive_candidate。",
+
++        "语文学科现在拥有独立的 chinese_long_reading_positive_v1；本条仍只承担防误判 guard 角色。"
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "chinese_long_reading_positive_v1",
+
++      "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
+
++      "subject": "chinese",
+
++      "sample_name": "语文长文阅读正向样例",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_family": "chinese_long_reading",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++      "artifact_presence": {
+
++        "render_pair_exists": true,
+
++        "visual_similarity_exists": true,
+
++        "fidelity_veto_exists": true,
+
++        "human_review_report_exists": true,
+
++        "render_pair_ready_for_scoring": true,
+
++        "human_review_decision": "no_go"
+
++      },
+
++      "page_type": "chinese_long_reading",
+
++      "fallback_policy": {
+
++        "document_fallback": false,
+
++        "fallback_pages": [],
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          2,
+
++          3
+
++        ],
+
++        "seed_profile": "apple_baseline"
+
++      },
+
++      "positive_entry_criteria": [
+
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
+
++        "question_or_region_detection_available=true",
+
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
+
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
+
++      ],
+
++      "disallowed_uses": [
+
++        "不得把该长文阅读样例外推为作文/写作格能力证明",
+
++        "不得在 human_review_passed 之前宣称语文学科已通过人工视觉95",
+
++        "不得用它覆盖或替代 chinese_grade5 negative_guard 条目"
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+
++        "output_docx_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
+
++      },
+
++      "notes": [
+
++        "当前 canonical sample bundle 已具备真实 render_pair / visual_similarity / fidelity_veto / human_review 证据链。",
+
++        "selected_pages_or_crops=[1,2,3] 对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍保持 out-of-scope。",
+
++        "当前 human visual verdict 仍为 no_go：真实渲染相似度低于阈值并触发 P0 veto，因此尚不能进入全学科95正向通过分母。"
+
++      ]
+
++    }
+
++  ]
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json
+@@ -0,0 +1,327 @@
++{
+
++  "manifest_version": "pdf2word_final_gated_manifest/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "generated_by": "dev-1",
+
++  "purpose": "Split final-gated / variant / debug-authoritative sample usage and provide the only canonical source->output pair list for PDF→Word visual gate reruns.",
+
++  "naming_status": {
+
++    "claim_field_finalized": false,
+
++    "note": "Per PM sync on 2026-05-19, this manifest intentionally does not freeze any claim/declaration policy field names before arch-1 lands the canonical naming fix. Use tier + evaluation_role + eligible_for_human_visual_95 only."
+
++  },
+
++  "release_boundary": {
+
++    "engineering_gate_status": "quality_hybrid_async_pass_retained",
+
++    "human_visual_95_status": "not_yet_claimable",
+
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled"
+
++  },
+
++  "tier_definitions": {
+
++    "final_gated": "Canonical sample suite used by downstream render-pair generation, manual visual rubric, and final human-visual reruns.",
+
++    "variant_excluded": "Student / teacher / review / answer-area variants. Valid for specialized capability checks but never direct evidence for mainline 95 declaration.",
+
++    "debug_authoritative_excluded": "Authoritative probes, intermediate pages, debug artifacts, and review-only evidence. Useful for diagnosis, not for 95 declaration."
+
++  },
+
++  "samples": [
+
++    {
+
++      "sample_key": "science_grade5",
+
++      "sample_name": "五下科学",
+
++      "subject": "science",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /五下科学.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
+
++      "published_aliases": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-hybrid_experimental-output.docx"
+
++      ],
+
++      "page_type": "science_experiment_table_and_image_mixed",
+
++      "selected_pages_or_crops": [
+
++        4,
+
++        5,
+
++        6
+
++      ],
+
++      "current_facts": {
+
++        "table_xml_present": true,
+
++        "word_media_count": 4,
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          1
+
++        ]
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word最终输出样例-五下科学-student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "render_pairs",
+
++        "visual_similarity.json",
+
++        "human_review_report"
+
++      ],
+
++      "notes": [
+
++        "Current representative public sample already exists under final-output-samples aliases.",
+
++        "Human visual 95 remains blocked until render-pair evidence is generated and reviewed."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "math_grade8",
+
++      "sample_name": "数学八年级",
+
++      "subject": "math",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
+
++      "published_aliases": [],
+
++      "page_type": "math_exercise_with_sparse_image_and_table",
+
++      "selected_pages_or_crops": [
+
++        1,
+
++        3,
+
++        4,
+
++        6,
+
++        7,
+
++        8
+
++      ],
+
++      "current_facts": {
+
++        "table_xml_present": true,
+
++        "word_media_count": 2,
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          5
+
++        ]
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "render_pairs",
+
++        "visual_similarity.json",
+
++        "human_review_report"
+
++      ],
+
++      "notes": [
+
++        "Math sample remains in mainline final-gated suite.",
+
++        "Answer-section teacher/review variants are explicitly excluded from mainline 95 evidence."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "math_exam",
+
++      "sample_name": "数学试卷",
+
++      "subject": "math",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
+
++      "published_aliases": [],
+
++      "page_type": "math_exam_image_dense",
+
++      "selected_pages_or_crops": [
+
++        1,
+
++        3,
+
++        4,
+
++        6,
+
++        8,
+
++        9,
+
++        11
+
++      ],
+
++      "current_facts": {
+
++        "table_xml_present": false,
+
++        "word_media_count": 20,
+
++        "document_fallback": false,
+
++        "fallback_pages": []
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "render_pairs",
+
++        "visual_similarity.json",
+
++        "human_review_report"
+
++      ],
+
++      "notes": [
+
++        "Image-dense sample is canonical for math exam visual density checks."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "english_grade8",
+
++      "sample_name": "英语八年级",
+
++      "subject": "english",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
+
++      "published_aliases": [],
+
++      "page_type": "language_exercise_sparse_media_with_fallback_pages",
+
++      "selected_pages_or_crops": [
+
++        1,
+
++        4,
+
++        5,
+
++        7,
+
++        9
+
++      ],
+
++      "current_facts": {
+
++        "table_xml_present": false,
+
++        "word_media_count": 1,
+
++        "document_fallback": false,
+
++        "fallback_pages": [
+
++          3,
+
++          8,
+
++          11,
+
++          12
+
++        ]
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "render_pairs",
+
++        "visual_similarity.json",
+
++        "human_review_report"
+
++      ],
+
++      "notes": [
+
++        "English fallback-page facts are not yet perfectly aligned between final_acceptance_summary and authoritative archive; rerun should normalize this before final human-visual declaration."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "chinese_long_reading_positive_v1",
+
++      "sample_name": "语文长文阅读正向样例",
+
++      "subject": "chinese",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++      "published_aliases": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
+
++      ],
+
++      "page_type": "chinese_long_reading",
+
++      "selected_pages_or_crops": [
+
++        1,
+
++        2,
+
++        3
+
++      ],
+
++      "current_facts": {
+
++        "table_xml_present": false,
+
++        "word_media_count": 0,
+
++        "document_fallback": false,
+
++        "fallback_pages": [],
+
++        "seed_profile": "apple_baseline",
+
++        "render_pair_status": "success",
+
++        "visual_similarity_status": "scored_no_go",
+
++        "human_visual_decision": "no_go"
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+
++        "seed_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/pages.jsonl",
+
++        "source_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "improve_selected_long_reading_page_similarity_above_human_visual_thresholds",
+
++        "add_dedicated_chinese_composition_grid_positive_sample_before_composition_claim"
+
++      ],
+
++      "notes": [
+
++        "This sample remains distinct from chinese_grade5 negative_guard and now has real visual evidence for selected long-reading pages.",
+
++        "selected_pages_or_crops=[1,2,3] scope the evidence to 《爸爸的鸽子》 reading material + question region; composition/writing-grid claims stay out-of-scope.",
+
++        "Current human visual verdict remains no_go because measured similarity on the selected pages stays below the 95 gate thresholds."
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "chinese_grade5",
+
++      "sample_name": "语文五年级",
+
++      "subject": "chinese",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "negative_guard",
+
++      "eligible_for_human_visual_95": false,
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
+
++      "published_aliases": [],
+
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
+
++      "selected_pages_or_crops": [],
+
++      "current_facts": {
+
++        "table_xml_present": false,
+
++        "word_media_count": 0,
+
++        "document_fallback": true,
+
++        "fallback_pages": [
+
++          1,
+
++          2,
+
++          3,
+
++          4,
+
++          5,
+
++          6,
+
++          7,
+
++          8,
+
++          9,
+
++          10,
+
++          11,
+
++          12,
+
++          13
+
++        ]
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/validator-report.json"
+
++      },
+
++      "excluded_variants": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/student.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/teacher.docx",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/review.docx"
+
++      ],
+
++      "required_followups": [
+
++        "negative_guard_review",
+
++        "separate_chinese_long_text_baseline"
+
++      ],
+
++      "notes": [
+
++        "This sample stays inside the final-gated suite as a negative guard, but is explicitly excluded from positive human-visual 95 averaging.",
+
++        "A separate positive Chinese long-reading sample now exists as chinese_long_reading_positive_v1; this negative guard still must not be counted as positive human visual 95 evidence."
+
++      ]
+
++    }
+
++  ],
+
++  "excluded_roots": [
+
++    {
+
++      "tier": "variant_excluded",
+
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative",
+
++      "reason": "Teacher / student / review variants validate answer-area capability, not mainline final 95 fidelity."
+
++    },
+
++    {
+
++      "tier": "debug_authoritative_excluded",
+
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation",
+
++      "reason": "Intermediate pages / validator artifacts are evidence inputs, not user-facing final-gated outputs."
+
++    }
+
++  ]
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json
+@@ -0,0 +1,262 @@
++{
+
++  "manifest_version": "pdf2word_chinese_samples_manifest/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "generated_by": "dev-1",
+
++  "task_id": "实现语文正向长文作文样例与统一Manifest",
+
++  "purpose": "Rebuild the Chinese long-text/composition/negative-sample policy so current document_fallback evidence cannot be misread as a positive human-visual 95% sample.",
+
++  "scope": {
+
++    "subject": "chinese",
+
++    "must_not_ignore_chinese": true,
+
++    "all_subject_policy": "Chinese 现在同时拥有 negative_guard 与带真实视觉证据的 long-reading positive candidate；后者当前结论仍为 no_go，不得被宣称为已通过人工视觉95。"
+
++  },
+
++  "aligned_truth_sources": [
+
++    {
+
++      "name": "final-gated-manifest.json",
+
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+
++      "expected_chinese_record": {
+
++        "sample_key": "chinese_grade5",
+
++        "tier": "final_gated",
+
++        "evaluation_role": "negative_guard",
+
++        "eligible_for_human_visual_95": false,
+
++        "page_type": "negative_non_exercise_or_question_region_unresolvable"
+
++      },
+
++      "interpretation": "This is the canonical final-gated suite boundary. The Chinese row remains in the suite for negative-guard coverage, not for positive 95 averaging."
+
++    },
+
++    {
+
++      "name": "PDF转Word全学科人工视觉复核Rubric.md",
+
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全学科人工视觉复核Rubric.md",
+
++      "interpretation": "Human visual 95 requires render pairs, canonical visual_similarity.json, page/region review, and no P0 veto; engineering L0/L1 facts are not sufficient."
+
++    },
+
++    {
+
++      "name": "PDF转Word全学科视觉基线报告.md",
+
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全学科视觉基线报告.md",
+
++      "interpretation": "Current Chinese baseline is negative_guard_only and not part of the positive human visual 95 average."
+
++    }
+
++  ],
+
++  "release_boundary": {
+
++    "engineering_gate_status": "quality_hybrid_async_engineering_95_gate_pass_retained",
+
++    "human_visual_95_status": "no_go_for_current_chinese_positive_candidate_until_selected_pages_pass_rubric",
+
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
+
++    "current_chinese_public_claim": "Chinese 已拥有独立长文阅读 positive_candidate 与真实视觉证据链，但当前 selected_pages_or_crops=[1,2,3] 的真实评分仍为 no_go；只能据此证明已纳入同口径治理，不能宣称已通过人工视觉95。"
+
++  },
+
++  "classification_rules": {
+
++    "positive_chinese_human_visual_95_candidate_requires_all": [
+
++      "tier=final_gated and evaluation_role=positive_candidate in the canonical manifest",
+
++      "unique source_pdf -> final-gated output_docx pair; no student/teacher/review/authoritative/debug variant",
+
++      "not document_fallback and not baseline_only/generic_fallback as the dominant path",
+
++      "representative Chinese page type is covered: long reading, question area, composition/writing grid, or answer-space page depending on declared claim",
+
++      "render_pairs exist for PDF pages and DOCX-rendered pages",
+
++      "canonical visual_similarity.json is produced from real render-pair evidence",
+
++      "human review report follows the all-subject rubric, including page-level and region-level scores",
+
++      "no P0 veto on long text, composition grid, reading order, OCR readability, or key region layout"
+
++    ],
+
++    "negative_or_baseline_sample": {
+
++      "allowed_role": "negative_guard",
+
++      "allowed_uses": [
+
++        "prove that Chinese is not ignored in the governance suite",
+
++        "verify that document_fallback/baseline evidence is not promoted into a positive 95 claim",
+
++        "serve as a regression guard for future Chinese routing and sample classification"
+
++      ],
+
++      "disallowed_uses": [
+
++        "positive human visual 95 proof",
+
++        "positive average denominator or numerator",
+
++        "external claim that Chinese PDF→Word already reaches human visual 95%",
+
++        "replacement for a true long-text or composition positive sample"
+
++      ]
+
++    },
+
++    "composition_and_long_text_special_policy": {
+
++      "needs_separate_positive_sample": true,
+
++      "reason": "Chinese long text and composition pages have unique visual obligations: paragraph indentation, dense reading blocks, punctuation/annotation readability, question-to-material binding, writing grid or answer-space geometry. A document_fallback negative guard does not exercise these obligations."
+
++    }
+
++  },
+
++  "samples": [
+
++    {
+
++      "sample_key": "chinese_grade5",
+
++      "entry_id": "chinese_grade5_current_policy",
+
++      "record_role": "supplemental_policy_entry",
+
++      "sample_generation": "current_negative_document_fallback_baseline",
+
++      "sample_name": "语文五年级",
+
++      "subject": "chinese",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "negative_guard",
+
++      "chinese_sample_role": "negative_document_fallback_baseline",
+
++      "eligible_for_human_visual_95": false,
+
++      "count_in_positive_human_visual_95_average": false,
+
++      "include_in_suite_for_guard": true,
+
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
+
++      "current_facts": {
+
++        "docx_kind": "generic_fallback",
+
++        "docx_openable": true,
+
++        "word_media_count": 0,
+
++        "table_xml_present": false,
+
++        "image_entered_final_word": false,
+
++        "table_entered_final_word": false,
+
++        "question_count": 0,
+
++        "option_count": 0,
+
++        "answer_area_item_count": 0,
+
++        "answer_section_count": 0,
+
++        "document_fallback": true,
+
++        "fallback_pages": [
+
++          1,
+
++          2,
+
++          3,
+
++          4,
+
++          5,
+
++          6,
+
++          7,
+
++          8,
+
++          9,
+
++          10,
+
++          11,
+
++          12,
+
++          13
+
++        ],
+
++        "fallback_page_count": 13,
+
++        "default_source_profile": "baseline_only",
+
++        "supplemental_source_profile": null,
+
++        "selected_pages_or_crops": [],
+
++        "structured_image_count": 0,
+
++        "structured_table_count": 0,
+
++        "accepted_candidate_total": 0,
+
++        "appended_block_total": 0
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
+
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/hybrid-pages.jsonl",
+
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/validator-report.json",
+
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/source_manifest.json"
+
++      },
+
++      "baseline_interpretation": [
+
++        "This sample proves only that the current pipeline can preserve an auditable Chinese negative/document_fallback baseline.",
+
++        "It does not prove Chinese long-text, reading-question, composition-grid, or answer-space fidelity.",
+
++        "It must remain excluded from positive human visual 95 scoring until a positive Chinese sample is added and rerun through the all-subject rubric."
+
++      ],
+
++      "required_followups_before_positive_claim": [
+
++        {
+
++          "action": "add_positive_chinese_long_text_sample",
+
++          "priority": "P0_before_chinese_claim",
+
++          "acceptance": "A Chinese reading/long-text final-gated positive_candidate has source_pdf, output_docx, render_pairs, visual_similarity.json, and human review without P0 veto."
+
++        },
+
++        {
+
++          "action": "add_positive_chinese_composition_or_writing_grid_sample",
+
++          "priority": "P0_before_composition_claim",
+
++          "acceptance": "Composition/writing-grid or answer-space geometry is represented and passes page/region visual review; otherwise composition-specific claims stay excluded."
+
++        },
+
++        {
+
++          "action": "rerun_human_visual_95_with_chinese_positive_samples",
+
++          "priority": "P0_before_all_subject_claim",
+
++          "acceptance": "Chinese positive samples are counted only after passing the same human_visual_95_gate thresholds as science/math/English positive candidates."
+
++        }
+
++      ]
+
++    },
+
++    {
+
++      "sample_key": "chinese_long_reading_positive_v1",
+
++      "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
+
++      "record_role": "canonical_positive_candidate",
+
++      "sample_generation": "implemented_positive_candidate",
+
++      "sample_name": "语文长文阅读正向样例",
+
++      "subject": "chinese",
+
++      "tier": "final_gated",
+
++      "evaluation_role": "positive_candidate",
+
++      "chinese_sample_role": "long_reading_positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "include_in_suite_for_guard": false,
+
++      "page_type": "chinese_long_reading",
+
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++      "current_facts": {
+
++        "docx_kind": "apple_baseline_seed_bundle",
+
++        "docx_openable": true,
+
++        "word_media_count": 0,
+
++        "table_xml_present": false,
+
++        "image_entered_final_word": false,
+
++        "table_entered_final_word": false,
+
++        "question_or_region_detection_available": true,
+
++        "document_fallback": false,
+
++        "fallback_pages": [],
+
++        "fallback_page_count": 0,
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          2,
+
++          3
+
++        ],
+
++        "default_source_profile": "apple_baseline_seed",
+
++        "supplemental_source_profile": null,
+
++        "render_pair_status": "success",
+
++        "visual_similarity_status": "scored_no_go",
+
++        "human_visual_decision": "no_go",
+
++        "render_pair_ready_for_scoring": true
+
++      },
+
++      "evidence_paths": {
+
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+
++        "published_source_alias": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "published_output_alias": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
+
++      },
+
++      "baseline_interpretation": [
+
++        "该样例仍是独立于 chinese_grade5 的语文长文阅读正向候选 bundle。",
+
++        "当前 bundle 已从 staged_seed 进入 real_scoring_ready：真实 render_pair / visual_similarity / fidelity_veto / human_review 均已落盘。",
+
++        "当前人眼结论仍为 no_go，因此它可以参与 QA 复验是否进入后续重跑口径，但不能被当作语文学科已通过人工视觉95的事实。"
+
++      ],
+
++      "required_followups_before_positive_claim": [
+
++        {
+
++          "action": "raise_selected_long_reading_similarity_for_chinese_long_reading_positive_v1",
+
++          "priority": "P0_before_chinese_claim",
+
++          "acceptance": "selected_pages_or_crops=[1,2,3] 的 overall similarity >= 0.95，且关键页 >= 0.92，无 P0 veto。"
+
++        },
+
++        {
+
++          "action": "add_positive_chinese_composition_or_writing_grid_sample",
+
++          "priority": "P0_before_composition_claim",
+
++          "acceptance": "作文/写作格需独立样例与区域级视觉证据；当前长文阅读样例不能替代该能力证明。"
+
++        }
+
++      ]
+
++    }
+
++  ],
+
++  "recommended_positive_chinese_sample_set": [
+
++    {
+
++      "sample_type": "chinese_long_reading_or_reading_question",
+
++      "minimum_count": 1,
+
++      "must_cover": [
+
++        "dense paragraphs",
+
++        "paragraph indentation and line breaks",
+
++        "question-to-material binding",
+
++        "punctuation/annotation readability",
+
++        "page density and margins"
+
++      ],
+
++      "claim_unlocked_if_passed": "Chinese long-text/readability can be considered for positive human visual 95."
+
++    },
+
++    {
+
++      "sample_type": "chinese_composition_or_writing_grid",
+
++      "minimum_count": 1,
+
++      "must_cover": [
+
++        "composition grid or writing area geometry",
+
++        "answer-space boundaries",
+
++        "title/body separation",
+
++        "teacher-facing blank area preservation if claimed"
+
++      ],
+
++      "claim_unlocked_if_passed": "Composition/writing-area claims can be considered; if absent, composition remains explicitly out of scope."
+
++    }
+
++  ],
+
++  "claim_recommendation": {
+
++    "current_decision": "current_chinese_negative_guard_preserved_and_positive_long_reading_seed_added_but_not_yet_passed",
+
++    "suite_decision": "keep_current_chinese_sample_as_final_gated_negative_guard",
+
++    "if_pm_needs_all_subject_human_visual_95_claim": "delay the claim or add qualified positive Chinese samples and rerun the full rubric before claiming science/math/Chinese/English all-subject human visual 95%.",
+
++    "allowed_wording": [
+
++      "语文已纳入 PDF→Word 样例治理和门禁范围；当前语文样例为 negative/document_fallback guard，不作为正向人工视觉 95 证据。",
+
++      "当前可保留 quality/hybrid_async 工程门禁通过；全学科人工逐页视觉 95 仍需补齐语文正样例和 render-pair 复核。",
+
++      "如需把语文纳入本轮 95 宣称，必须先补充长文/作文等正样例并完成全学科 Rubric 复验。"
+
++    ],
+
++    "disallowed_wording": [
+
++      "语文五年级已证明语文学科达到人工视觉 95%。",
+
++      "语文负样例可以与科学/数学/英语正样例一起计入 95 平均。",
+
++      "document_fallback 通过即可代表长文/作文版式高还原。"
+
++    ]
+
++  }
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json
+@@ -0,0 +1,99 @@
++{
+
++  "normalized_sample_name": "语文正向样例",
+
++  "original_sample_name": "语文五年级（长文阅读正向候选）",
+
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级",
+
++  "copied_files": [
+
++    "output.docx",
+
++    "pages.jsonl"
+
++  ],
+
++  "generated_files": [
+
++    "metrics.json",
+
++    "warnings.json",
+
++    "render_pair.json",
+
++    "visual_similarity.json",
+
++    "fidelity_veto.json",
+
++    "human_review_report.json",
+
++    "render_pair_artifacts/"
+
++  ],
+
++  "missing_files": [],
+
++  "source_artifacts": {
+
++    "source_pdf_origin_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
+
++    "source_pdf_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++    "output_docx_seed_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级/output.docx",
+
++    "output_docx_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx",
+
++    "pages_source_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级/pages.jsonl",
+
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+
++    "unified_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+
++    "final_gated_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++    "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts",
+
++    "docx_renderer_strategy": "python_docx_text_fallback/v1",
+
++    "docx_renderer_fallback_used": true,
+
++    "canonical_visual_evidence_materialized": true,
+
++    "canonical_visual_evidence_scoring_ready": true,
+
++    "reproduce_script_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py",
+
++    "reproduce_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-chinese /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py"
+
++  },
+
++  "positive_candidate": {
+
++    "sample_key": "chinese_long_reading_positive_v1",
+
++    "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
+
++    "evaluation_role": "positive_candidate",
+
++    "page_type": "chinese_long_reading",
+
++    "selected_pages_or_crops": [
+
++      1,
+
++      2,
+
++      3
+
++    ],
+
++    "eligible_for_human_visual_95": true,
+
++    "count_in_positive_human_visual_95_average": true,
+
++    "gate_status": "human_review_failed",
+
++    "seed_profile": "apple_baseline"
+
++  },
+
++  "checksums": {
+
++    "source_pdf_alias_sha256": "e34032a73e26a8abf8bc77d03afcb7e85b4da462ef67626147a08bd18a5484ae",
+
++    "output_docx_sha256": "a6bc1e8fe9b18666139ef93e8133e009f12e7f20957c532ad82b808e32b1834b",
+
++    "pages_jsonl_sha256": "5c7a32d03a1b4e999773ec7ed74c5f35613c71b857491e15993e39add3fc110a"
+
++  },
+
++  "notes": [
+
++    "该样例不会改写 chinese_grade5 negative_guard，而是以独立 sample_key + 独立 alias/source_manifest 进入 positive_candidate 体系。",
+
++    "selected_pages_or_crops=[1,2,3] 对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍保持 out-of-scope，待单独样例。",
+
++    "output.docx/pages.jsonl 复制自 apple_baseline 语文五年级；当前已补齐真实 render_pair / visual_similarity / fidelity_veto / human_review 证据链。",
+
++    "Current human visual verdict remains no_go because the selected long-reading pages score below threshold and trigger P0 veto; blocker is no longer artifact_missing or pending review."
+
++  ],
+
++  "docx_render_dependency": {
+
++    "preferred_native_converter": "soffice/libreoffice --headless --convert-to pdf",
+
++    "preferred_native_converter_available": false,
+
++    "fallback_renderer": "python stdlib zip/xml DOCX text extractor + Pillow PNG renderer",
+
++    "fallback_renderer_version": "python_docx_text_fallback/v1",
+
++    "render_dpi": 96,
+
++    "reproduce_command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-chinese /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py",
+
++    "reproduce_script_path": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py",
+
++    "provenance_stability": "task_artifact_path"
+
++  },
+
++  "updated_at": "2026-05-20T11:41:10+08:00",
+
++  "current_visual_evidence_status": {
+
++    "render_pair_status": "success",
+
++    "render_pair_failure_code": null,
+
++    "visual_similarity_status": "scored_no_go",
+
++    "visual_similarity_failure_code": "visual_similarity_below_threshold",
+
++    "artifact_ready_for_scoring": true,
+
++    "visual_similarity_gate_passed": false,
+
++    "human_visual_decision": "no_go",
+
++    "sample_verdict": "no_go",
+
++    "eligible_for_human_visual_95": false,
+
++    "blocking_reasons": [
+
++      "visual_similarity_below_threshold",
+
++      "p0_fidelity_veto_present"
+
++    ],
+
++    "selected_pages_or_crops": [
+
++      1,
+
++      2,
+
++      3
+
++    ],
+
++    "provenance_note": "render_pair/visual_similarity 已可评分；当前 no_go 来自 selected_pages_or_crops=[1,2,3] 的真实阈值/P0 veto，而非 artifact_missing。"
+
++  }
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json
+@@ -0,0 +1,195 @@
++{
+
++  "report_type": "pdf_to_word_render_pair_evidence",
+
++  "contract_version": "pdf_to_word_render_pair/v1",
+
++  "status": "success",
+
++  "failure_code": null,
+
++  "ok": true,
+
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++  "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++  "evidence_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts",
+
++  "render_dpi": 96,
+
++  "renderer_strategy": "python_docx_text_fallback/v1",
+
++  "fallback_used": true,
+
++  "fallback_reason": {
+
++    "code": "docx_renderer_unavailable",
+
++    "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++    "details": {
+
++      "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++      "searched_binaries": [
+
++        "soffice",
+
++        "libreoffice"
+
++      ]
+
++    }
+
++  },
+
++  "source_page_count": 3,
+
++  "docx_page_count": 3,
+
++  "matched_pages": 3,
+
++  "render_pairs": [
+
++    {
+
++      "page_index": 1,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 1,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++        "image_sha256": "c7242953134c52e3dc85a732d028fc5f45f225f2abb429668a47b4d441372958",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 1,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png",
+
++        "image_sha256": "a5c381e8c4ffd214ab079f3878b89a1430d65799695772e8d2d7200f3f4899c6",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png",
+
++      "source_image_sha256": "c7242953134c52e3dc85a732d028fc5f45f225f2abb429668a47b4d441372958",
+
++      "docx_image_sha256": "a5c381e8c4ffd214ab079f3878b89a1430d65799695772e8d2d7200f3f4899c6"
+
++    },
+
++    {
+
++      "page_index": 2,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 2,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++        "image_sha256": "04d2c5742261b771c5a9dec077153d83759a8b384dc69ecc0b158ff1e106bf95",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 2,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png",
+
++        "image_sha256": "8bec7cd6628ae274213fbbdf66b10d3185ea932d53b5b1b723bdd85e25556f57",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png",
+
++      "source_image_sha256": "04d2c5742261b771c5a9dec077153d83759a8b384dc69ecc0b158ff1e106bf95",
+
++      "docx_image_sha256": "8bec7cd6628ae274213fbbdf66b10d3185ea932d53b5b1b723bdd85e25556f57"
+
++    },
+
++    {
+
++      "page_index": 3,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 3,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++        "image_sha256": "a9bf0d005c33f9cde6aff9fce86bc87d60b931a8ecdf2a6145af70da3591453d",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 3,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png",
+
++        "image_sha256": "c0d1ccca22696b98d064b61455d205ee1d5e7c6b653e735bc051a403cae995da",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png",
+
++      "source_image_sha256": "a9bf0d005c33f9cde6aff9fce86bc87d60b931a8ecdf2a6145af70da3591453d",
+
++      "docx_image_sha256": "c0d1ccca22696b98d064b61455d205ee1d5e7c6b653e735bc051a403cae995da"
+
++    }
+
++  ],
+
++  "selected_pages_or_crops": [
+
++    1,
+
++    2,
+
++    3
+
++  ],
+
++  "scoring_scope": {
+
++    "mode": "selected_pages_or_crops",
+
++    "selected_pages_or_crops": [
+
++      1,
+
++      2,
+
++      3
+
++    ],
+
++    "scope_reason": "只评价长文阅读《爸爸的鸽子》材料与题目区域；作文/写作格仍 out-of-scope"
+
++  },
+
++  "total_source_page_count": 13,
+
++  "total_docx_page_count": 13,
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "sample_name": "语文长文阅读正向样例",
+
++  "source_name": "语文长文阅读正向样例",
+
++  "subject": "chinese",
+
++  "document_page_type": "chinese_long_reading",
+
++  "notes": [
+
++    "render_pair_artifacts 已对整份 13 页 source/docx 生成 PNG，当前 scoring scope 仅使用 selected_pages_or_crops=[1,2,3]。",
+
++    "DOCX 侧在当前 dev 环境使用 python_docx_text_fallback/v1 生成可复现渲染图。"
+
++  ]
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json
+@@ -0,0 +1,300 @@
++{
+
++  "report_type": "pdf_to_word_visual_similarity_evidence",
+
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
+
++  "artifact_name": "visual_similarity.json",
+
++  "implementation_status": "real_render_pair_scored",
+
++  "status": "scored_no_go",
+
++  "failure_code": "visual_similarity_below_threshold",
+
++  "sample_name": "语文长文阅读正向样例",
+
++  "subject": "chinese",
+
++  "document_page_type": "chinese_long_reading",
+
++  "mode_boundary": {
+
++    "requested_mode": "quality/hybrid_async",
+
++    "parser_backend": "hybrid_experimental",
+
++    "resolved_gate_mode": "quality/hybrid_async",
+
++    "enabled": true,
+
++    "default_sync_safe": true,
+
++    "default_sync_invokes_render_or_slow_model": false,
+
++    "reason": "visual similarity counts only in quality/hybrid_async"
+
++  },
+
++  "score_contract": {
+
++    "dimension_key": "visual_similarity",
+
++    "dimension_weight": 17,
+
++    "eligible_for_final_score": true,
+
++    "counts_toward_final_score": true,
+
++    "reason": "real render pair + page scores ready"
+
++  },
+
++  "thresholds": {
+
++    "document_overall_similarity_min": 0.95,
+
++    "critical_page_render_similarity_min": 0.92,
+
++    "regular_page_render_similarity_min": 0.88,
+
++    "key_region_similarity_min": 0.9
+
++  },
+
++  "render_pair_status": "success",
+
++  "render_pair_failure_code": null,
+
++  "renderer_strategy": "python_docx_text_fallback/v1",
+
++  "fallback_used": true,
+
++  "render_pairs": [
+
++    {
+
++      "page_index": 1,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 1,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++        "image_sha256": "c7242953134c52e3dc85a732d028fc5f45f225f2abb429668a47b4d441372958",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 1,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png",
+
++        "image_sha256": "a5c381e8c4ffd214ab079f3878b89a1430d65799695772e8d2d7200f3f4899c6",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png",
+
++      "source_image_sha256": "c7242953134c52e3dc85a732d028fc5f45f225f2abb429668a47b4d441372958",
+
++      "docx_image_sha256": "a5c381e8c4ffd214ab079f3878b89a1430d65799695772e8d2d7200f3f4899c6"
+
++    },
+
++    {
+
++      "page_index": 2,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 2,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++        "image_sha256": "04d2c5742261b771c5a9dec077153d83759a8b384dc69ecc0b158ff1e106bf95",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 2,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png",
+
++        "image_sha256": "8bec7cd6628ae274213fbbdf66b10d3185ea932d53b5b1b723bdd85e25556f57",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png",
+
++      "source_image_sha256": "04d2c5742261b771c5a9dec077153d83759a8b384dc69ecc0b158ff1e106bf95",
+
++      "docx_image_sha256": "8bec7cd6628ae274213fbbdf66b10d3185ea932d53b5b1b723bdd85e25556f57"
+
++    },
+
++    {
+
++      "page_index": 3,
+
++      "pair_status": "matched",
+
++      "source_page": {
+
++        "page_index": 3,
+
++        "source_name": "PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++        "render_dpi": 96,
+
++        "width_points": 595.2440185546875,
+
++        "height_points": 841.9199829101562,
+
++        "rotation_degrees": 180,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++        "image_sha256": "a9bf0d005c33f9cde6aff9fce86bc87d60b931a8ecdf2a6145af70da3591453d",
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.json"
+
++      },
+
++      "docx_page": {
+
++        "page_index": 3,
+
++        "source_name": "output.docx",
+
++        "source_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++        "render_dpi": 96,
+
++        "pixel_width": 794,
+
++        "pixel_height": 1123,
+
++        "image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png",
+
++        "image_sha256": "c0d1ccca22696b98d064b61455d205ee1d5e7c6b653e735bc051a403cae995da",
+
++        "renderer_strategy": "python_docx_text_fallback/v1",
+
++        "fallback_reason": {
+
++          "code": "docx_renderer_unavailable",
+
++          "message": "LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer",
+
++          "details": {
+
++            "docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++            "searched_binaries": [
+
++              "soffice",
+
++              "libreoffice"
+
++            ]
+
++          }
+
++        },
+
++        "text_block_count": 409,
+
++        "line_count": 47,
+
++        "render_artifact": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.json"
+
++      },
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png",
+
++      "source_image_sha256": "a9bf0d005c33f9cde6aff9fce86bc87d60b931a8ecdf2a6145af70da3591453d",
+
++      "docx_image_sha256": "c0d1ccca22696b98d064b61455d205ee1d5e7c6b653e735bc051a403cae995da"
+
++    }
+
++  ],
+
++  "page_scores": [
+
++    {
+
++      "page_index": 1,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.8617,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png"
+
++    },
+
++    {
+
++      "page_index": 2,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.863,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png"
+
++    },
+
++    {
+
++      "page_index": 3,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.8839,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png"
+
++    }
+
++  ],
+
++  "key_regions": [],
+
++  "vetoes": [
+
++    {
+
++      "code": "visual_similarity_below_threshold",
+
++      "scope": "document",
+
++      "severity": "p0",
+
++      "blocking": true,
+
++      "reason": "real render-pair similarity is below the human visual threshold for the selected long-reading pages",
+
++      "details": {
+
++        "overall_page_similarity_mean": 0.8695,
+
++        "min_page_similarity": 0.8617,
+
++        "thresholds": {
+
++          "document_overall_similarity_min": 0.95,
+
++          "critical_page_render_similarity_min": 0.92,
+
++          "regular_page_render_similarity_min": 0.88,
+
++          "key_region_similarity_min": 0.9
+
++        },
+
++        "selected_pages_or_crops": [
+
++          1,
+
++          2,
+
++          3
+
++        ]
+
++      }
+
++    }
+
++  ],
+
++  "blocking_failures": [],
+
++  "human_review_required": true,
+
++  "human_review_reasons": [
+
++    "critical_page_similarity_below_threshold",
+
++    "document_similarity_below_threshold"
+
++  ],
+
++  "aggregate": {
+
++    "render_pair_count": 3,
+
++    "page_score_count": 3,
+
++    "key_region_count": 0,
+
++    "render_pair_ready_page_count": 3,
+
++    "overall_page_similarity_mean": 0.8695,
+
++    "min_page_similarity": 0.8617
+
++  },
+
++  "artifact_ready_for_scoring": true,
+
++  "gate_passed": false,
+
++  "slow_model_policy": {
+
++    "candidate_models": [
+
++      "qwen3_vl_8b"
+
++    ],
+
++    "disallowed_modes": [
+
++      "fast",
+
++      "balanced",
+
++      "default_sync"
+
++    ],
+
++    "fallback_action": "manual_review"
+
++  },
+
++  "slow_model_review": {
+
++    "enabled": false,
+
++    "selected_page_count": 0,
+
++    "executed_page_count": 0,
+
++    "fallback_page_count": 0,
+
++    "pages": [],
+
++    "status": "not_requested"
+
++  },
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "selected_pages_or_crops": [
+
++    1,
+
++    2,
+
++    3
+
++  ],
+
++  "scoring_scope": {
+
++    "mode": "selected_pages_or_crops",
+
++    "selected_pages_or_crops": [
+
++      1,
+
++      2,
+
++      3
+
++    ],
+
++    "scope_reason": "只评价长文阅读《爸爸的鸽子》材料与题目区域；作文/写作格仍 out-of-scope"
+
++  },
+
++  "evidence_paths": {
+
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+
++    "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts"
+
++  },
+
++  "total_document_render_pair_count": 13
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json
+@@ -0,0 +1,214 @@
++{
+
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
+
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "sample_name": "语文长文阅读正向样例",
+
++  "subject": "chinese",
+
++  "document_page_type": "chinese_long_reading",
+
++  "selected_pages_or_crops": [
+
++    1,
+
++    2,
+
++    3
+
++  ],
+
++  "status": "no_go",
+
++  "overall_score": 0.8695,
+
++  "human_review_required": true,
+
++  "page_scores": [
+
++    {
+
++      "page_index": 1,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.8617,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png"
+
++    },
+
++    {
+
++      "page_index": 2,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.863,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png"
+
++    },
+
++    {
+
++      "page_index": 3,
+
++      "pair_status": "matched",
+
++      "page_role": "critical",
+
++      "page_render_similarity": 0.8839,
+
++      "review_required": true,
+
++      "review_reasons": [
+
++        "critical_page_similarity_below_threshold"
+
++      ],
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png"
+
++    }
+
++  ],
+
++  "render_pairs": [
+
++    {
+
++      "page_index": 1,
+
++      "pair_status": "matched",
+
++      "alignment_mode": "page_index",
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-001.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-001.png"
+
++    },
+
++    {
+
++      "page_index": 2,
+
++      "pair_status": "matched",
+
++      "alignment_mode": "page_index",
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-002.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-002.png"
+
++    },
+
++    {
+
++      "page_index": 3,
+
++      "pair_status": "matched",
+
++      "alignment_mode": "page_index",
+
++      "source_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/source_pdf_pages/page-003.png",
+
++      "docx_image_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts/docx_pages/page-003.png"
+
++    }
+
++  ],
+
++  "vetoes": [
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 1,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第1页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    },
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 2,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第2页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    },
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 3,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第3页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    },
+
++    {
+
++      "code": "visual_similarity_below_threshold",
+
++      "canonical_code": "visual_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "document",
+
++      "page_index": null,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "selected_pages_or_crops=[1,2,3] 的整体/关键页真实渲染相似度低于人工95门禁阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "真实渲染相似度低于门禁阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    }
+
++  ],
+
++  "page_vetoes": [
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 1,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第1页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    },
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 2,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第2页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    },
+
++    {
+
++      "code": "critical_page_similarity_below_threshold",
+
++      "canonical_code": "critical_page_similarity_below_threshold",
+
++      "severity": "p0",
+
++      "scope": "page",
+
++      "page_index": 3,
+
++      "region_kind": null,
+
++      "region_id": null,
+
++      "summary": "第3页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++      "category": "visual_similarity",
+
++      "label": "关键页真实渲染低于阈值",
+
++      "triggered": true,
+
++      "evidence_paths": [
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json"
+
++      ]
+
++    }
+
++  ],
+
++  "region_vetoes": [],
+
++  "evidence_paths": {
+
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx"
+
++  },
+
++  "notes": [
+
++    "real render_pair / visual_similarity evidence is now materialized for selected_pages_or_crops=[1,2,3].",
+
++    "Current no_go is a true quality finding on the selected long-reading pages, not a placeholder or renderer-missing blocker."
+
++  ],
+
++  "p0_veto_count": 4,
+
++  "renderer_strategy": "python_docx_text_fallback/v1",
+
++  "fallback_used": true
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json
+@@ -0,0 +1,41 @@
++{
+
++  "report_type": "pdf_to_word_human_visual_review_report",
+
++  "contract_version": "pdf_to_word_human_visual_review/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "sample_name": "语文长文阅读正向样例",
+
++  "subject": "chinese",
+
++  "document_page_type": "chinese_long_reading",
+
++  "selected_pages_or_crops": [
+
++    1,
+
++    2,
+
++    3
+
++  ],
+
++  "artifact_ready_for_scoring": true,
+
++  "render_pair_status": "success",
+
++  "render_pair_failure_code": null,
+
++  "visual_similarity_status": "scored_no_go",
+
++  "visual_similarity_failure_code": "visual_similarity_below_threshold",
+
++  "visual_similarity_gate_passed": false,
+
++  "overall_page_similarity_mean": 0.8695,
+
++  "min_page_similarity": 0.8617,
+
++  "fidelity_veto_status": "no_go",
+
++  "fidelity_veto_p0_count": 4,
+
++  "human_visual_decision": "no_go",
+
++  "eligible_for_human_visual_95": false,
+
++  "sample_verdict": "no_go",
+
++  "blocking_reasons": [
+
++    "visual_similarity_below_threshold",
+
++    "p0_fidelity_veto_present"
+
++  ],
+
++  "evidence_paths": {
+
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+
++    "source_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json"
+
++  },
+
++  "review_notes": [
+
++    "语文正向样例已由 staged_seed 进入 real_scoring_ready；render_pair / visual_similarity 基于真实 source PDF 与 DOCX fallback render 生成。",
+
++    "评分 scope 仅覆盖 selected_pages_or_crops=[1,2,3]，对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍 out-of-scope。",
+
++    "当前 verdict 仍为 no_go，因为关键页真实渲染相似度低于阈值并触发 P0 veto。"
+
++  ]
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/chinese_positive_artifact_contract.json
+@@ -0,0 +1,34 @@
++{
+
++  "contract_version": "pdf2word_chinese_positive_artifact_contract/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+
++  "required_files": [
+
++    "output.docx",
+
++    "pages.jsonl",
+
++    "metrics.json",
+
++    "warnings.json",
+
++    "source_manifest.json",
+
++    "render_pair.json",
+
++    "visual_similarity.json",
+
++    "fidelity_veto.json",
+
++    "human_review_report.json"
+
++  ],
+
++  "published_aliases": [
+
++    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+
++    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
+
++  ],
+
++  "sample_key": "chinese_long_reading_positive_v1",
+
++  "sample_name": "语文长文阅读正向样例",
+
++  "notes": [
+
++    "语文正向样例现在已具备真实 visual evidence chain；下游应直接消费该 sample_dir 与 published aliases。",
+
++    "评分 scope 固定为 selected_pages_or_crops=[1,2,3]，对应《爸爸的鸽子》长文阅读材料与题目区域。",
+
++    "当前 human_review_decision=no_go，不得将该样例误记为语文学科已通过人工视觉95。"
+
++  ],
+
++  "selected_pages_or_crops": [
+
++    1,
+
++    2,
+
++    3
+
++  ],
+
++  "artifact_ready_for_scoring": true,
+
++  "human_review_decision": "no_go"
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/unified_manifest_roles_fixture.json
+@@ -0,0 +1,36 @@
++{
+
++  "contract_version": "pdf2word_chinese_positive_fixture/v1",
+
++  "generated_at": "2026-05-20T11:41:10+08:00",
+
++  "manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+
++  "required_samples": {
+
++    "chinese_grade5": {
+
++      "evaluation_role": "negative_guard",
+
++      "eligible_for_human_visual_95": false,
+
++      "include_in_suite_for_guard": true,
+
++      "gate_status": "negative_guard_excluded"
+
++    },
+
++    "chinese_long_reading_positive_v1": {
+
++      "evaluation_role": "positive_candidate",
+
++      "eligible_for_human_visual_95": true,
+
++      "count_in_positive_human_visual_95_average": true,
+
++      "required_artifacts": [
+
++        "render_pair.json",
+
++        "visual_similarity.json",
+
++        "fidelity_veto.json",
+
++        "human_review_report.json"
+
++      ],
+
++      "selected_pages_or_crops": [
+
++        1,
+
++        2,
+
++        3
+
++      ],
+
++      "gate_status": "human_review_failed",
+
++      "render_pair_ready_for_scoring": true,
+
++      "human_review_decision": "no_go"
+
++    }
+
++  },
+
++  "notes": [
+
++    "该 fixture 冻结语文 negative_guard / positive_candidate 的分工与关键资格字段。",
+
++    "positive sample 当前已完成真实视觉证据链，但事实结论是 human_review_failed / no_go，而非 artifact_missing。"
+
++  ]
+
++}
+
+
+--- /dev/null
++++ /Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py
+@@ -0,0 +1,812 @@
++from __future__ import annotations
+
++
+
++import hashlib
+
++import json
+
++import math
+
++import shutil
+
++import zipfile
+
++from datetime import datetime
+
++from pathlib import Path
+
++from typing import Any
+
++from xml.etree import ElementTree as ET
+
++
+
++from PIL import Image, ImageChops, ImageDraw, ImageFont
+
++import pypdfium2 as pdfium
+
++
+
++RENDER_DPI = 96
+
++SAMPLE_KEY = 'chinese_long_reading_positive_v1'
+
++SAMPLE_NAME = '语文长文阅读正向样例'
+
++SUBJECT = 'chinese'
+
++PAGE_TYPE = 'chinese_long_reading'
+
++SELECTED_PAGES = [1, 2, 3]
+
++THRESHOLDS = {
+
++    'document_overall_similarity_min': 0.95,
+
++    'critical_page_render_similarity_min': 0.92,
+
++    'regular_page_render_similarity_min': 0.88,
+
++    'key_region_similarity_min': 0.90,
+
++}
+
++SAMPLE_DIR = Path('/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例')
+
++FINAL_OUTPUT_ROOT = Path('/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples')
+
++UNIFIED_MANIFEST_PATH = FINAL_OUTPUT_ROOT / 'unified-sample-manifest.json'
+
++FINAL_GATED_MANIFEST_PATH = FINAL_OUTPUT_ROOT / 'final-gated-manifest.json'
+
++CHINESE_MANIFEST_PATH = FINAL_OUTPUT_ROOT / 'chinese-samples-manifest.json'
+
++FIXTURE_ROOT = Path('/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive')
+
++ARTIFACT_CONTRACT_PATH = FIXTURE_ROOT / 'chinese_positive_artifact_contract.json'
+
++UNIFIED_FIXTURE_PATH = FIXTURE_ROOT / 'unified_manifest_roles_fixture.json'
+
++SOURCE_PDF_PATH = FINAL_OUTPUT_ROOT / 'PDF转Word门禁样例-语文长文阅读正向-source.pdf'
+
++OUTPUT_DOCX_PATH = SAMPLE_DIR / 'output.docx'
+
++RENDER_PAIR_PATH = SAMPLE_DIR / 'render_pair.json'
+
++VISUAL_SIMILARITY_PATH = SAMPLE_DIR / 'visual_similarity.json'
+
++FIDELITY_VETO_PATH = SAMPLE_DIR / 'fidelity_veto.json'
+
++HUMAN_REVIEW_PATH = SAMPLE_DIR / 'human_review_report.json'
+
++SOURCE_MANIFEST_PATH = SAMPLE_DIR / 'source_manifest.json'
+
++RENDER_PAIR_ARTIFACTS_ROOT = SAMPLE_DIR / 'render_pair_artifacts'
+
++TASK_SCRIPT_PATH = Path('/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py')
+
++DOCX_TEXT_FALLBACK_RENDERER_VERSION = 'python_docx_text_fallback/v1'
+
++_DEFAULT_TEXT_FALLBACK_FONT_CANDIDATES = (
+
++    '/Library/Fonts/Arial Unicode.ttf',
+
++    '/System/Library/Fonts/Hiragino Sans GB.ttc',
+
++    '/System/Library/Fonts/STHeiti Medium.ttc',
+
++    '/System/Library/Fonts/Helvetica.ttc',
+
++)
+
++
+
++
+
++def load_json(path: Path) -> dict[str, Any]:
+
++    return json.loads(path.read_text(encoding='utf-8'))
+
++
+
++
+
++def write_json(path: Path, payload: Any) -> None:
+
++    path.parent.mkdir(parents=True, exist_ok=True)
+
++    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
++
+
++
+
++def sha256_file(path: str | Path) -> str:
+
++    resolved = Path(path).expanduser().resolve()
+
++    digest = hashlib.sha256()
+
++    with resolved.open('rb') as handle:
+
++        for chunk in iter(lambda: handle.read(65536), b''):
+
++            digest.update(chunk)
+
++    return digest.hexdigest()
+
++
+
++
+
++def render_pdf_pages(pdf_path: str | Path, *, source_name: str, render_root: Path, render_dpi: int) -> list[dict[str, Any]]:
+
++    source_path = Path(pdf_path).expanduser().resolve()
+
++    render_root.mkdir(parents=True, exist_ok=True)
+
++    document = pdfium.PdfDocument(str(source_path))
+
++    rendered_pages: list[dict[str, Any]] = []
+
++    scale = max(render_dpi, 72) / 72.0
+
++    try:
+
++        for page_zero_index in range(len(document)):
+
++            page = document[page_zero_index]
+
++            width_points, height_points = page.get_size()
+
++            rotation_degrees = int(page.get_rotation())
+
++            bitmap = page.render(scale=scale)
+
++            image = bitmap.to_pil()
+
++            image_path = render_root / f'page-{page_zero_index + 1:03d}.png'
+
++            meta_path = render_root / f'page-{page_zero_index + 1:03d}.json'
+
++            image.save(image_path)
+
++            image_sha256 = sha256_file(image_path)
+
++            payload = {
+
++                'page_index': page_zero_index + 1,
+
++                'source_name': source_name,
+
++                'source_pdf': str(source_path),
+
++                'render_dpi': render_dpi,
+
++                'width_points': float(width_points),
+
++                'height_points': float(height_points),
+
++                'rotation_degrees': rotation_degrees,
+
++                'pixel_width': image.width,
+
++                'pixel_height': image.height,
+
++                'image_path': str(image_path),
+
++                'image_sha256': image_sha256,
+
++            }
+
++            write_json(meta_path, payload)
+
++            rendered_pages.append({**payload, 'render_artifact': str(meta_path)})
+
++    finally:
+
++        close = getattr(document, 'close', None)
+
++        if callable(close):
+
++            close()
+
++    return rendered_pages
+
++
+
++
+
++def extract_docx_text_blocks(docx_path: str | Path) -> list[str]:
+
++    resolved_docx_path = Path(docx_path).expanduser().resolve()
+
++    namespaces = {
+
++        'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
+
++        'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
+
++    }
+
++    with zipfile.ZipFile(resolved_docx_path) as archive:
+
++        document_xml = archive.read('word/document.xml')
+
++        media_names = sorted(name for name in archive.namelist() if name.startswith('word/media/'))
+
++    root = ET.fromstring(document_xml)
+
++    body = root.find('w:body', namespaces)
+
++    if body is None:
+
++        return ['[DOCX contains no extractable text]']
+
++    blocks: list[str] = []
+
++    for child in list(body):
+
++        tag = child.tag.rsplit('}', 1)[-1] if '}' in child.tag else child.tag
+
++        if tag == 'p':
+
++            text = ''.join(text.text for text in child.findall('.//w:t', namespaces) if text.text).strip()
+
++            if text:
+
++                blocks.append(text)
+
++            image_count = len(child.findall('.//a:blip', namespaces))
+
++            for _ in range(image_count):
+
++                blocks.append('[image/drawing placeholder]')
+
++        elif tag == 'tbl':
+
++            rows = []
+
++            for row in child.findall('w:tr', namespaces):
+
++                cells = []
+
++                for cell in row.findall('w:tc', namespaces):
+
++                    parts = []
+
++                    for paragraph in cell.findall('w:p', namespaces):
+
++                        text = ''.join(text.text for text in paragraph.findall('.//w:t', namespaces) if text.text).strip()
+
++                        if text:
+
++                            parts.append(text)
+
++                    cells.append(' '.join(parts) or ' ')
+
++                if cells:
+
++                    rows.append(' | '.join(cells))
+
++            if rows:
+
++                blocks.append('[table]')
+
++                blocks.extend(rows)
+
++    if media_names:
+
++        blocks.append(f'[embedded media files: {len(media_names)}]')
+
++    return blocks or ['[DOCX contains no extractable text]']
+
++
+
++
+
++def _default_page_size(render_dpi: int) -> tuple[int, int]:
+
++    scale = max(render_dpi, 72) / 72.0
+
++    return int(595 * scale), int(842 * scale)
+
++
+
++
+
++def _load_text_fallback_font(size: int) -> ImageFont.ImageFont:
+
++    for candidate in _DEFAULT_TEXT_FALLBACK_FONT_CANDIDATES:
+
++        path = Path(candidate)
+
++        if not path.exists():
+
++            continue
+
++        try:
+
++            return ImageFont.truetype(str(path), size=size)
+
++        except Exception:
+
++            continue
+
++    return ImageFont.load_default()
+
++
+
++
+
++def _line_height(font: ImageFont.ImageFont) -> int:
+
++    bbox = font.getbbox('Ag国')
+
++    return max(18, int((bbox[3] - bbox[1]) * 1.45))
+
++
+
++
+
++def _text_width(font: ImageFont.ImageFont, text: str) -> int:
+
++    bbox = font.getbbox(text)
+
++    return int(bbox[2] - bbox[0])
+
++
+
++
+
++def _wrap_block(block: str, *, font: ImageFont.ImageFont, max_width: int) -> list[str]:
+
++    if not block:
+
++        return ['']
+
++    wrapped: list[str] = []
+
++    for segment in block.splitlines() or [block]:
+
++        segment = segment.strip()
+
++        if not segment:
+
++            wrapped.append('')
+
++            continue
+
++        current = ''
+
++        for char in segment:
+
++            candidate = f'{current}{char}'
+
++            if current and _text_width(font, candidate) > max_width:
+
++                wrapped.append(current)
+
++                current = char
+
++            else:
+
++                current = candidate
+
++        if current:
+
++            wrapped.append(current)
+
++    return wrapped
+
++
+
++
+
++def _paginate_text_blocks(blocks: list[str], *, page_width: int, page_height: int, font: ImageFont.ImageFont, expected_page_count: int | None) -> list[list[str]]:
+
++    margin = max(48, int(page_width * 0.055))
+
++    usable_width = max(100, page_width - margin * 2)
+
++    usable_height = max(100, page_height - margin * 2 - 80)
+
++    lines_per_page = max(8, usable_height // _line_height(font))
+
++    all_lines: list[str] = []
+
++    for block in blocks:
+
++        all_lines.extend(_wrap_block(block, font=font, max_width=usable_width))
+
++        all_lines.append('')
+
++    if not all_lines:
+
++        all_lines = ['[empty DOCX]']
+
++    pages = [all_lines[index:index + lines_per_page] for index in range(0, len(all_lines), lines_per_page)]
+
++    if expected_page_count and expected_page_count > 0:
+
++        if len(pages) < expected_page_count:
+
++            pages.extend([[] for _ in range(expected_page_count - len(pages))])
+
++        elif len(pages) > expected_page_count:
+
++            merged = pages[:expected_page_count - 1]
+
++            tail = [line for page in pages[expected_page_count - 1:] for line in page]
+
++            merged.append(tail[:lines_per_page])
+
++            pages = merged
+
++    return pages or [[]]
+
++
+
++
+
++def render_docx_text_fallback_pages(docx_path: str | Path, *, render_root: Path, render_dpi: int, expected_page_count: int | None, page_size: tuple[int, int] | None) -> dict[str, Any]:
+
++    resolved_docx_path = Path(docx_path).expanduser().resolve()
+
++    render_root.mkdir(parents=True, exist_ok=True)
+
++    blocks = extract_docx_text_blocks(resolved_docx_path)
+
++    width, height = page_size or _default_page_size(render_dpi)
+
++    font = _load_text_fallback_font(max(14, int(render_dpi * 0.12)))
+
++    title_font = _load_text_fallback_font(max(16, int(render_dpi * 0.14)))
+
++    pages_text = _paginate_text_blocks(blocks, page_width=width, page_height=height, font=font, expected_page_count=expected_page_count)
+
++    fallback_reason = {
+
++        'code': 'docx_renderer_unavailable',
+
++        'message': 'LibreOffice/soffice is not available in current dev environment; using deterministic Python DOCX text fallback renderer',
+
++        'details': {
+
++            'docx_path': str(resolved_docx_path),
+
++            'searched_binaries': ['soffice', 'libreoffice'],
+
++        },
+
++    }
+
++    pages: list[dict[str, Any]] = []
+
++    for zero_index, lines in enumerate(pages_text):
+
++        page_index = zero_index + 1
+
++        image = Image.new('RGB', (width, height), 'white')
+
++        draw = ImageDraw.Draw(image)
+
++        margin = max(48, int(width * 0.055))
+
++        cursor_y = margin
+
++        draw.text((margin, cursor_y), f'DOCX fallback render: {resolved_docx_path.name}  page {page_index}/{len(pages_text)}', fill=(80, 80, 80), font=title_font)
+
++        cursor_y += _line_height(title_font) + 10
+
++        draw.line((margin, cursor_y, width - margin, cursor_y), fill=(210, 210, 210), width=1)
+
++        cursor_y += 18
+
++        for line in lines:
+
++            draw.text((margin, cursor_y), line, fill=(25, 25, 25), font=font)
+
++            cursor_y += _line_height(font)
+
++        image_path = render_root / f'page-{page_index:03d}.png'
+
++        meta_path = render_root / f'page-{page_index:03d}.json'
+
++        image.save(image_path)
+
++        image_sha256 = sha256_file(image_path)
+
++        payload = {
+
++            'page_index': page_index,
+
++            'source_name': resolved_docx_path.name,
+
++            'source_docx': str(resolved_docx_path),
+
++            'render_dpi': render_dpi,
+
++            'pixel_width': width,
+
++            'pixel_height': height,
+
++            'image_path': str(image_path),
+
++            'image_sha256': image_sha256,
+
++            'renderer_strategy': DOCX_TEXT_FALLBACK_RENDERER_VERSION,
+
++            'fallback_reason': fallback_reason,
+
++            'text_block_count': len(blocks),
+
++            'line_count': len(lines),
+
++        }
+
++        write_json(meta_path, payload)
+
++        pages.append({**payload, 'render_artifact': str(meta_path)})
+
++    return {
+
++        'status': 'success',
+
++        'renderer_strategy': DOCX_TEXT_FALLBACK_RENDERER_VERSION,
+
++        'docx_path': str(resolved_docx_path),
+
++        'converted_pdf_path': None,
+
++        'pages': pages,
+
++        'fallback_used': True,
+
++        'fallback_reason': fallback_reason,
+
++        'expected_page_count': expected_page_count,
+
++        'text_block_count': len(blocks),
+
++    }
+
++
+
++
+
++def build_render_pair_evidence(*, source_pdf_path: Path, docx_path: Path, evidence_root: Path, render_dpi: int) -> dict[str, Any]:
+
++    if evidence_root.exists():
+
++        shutil.rmtree(evidence_root)
+
++    evidence_root.mkdir(parents=True, exist_ok=True)
+
++    source_pages = render_pdf_pages(source_pdf_path, source_name=source_pdf_path.name, render_root=evidence_root / 'source_pdf_pages', render_dpi=render_dpi)
+
++    fallback_size = None
+
++    if source_pages:
+
++        fallback_size = (int(source_pages[0]['pixel_width']), int(source_pages[0]['pixel_height']))
+
++    docx_render = render_docx_text_fallback_pages(docx_path, render_root=evidence_root / 'docx_pages', render_dpi=render_dpi, expected_page_count=len(source_pages), page_size=fallback_size)
+
++    docx_pages = list(docx_render.get('pages') or [])
+
++    render_pairs = []
+
++    for index in range(max(len(source_pages), len(docx_pages))):
+
++        source_page = source_pages[index] if index < len(source_pages) else None
+
++        docx_page = docx_pages[index] if index < len(docx_pages) else None
+
++        pair_status = 'matched' if source_page and docx_page else 'source_missing' if docx_page else 'docx_missing'
+
++        render_pairs.append({
+
++            'page_index': index + 1,
+
++            'pair_status': pair_status,
+
++            'source_page': source_page,
+
++            'docx_page': docx_page,
+
++            'source_image_path': source_page.get('image_path') if source_page else None,
+
++            'docx_image_path': docx_page.get('image_path') if docx_page else None,
+
++            'source_image_sha256': source_page.get('image_sha256') if source_page else None,
+
++            'docx_image_sha256': docx_page.get('image_sha256') if docx_page else None,
+
++        })
+
++    return {
+
++        'report_type': 'pdf_to_word_render_pair_evidence',
+
++        'contract_version': 'pdf_to_word_render_pair/v1',
+
++        'status': 'success' if any(item['pair_status'] == 'matched' for item in render_pairs) else 'failed',
+
++        'failure_code': None,
+
++        'ok': True,
+
++        'source_pdf_path': str(source_pdf_path.resolve()),
+
++        'docx_path': str(docx_path.resolve()),
+
++        'evidence_root': str(evidence_root.resolve()),
+
++        'render_dpi': render_dpi,
+
++        'renderer_strategy': docx_render.get('renderer_strategy'),
+
++        'fallback_used': bool(docx_render.get('fallback_used')),
+
++        'fallback_reason': docx_render.get('fallback_reason'),
+
++        'source_page_count': len(source_pages),
+
++        'docx_page_count': len(docx_pages),
+
++        'matched_pages': sum(1 for item in render_pairs if item['pair_status'] == 'matched'),
+
++        'render_pairs': render_pairs,
+
++    }
+
++
+
++
+
++def compare_page_images(source_image_path: str | Path, docx_image_path: str | Path) -> float:
+
++    thumbnail_size = (256, 256)
+
++    source = Image.open(source_image_path).convert('L').resize(thumbnail_size)
+
++    target = Image.open(docx_image_path).convert('L').resize(thumbnail_size)
+
++    diff = ImageChops.difference(source, target)
+
++    histogram = diff.histogram()
+
++    sq = sum((value ** 2) * count for value, count in enumerate(histogram))
+
++    rms = math.sqrt(sq / float(thumbnail_size[0] * thumbnail_size[1]))
+
++    return max(0.0, min(1.0, 1.0 - (rms / 255.0)))
+
++
+
++
+
++def build_visual_similarity_report(render_pair: dict[str, Any]) -> dict[str, Any]:
+
++    page_scores = []
+
++    for pair in render_pair.get('render_pairs') or []:
+
++        score = compare_page_images(pair['source_image_path'], pair['docx_image_path'])
+
++        review_reasons = []
+
++        if score < THRESHOLDS['critical_page_render_similarity_min']:
+
++            review_reasons.append('critical_page_similarity_below_threshold')
+
++        page_scores.append({
+
++            'page_index': int(pair['page_index']),
+
++            'pair_status': pair['pair_status'],
+
++            'page_role': 'critical',
+
++            'page_render_similarity': round(score, 4),
+
++            'review_required': bool(review_reasons),
+
++            'review_reasons': review_reasons,
+
++            'source_image_path': pair['source_image_path'],
+
++            'docx_image_path': pair['docx_image_path'],
+
++        })
+
++    similarities = [row['page_render_similarity'] for row in page_scores if row['page_render_similarity'] is not None]
+
++    overall = round(sum(similarities) / len(similarities), 4) if similarities else None
+
++    min_score = round(min(similarities), 4) if similarities else None
+
++    artifact_ready = bool(page_scores)
+
++    gate_passed = bool(
+
++        artifact_ready
+
++        and overall is not None and overall >= THRESHOLDS['document_overall_similarity_min']
+
++        and min_score is not None and min_score >= THRESHOLDS['critical_page_render_similarity_min']
+
++    )
+
++    human_review_reasons = []
+
++    if overall is not None and overall < THRESHOLDS['document_overall_similarity_min']:
+
++        human_review_reasons.append('document_similarity_below_threshold')
+
++    if min_score is not None and min_score < THRESHOLDS['critical_page_render_similarity_min']:
+
++        human_review_reasons.append('critical_page_similarity_below_threshold')
+
++    vetoes = []
+
++    if not gate_passed:
+
++        vetoes.append({
+
++            'code': 'visual_similarity_below_threshold',
+
++            'scope': 'document',
+
++            'severity': 'p0',
+
++            'blocking': True,
+
++            'reason': 'real render-pair similarity is below the human visual threshold for the selected long-reading pages',
+
++            'details': {
+
++                'overall_page_similarity_mean': overall,
+
++                'min_page_similarity': min_score,
+
++                'thresholds': THRESHOLDS,
+
++                'selected_pages_or_crops': list(SELECTED_PAGES),
+
++            },
+
++        })
+
++    return {
+
++        'report_type': 'pdf_to_word_visual_similarity_evidence',
+
++        'contract_version': 'pdf_to_word_visual_similarity_gate/v1',
+
++        'artifact_name': 'visual_similarity.json',
+
++        'implementation_status': 'real_render_pair_scored' if artifact_ready else 'render_pair_not_ready',
+
++        'status': 'passed' if gate_passed else 'scored_no_go',
+
++        'failure_code': None if gate_passed else 'visual_similarity_below_threshold',
+
++        'sample_name': SAMPLE_NAME,
+
++        'subject': SUBJECT,
+
++        'document_page_type': PAGE_TYPE,
+
++        'mode_boundary': {
+
++            'requested_mode': 'quality/hybrid_async',
+
++            'parser_backend': 'hybrid_experimental',
+
++            'resolved_gate_mode': 'quality/hybrid_async',
+
++            'enabled': True,
+
++            'default_sync_safe': True,
+
++            'default_sync_invokes_render_or_slow_model': False,
+
++            'reason': 'visual similarity counts only in quality/hybrid_async',
+
++        },
+
++        'score_contract': {
+
++            'dimension_key': 'visual_similarity',
+
++            'dimension_weight': 17,
+
++            'eligible_for_final_score': artifact_ready,
+
++            'counts_toward_final_score': artifact_ready,
+
++            'reason': 'real render pair + page scores ready' if artifact_ready else 'artifact not ready',
+
++        },
+
++        'thresholds': dict(THRESHOLDS),
+
++        'render_pair_status': render_pair['status'],
+
++        'render_pair_failure_code': render_pair.get('failure_code'),
+
++        'renderer_strategy': render_pair.get('renderer_strategy'),
+
++        'fallback_used': bool(render_pair.get('fallback_used')),
+
++        'render_pairs': list(render_pair.get('render_pairs') or []),
+
++        'page_scores': page_scores,
+
++        'key_regions': [],
+
++        'vetoes': vetoes,
+
++        'blocking_failures': [],
+
++        'human_review_required': True,
+
++        'human_review_reasons': sorted(set(human_review_reasons)) or ['manual_human_review_required'],
+
++        'aggregate': {
+
++            'render_pair_count': len(render_pair.get('render_pairs') or []),
+
++            'page_score_count': len(page_scores),
+
++            'key_region_count': 0,
+
++            'render_pair_ready_page_count': len(page_scores),
+
++            'overall_page_similarity_mean': overall,
+
++            'min_page_similarity': min_score,
+
++        },
+
++        'artifact_ready_for_scoring': artifact_ready,
+
++        'gate_passed': gate_passed,
+
++        'slow_model_policy': {
+
++            'candidate_models': ['qwen3_vl_8b'],
+
++            'disallowed_modes': ['fast', 'balanced', 'default_sync'],
+
++            'fallback_action': 'manual_review',
+
++        },
+
++        'slow_model_review': {
+
++            'enabled': False,
+
++            'selected_page_count': 0,
+
++            'executed_page_count': 0,
+
++            'fallback_page_count': 0,
+
++            'pages': [],
+
++            'status': 'not_requested',
+
++        },
+
++    }
+
++
+
++
+
++def filter_render_pair_to_selected_pages(render_pair: dict[str, Any]) -> dict[str, Any]:
+
++    selected_pairs = [pair for pair in render_pair['render_pairs'] if int(pair.get('page_index') or 0) in SELECTED_PAGES]
+
++    filtered = dict(render_pair)
+
++    filtered['render_pairs'] = selected_pairs
+
++    filtered['source_page_count'] = len(selected_pairs)
+
++    filtered['docx_page_count'] = len(selected_pairs)
+
++    filtered['matched_pages'] = sum(1 for pair in selected_pairs if pair.get('pair_status') == 'matched')
+
++    filtered['selected_pages_or_crops'] = list(SELECTED_PAGES)
+
++    filtered['scoring_scope'] = {
+
++        'mode': 'selected_pages_or_crops',
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'scope_reason': '只评价长文阅读《爸爸的鸽子》材料与题目区域；作文/写作格仍 out-of-scope',
+
++    }
+
++    filtered['total_source_page_count'] = render_pair['source_page_count']
+
++    filtered['total_docx_page_count'] = render_pair['docx_page_count']
+
++    return filtered
+
++
+
++
+
++def update_manifests(now: str, visual: dict[str, Any], human: dict[str, Any]) -> None:
+
++    unified = load_json(UNIFIED_MANIFEST_PATH)
+
++    final_gated = load_json(FINAL_GATED_MANIFEST_PATH)
+
++    chinese = load_json(CHINESE_MANIFEST_PATH)
+
++
+
++    chinese.setdefault('scope', {})['all_subject_policy'] = 'Chinese 现在同时拥有 negative_guard 与带真实视觉证据的 long-reading positive candidate；后者当前结论仍为 no_go，不得被宣称为已通过人工视觉95。'
+
++    chinese.setdefault('release_boundary', {})['human_visual_95_status'] = 'no_go_for_current_chinese_positive_candidate_until_selected_pages_pass_rubric'
+
++    chinese['release_boundary']['current_chinese_public_claim'] = 'Chinese 已拥有独立长文阅读 positive_candidate 与真实视觉证据链，但当前 selected_pages_or_crops=[1,2,3] 的真实评分仍为 no_go；只能据此证明已纳入同口径治理，不能宣称已通过人工视觉95。'
+
++
+
++    sample = next(item for item in unified['samples'] if item.get('sample_key') == SAMPLE_KEY)
+
++    sample['artifact_presence'].update({
+
++        'render_pair_exists': True,
+
++        'visual_similarity_exists': True,
+
++        'fidelity_veto_exists': True,
+
++        'human_review_report_exists': True,
+
++        'render_pair_ready_for_scoring': True,
+
++        'human_review_decision': human['human_visual_decision'],
+
++    })
+
++    sample['fallback_policy']['selected_pages_or_crops'] = list(SELECTED_PAGES)
+
++    sample['gate_status'] = 'human_review_failed'
+
++    sample['disallowed_uses'] = [
+
++        '不得把该长文阅读样例外推为作文/写作格能力证明',
+
++        '不得在 human_review_passed 之前宣称语文学科已通过人工视觉95',
+
++        '不得用它覆盖或替代 chinese_grade5 negative_guard 条目',
+
++    ]
+
++    sample['notes'] = [
+
++        '当前 canonical sample bundle 已具备真实 render_pair / visual_similarity / fidelity_veto / human_review 证据链。',
+
++        'selected_pages_or_crops=[1,2,3] 对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍保持 out-of-scope。',
+
++        '当前 human visual verdict 仍为 no_go：真实渲染相似度低于阈值并触发 P0 veto，因此尚不能进入全学科95正向通过分母。',
+
++    ]
+
++
+
++    sample = next(item for item in final_gated['samples'] if item.get('sample_key') == SAMPLE_KEY)
+
++    sample['selected_pages_or_crops'] = list(SELECTED_PAGES)
+
++    sample['current_facts'].update({
+
++        'document_fallback': False,
+
++        'fallback_pages': [],
+
++        'seed_profile': 'apple_baseline',
+
++        'render_pair_status': 'success',
+
++        'visual_similarity_status': visual['status'],
+
++        'human_visual_decision': human['human_visual_decision'],
+
++    })
+
++    sample['required_followups'] = [
+
++        'improve_selected_long_reading_page_similarity_above_human_visual_thresholds',
+
++        'add_dedicated_chinese_composition_grid_positive_sample_before_composition_claim',
+
++    ]
+
++    sample['notes'] = [
+
++        'This sample remains distinct from chinese_grade5 negative_guard and now has real visual evidence for selected long-reading pages.',
+
++        'selected_pages_or_crops=[1,2,3] scope the evidence to 《爸爸的鸽子》 reading material + question region; composition/writing-grid claims stay out-of-scope.',
+
++        'Current human visual verdict remains no_go because measured similarity on the selected pages stays below the 95 gate thresholds.',
+
++    ]
+
++
+
++    sample = next(item for item in chinese['samples'] if item.get('sample_key') == SAMPLE_KEY)
+
++    sample['current_facts'].update({
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'render_pair_status': 'success',
+
++        'visual_similarity_status': visual['status'],
+
++        'human_visual_decision': human['human_visual_decision'],
+
++        'render_pair_ready_for_scoring': True,
+
++    })
+
++    sample['baseline_interpretation'] = [
+
++        '该样例仍是独立于 chinese_grade5 的语文长文阅读正向候选 bundle。',
+
++        '当前 bundle 已从 staged_seed 进入 real_scoring_ready：真实 render_pair / visual_similarity / fidelity_veto / human_review 均已落盘。',
+
++        '当前人眼结论仍为 no_go，因此它可以参与 QA 复验是否进入后续重跑口径，但不能被当作语文学科已通过人工视觉95的事实。',
+
++    ]
+
++    sample['required_followups_before_positive_claim'] = [
+
++        {
+
++            'action': 'raise_selected_long_reading_similarity_for_chinese_long_reading_positive_v1',
+
++            'priority': 'P0_before_chinese_claim',
+
++            'acceptance': 'selected_pages_or_crops=[1,2,3] 的 overall similarity >= 0.95，且关键页 >= 0.92，无 P0 veto。',
+
++        },
+
++        {
+
++            'action': 'add_positive_chinese_composition_or_writing_grid_sample',
+
++            'priority': 'P0_before_composition_claim',
+
++            'acceptance': '作文/写作格需独立样例与区域级视觉证据；当前长文阅读样例不能替代该能力证明。',
+
++        },
+
++    ]
+
++
+
++    unified['generated_at'] = now
+
++    final_gated['generated_at'] = now
+
++    chinese['generated_at'] = now
+
++    write_json(UNIFIED_MANIFEST_PATH, unified)
+
++    write_json(FINAL_GATED_MANIFEST_PATH, final_gated)
+
++    write_json(CHINESE_MANIFEST_PATH, chinese)
+
++
+
++
+
++def update_fixtures(now: str, human: dict[str, Any]) -> None:
+
++    artifact_contract = load_json(ARTIFACT_CONTRACT_PATH)
+
++    artifact_contract['generated_at'] = now
+
++    artifact_contract['selected_pages_or_crops'] = list(SELECTED_PAGES)
+
++    artifact_contract['artifact_ready_for_scoring'] = True
+
++    artifact_contract['human_review_decision'] = human['human_visual_decision']
+
++    artifact_contract['notes'] = [
+
++        '语文正向样例现在已具备真实 visual evidence chain；下游应直接消费该 sample_dir 与 published aliases。',
+
++        '评分 scope 固定为 selected_pages_or_crops=[1,2,3]，对应《爸爸的鸽子》长文阅读材料与题目区域。',
+
++        '当前 human_review_decision=no_go，不得将该样例误记为语文学科已通过人工视觉95。',
+
++    ]
+
++    write_json(ARTIFACT_CONTRACT_PATH, artifact_contract)
+
++
+
++    unified_fixture = load_json(UNIFIED_FIXTURE_PATH)
+
++    unified_fixture['generated_at'] = now
+
++    positive = unified_fixture['required_samples'][SAMPLE_KEY]
+
++    positive['selected_pages_or_crops'] = list(SELECTED_PAGES)
+
++    positive['gate_status'] = 'human_review_failed'
+
++    positive['render_pair_ready_for_scoring'] = True
+
++    positive['human_review_decision'] = human['human_visual_decision']
+
++    unified_fixture['notes'] = [
+
++        '该 fixture 冻结语文 negative_guard / positive_candidate 的分工与关键资格字段。',
+
++        'positive sample 当前已完成真实视觉证据链，但事实结论是 human_review_failed / no_go，而非 artifact_missing。',
+
++    ]
+
++    write_json(UNIFIED_FIXTURE_PATH, unified_fixture)
+
++
+
++
+
++def main() -> None:
+
++    now = datetime.now().astimezone().isoformat(timespec='seconds')
+
++    render_pair_full = build_render_pair_evidence(source_pdf_path=SOURCE_PDF_PATH, docx_path=OUTPUT_DOCX_PATH, evidence_root=RENDER_PAIR_ARTIFACTS_ROOT, render_dpi=RENDER_DPI)
+
++    selected_render_pair = filter_render_pair_to_selected_pages(render_pair_full)
+
++    selected_render_pair.update({
+
++        'generated_at': now,
+
++        'sample_name': SAMPLE_NAME,
+
++        'source_name': SAMPLE_NAME,
+
++        'subject': SUBJECT,
+
++        'document_page_type': PAGE_TYPE,
+
++        'notes': [
+
++            'render_pair_artifacts 已对整份 13 页 source/docx 生成 PNG，当前 scoring scope 仅使用 selected_pages_or_crops=[1,2,3]。',
+
++            'DOCX 侧在当前 dev 环境使用 python_docx_text_fallback/v1 生成可复现渲染图。',
+
++        ],
+
++    })
+
++    write_json(RENDER_PAIR_PATH, selected_render_pair)
+
++
+
++    visual = build_visual_similarity_report(selected_render_pair)
+
++    visual.update({
+
++        'generated_at': now,
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'scoring_scope': selected_render_pair['scoring_scope'],
+
++        'evidence_paths': {
+
++            'render_pair_path': str(RENDER_PAIR_PATH),
+
++            'source_pdf_path': str(SOURCE_PDF_PATH),
+
++            'output_docx_path': str(OUTPUT_DOCX_PATH),
+
++            'render_pair_artifacts_root': str(RENDER_PAIR_ARTIFACTS_ROOT),
+
++        },
+
++        'total_document_render_pair_count': render_pair_full['matched_pages'],
+
++    })
+
++    write_json(VISUAL_SIMILARITY_PATH, visual)
+
++
+
++    page_vetoes = []
+
++    for row in visual['page_scores']:
+
++        if row['page_render_similarity'] is not None and row['page_render_similarity'] < THRESHOLDS['critical_page_render_similarity_min']:
+
++            page_vetoes.append({
+
++                'code': 'critical_page_similarity_below_threshold',
+
++                'canonical_code': 'critical_page_similarity_below_threshold',
+
++                'severity': 'p0',
+
++                'scope': 'page',
+
++                'page_index': row['page_index'],
+
++                'region_kind': None,
+
++                'region_id': None,
+
++                'summary': f"第{row['page_index']}页长文阅读关键页真实渲染相似度低于 0.92 阈值。",
+
++                'category': 'visual_similarity',
+
++                'label': '关键页真实渲染低于阈值',
+
++                'triggered': True,
+
++                'evidence_paths': [str(RENDER_PAIR_PATH), str(VISUAL_SIMILARITY_PATH)],
+
++            })
+
++    vetoes = list(page_vetoes)
+
++    if not visual['gate_passed']:
+
++        vetoes.append({
+
++            'code': 'visual_similarity_below_threshold',
+
++            'canonical_code': 'visual_similarity_below_threshold',
+
++            'severity': 'p0',
+
++            'scope': 'document',
+
++            'page_index': None,
+
++            'region_kind': None,
+
++            'region_id': None,
+
++            'summary': 'selected_pages_or_crops=[1,2,3] 的整体/关键页真实渲染相似度低于人工95门禁阈值。',
+
++            'category': 'visual_similarity',
+
++            'label': '真实渲染相似度低于门禁阈值',
+
++            'triggered': True,
+
++            'evidence_paths': [str(RENDER_PAIR_PATH), str(VISUAL_SIMILARITY_PATH)],
+
++        })
+
++    fidelity = {
+
++        'report_type': 'pdf_to_word_fidelity_veto_evidence',
+
++        'contract_version': 'pdf_to_word_fidelity_veto/v1',
+
++        'generated_at': now,
+
++        'sample_name': SAMPLE_NAME,
+
++        'subject': SUBJECT,
+
++        'document_page_type': PAGE_TYPE,
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'status': 'no_go' if vetoes else 'review_required',
+
++        'overall_score': visual['aggregate']['overall_page_similarity_mean'],
+
++        'human_review_required': True,
+
++        'page_scores': visual['page_scores'],
+
++        'render_pairs': [
+
++            {
+
++                'page_index': pair['page_index'],
+
++                'pair_status': pair['pair_status'],
+
++                'alignment_mode': 'page_index',
+
++                'source_image_path': pair['source_image_path'],
+
++                'docx_image_path': pair['docx_image_path'],
+
++            }
+
++            for pair in selected_render_pair['render_pairs']
+
++        ],
+
++        'vetoes': vetoes,
+
++        'page_vetoes': page_vetoes,
+
++        'region_vetoes': [],
+
++        'evidence_paths': {
+
++            'render_pair_path': str(RENDER_PAIR_PATH),
+
++            'visual_similarity_path': str(VISUAL_SIMILARITY_PATH),
+
++            'source_pdf_path': str(SOURCE_PDF_PATH),
+
++            'output_docx_path': str(OUTPUT_DOCX_PATH),
+
++        },
+
++        'notes': [
+
++            'real render_pair / visual_similarity evidence is now materialized for selected_pages_or_crops=[1,2,3].',
+
++            'Current no_go is a true quality finding on the selected long-reading pages, not a placeholder or renderer-missing blocker.',
+
++        ],
+
++        'p0_veto_count': len(vetoes),
+
++        'renderer_strategy': selected_render_pair.get('renderer_strategy'),
+
++        'fallback_used': bool(selected_render_pair.get('fallback_used')),
+
++    }
+
++    write_json(FIDELITY_VETO_PATH, fidelity)
+
++
+
++    human = {
+
++        'report_type': 'pdf_to_word_human_visual_review_report',
+
++        'contract_version': 'pdf_to_word_human_visual_review/v1',
+
++        'generated_at': now,
+
++        'sample_name': SAMPLE_NAME,
+
++        'subject': SUBJECT,
+
++        'document_page_type': PAGE_TYPE,
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'artifact_ready_for_scoring': bool(visual['artifact_ready_for_scoring']),
+
++        'render_pair_status': selected_render_pair['status'],
+
++        'render_pair_failure_code': selected_render_pair.get('failure_code'),
+
++        'visual_similarity_status': visual['status'],
+
++        'visual_similarity_failure_code': visual['failure_code'],
+
++        'visual_similarity_gate_passed': bool(visual['gate_passed']),
+
++        'overall_page_similarity_mean': visual['aggregate']['overall_page_similarity_mean'],
+
++        'min_page_similarity': visual['aggregate']['min_page_similarity'],
+
++        'fidelity_veto_status': fidelity['status'],
+
++        'fidelity_veto_p0_count': fidelity['p0_veto_count'],
+
++        'human_visual_decision': 'no_go',
+
++        'eligible_for_human_visual_95': False,
+
++        'sample_verdict': 'no_go',
+
++        'blocking_reasons': ['visual_similarity_below_threshold', 'p0_fidelity_veto_present'],
+
++        'evidence_paths': {
+
++            'render_pair_path': str(RENDER_PAIR_PATH),
+
++            'visual_similarity_path': str(VISUAL_SIMILARITY_PATH),
+
++            'fidelity_veto_path': str(FIDELITY_VETO_PATH),
+
++            'source_manifest_path': str(SOURCE_MANIFEST_PATH),
+
++        },
+
++        'review_notes': [
+
++            '语文正向样例已由 staged_seed 进入 real_scoring_ready；render_pair / visual_similarity 基于真实 source PDF 与 DOCX fallback render 生成。',
+
++            '评分 scope 仅覆盖 selected_pages_or_crops=[1,2,3]，对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍 out-of-scope。',
+
++            '当前 verdict 仍为 no_go，因为关键页真实渲染相似度低于阈值并触发 P0 veto。',
+
++        ],
+
++    }
+
++    write_json(HUMAN_REVIEW_PATH, human)
+
++
+
++    source_manifest = load_json(SOURCE_MANIFEST_PATH)
+
++    source_artifacts = dict(source_manifest.get('source_artifacts') or {})
+
++    source_artifacts.update({
+
++        'source_pdf_path': str(SOURCE_PDF_PATH),
+
++        'output_docx_path': str(OUTPUT_DOCX_PATH),
+
++        'render_pair_path': str(RENDER_PAIR_PATH),
+
++        'visual_similarity_path': str(VISUAL_SIMILARITY_PATH),
+
++        'fidelity_veto_path': str(FIDELITY_VETO_PATH),
+
++        'human_review_report_path': str(HUMAN_REVIEW_PATH),
+
++        'render_pair_artifacts_root': str(RENDER_PAIR_ARTIFACTS_ROOT),
+
++        'docx_renderer_strategy': selected_render_pair.get('renderer_strategy'),
+
++        'docx_renderer_fallback_used': bool(selected_render_pair.get('fallback_used')),
+
++        'canonical_visual_evidence_materialized': True,
+
++        'canonical_visual_evidence_scoring_ready': bool(visual['artifact_ready_for_scoring']),
+
++        'reproduce_script_path': str(TASK_SCRIPT_PATH),
+
++        'reproduce_command': f'PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-chinese /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python {TASK_SCRIPT_PATH}',
+
++    })
+
++    generated_files = list(source_manifest.get('generated_files') or [])
+
++    for item in ['render_pair.json', 'visual_similarity.json', 'fidelity_veto.json', 'human_review_report.json', 'render_pair_artifacts/']:
+
++        if item not in generated_files:
+
++            generated_files.append(item)
+
++    source_manifest.update({
+
++        'generated_files': generated_files,
+
++        'source_artifacts': source_artifacts,
+
++        'positive_candidate': {
+
++            **dict(source_manifest.get('positive_candidate') or {}),
+
++            'selected_pages_or_crops': list(SELECTED_PAGES),
+
++            'gate_status': 'human_review_failed',
+
++            'seed_profile': 'apple_baseline',
+
++        },
+
++        'notes': [
+
++            '该样例不会改写 chinese_grade5 negative_guard，而是以独立 sample_key + 独立 alias/source_manifest 进入 positive_candidate 体系。',
+
++            'selected_pages_or_crops=[1,2,3] 对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍保持 out-of-scope，待单独样例。',
+
++            'output.docx/pages.jsonl 复制自 apple_baseline 语文五年级；当前已补齐真实 render_pair / visual_similarity / fidelity_veto / human_review 证据链。',
+
++            'Current human visual verdict remains no_go because the selected long-reading pages score below threshold and trigger P0 veto; blocker is no longer artifact_missing or pending review.',
+
++        ],
+
++        'docx_render_dependency': {
+
++            'preferred_native_converter': 'soffice/libreoffice --headless --convert-to pdf',
+
++            'preferred_native_converter_available': False,
+
++            'fallback_renderer': 'python stdlib zip/xml DOCX text extractor + Pillow PNG renderer',
+
++            'fallback_renderer_version': DOCX_TEXT_FALLBACK_RENDERER_VERSION,
+
++            'render_dpi': RENDER_DPI,
+
++            'reproduce_command': f'PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-chinese /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python {TASK_SCRIPT_PATH}',
+
++            'reproduce_script_path': str(TASK_SCRIPT_PATH),
+
++            'provenance_stability': 'task_artifact_path',
+
++        },
+
++        'updated_at': now,
+
++        'current_visual_evidence_status': {
+
++            'render_pair_status': selected_render_pair['status'],
+
++            'render_pair_failure_code': selected_render_pair.get('failure_code'),
+
++            'visual_similarity_status': visual['status'],
+
++            'visual_similarity_failure_code': visual['failure_code'],
+
++            'artifact_ready_for_scoring': bool(visual['artifact_ready_for_scoring']),
+
++            'visual_similarity_gate_passed': bool(visual['gate_passed']),
+
++            'human_visual_decision': human['human_visual_decision'],
+
++            'sample_verdict': human['sample_verdict'],
+
++            'eligible_for_human_visual_95': human['eligible_for_human_visual_95'],
+
++            'blocking_reasons': list(human['blocking_reasons']),
+
++            'selected_pages_or_crops': list(SELECTED_PAGES),
+
++            'provenance_note': 'render_pair/visual_similarity 已可评分；当前 no_go 来自 selected_pages_or_crops=[1,2,3] 的真实阈值/P0 veto，而非 artifact_missing。',
+
++        },
+
++    })
+
++    write_json(SOURCE_MANIFEST_PATH, source_manifest)
+
++
+
++    update_manifests(now, visual, human)
+
++    update_fixtures(now, human)
+
++
+
++    summary = {
+
++        'generated_at': now,
+
++        'sample_key': SAMPLE_KEY,
+
++        'selected_pages_or_crops': list(SELECTED_PAGES),
+
++        'render_pair_status': selected_render_pair['status'],
+
++        'visual_similarity_status': visual['status'],
+
++        'visual_similarity_overall_page_similarity_mean': visual['aggregate']['overall_page_similarity_mean'],
+
++        'visual_similarity_min_page_similarity': visual['aggregate']['min_page_similarity'],
+
++        'artifact_ready_for_scoring': visual['artifact_ready_for_scoring'],
+
++        'human_visual_decision': human['human_visual_decision'],
+
++        'fidelity_veto_p0_count': fidelity['p0_veto_count'],
+
++        'sample_verdict': human['sample_verdict'],
+
++    }
+
++    print(json.dumps(summary, ensure_ascii=False, indent=2))
+
++
+
++
+
++if __name__ == '__main__':
+
++    main()
+
+

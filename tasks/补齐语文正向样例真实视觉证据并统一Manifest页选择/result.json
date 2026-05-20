@@ -1,0 +1,61 @@
+{
+  "task_id": "补齐语文正向样例真实视觉证据并统一Manifest页选择",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已将语文长文阅读正向样例从 staged seed 推进到 real_scoring_ready：三份 manifest 与 fixture 已统一 selected_pages_or_crops=[1,2,3]，并为语文正向样例补齐真实 render_pair / visual_similarity / fidelity_veto / human_review_report；当前真实结论仍为 no_go。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair_artifacts",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/chinese_positive_artifact_contract.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/unified_manifest_roles_fixture.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/Manifest-2ec1baca.patch"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-chinese /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py -> passed",
+    "python3 consistency assertion: manifests/source_manifest/evidence/fixtures all agree on selected_pages_or_crops=[1,2,3], artifact_ready_for_scoring=true, human_visual_decision=no_go, and chinese_grade5 remains negative_guard -> passed",
+    "python3 preview scoring check: selected_pages_or_crops=[1,2,3] overall_page_similarity_mean=0.8695, min_page_similarity=0.8617 -> passed",
+    "No pytest run: 本任务只更新 artifact/manifest/fixture，未修改 backend 业务代码；write_scope 也不包含额外代码模块。"
+  ],
+  "risks": [
+    "语文正向样例虽已 real_scoring_ready，但当前 selected_pages_or_crops=[1,2,3] 的真实相似度仍低于门禁：overall_page_similarity_mean=0.8695 < 0.95，min_page_similarity=0.8617 < 0.92。",
+    "fidelity_veto.json 当前累计 4 个 P0 veto，因此 human_review_report 仍是 no_go / human_review_failed，不能纳入全学科95正向通过分母。",
+    "当前证据 scope 仅覆盖长文阅读《爸爸的鸽子》材料与题目区域；作文/写作格能力仍需单独正向样例。"
+  ],
+  "deliverables": {
+    "staged_seed_transition": "real_scoring_ready",
+    "selected_pages_or_crops": [
+      1,
+      2,
+      3
+    ],
+    "render_pair_status": "success",
+    "visual_similarity_status": "scored_no_go",
+    "visual_similarity_overall_page_similarity_mean": 0.8695,
+    "visual_similarity_min_page_similarity": 0.8617,
+    "artifact_ready_for_scoring": true,
+    "fidelity_veto_status": "no_go",
+    "fidelity_veto_p0_count": 4,
+    "human_visual_decision": "no_go",
+    "sample_verdict": "no_go",
+    "negative_guard_unchanged": {
+      "sample_key": "chinese_grade5",
+      "evaluation_role": "negative_guard",
+      "eligible_for_human_visual_95": false,
+      "count_in_positive_human_visual_95_average": false,
+      "gate_status": "negative_guard_excluded"
+    }
+  },
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/rerun_chinese_positive_visual_evidence.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/补齐语文正向样例真实视觉证据并统一Manifest页选择/artifacts/Manifest-2ec1baca.patch"
+  ],
+  "completed_at": "2026-05-20T12:25:32+08:00"
+}

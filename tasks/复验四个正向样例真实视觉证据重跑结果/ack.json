@@ -1,0 +1,8 @@
+{
+  "task_id": "复验四个正向样例真实视觉证据重跑结果",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-20T11:40:53+08:00",
+  "summary": "qa-1 已读取 instruction.md，开始只读复验：逐样例核查四个 positive_candidate 的 render_pair / visual_similarity / fidelity_veto / sample_verdict，重点判断是否都已 real-scoring-ready，以及当前应输出 done+no_go 还是继续 blocked。"
+}

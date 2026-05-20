@@ -104,5 +104,8 @@
   "control_plane_updated_at": "2026-05-20T10:56:15+08:00",
   "state_invariant_violations": [],
   "state_invariant_signature": "",
-  "state_invariant_checked_at": "2026-05-20T10:56:15+08:00"
+  "state_invariant_checked_at": "2026-05-20T10:56:15+08:00",
+  "pm_notes": [
+    "2026-05-20 PM判定：当前 blocked 原因不是 table_gate 设计失败，而是 canonical 主工作区尚未真正合入 runtime consumer 变更；已新增集成任务“合入表格联合门禁到主工作区并恢复QA复验”，待完成后恢复本 QA 复验。"
+  ]
 }

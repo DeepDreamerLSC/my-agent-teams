@@ -1,0 +1,9 @@
+{
+  "task_id": "复验四个正向样例真实视觉证据重跑结果",
+  "reassigned_at": "2026-05-20T11:39:47+08:00",
+  "reassigned_by": "task-watcher",
+  "from_agent": "auto",
+  "to_agent": "qa-1",
+  "reason": "upstream DOCX evidence rerun task closed after review+QA; direct push downstream verification",
+  "archived_files": []
+}
