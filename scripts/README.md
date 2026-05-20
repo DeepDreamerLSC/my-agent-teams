@@ -7,7 +7,7 @@
 
 ### 任务生命周期入口
 
-- `create-task.sh`：创建任务目录、`task.json`、`instruction.md` 与初始流转日志。
+- `create-task.sh`：创建任务目录、`task.json`、`instruction.md` 与初始流转日志；入口仅保留参数解析，任务 schema/校验实现已下沉到 `scripts/lib/create_task_impl.py`。
 - `dispatch-task.sh`：将任务派发到指定 agent，并注入执行提示。
 - `claim-task.sh` / `pool-task.sh` / `queue-task.sh` / `resume-task.sh`：任务池、预留、认领与恢复。
 - `close-task.sh` / `archive-task.sh` / `reassign-task.sh`：收口、归档、改派。
@@ -48,16 +48,16 @@
 - 顶层脚本应尽量保持“参数解析 + 编排”，业务规则和可复用函数逐步下沉到 `scripts/lib/`。
 - 已有外部调用较多的顶层脚本暂不移动路径；若未来确需移动，必须先保留同名兼容 wrapper。
 
-## 超大脚本拆分现状
+## 重点脚本拆分现状
 
-当前超过 500 行的脚本及处理策略：
+2026-05-20 复查：`task-watcher.sh` 与 `scripts/lib/task_artifacts.py` 仍超过 500 行；`create-task.sh`、`teamctl.sh` 已完成低风险入口/业务逻辑拆分。
 
-| 脚本 | 当前策略 |
+| 脚本/模块 | 当前策略 |
 | --- | --- |
 | `task-watcher.sh` | 已抽出 runtime/logging/singleton 到 `scripts/lib/task_watcher_runtime.sh`，通知/系统 chat 事件到 `scripts/lib/task_watcher_notifications.sh`；后续继续按 routing、gate、queue 拆分。 |
 | `teamctl.sh` | 已抽出 watcher/dashboard/Codex gateway 服务管理到 `scripts/lib/teamctl_services.sh`，顶层保留 bootstrap/doctor/agent 编排入口。 |
 | `scripts/lib/task_artifacts.py` | 已是共享库；建议下一步按 schema 读写、摘要提取、原子写入拆分。 |
-| `create-task.sh` | 当前接近 500 行边界；后续应将内嵌 Python task schema 构造迁入 `scripts/lib/create_task_impl.py`。 |
+| `create-task.sh` | 已拆分：顶层入口约 42 行，内嵌 Python task schema 构造已迁入 `scripts/lib/create_task_impl.py`。 |
 
 ## 变更准则
 

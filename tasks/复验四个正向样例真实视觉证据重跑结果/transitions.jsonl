@@ -2,3 +2,4 @@
 {"from": "pooled", "to": "dispatched", "at": "2026-05-20T11:39:47+08:00", "reason": "reassign-task: upstream DOCX evidence rerun task closed after review+QA; direct push downstream verification", "actor": "task-watcher"}
 {"from": "dispatched", "to": "working", "at": "2026-05-20T11:41:01+08:00", "reason": "watcher observed ack.json"}
 {"from": "working", "to": "ready_for_merge", "at": "2026-05-20T12:26:31+08:00", "reason": "watcher observed result.json status=success"}
+{"from": "ready_for_merge", "to": "done", "at": "2026-05-20T12:37:21+08:00", "reason": "task-watcher auto close after review pass without qa"}

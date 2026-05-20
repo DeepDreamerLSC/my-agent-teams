@@ -372,19 +372,26 @@ for item in items:
     rows.append([title, role, status, start_dt, end_dt, str(duration_h)])
 
 if rows:
-    payload = {"fields": ["任务名称", "负责人", "状态", "开始时间", "结束时间", "持续时长h"], "rows": rows}
+    FIELDS = ["任务名称", "负责人", "状态", "开始时间", "结束时间", "持续时长h"]
+    BATCH_SIZE = 200
+    total_synced = 0
     TMP_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = TMP_DIR / "task_sync_payload.json"
-    tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    result = run_lark(["lark-cli", "base", "+record-batch-create",
-        "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
-        "--as", "user", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
-    tmp.unlink()
-    if result and result.get("ok"):
-        count = len(result.get("data", {}).get("record_id_list", []))
-        print(f"[task-detail] 已同步 {count} 条任务（含时分）", file=sys.stderr)
-    else:
-        print("[task-detail] 同步失败", file=sys.stderr)
+    for i in range(0, len(rows), BATCH_SIZE):
+        batch = rows[i:i+BATCH_SIZE]
+        payload = {"fields": FIELDS, "rows": batch}
+        tmp = TMP_DIR / f"task_sync_{i}.json"
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        result = run_lark(["lark-cli", "base", "+record-batch-create",
+            "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+            "--as", "user", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
+        tmp.unlink()
+        if result and result.get("ok"):
+            count = len(result.get("data", {}).get("record_id_list", []))
+            total_synced += count
+            print(f"[task-detail] 批次 {i//BATCH_SIZE+1} 已同步 {count} 条", file=sys.stderr)
+        else:
+            print(f"[task-detail] 批次 {i//BATCH_SIZE+1} 同步失败", file=sys.stderr)
+    print(f"[task-detail] 全部完成: {total_synced}/{len(rows)} 条", file=sys.stderr)
 else:
     print("[task-detail] 无任务数据", file=sys.stderr)
 TDEOF

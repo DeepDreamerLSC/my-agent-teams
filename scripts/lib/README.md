@@ -4,6 +4,7 @@
 
 ## Python 模块
 
+- `create_task_impl.py`：`create-task.sh` 的任务 schema 构造、write_scope 校验、review/QA gate 派生与初始 artifact 写入实现。
 - `task_artifacts.py`：任务产物读取、摘要与原子写入工具。
 - `task_pool_rules.py`：任务池/预留/认领规则。
 - `task_quality_rules.py`：质量闸门规则。
