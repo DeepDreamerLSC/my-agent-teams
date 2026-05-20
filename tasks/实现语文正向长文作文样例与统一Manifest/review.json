@@ -1,0 +1,61 @@
+{
+  "task_id": "实现语文正向长文作文样例与统一Manifest",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T09:06:17+08:00",
+  "status": "approve",
+  "summary": "审查通过。当前交付已把 `chinese_long_reading_positive_v1` 作为独立语文正向样例接入 final-gated / unified / chinese manifests，并明确保持 `chinese_grade5` 为 `negative_guard`；语文正向样例 bundle、published aliases、source_manifest、四类 canonical artifact placeholder 与 fixture 也已同步落盘。reviewer 复核 manifest 角色区分、bundle 路径/校验和、两份 DOCX ZIP 结构与 result.json 摘要后，确认该样例已可被后续全学科95复验链路直接消费，但当前仍只是 staged seed，`gate_status=artifact_missing` 的限制也已被如实暴露。未发现阻塞放行的问题，建议交 PM 收口。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现语文正向长文作文样例与统一Manifest",
+      "finding": "任务目录当前没有 verify.json，且 task.json 标记 `qa_gate_state=skipped`。",
+      "recommendation": "本轮不阻塞；如后续 watcher/QA 需要完整留痕，可补写 verify.json。",
+      "evidence": "reviewer 审查时任务目录仅见 ack/result/task/transitions/artifacts，无 verify.json。"
+    },
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
+      "finding": "本轮新增的是语文长文阅读正向样例 seed，作文/写作格能力声明仍保持 out-of-scope，尚无独立 composition 正向样例。",
+      "recommendation": "不阻塞当前任务；但下游若要对外扩展到作文/写作格 claim，仍需单独补一个 composition sample，并沿同一 manifest / evidence contract 接入。",
+      "evidence": "result.json `unfinished_items` 明确写出“作文/写作格页型尚未纳入本轮语文正向分母”；`chinese-samples-manifest.json` 与 `source_manifest.json` 也都把 composition/writing-grid 标记为后续单独样例。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现语文正向长文作文样例与统一Manifest/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现语文正向长文作文样例与统一Manifest/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现语文正向长文作文样例与统一Manifest/result.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/README.final-gated.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/chinese_positive_artifact_contract.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/unified_manifest_roles_fixture.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/warnings.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/pages.jsonl"
+  ],
+  "test_evidence": [
+    {
+      "command": "python3 - <<'PY' ... validate chinese_long_reading_positive_v1 / chinese_grade5 roles across final-gated-manifest.json, unified-sample-manifest.json, chinese-samples-manifest.json ... PY",
+      "result": "passed（确认 `chinese_long_reading_positive_v1=positive_candidate`、`chinese_grade5=negative_guard`，且资格字段/gate_status 与 fixture 一致）"
+    },
+    {
+      "command": "python3 - <<'PY' ... validate published aliases, source_manifest checksums, and ZIP-openability of final-output alias DOCX + archive output.docx ... PY",
+      "result": "passed（source/output alias 均存在；两份 DOCX 都能以 ZIP 打开且包含 `word/document.xml`；source_manifest 中 source/output/pages 校验和与磁盘一致）"
+    },
+    {
+      "command": "python3 - <<'PY' ... validate staged artifact bundle fields for source_manifest/render_pair/visual_similarity/fidelity_veto/human_review_report and compare with result.json ... PY",
+      "result": "passed（确认 bundle 为 staged positive seed：`render_pair.status=staged_positive_candidate_pending_generation`、`visual_similarity.status=artifact_missing`、`human_review_report.human_visual_decision=pending`，与 result.json 的 `gate_status=artifact_missing` 和 unfinished_items 一致）"
+    }
+  ],
+  "recommended_next_action": "pm"
+}
