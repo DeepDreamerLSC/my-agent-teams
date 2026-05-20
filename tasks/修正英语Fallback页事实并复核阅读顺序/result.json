@@ -2,34 +2,9 @@
   "task_id": "修正英语Fallback页事实并复核阅读顺序",
   "agent": "dev-2",
   "status": "blocked",
-  "summary": "当前任务按 blocked 收口：已完成英语八年级 fallback 页事实核验，但当前 write_scope 不包含 final_acceptance_summary.json，无法在任务边界内同时统一 authoritative archive / final acceptance / visual evidence 的事实口径。",
-  "files_modified": [],
-  "tests": [
-    "已人工核验 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/validator-report.json、warnings.json、visual_similarity.json、fidelity_veto.json、human_review_report.json 与 final_acceptance_summary.json 的英语样例条目。"
-  ],
-  "blockers": [
-    {
-      "reason": "write_scope 缺少 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json，无法直接修正 FinalAcceptance strong gate 汇总口径。",
-      "impact": "当前只能确认 archive/evidence 与 final acceptance summary 存在冲突，不能在本任务边界内完成“三处口径统一”。",
-      "evidence": [
-        "validator-report.json: fallback_pages=2，实际页为 [3, 11]",
-        "warnings.json: fallback_pages=3,11",
-        "final_acceptance_summary.json: 英语样例当前记录 fallback_pages=[3, 8, 11, 12]"
-      ]
-    }
-  ],
-  "completed_checks": [
-    "已确认 authoritative archive 现口径以 validator-report.json / warnings.json 为准，英语八年级 fallback 页事实应为第 3、11 页。",
-    "已确认 final_acceptance_summary.json 当前英语样例条目仍保留旧口径 fallback_pages=[3, 8, 11, 12]，与 archive 不一致。",
-    "已确认当前任务 write_scope 中声明的 english_visual_gate.py 与 backend/tests/fixtures/pdf_to_word/visual_similarity/english 路径在仓库当前状态下尚不存在；即使本轮新建，也不能单独修复 FinalAcceptance summary 冲突。"
-  ],
-  "pm_coordination_needed": [
-    "扩 write_scope，允许直接修正 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json（及必要的 final acceptance 报告/JSON）",
-    "或转派/联动负责 FinalAcceptance 汇总产物的任务，由其基于 authoritative archive 重新生成 strong gate summary"
-  ],
+  "cause": "write_scope 不含 final_acceptance_summary.json，无法统一 FinalAcceptance 口径",
+  "done": "已核验英语 fallback 页事实冲突：authoritative archive 为 fallback_pages=3,11，而 final_acceptance_summary 仍为 fallback_pages=[3,8,11,12]。",
+  "needed": "需要 PM 决定扩 scope 或转派。",
   "next_update_at": "2026-05-20T12:45:00+08:00",
-  "notes": [
-    "当前等待 PM 扩 scope 或明确转派/联动方案；在未获新指令前不继续空转改动。"
-  ],
-  "completed_at": "2026-05-20T12:47:13+08:00"
+  "completed_at": "2026-05-20T12:47:40+08:00"
 }
