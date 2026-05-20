@@ -1,0 +1,647 @@
+diff --git a/backend/app/services/pdf_to_word/table_ir.py b/backend/app/services/pdf_to_word/table_ir.py
+index 9e49c5f..795cf89 100644
+--- a/backend/app/services/pdf_to_word/table_ir.py
++++ b/backend/app/services/pdf_to_word/table_ir.py
+@@ -9,6 +9,9 @@ from .models import PageBox
+ 
+ 
+ NORMALIZED_TABLE_IR_VERSION = "normalized_table_ir/v1"
++TABLE_EDITABLE_VISUAL_GATE_VERSION = "pdf_to_word_table_editable_visual_gate/v1"
++TABLE_EDITABLE_VISUAL_GATE_REPORT_TYPE = "pdf_to_word_table_editable_visual_gate"
++DEFAULT_TABLE_REGION_SIMILARITY_MIN = 0.90
+ 
+ TableIRContractStatus = Literal["pass", "review", "fail"]
+ 
+@@ -18,6 +21,9 @@ WARN_TABLE_DIMENSION_MISMATCH = "table_dimension_mismatch"
+ WARN_TABLE_GRID_INCOMPLETE = "table_grid_incomplete"
+ WARN_TABLE_SPAN_OUT_OF_BOUNDS = "table_span_out_of_bounds"
+ WARN_TABLE_CELL_OVERLAP = "table_cell_overlap"
++WARN_TABLE_VISUAL_REGIONS_MISSING = "table_visual_regions_missing"
++WARN_TABLE_REGION_SIMILARITY_MISSING = "table_region_similarity_missing"
++WARN_TABLE_REGION_EVIDENCE_MISSING = "table_region_evidence_missing"
+ 
+ REQUIRED_TABLE_IR_FIELDS = frozenset(
+     {
+@@ -320,6 +326,48 @@ class TableIRValidationResult:
+         return self.status == "pass"
+ 
+ 
++@dataclass(frozen=True)
++class TableEditableVisualGateResult:
++    report_type: str
++    contract_version: str
++    status: str
++    failure_code: str | None
++    gate_passed: bool
++    human_review_required: bool
++    sample_name: str | None
++    subject: str | None
++    document_page_type: str | None
++    table_id: str
++    source_candidate_id: str
++    structure_gate: dict[str, Any]
++    visual_regions: tuple[dict[str, Any], ...]
++    vetoes: tuple[dict[str, Any], ...]
++    blocking_failures: tuple[str, ...]
++    editable_contract: dict[str, Any]
++    evidence_paths: dict[str, Any]
++
++    def to_dict(self) -> dict[str, Any]:
++        return {
++            "report_type": self.report_type,
++            "contract_version": self.contract_version,
++            "status": self.status,
++            "failure_code": self.failure_code,
++            "gate_passed": self.gate_passed,
++            "human_review_required": self.human_review_required,
++            "sample_name": self.sample_name,
++            "subject": self.subject,
++            "document_page_type": self.document_page_type,
++            "table_id": self.table_id,
++            "source_candidate_id": self.source_candidate_id,
++            "structure_gate": dict(self.structure_gate),
++            "visual_regions": [dict(item) for item in self.visual_regions],
++            "vetoes": [dict(item) for item in self.vetoes],
++            "blocking_failures": list(self.blocking_failures),
++            "editable_contract": dict(self.editable_contract),
++            "evidence_paths": dict(self.evidence_paths),
++        }
++
++
+ def load_normalized_table_ir(path: str | Path) -> NormalizedTableIR:
+     import json
+ 
+@@ -396,6 +444,204 @@ def validate_normalized_table_ir(table: NormalizedTableIR) -> TableIRValidationR
+     )
+ 
+ 
++def build_table_editable_visual_gate_result(
++    table: NormalizedTableIR,
++    *,
++    sample_name: str | None = None,
++    subject: str | None = None,
++    document_page_type: str | None = None,
++    visual_regions: Sequence[Mapping[str, Any]] | None = None,
++    visual_vetoes: Sequence[Mapping[str, Any]] | None = None,
++    evidence_paths: Mapping[str, Any] | None = None,
++    region_similarity_min: float = DEFAULT_TABLE_REGION_SIMILARITY_MIN,
++) -> TableEditableVisualGateResult:
++    structure_report = validate_normalized_table_ir(table)
++    blocking_failures: list[str] = []
++    vetoes: list[dict[str, Any]] = []
++    visual_region_reports: list[dict[str, Any]] = []
++    human_review_required = False
++
++    if structure_report.status != "pass":
++        human_review_required = True
++        if structure_report.status == "fail":
++            blocking_failures.append("table_structure_contract_failed")
++        else:
++            blocking_failures.append("table_structure_contract_review")
++
++    normalized_regions = [item for item in (visual_regions or ()) if isinstance(item, Mapping)]
++    if not normalized_regions:
++        blocking_failures.append(WARN_TABLE_VISUAL_REGIONS_MISSING)
++        human_review_required = True
++    else:
++        for index, raw_region in enumerate(normalized_regions):
++            region_payload, region_failures, region_vetoes = _build_table_visual_region_report(
++                raw_region,
++                index=index,
++                similarity_min=region_similarity_min,
++            )
++            visual_region_reports.append(region_payload)
++            vetoes.extend(region_vetoes)
++            if region_failures:
++                blocking_failures.extend(region_failures)
++                human_review_required = True
++
++    for raw_veto in visual_vetoes or ():
++        veto_payload = _coerce_table_visual_veto(raw_veto)
++        if veto_payload is None:
++            continue
++        vetoes.append(veto_payload)
++        if veto_payload.get("blocking"):
++            blocking_failures.append(str(veto_payload.get("code") or "table_visual_veto_triggered"))
++            human_review_required = True
++
++    blocking_vetoes = [item for item in vetoes if item.get("blocking")]
++    if structure_report.status == "fail" or blocking_vetoes:
++        status = "failed"
++        failure_code = _first_failure_code(blocking_failures) or "table_visual_veto_triggered"
++    elif blocking_failures:
++        status = "artifact_not_ready"
++        failure_code = _first_failure_code(blocking_failures)
++    else:
++        status = "ready"
++        failure_code = None
++
++    editable_contract = {
++        "structured_cells_required": True,
++        "visual_region_veto_required": True,
++        "has_structured_cells": table.has_structured_cells,
++        "table_xml_only_is_insufficient": True,
++        "raw_visual_fallback_present": table.raw.has_visual_fallback,
++        "row_count": table.row_count,
++        "column_count": table.column_count,
++        "cell_count": len(table.cells),
++    }
++    structure_gate = {
++        "status": structure_report.status,
++        "passable": structure_report.passable,
++        "errors": list(structure_report.errors),
++        "warnings": list(structure_report.warnings),
++        "inferred_row_count": structure_report.inferred_row_count,
++        "inferred_column_count": structure_report.inferred_column_count,
++        "has_structured_cells": structure_report.has_structured_cells,
++    }
++    normalized_evidence_paths = {
++        str(key): value for key, value in (evidence_paths or {}).items()
++    }
++    if table.raw.image_path and "table_image_path" not in normalized_evidence_paths:
++        normalized_evidence_paths["table_image_path"] = table.raw.image_path
++
++    return TableEditableVisualGateResult(
++        report_type=TABLE_EDITABLE_VISUAL_GATE_REPORT_TYPE,
++        contract_version=TABLE_EDITABLE_VISUAL_GATE_VERSION,
++        status=status,
++        failure_code=failure_code,
++        gate_passed=status == "ready",
++        human_review_required=human_review_required,
++        sample_name=_optional_str(sample_name),
++        subject=_optional_str(subject),
++        document_page_type=_optional_str(document_page_type),
++        table_id=table.table_id,
++        source_candidate_id=table.source_candidate_id,
++        structure_gate=structure_gate,
++        visual_regions=tuple(visual_region_reports),
++        vetoes=tuple(vetoes),
++        blocking_failures=tuple(_unique(blocking_failures)),
++        editable_contract=editable_contract,
++        evidence_paths=normalized_evidence_paths,
++    )
++
++
++def write_table_editable_visual_gate_result(report: TableEditableVisualGateResult, path: str | Path) -> Path:
++    import json
++
++    target = Path(path).expanduser().resolve()
++    target.parent.mkdir(parents=True, exist_ok=True)
++    target.write_text(json.dumps(report.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
++    return target
++
++
++def _build_table_visual_region_report(
++    raw_region: Mapping[str, Any],
++    *,
++    index: int,
++    similarity_min: float,
++) -> tuple[dict[str, Any], list[str], list[dict[str, Any]]]:
++    region_id = str(raw_region.get("region_id") or f"table-region-{index + 1:02d}")
++    evidence = {
++        "source_crop_path": _optional_str(raw_region.get("source_crop_path")),
++        "docx_crop_path": _optional_str(raw_region.get("docx_crop_path")),
++        "diff_image_path": _optional_str(raw_region.get("diff_image_path")),
++    }
++    similarity = _optional_float(raw_region.get("similarity"))
++    failures: list[str] = []
++    vetoes: list[dict[str, Any]] = []
++    if similarity is None:
++        failures.append(f"{WARN_TABLE_REGION_SIMILARITY_MISSING}:{region_id}")
++    if not evidence["source_crop_path"] or not evidence["docx_crop_path"]:
++        failures.append(f"{WARN_TABLE_REGION_EVIDENCE_MISSING}:{region_id}")
++    passed = similarity is not None and similarity >= similarity_min and not failures
++    if similarity is not None and similarity < similarity_min:
++        failures.append(f"table_region_similarity_below_threshold:{region_id}")
++        vetoes.append(
++            {
++                "code": "table_region_similarity_below_threshold",
++                "severity": "p0",
++                "scope": "region",
++                "blocking": True,
++                "region_id": region_id,
++                "page_index": _optional_int(raw_region.get("page_index")),
++                "summary": (
++                    f"table region similarity {similarity:.4f} below {similarity_min:.4f} for {region_id}"
++                ),
++                "evidence_paths": [path for path in evidence.values() if path],
++            }
++        )
++    payload = {
++        "region_id": region_id,
++        "page_index": _optional_int(raw_region.get("page_index")),
++        "role": _optional_str(raw_region.get("role")) or "table_region",
++        "bbox": _page_box_to_dict(raw_region.get("bbox")),
++        "similarity": similarity,
++        "similarity_min": similarity_min,
++        "passed": passed,
++        "evidence": evidence,
++        "warnings": list(failures),
++    }
++    return payload, failures, vetoes
++
++
++def _coerce_table_visual_veto(raw_veto: Any) -> dict[str, Any] | None:
++    if not isinstance(raw_veto, Mapping):
++        return None
++    return {
++        "code": str(raw_veto.get("code") or "table_visual_veto"),
++        "severity": str(raw_veto.get("severity") or "p0"),
++        "scope": str(raw_veto.get("scope") or "region"),
++        "blocking": bool(raw_veto.get("blocking", True)),
++        "region_id": _optional_str(raw_veto.get("region_id")),
++        "page_index": _optional_int(raw_veto.get("page_index")),
++        "summary": str(raw_veto.get("summary") or raw_veto.get("reason") or "table visual veto triggered"),
++        "evidence_paths": [
++            str(item) for item in _sequence(raw_veto.get("evidence_paths"), "table_visual_veto.evidence_paths")
++        ]
++        if raw_veto.get("evidence_paths") is not None
++        else [],
++    }
++
++
++def _first_failure_code(values: Sequence[str]) -> str | None:
++    for value in values:
++        normalized = str(value).strip()
++        if normalized:
++            return normalized.split(":", 1)[0]
++    return None
++
++
++def _page_box_to_dict(value: Any) -> dict[str, Any] | None:
++    page_box = _page_box_from_dict(value)
++    return page_box.to_dict() if page_box is not None else None
++
++
+ def _append_unique(items: list[str], value: str) -> None:
+     if value not in items:
+         items.append(value)
+@@ -472,12 +718,16 @@ def _optional_str(value: Any) -> str | None:
+ 
+ 
+ __all__ = [
++    "DEFAULT_TABLE_REGION_SIMILARITY_MIN",
+     "NORMALIZED_TABLE_IR_VERSION",
+     "REQUIRED_CELL_FIELDS",
+     "REQUIRED_RAW_FIELDS",
+     "REQUIRED_TABLE_IR_FIELDS",
+     "STRUCTURAL_REVIEW_WARNINGS",
++    "TABLE_EDITABLE_VISUAL_GATE_REPORT_TYPE",
++    "TABLE_EDITABLE_VISUAL_GATE_VERSION",
+     "TableCellIR",
++    "TableEditableVisualGateResult",
+     "TableIRContractStatus",
+     "TableIRValidationResult",
+     "TableMetrics",
+@@ -489,8 +739,13 @@ __all__ = [
+     "WARN_TABLE_CELL_OVERLAP",
+     "WARN_TABLE_DIMENSION_MISMATCH",
+     "WARN_TABLE_GRID_INCOMPLETE",
++    "WARN_TABLE_REGION_EVIDENCE_MISSING",
++    "WARN_TABLE_REGION_SIMILARITY_MISSING",
+     "WARN_TABLE_SPAN_OUT_OF_BOUNDS",
+     "WARN_TABLE_STRUCTURE_MISSING",
++    "WARN_TABLE_VISUAL_REGIONS_MISSING",
++    "build_table_editable_visual_gate_result",
+     "load_normalized_table_ir",
+     "validate_normalized_table_ir",
++    "write_table_editable_visual_gate_result",
+ ]
+diff --git a/backend/tests/test_pdf_to_word_table_ir_contract.py b/backend/tests/test_pdf_to_word_table_ir_contract.py
+index 9553711..6305f7a 100644
+--- a/backend/tests/test_pdf_to_word_table_ir_contract.py
++++ b/backend/tests/test_pdf_to_word_table_ir_contract.py
+@@ -7,18 +7,24 @@ from pathlib import Path
+ import pytest
+ 
+ from app.services.pdf_to_word.table_ir import (
++    DEFAULT_TABLE_REGION_SIMILARITY_MIN,
+     NORMALIZED_TABLE_IR_VERSION,
+     REQUIRED_CELL_FIELDS,
+     REQUIRED_RAW_FIELDS,
+     REQUIRED_TABLE_IR_FIELDS,
+     NormalizedTableIR,
++    WARN_TABLE_REGION_EVIDENCE_MISSING,
++    WARN_TABLE_REGION_SIMILARITY_MISSING,
+     WARN_IMAGE_ONLY_FALLBACK,
+     WARN_TABLE_CELL_OVERLAP,
+     WARN_TABLE_DIMENSION_MISMATCH,
+     WARN_TABLE_SPAN_OUT_OF_BOUNDS,
+     WARN_TABLE_STRUCTURE_MISSING,
++    WARN_TABLE_VISUAL_REGIONS_MISSING,
++    build_table_editable_visual_gate_result,
+     load_normalized_table_ir,
+     validate_normalized_table_ir,
++    write_table_editable_visual_gate_result,
+ )
+ 
+ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pdf_to_word" / "table_ir"
+@@ -146,3 +152,121 @@ def test_missing_required_contract_fields_fail_fast():
+ 
+     with pytest.raises(ValueError, match="source_candidate_id"):
+         NormalizedTableIR.from_dict(payload)
++
++
++def test_table_editable_visual_gate_requires_structure_and_visual_regions(tmp_path: Path):
++    table = load_normalized_table_ir(FIXTURE_DIR / "structured_table.json")
++
++    report = build_table_editable_visual_gate_result(
++        table,
++        sample_name="五下科学",
++        subject="science",
++        document_page_type="science_experiment_table_and_image_mixed",
++        visual_regions=[
++            {
++                "region_id": "science-table-grid",
++                "page_index": 1,
++                "role": "table_grid",
++                "bbox": {"page": 1, "x0": 112.0, "y0": 220.0, "x1": 472.0, "y1": 302.0},
++                "similarity": 0.96,
++                "source_crop_path": "regions/science-table-source.png",
++                "docx_crop_path": "regions/science-table-docx.png",
++                "diff_image_path": "regions/science-table-diff.png",
++            },
++            {
++                "region_id": "science-table-header",
++                "page_index": 1,
++                "role": "table_header",
++                "bbox": {"page": 1, "x0": 112.0, "y0": 220.0, "x1": 472.0, "y1": 246.0},
++                "similarity": 0.93,
++                "source_crop_path": "regions/science-header-source.png",
++                "docx_crop_path": "regions/science-header-docx.png",
++                "diff_image_path": "regions/science-header-diff.png",
++            },
++        ],
++        evidence_paths={"visual_similarity_path": "visual_similarity.json"},
++    )
++    artifact_path = write_table_editable_visual_gate_result(report, tmp_path / "table_gate.json")
++
++    assert report.status == "ready"
++    assert report.gate_passed is True
++    assert report.failure_code is None
++    assert report.structure_gate["status"] == "pass"
++    assert report.editable_contract["table_xml_only_is_insufficient"] is True
++    assert len(report.visual_regions) == 2
++    assert artifact_path.exists()
++
++
++def test_table_editable_visual_gate_fails_when_visual_veto_or_similarity_breaks():
++    table = load_normalized_table_ir(FIXTURE_DIR / "structured_table.json")
++
++    report = build_table_editable_visual_gate_result(
++        table,
++        sample_name="数学八年级",
++        subject="math",
++        document_page_type="math_exercise_with_sparse_image_and_table",
++        visual_regions=[
++            {
++                "region_id": "math-table-grid",
++                "page_index": 3,
++                "role": "table_grid",
++                "bbox": {"page": 3, "x0": 98.0, "y0": 310.0, "x1": 508.0, "y1": 468.0},
++                "similarity": 0.74,
++                "source_crop_path": "regions/math-table-source.png",
++                "docx_crop_path": "regions/math-table-docx.png",
++                "diff_image_path": "regions/math-table-diff.png",
++            }
++        ],
++        visual_vetoes=[
++            {
++                "code": "table_header_merge_lost",
++                "severity": "p0",
++                "scope": "region",
++                "blocking": True,
++                "region_id": "math-table-grid",
++                "page_index": 3,
++                "summary": "表头合并关系丢失",
++                "evidence_paths": ["regions/math-table-diff.png"],
++            }
++        ],
++    )
++
++    assert report.status == "failed"
++    assert report.gate_passed is False
++    assert report.failure_code == "table_region_similarity_below_threshold"
++    assert report.human_review_required is True
++    assert any(veto["code"] == "table_region_similarity_below_threshold" for veto in report.vetoes)
++    assert any(veto["code"] == "table_header_merge_lost" for veto in report.vetoes)
++
++
++def test_table_editable_visual_gate_marks_image_only_or_missing_region_evidence_not_ready():
++    table = load_normalized_table_ir(FIXTURE_DIR / "image_only_missing_structure.json")
++    report = build_table_editable_visual_gate_result(table, sample_name="五下科学")
++
++    assert report.status == "artifact_not_ready"
++    assert report.gate_passed is False
++    assert report.failure_code == "table_structure_contract_review"
++    assert WARN_TABLE_VISUAL_REGIONS_MISSING in report.blocking_failures
++
++    structured = load_normalized_table_ir(FIXTURE_DIR / "structured_table.json")
++    report_with_missing_region = build_table_editable_visual_gate_result(
++        structured,
++        visual_regions=[
++            {
++                "region_id": "table-grid",
++                "page_index": 1,
++                "role": "table_grid",
++                "bbox": {"page": 1, "x0": 112.0, "y0": 220.0, "x1": 472.0, "y1": 302.0},
++                "similarity": None,
++                "source_crop_path": "regions/source.png",
++                "docx_crop_path": None,
++                "diff_image_path": "regions/diff.png",
++            }
++        ],
++    )
++
++    assert report_with_missing_region.status == "artifact_not_ready"
++    assert report_with_missing_region.failure_code == WARN_TABLE_REGION_SIMILARITY_MISSING
++    assert any(item.startswith(f"{WARN_TABLE_REGION_SIMILARITY_MISSING}:") for item in report_with_missing_region.blocking_failures)
++    assert any(item.startswith(f"{WARN_TABLE_REGION_EVIDENCE_MISSING}:") for item in report_with_missing_region.blocking_failures)
++    assert report_with_missing_region.visual_regions[0]["similarity_min"] == DEFAULT_TABLE_REGION_SIMILARITY_MIN
+diff --git "a/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json" "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
+new file mode 100644
+index 0000000..1d6e2ca
+--- /dev/null
++++ "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\344\272\224\344\270\213\347\247\221\345\255\246_table_gate_ready.json"
+@@ -0,0 +1,82 @@
++{
++  "report_type": "pdf_to_word_table_editable_visual_gate",
++  "contract_version": "pdf_to_word_table_editable_visual_gate/v1",
++  "status": "ready",
++  "failure_code": null,
++  "gate_passed": true,
++  "human_review_required": false,
++  "sample_name": "五下科学",
++  "subject": "science",
++  "document_page_type": "science_experiment_table_and_image_mixed",
++  "table_id": "table:p1:candidate-0007",
++  "source_candidate_id": "mineru_full:p1:b7",
++  "structure_gate": {
++    "status": "pass",
++    "passable": true,
++    "errors": [],
++    "warnings": [],
++    "inferred_row_count": 3,
++    "inferred_column_count": 3,
++    "has_structured_cells": true
++  },
++  "visual_regions": [
++    {
++      "region_id": "science-table-grid",
++      "page_index": 1,
++      "role": "table_grid",
++      "bbox": {
++        "page": 1,
++        "x0": 112.0,
++        "y0": 220.0,
++        "x1": 472.0,
++        "y1": 302.0
++      },
++      "similarity": 0.96,
++      "similarity_min": 0.9,
++      "passed": true,
++      "evidence": {
++        "source_crop_path": "regions/science-table-source.png",
++        "docx_crop_path": "regions/science-table-docx.png",
++        "diff_image_path": "regions/science-table-diff.png"
++      },
++      "warnings": []
++    },
++    {
++      "region_id": "science-table-header",
++      "page_index": 1,
++      "role": "table_header",
++      "bbox": {
++        "page": 1,
++        "x0": 112.0,
++        "y0": 220.0,
++        "x1": 472.0,
++        "y1": 246.0
++      },
++      "similarity": 0.93,
++      "similarity_min": 0.9,
++      "passed": true,
++      "evidence": {
++        "source_crop_path": "regions/science-header-source.png",
++        "docx_crop_path": "regions/science-header-docx.png",
++        "diff_image_path": "regions/science-header-diff.png"
++      },
++      "warnings": []
++    }
++  ],
++  "vetoes": [],
++  "blocking_failures": [],
++  "editable_contract": {
++    "structured_cells_required": true,
++    "visual_region_veto_required": true,
++    "has_structured_cells": true,
++    "table_xml_only_is_insufficient": true,
++    "raw_visual_fallback_present": true,
++    "row_count": 3,
++    "column_count": 3,
++    "cell_count": 7
++  },
++  "evidence_paths": {
++    "visual_similarity_path": "visual_similarity/science-table.json",
++    "table_image_path": "crops/page-1/table-0007.png"
++  }
++}
+diff --git "a/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json" "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
+new file mode 100644
+index 0000000..7ea6c7f
+--- /dev/null
++++ "b/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/\346\225\260\345\255\246\345\205\253\345\271\264\347\272\247_table_gate_failed.json"
+@@ -0,0 +1,93 @@
++{
++  "report_type": "pdf_to_word_table_editable_visual_gate",
++  "contract_version": "pdf_to_word_table_editable_visual_gate/v1",
++  "status": "failed",
++  "failure_code": "table_region_similarity_below_threshold",
++  "gate_passed": false,
++  "human_review_required": true,
++  "sample_name": "数学八年级",
++  "subject": "math",
++  "document_page_type": "math_exercise_with_sparse_image_and_table",
++  "table_id": "table:p1:candidate-0007",
++  "source_candidate_id": "mineru_full:p1:b7",
++  "structure_gate": {
++    "status": "pass",
++    "passable": true,
++    "errors": [],
++    "warnings": [],
++    "inferred_row_count": 3,
++    "inferred_column_count": 3,
++    "has_structured_cells": true
++  },
++  "visual_regions": [
++    {
++      "region_id": "math-table-grid",
++      "page_index": 3,
++      "role": "table_grid",
++      "bbox": {
++        "page": 3,
++        "x0": 98.0,
++        "y0": 310.0,
++        "x1": 508.0,
++        "y1": 468.0
++      },
++      "similarity": 0.74,
++      "similarity_min": 0.9,
++      "passed": false,
++      "evidence": {
++        "source_crop_path": "regions/math-table-source.png",
++        "docx_crop_path": "regions/math-table-docx.png",
++        "diff_image_path": "regions/math-table-diff.png"
++      },
++      "warnings": [
++        "table_region_similarity_below_threshold:math-table-grid"
++      ]
++    }
++  ],
++  "vetoes": [
++    {
++      "code": "table_region_similarity_below_threshold",
++      "severity": "p0",
++      "scope": "region",
++      "blocking": true,
++      "region_id": "math-table-grid",
++      "page_index": 3,
++      "summary": "table region similarity 0.7400 below 0.9000 for math-table-grid",
++      "evidence_paths": [
++        "regions/math-table-source.png",
++        "regions/math-table-docx.png",
++        "regions/math-table-diff.png"
++      ]
++    },
++    {
++      "code": "table_header_merge_lost",
++      "severity": "p0",
++      "scope": "region",
++      "blocking": true,
++      "region_id": "math-table-grid",
++      "page_index": 3,
++      "summary": "表头合并关系丢失",
++      "evidence_paths": [
++        "regions/math-table-diff.png"
++      ]
++    }
++  ],
++  "blocking_failures": [
++    "table_region_similarity_below_threshold:math-table-grid",
++    "table_header_merge_lost"
++  ],
++  "editable_contract": {
++    "structured_cells_required": true,
++    "visual_region_veto_required": true,
++    "has_structured_cells": true,
++    "table_xml_only_is_insufficient": true,
++    "raw_visual_fallback_present": true,
++    "row_count": 3,
++    "column_count": 3,
++    "cell_count": 7
++  },
++  "evidence_paths": {
++    "visual_similarity_path": "visual_similarity/math-table.json",
++    "table_image_path": "crops/page-1/table-0007.png"
++  }
++}

@@ -1,0 +1,1433 @@
+# Task patch snapshot: 实现语文正向长文作文样例与统一Manifest
+# Generated at: 2026-05-20T10:04:21+08:00
+# Repository: /Users/linsuchang/Desktop/work/chiralium
+# Context: these artifacts are currently untracked outputs, so this snapshot uses /dev/null -> file diffs for new text files
+# and a checksum inventory for copied/binary artifacts that are part of the deliverable bundle.
+
+--- /dev/null
++++ artifacts/pdf2word/final-output-samples/README.final-gated.md
+@@ -0,0 +1,19 @@
++# PDF→Word final-gated 样例清单
++
++- 主文件：`final-gated-manifest.json`
++- 统一清单：`unified-sample-manifest.json`
++- 语文专项：`chinese-samples-manifest.json`
++- 更新时间：`2026-05-20T09:23:18+08:00`
++
++## 当前新增
++
++- 新增语文正向长文样例：`chinese_long_reading_positive_v1` / `语文长文阅读正向样例`
++- 保留 `chinese_grade5` 为 `negative_guard`
++- 作文/写作格页型仍未进入当前正向分母，需单独样例
++
++## 使用原则
++
++1. `final-gated-manifest.json` 继续作为样例 source→output 配对的兼容真相源。
++2. `unified-sample-manifest.json` 提供 `record_role`、`sample_generation`、`artifact_presence`、`count_in_positive_human_visual_95_average` 等扩展字段。
++3. `chinese_grade5` 只能做 negative guard；`chinese_long_reading_positive_v1` 才是语文学科进入正向复验队列的 canonical positive candidate。
++4. 语文正向样例当前仍需真实 render_pair / visual_similarity / human review 重跑，不能直接对外宣称人工视觉95通过。
+
+--- /dev/null
++++ artifacts/pdf2word/final-output-samples/final-gated-manifest.json
+@@ -0,0 +1,326 @@
++{
++  "manifest_version": "pdf2word_final_gated_manifest/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "generated_by": "dev-1",
++  "purpose": "Split final-gated / variant / debug-authoritative sample usage and provide the only canonical source->output pair list for PDF→Word visual gate reruns.",
++  "naming_status": {
++    "claim_field_finalized": false,
++    "note": "Per PM sync on 2026-05-19, this manifest intentionally does not freeze any claim/declaration policy field names before arch-1 lands the canonical naming fix. Use tier + evaluation_role + eligible_for_human_visual_95 only."
++  },
++  "release_boundary": {
++    "engineering_gate_status": "quality_hybrid_async_pass_retained",
++    "human_visual_95_status": "not_yet_claimable",
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled"
++  },
++  "tier_definitions": {
++    "final_gated": "Canonical sample suite used by downstream render-pair generation, manual visual rubric, and final human-visual reruns.",
++    "variant_excluded": "Student / teacher / review / answer-area variants. Valid for specialized capability checks but never direct evidence for mainline 95 declaration.",
++    "debug_authoritative_excluded": "Authoritative probes, intermediate pages, debug artifacts, and review-only evidence. Useful for diagnosis, not for 95 declaration."
++  },
++  "samples": [
++    {
++      "sample_key": "science_grade5",
++      "sample_name": "五下科学",
++      "subject": "science",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /五下科学.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
++      "published_aliases": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-source.pdf",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-五下科学-hybrid_experimental-output.docx"
++      ],
++      "page_type": "science_experiment_table_and_image_mixed",
++      "selected_pages_or_crops": [
++        4,
++        5,
++        6
++      ],
++      "current_facts": {
++        "table_xml_present": true,
++        "word_media_count": 4,
++        "document_fallback": false,
++        "fallback_pages": [
++          1
++        ]
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word最终输出样例-五下科学-student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/五下科学/review.docx"
++      ],
++      "required_followups": [
++        "render_pairs",
++        "visual_similarity.json",
++        "human_review_report"
++      ],
++      "notes": [
++        "Current representative public sample already exists under final-output-samples aliases.",
++        "Human visual 95 remains blocked until render-pair evidence is generated and reviewed."
++      ]
++    },
++    {
++      "sample_key": "math_grade8",
++      "sample_name": "数学八年级",
++      "subject": "math",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
++      "published_aliases": [],
++      "page_type": "math_exercise_with_sparse_image_and_table",
++      "selected_pages_or_crops": [
++        1,
++        3,
++        4,
++        6,
++        7,
++        8
++      ],
++      "current_facts": {
++        "table_xml_present": true,
++        "word_media_count": 2,
++        "document_fallback": false,
++        "fallback_pages": [
++          5
++        ]
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学八年级/review.docx"
++      ],
++      "required_followups": [
++        "render_pairs",
++        "visual_similarity.json",
++        "human_review_report"
++      ],
++      "notes": [
++        "Math sample remains in mainline final-gated suite.",
++        "Answer-section teacher/review variants are explicitly excluded from mainline 95 evidence."
++      ]
++    },
++    {
++      "sample_key": "math_exam",
++      "sample_name": "数学试卷",
++      "subject": "math",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
++      "published_aliases": [],
++      "page_type": "math_exam_image_dense",
++      "selected_pages_or_crops": [
++        1,
++        3,
++        4,
++        6,
++        8,
++        9,
++        11
++      ],
++      "current_facts": {
++        "table_xml_present": false,
++        "word_media_count": 20,
++        "document_fallback": false,
++        "fallback_pages": []
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/数学试卷/review.docx"
++      ],
++      "required_followups": [
++        "render_pairs",
++        "visual_similarity.json",
++        "human_review_report"
++      ],
++      "notes": [
++        "Image-dense sample is canonical for math exam visual density checks."
++      ]
++    },
++    {
++      "sample_key": "english_grade8",
++      "sample_name": "英语八年级",
++      "subject": "english",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
++      "published_aliases": [],
++      "page_type": "language_exercise_sparse_media_with_fallback_pages",
++      "selected_pages_or_crops": [
++        1,
++        4,
++        5,
++        7,
++        9
++      ],
++      "current_facts": {
++        "table_xml_present": false,
++        "word_media_count": 1,
++        "document_fallback": false,
++        "fallback_pages": [
++          3,
++          8,
++          11,
++          12
++        ]
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/英语八年级/review.docx"
++      ],
++      "required_followups": [
++        "render_pairs",
++        "visual_similarity.json",
++        "human_review_report"
++      ],
++      "notes": [
++        "English fallback-page facts are not yet perfectly aligned between final_acceptance_summary and authoritative archive; rerun should normalize this before final human-visual declaration."
++      ]
++    },
++    {
++      "sample_key": "chinese_long_reading_positive_v1",
++      "sample_name": "语文长文阅读正向样例",
++      "subject": "chinese",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
++      "published_aliases": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
++      ],
++      "page_type": "chinese_long_reading",
++      "selected_pages_or_crops": [
++        1,
++        2,
++        3
++      ],
++      "current_facts": {
++        "table_xml_present": false,
++        "word_media_count": 0,
++        "document_fallback": false,
++        "fallback_pages": [],
++        "seed_profile": "apple_baseline"
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
++        "seed_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/pages.jsonl",
++        "source_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/review.docx"
++      ],
++      "required_followups": [
++        "rerun_render_pairs",
++        "rerun_visual_similarity.json",
++        "rerun_fidelity_veto.json",
++        "complete_human_review_report"
++      ],
++      "notes": [
++        "This sample is a staged positive Chinese long-reading seed and does not rewrite chinese_grade5 negative_guard.",
++        "It uses apple_baseline output as the current best available long-reading DOCX seed while downstream rerun tasks regenerate visual evidence.",
++        "Composition/writing-grid claims remain explicitly out-of-scope until a dedicated composition sample is added."
++      ]
++    },
++    {
++      "sample_key": "chinese_grade5",
++      "sample_name": "语文五年级",
++      "subject": "chinese",
++      "tier": "final_gated",
++      "evaluation_role": "negative_guard",
++      "eligible_for_human_visual_95": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
++      "published_aliases": [],
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
++      "selected_pages_or_crops": [],
++      "current_facts": {
++        "table_xml_present": false,
++        "word_media_count": 0,
++        "document_fallback": true,
++        "fallback_pages": [
++          1,
++          2,
++          3,
++          4,
++          5,
++          6,
++          7,
++          8,
++          9,
++          10,
++          11,
++          12,
++          13
++        ]
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/validator-report.json"
++      },
++      "excluded_variants": [
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/student.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/teacher.docx",
++        "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative/语文五年级/review.docx"
++      ],
++      "required_followups": [
++        "negative_guard_review",
++        "separate_chinese_long_text_baseline"
++      ],
++      "notes": [
++        "This sample stays inside the final-gated suite as a negative guard, but is explicitly excluded from positive human-visual 95 averaging.",
++        "A separate positive Chinese long-reading sample now exists as chinese_long_reading_positive_v1; this negative guard still must not be counted as positive human visual 95 evidence."
++      ]
++    }
++  ],
++  "excluded_roots": [
++    {
++      "tier": "variant_excluded",
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/p2-answer-teacher/authoritative",
++      "reason": "Teacher / student / review variants validate answer-area capability, not mainline final 95 fidelity."
++    },
++    {
++      "tier": "debug_authoritative_excluded",
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation",
++      "reason": "Intermediate pages / validator artifacts are evidence inputs, not user-facing final-gated outputs."
++    }
++  ]
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-output-samples/unified-sample-manifest.json
+@@ -0,0 +1,392 @@
++{
++  "manifest_version": "pdf2word_unified_sample_manifest/v2",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "suite_id": "pdf2word_final_gated_all_subject_suite",
++  "claim_scope": {
++    "engineering_gate_status": "quality_hybrid_async_pass_retained",
++    "human_visual_95_status": "no_go_until_all_positive_candidates_have_real_render_pair_and_human_review_pass",
++    "current_chinese_positive_sample": "chinese_long_reading_positive_v1",
++    "composition_claim_status": "out_of_scope_until_dedicated_sample_added"
++  },
++  "role_counts": {
++    "positive_candidate": 5,
++    "negative_guard": 1,
++    "excluded": 0
++  },
++  "evidence_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "ready_gate_requirements": [
++      "human_visual_score>=95",
++      "critical_page_score>=92",
++      "critical_region_score>=90",
++      "no_p0_veto"
++    ],
++    "notes": [
++      "positive_candidate 允许先进入 suite，但在 gate_status=human_review_passed 之前不得计入对外95通过结论。",
++      "negative_guard 始终不计入正向95分母。"
++    ]
++  },
++  "samples": [
++    {
++      "sample_key": "science_grade5",
++      "entry_id": "science_grade5_current_bundle",
++      "subject": "science",
++      "sample_name": "五下科学",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_family": "science_experiment_table_and_image_mixed",
++      "sample_generation": "implemented_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /五下科学.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": true,
++        "visual_similarity_exists": true,
++        "fidelity_veto_exists": true,
++        "human_review_report_exists": true,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "no_go"
++      },
++      "page_type": "science_experiment_table_and_image_mixed",
++      "fallback_policy": {
++        "document_fallback": false,
++        "fallback_pages": [
++          1
++        ],
++        "selected_pages_or_crops": [
++          4,
++          5,
++          6
++        ]
++      },
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "disallowed_uses": [
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
++        "不得把该样例外推到作文/写作格 claim",
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
++      ],
++      "gate_status": "human_review_failed",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/五下科学/validator-report.json"
++      },
++      "notes": [
++        "Current representative public sample already exists under final-output-samples aliases.",
++        "Human visual 95 remains blocked until render-pair evidence is generated and reviewed."
++      ]
++    },
++    {
++      "sample_key": "math_grade8",
++      "entry_id": "math_grade8_current_bundle",
++      "subject": "math",
++      "sample_name": "数学八年级",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_family": "math_exercise_with_sparse_image_and_table",
++      "sample_generation": "implemented_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学 八年级下册pdf.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": true,
++        "visual_similarity_exists": true,
++        "fidelity_veto_exists": true,
++        "human_review_report_exists": true,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "no_go"
++      },
++      "page_type": "math_exercise_with_sparse_image_and_table",
++      "fallback_policy": {
++        "document_fallback": false,
++        "fallback_pages": [
++          5
++        ],
++        "selected_pages_or_crops": [
++          1,
++          3,
++          4,
++          6,
++          7,
++          8
++        ]
++      },
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "disallowed_uses": [
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
++        "不得把该样例外推到作文/写作格 claim",
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
++      ],
++      "gate_status": "human_review_failed",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学八年级/validator-report.json"
++      },
++      "notes": [
++        "Math sample remains in mainline final-gated suite.",
++        "Answer-section teacher/review variants are explicitly excluded from mainline 95 evidence."
++      ]
++    },
++    {
++      "sample_key": "math_exam",
++      "entry_id": "math_exam_current_bundle",
++      "subject": "math",
++      "sample_name": "数学试卷",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_family": "math_exam_image_dense",
++      "sample_generation": "implemented_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /数学试卷.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": true,
++        "visual_similarity_exists": true,
++        "fidelity_veto_exists": true,
++        "human_review_report_exists": true,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "no_go"
++      },
++      "page_type": "math_exam_image_dense",
++      "fallback_policy": {
++        "document_fallback": false,
++        "fallback_pages": [],
++        "selected_pages_or_crops": [
++          1,
++          3,
++          4,
++          6,
++          8,
++          9,
++          11
++        ]
++      },
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "disallowed_uses": [
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
++        "不得把该样例外推到作文/写作格 claim",
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
++      ],
++      "gate_status": "human_review_failed",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/数学试卷/validator-report.json"
++      },
++      "notes": [
++        "Image-dense sample is canonical for math exam visual density checks."
++      ]
++    },
++    {
++      "sample_key": "english_grade8",
++      "entry_id": "english_grade8_current_bundle",
++      "subject": "english",
++      "sample_name": "英语八年级",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_family": "language_exercise_sparse_media_with_fallback_pages",
++      "sample_generation": "implemented_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /英语 八年级下册.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": true,
++        "visual_similarity_exists": true,
++        "fidelity_veto_exists": true,
++        "human_review_report_exists": true,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "no_go"
++      },
++      "page_type": "language_exercise_sparse_media_with_fallback_pages",
++      "fallback_policy": {
++        "document_fallback": false,
++        "fallback_pages": [
++          3,
++          8,
++          11,
++          12
++        ],
++        "selected_pages_or_crops": [
++          1,
++          4,
++          5,
++          7,
++          9
++        ]
++      },
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "disallowed_uses": [
++        "不得在 human_review_passed 之前对外宣称人工视觉95通过",
++        "不得把该样例外推到作文/写作格 claim",
++        "不得用 student/teacher/review/debug 变体替代 canonical source->output pair"
++      ],
++      "gate_status": "human_review_failed",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/英语八年级/validator-report.json"
++      },
++      "notes": [
++        "English fallback-page facts are not yet perfectly aligned between final_acceptance_summary and authoritative archive; rerun should normalize this before final human-visual declaration."
++      ]
++    },
++    {
++      "sample_key": "chinese_grade5",
++      "entry_id": "chinese_grade5_current_policy",
++      "subject": "chinese",
++      "sample_name": "语文五年级",
++      "tier": "final_gated",
++      "evaluation_role": "negative_guard",
++      "record_role": "canonical_negative_guard",
++      "sample_family": "chinese_negative_document_fallback_guard",
++      "sample_generation": "current_negative_document_fallback_baseline",
++      "eligible_for_human_visual_95": false,
++      "count_in_positive_human_visual_95_average": false,
++      "include_in_suite_for_guard": true,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": false,
++        "visual_similarity_exists": false,
++        "fidelity_veto_exists": false,
++        "human_review_report_exists": false,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "negative_guard_excluded"
++      },
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
++      "fallback_policy": {
++        "document_fallback": true,
++        "fallback_pages": [
++          1,
++          2,
++          3,
++          4,
++          5,
++          6,
++          7,
++          8,
++          9,
++          10,
++          11,
++          12,
++          13
++        ],
++        "selected_pages_or_crops": []
++      },
++      "positive_entry_criteria": [],
++      "disallowed_uses": [
++        "不得计入正向 human visual 95 分母或均值",
++        "不得替代语文长文/作文正向样例",
++        "不得作为语文学科人工视觉95通过证据"
++      ],
++      "gate_status": "negative_guard_excluded",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/source_manifest.json"
++      },
++      "notes": [
++        "保持 canonical negative_guard，不得原地改写为 positive_candidate。",
++        "语文学科现在拥有独立的 chinese_long_reading_positive_v1；本条仍只承担防误判 guard 角色。"
++      ]
++    },
++    {
++      "sample_key": "chinese_long_reading_positive_v1",
++      "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
++      "subject": "chinese",
++      "sample_name": "语文长文阅读正向样例",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "record_role": "canonical_positive_candidate",
++      "sample_family": "chinese_long_reading",
++      "sample_generation": "implemented_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
++      "artifact_presence": {
++        "render_pair_exists": true,
++        "visual_similarity_exists": true,
++        "fidelity_veto_exists": true,
++        "human_review_report_exists": true,
++        "render_pair_ready_for_scoring": false,
++        "human_review_decision": "pending"
++      },
++      "page_type": "chinese_long_reading",
++      "fallback_policy": {
++        "document_fallback": false,
++        "fallback_pages": [],
++        "selected_pages_or_crops": [
++          1,
++          2,
++          3
++        ],
++        "seed_profile": "apple_baseline"
++      },
++      "positive_entry_criteria": [
++        "document_fallback=false 或 fallback_pages_ratio <= 20% 且非关键页",
++        "question_or_region_detection_available=true",
++        "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 全部落盘",
++        "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto"
++      ],
++      "disallowed_uses": [
++        "不得把该长文阅读样例外推为作文/写作格能力证明",
++        "不得在 render_pair/visual_similarity/human review 重跑前宣称语文学科已通过人工视觉95",
++        "不得用它覆盖或替代 chinese_grade5 negative_guard 条目"
++      ],
++      "gate_status": "artifact_missing",
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
++        "output_docx_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
++      },
++      "notes": [
++        "当前已形成可消费的 canonical sample bundle，但 real render_pair / visual_similarity 仍待重跑。",
++        "selected_pages_or_crops=[1,2,3] 覆盖《爸爸的鸽子》长文材料 + 题目区域。",
++        "作文/写作格维度仍需单独的 chinese_composition_grid_positive_v1。"
++      ]
++    }
++  ]
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json
+@@ -0,0 +1,259 @@
++{
++  "manifest_version": "pdf2word_chinese_samples_manifest/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "generated_by": "dev-1",
++  "task_id": "实现语文正向长文作文样例与统一Manifest",
++  "purpose": "Rebuild the Chinese long-text/composition/negative-sample policy so current document_fallback evidence cannot be misread as a positive human-visual 95% sample.",
++  "scope": {
++    "subject": "chinese",
++    "must_not_ignore_chinese": true,
++    "all_subject_policy": "Chinese must stay in the PDF→Word gate governance alongside science, math, and English, but the current Chinese evidence is a negative guard rather than a positive 95% proof."
++  },
++  "aligned_truth_sources": [
++    {
++      "name": "final-gated-manifest.json",
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
++      "expected_chinese_record": {
++        "sample_key": "chinese_grade5",
++        "tier": "final_gated",
++        "evaluation_role": "negative_guard",
++        "eligible_for_human_visual_95": false,
++        "page_type": "negative_non_exercise_or_question_region_unresolvable"
++      },
++      "interpretation": "This is the canonical final-gated suite boundary. The Chinese row remains in the suite for negative-guard coverage, not for positive 95 averaging."
++    },
++    {
++      "name": "PDF转Word全学科人工视觉复核Rubric.md",
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全学科人工视觉复核Rubric.md",
++      "interpretation": "Human visual 95 requires render pairs, canonical visual_similarity.json, page/region review, and no P0 veto; engineering L0/L1 facts are not sufficient."
++    },
++    {
++      "name": "PDF转Word全学科视觉基线报告.md",
++      "path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word全学科视觉基线报告.md",
++      "interpretation": "Current Chinese baseline is negative_guard_only and not part of the positive human visual 95 average."
++    }
++  ],
++  "release_boundary": {
++    "engineering_gate_status": "quality_hybrid_async_engineering_95_gate_pass_retained",
++    "human_visual_95_status": "no_go_for_chinese_positive_claim_until_positive_samples_exist_and_pass_rubric",
++    "default_release_policy": "apple default + hybrid_experimental quality gray + formula audit-only / merge-disabled",
++    "current_chinese_public_claim": "Chinese is covered by sample governance, but current Chinese evidence is only negative/document_fallback coverage and must not be claimed as positive human visual 95%."
++  },
++  "classification_rules": {
++    "positive_chinese_human_visual_95_candidate_requires_all": [
++      "tier=final_gated and evaluation_role=positive_candidate in the canonical manifest",
++      "unique source_pdf -> final-gated output_docx pair; no student/teacher/review/authoritative/debug variant",
++      "not document_fallback and not baseline_only/generic_fallback as the dominant path",
++      "representative Chinese page type is covered: long reading, question area, composition/writing grid, or answer-space page depending on declared claim",
++      "render_pairs exist for PDF pages and DOCX-rendered pages",
++      "canonical visual_similarity.json is produced from real render-pair evidence",
++      "human review report follows the all-subject rubric, including page-level and region-level scores",
++      "no P0 veto on long text, composition grid, reading order, OCR readability, or key region layout"
++    ],
++    "negative_or_baseline_sample": {
++      "allowed_role": "negative_guard",
++      "allowed_uses": [
++        "prove that Chinese is not ignored in the governance suite",
++        "verify that document_fallback/baseline evidence is not promoted into a positive 95 claim",
++        "serve as a regression guard for future Chinese routing and sample classification"
++      ],
++      "disallowed_uses": [
++        "positive human visual 95 proof",
++        "positive average denominator or numerator",
++        "external claim that Chinese PDF→Word already reaches human visual 95%",
++        "replacement for a true long-text or composition positive sample"
++      ]
++    },
++    "composition_and_long_text_special_policy": {
++      "needs_separate_positive_sample": true,
++      "reason": "Chinese long text and composition pages have unique visual obligations: paragraph indentation, dense reading blocks, punctuation/annotation readability, question-to-material binding, writing grid or answer-space geometry. A document_fallback negative guard does not exercise these obligations."
++    }
++  },
++  "samples": [
++    {
++      "sample_key": "chinese_grade5",
++      "entry_id": "chinese_grade5_current_policy",
++      "record_role": "supplemental_policy_entry",
++      "sample_generation": "current_negative_document_fallback_baseline",
++      "sample_name": "语文五年级",
++      "subject": "chinese",
++      "tier": "final_gated",
++      "evaluation_role": "negative_guard",
++      "chinese_sample_role": "negative_document_fallback_baseline",
++      "eligible_for_human_visual_95": false,
++      "count_in_positive_human_visual_95_average": false,
++      "include_in_suite_for_guard": true,
++      "page_type": "negative_non_exercise_or_question_region_unresolvable",
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/output.docx",
++      "current_facts": {
++        "docx_kind": "generic_fallback",
++        "docx_openable": true,
++        "word_media_count": 0,
++        "table_xml_present": false,
++        "image_entered_final_word": false,
++        "table_entered_final_word": false,
++        "question_count": 0,
++        "option_count": 0,
++        "answer_area_item_count": 0,
++        "answer_section_count": 0,
++        "document_fallback": true,
++        "fallback_pages": [
++          1,
++          2,
++          3,
++          4,
++          5,
++          6,
++          7,
++          8,
++          9,
++          10,
++          11,
++          12,
++          13
++        ],
++        "fallback_page_count": 13,
++        "default_source_profile": "baseline_only",
++        "supplemental_source_profile": null,
++        "selected_pages_or_crops": [],
++        "structured_image_count": 0,
++        "structured_table_count": 0,
++        "accepted_candidate_total": 0,
++        "appended_block_total": 0
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级",
++        "hybrid_pages_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/hybrid-pages.jsonl",
++        "validator_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/hybrid-e2e-validation/语文五年级/validator-report.json",
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文五年级/source_manifest.json"
++      },
++      "baseline_interpretation": [
++        "This sample proves only that the current pipeline can preserve an auditable Chinese negative/document_fallback baseline.",
++        "It does not prove Chinese long-text, reading-question, composition-grid, or answer-space fidelity.",
++        "It must remain excluded from positive human visual 95 scoring until a positive Chinese sample is added and rerun through the all-subject rubric."
++      ],
++      "required_followups_before_positive_claim": [
++        {
++          "action": "add_positive_chinese_long_text_sample",
++          "priority": "P0_before_chinese_claim",
++          "acceptance": "A Chinese reading/long-text final-gated positive_candidate has source_pdf, output_docx, render_pairs, visual_similarity.json, and human review without P0 veto."
++        },
++        {
++          "action": "add_positive_chinese_composition_or_writing_grid_sample",
++          "priority": "P0_before_composition_claim",
++          "acceptance": "Composition/writing-grid or answer-space geometry is represented and passes page/region visual review; otherwise composition-specific claims stay excluded."
++        },
++        {
++          "action": "rerun_human_visual_95_with_chinese_positive_samples",
++          "priority": "P0_before_all_subject_claim",
++          "acceptance": "Chinese positive samples are counted only after passing the same human_visual_95_gate thresholds as science/math/English positive candidates."
++        }
++      ]
++    },
++    {
++      "sample_key": "chinese_long_reading_positive_v1",
++      "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
++      "record_role": "canonical_positive_candidate",
++      "sample_generation": "implemented_positive_candidate",
++      "sample_name": "语文长文阅读正向样例",
++      "subject": "chinese",
++      "tier": "final_gated",
++      "evaluation_role": "positive_candidate",
++      "chinese_sample_role": "long_reading_positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "include_in_suite_for_guard": false,
++      "page_type": "chinese_long_reading",
++      "source_pdf": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++      "output_docx": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
++      "current_facts": {
++        "docx_kind": "apple_baseline_seed_bundle",
++        "docx_openable": true,
++        "word_media_count": 0,
++        "table_xml_present": false,
++        "image_entered_final_word": false,
++        "table_entered_final_word": false,
++        "question_or_region_detection_available": true,
++        "document_fallback": false,
++        "fallback_pages": [],
++        "fallback_page_count": 0,
++        "selected_pages_or_crops": [
++          1,
++          2,
++          3
++        ],
++        "default_source_profile": "apple_baseline_seed",
++        "supplemental_source_profile": null,
++        "render_pair_status": "pending_generation"
++      },
++      "evidence_paths": {
++        "archive_sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
++        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
++        "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++        "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++        "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
++        "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
++        "published_source_alias": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++        "published_output_alias": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
++      },
++      "baseline_interpretation": [
++        "该样例是独立于 chinese_grade5 的语文长文阅读正向候选 bundle。",
++        "当前 bundle 解决的是 sample_key / manifest / 路径稳定性问题，不等于已经通过人眼95。",
++        "真正的正向结论仍依赖后续 render_pair / visual_similarity / fidelity_veto / human_review 重跑。"
++      ],
++      "required_followups_before_positive_claim": [
++        {
++          "action": "rerun_real_render_pair_for_chinese_long_reading_positive_v1",
++          "priority": "P0_before_chinese_claim",
++          "acceptance": "render_pair.json 与 visual_similarity.json 来自真实 PDF/DOCX 渲染，而不是 staged placeholder。"
++        },
++        {
++          "action": "complete_page_and_region_human_review",
++          "priority": "P0_before_all_subject_claim",
++          "acceptance": "human_visual_score>=95，关键页>=92，关键区域>=90，无 P0 veto。"
++        }
++      ]
++    }
++  ],
++  "recommended_positive_chinese_sample_set": [
++    {
++      "sample_type": "chinese_long_reading_or_reading_question",
++      "minimum_count": 1,
++      "must_cover": [
++        "dense paragraphs",
++        "paragraph indentation and line breaks",
++        "question-to-material binding",
++        "punctuation/annotation readability",
++        "page density and margins"
++      ],
++      "claim_unlocked_if_passed": "Chinese long-text/readability can be considered for positive human visual 95."
++    },
++    {
++      "sample_type": "chinese_composition_or_writing_grid",
++      "minimum_count": 1,
++      "must_cover": [
++        "composition grid or writing area geometry",
++        "answer-space boundaries",
++        "title/body separation",
++        "teacher-facing blank area preservation if claimed"
++      ],
++      "claim_unlocked_if_passed": "Composition/writing-area claims can be considered; if absent, composition remains explicitly out of scope."
++    }
++  ],
++  "claim_recommendation": {
++    "current_decision": "current_chinese_negative_guard_preserved_and_positive_long_reading_seed_added_but_not_yet_passed",
++    "suite_decision": "keep_current_chinese_sample_as_final_gated_negative_guard",
++    "if_pm_needs_all_subject_human_visual_95_claim": "delay the claim or add qualified positive Chinese samples and rerun the full rubric before claiming science/math/Chinese/English all-subject human visual 95%.",
++    "allowed_wording": [
++      "语文已纳入 PDF→Word 样例治理和门禁范围；当前语文样例为 negative/document_fallback guard，不作为正向人工视觉 95 证据。",
++      "当前可保留 quality/hybrid_async 工程门禁通过；全学科人工逐页视觉 95 仍需补齐语文正样例和 render-pair 复核。",
++      "如需把语文纳入本轮 95 宣称，必须先补充长文/作文等正样例并完成全学科 Rubric 复验。"
++    ],
++    "disallowed_wording": [
++      "语文五年级已证明语文学科达到人工视觉 95%。",
++      "语文负样例可以与科学/数学/英语正样例一起计入 95 平均。",
++      "document_fallback 通过即可代表长文/作文版式高还原。"
++    ]
++  }
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/metrics.json
+@@ -0,0 +1,50 @@
++{
++  "total_seconds": 80.9678,
++  "per_page_seconds": [
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283,
++    6.2283
++  ],
++  "peak_memory_mb": 1900.734,
++  "model_load_seconds": null,
++  "page_count": 13,
++  "block_count": 403,
++  "image_candidate_count": 0,
++  "formula_candidate_count": 0,
++  "table_block_count": 0,
++  "material_block_count": 4,
++  "question_count": 4,
++  "option_count": 0,
++  "answer_area_item_count": 0,
++  "answer_section_count": 0,
++  "office_math_count": 0,
++  "positive_candidate": {
++    "sample_key": "chinese_long_reading_positive_v1",
++    "sample_name": "语文长文阅读正向样例",
++    "page_type": "chinese_long_reading",
++    "selected_pages_or_crops": [
++      1,
++      2,
++      3
++    ],
++    "question_or_region_detection_available": true,
++    "seed_profile": "apple_baseline",
++    "seed_profile_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级/output.docx",
++    "count_in_positive_human_visual_95_average": true,
++    "human_visual_rerun_required": true
++  },
++  "docx_facts": {
++    "word_media_count": 0,
++    "table_xml_present": false
++  }
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/warnings.json
+@@ -0,0 +1,6 @@
++[
++  "staged_positive_candidate_seeded_from_apple_baseline",
++  "selected_positive_pages=1,2,3",
++  "human_visual_rerun_pending_real_render_pair",
++  "composition_or_writing_grid_claim_out_of_scope_until_separate_sample_added"
++]
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json
+@@ -0,0 +1,57 @@
++{
++  "normalized_sample_name": "语文正向样例",
++  "original_sample_name": "语文五年级（长文阅读正向候选）",
++  "source_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级",
++  "copied_files": [
++    "output.docx",
++    "pages.jsonl"
++  ],
++  "generated_files": [
++    "metrics.json",
++    "warnings.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "missing_files": [],
++  "source_artifacts": {
++    "source_pdf_origin_path": "/Users/linsuchang/Desktop/work/chiralium/example/扫描件 /语文五年级.pdf",
++    "source_pdf_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++    "output_docx_seed_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级/output.docx",
++    "output_docx_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx",
++    "pages_source_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/apple_baseline/语文五年级/pages.jsonl",
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++    "fidelity_veto_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
++    "human_review_report_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
++    "unified_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
++    "final_gated_manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json"
++  },
++  "positive_candidate": {
++    "sample_key": "chinese_long_reading_positive_v1",
++    "entry_id": "chinese_long_reading_positive_v1_seeded_from_apple_baseline",
++    "evaluation_role": "positive_candidate",
++    "page_type": "chinese_long_reading",
++    "selected_pages_or_crops": [
++      1,
++      2,
++      3
++    ],
++    "eligible_for_human_visual_95": true,
++    "count_in_positive_human_visual_95_average": true,
++    "gate_status": "artifact_missing",
++    "seed_profile": "apple_baseline"
++  },
++  "checksums": {
++    "source_pdf_alias_sha256": "e34032a73e26a8abf8bc77d03afcb7e85b4da462ef67626147a08bd18a5484ae",
++    "output_docx_sha256": "a6bc1e8fe9b18666139ef93e8133e009f12e7f20957c532ad82b808e32b1834b",
++    "pages_jsonl_sha256": "5c7a32d03a1b4e999773ec7ed74c5f35613c71b857491e15993e39add3fc110a"
++  },
++  "notes": [
++    "该样例不会改写 chinese_grade5 negative_guard，而是以独立 sample_key + 独立 alias/source_manifest 进入 positive_candidate 体系。",
++    "当前 bundle 使用 apple_baseline 输出作为长文阅读正向样例 seed，以便后续 human visual 复验链路直接消费。",
++    "selected_pages_or_crops=[1,2,3] 对应《爸爸的鸽子》长文材料与题目区域；作文/写作格仍保持 out-of-scope，待单独样例。",
++    "output.docx/pages.jsonl 复制自 apple_baseline 语文五年级；metrics/warnings 与四类 canonical artifacts 由当前任务生成，用于稳定化语文正向样例 seed bundle。"
++  ]
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json
+@@ -0,0 +1,27 @@
++{
++  "report_type": "pdf_to_word_render_pair/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "source_name": "语文长文阅读正向样例",
++  "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++  "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
++  "render_dpi": 180,
++  "status": "staged_positive_candidate_pending_generation",
++  "ok": false,
++  "failure_code": "render_pair_not_generated_yet",
++  "errors": [],
++  "page_counts": {
++    "source_pdf": 13,
++    "output_docx": null,
++    "matched": 0
++  },
++  "render_pairs": [],
++  "evidence_paths": {
++    "source_pdf_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++    "output_docx_alias_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx",
++    "sample_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例"
++  },
++  "notes": [
++    "canonical placeholder artifact exists so downstream rerun tasks can overwrite it in place",
++    "real render_pair must be regenerated from the staged positive Chinese sample before any human-visual claim"
++  ]
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json
+@@ -0,0 +1,106 @@
++{
++  "report_type": "pdf_to_word_visual_similarity_evidence",
++  "contract_version": "pdf_to_word_visual_similarity_gate/v1",
++  "artifact_name": "visual_similarity.json",
++  "implementation_status": "staged_positive_candidate_pending_render_pair",
++  "status": "artifact_missing",
++  "failure_code": "render_pair_not_generated_yet",
++  "mode_boundary": {
++    "requested_mode": "quality",
++    "parser_backend": "hybrid_experimental",
++    "resolved_gate_mode": "quality/hybrid_async",
++    "enabled": true,
++    "default_sync_safe": true,
++    "default_sync_invokes_render_or_slow_model": false,
++    "reason": "staged Chinese positive sample still needs a real render_pair run before scoring"
++  },
++  "score_contract": {
++    "dimension_key": "visual_similarity",
++    "dimension_weight": 17,
++    "eligible_for_final_score": false,
++    "counts_toward_final_score": false,
++    "reason": "render_pair not generated yet for the staged Chinese positive sample"
++  },
++  "thresholds": {
++    "document_overall_similarity_min": 0.95,
++    "critical_page_render_similarity_min": 0.92,
++    "regular_page_render_similarity_min": 0.88,
++    "key_region_similarity_min": 0.9
++  },
++  "artifact_contract": {
++    "required_artifacts": [
++      "render_pair.json",
++      "visual_similarity.json",
++      "fidelity_veto.json",
++      "human_review_report.json"
++    ],
++    "required_fields": [
++      "report_type",
++      "contract_version",
++      "status",
++      "failure_code",
++      "mode_boundary",
++      "score_contract"
++    ]
++  },
++  "render_pair_status": "staged_positive_candidate_pending_generation",
++  "render_pair_failure_code": "render_pair_not_generated_yet",
++  "render_pairs": [],
++  "page_scores": [],
++  "key_regions": [],
++  "vetoes": [],
++  "blocking_failures": [
++    "render_pair_not_generated_yet"
++  ],
++  "subject_page_type": "chinese_long_reading",
++  "human_review_required": true,
++  "human_review_reasons": [
++    "render_pair_not_generated_yet",
++    "visual_similarity_not_generated_yet"
++  ],
++  "evidence_paths": {
++    "render_pair_artifact_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx"
++  },
++  "aggregate": {
++    "render_pair_count": 0,
++    "page_score_count": 0,
++    "key_region_count": 0,
++    "render_pair_ready_page_count": 0,
++    "overall_page_similarity_mean": null
++  },
++  "artifact_ready_for_scoring": false,
++  "gate_passed": false,
++  "slow_model_policy": {
++    "candidate_models": [
++      "qwen3_vl_8b"
++    ],
++    "disallowed_modes": [
++      "fast",
++      "balanced",
++      "default_sync"
++    ],
++    "fallback_action": "manual_review"
++  },
++  "slow_model_review": {
++    "enabled": false,
++    "selected_page_count": 0,
++    "executed_page_count": 0,
++    "fallback_page_count": 0,
++    "pages": [],
++    "status": "not_requested"
++  },
++  "known_gaps": [
++    "render_pair_not_generated_yet",
++    "page_scores_missing",
++    "key_regions_missing"
++  ],
++  "downstream_required_work": [
++    "rerun_render_pair_generation",
++    "rerun_visual_similarity_scoring",
++    "complete_human_review_report_after_scoring"
++  ],
++  "sample_name": "语文长文阅读正向样例",
++  "subject": "chinese"
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json
+@@ -0,0 +1,26 @@
++{
++  "report_type": "pdf_to_word_fidelity_veto_evidence",
++  "contract_version": "pdf_to_word_fidelity_veto/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "sample_name": "语文长文阅读正向样例",
++  "subject": "chinese",
++  "document_page_type": "chinese_long_reading",
++  "status": "review_pending",
++  "overall_score": null,
++  "human_review_required": true,
++  "page_scores": [],
++  "render_pairs": [],
++  "vetoes": [],
++  "page_vetoes": [],
++  "region_vetoes": [],
++  "evidence_paths": {
++    "render_pair_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++    "visual_similarity_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++    "source_pdf_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++    "output_docx_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx"
++  },
++  "notes": [
++    "P0 veto review is intentionally pending until real render_pair and page/region visual scoring are regenerated.",
++    "This placeholder keeps the Chinese positive sample on the same canonical artifact contract as other subjects."
++  ]
++}
+
+--- /dev/null
++++ artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json
+@@ -0,0 +1,42 @@
++{
++  "report_type": "pdf_to_word_human_review_report/v1",
++  "contract_version": "pdf_to_word_human_review_report/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "sample_name": "语文长文阅读正向样例",
++  "subject": "chinese",
++  "page_type": "chinese_long_reading",
++  "evaluation_role": "positive_candidate",
++  "engineering_gate_status": "staged_seed_ready",
++  "eligible_for_human_visual_95": true,
++  "human_visual_decision": "pending",
++  "human_visual_score": null,
++  "human_visual_thresholds": {
++    "sample_min": 95,
++    "critical_page_min": 92,
++    "critical_region_min": 90
++  },
++  "artifact_presence": {
++    "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
++    "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
++    "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
++    "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json"
++  },
++  "artifact_ready_for_scoring": false,
++  "scoring_ready": false,
++  "blocking_reasons": [
++    "render_pair_not_generated_yet",
++    "visual_similarity_not_generated_yet",
++    "human_review_not_started"
++  ],
++  "fidelity_veto_summary": {
++    "status": "review_pending",
++    "p0_veto_count": 0,
++    "veto_count": 0,
++    "failed_taxonomy": []
++  },
++  "summary": "语文正向长文样例已进入 canonical manifest / archive sample bundle，但仍需真实 render-pair 与人工复核才能进入全学科95分母。",
++  "notes": [
++    "This report is a staged manifest artifact, not a pass verdict.",
++    "Do not use this sample for composition/writing-grid claims until a dedicated composition sample is added."
++  ]
++}
+
+--- /dev/null
++++ backend/tests/fixtures/pdf_to_word/chinese_positive/chinese_positive_artifact_contract.json
+@@ -0,0 +1,26 @@
++{
++  "contract_version": "pdf2word_chinese_positive_artifact_contract/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "sample_dir": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
++  "required_files": [
++    "output.docx",
++    "pages.jsonl",
++    "metrics.json",
++    "warnings.json",
++    "source_manifest.json",
++    "render_pair.json",
++    "visual_similarity.json",
++    "fidelity_veto.json",
++    "human_review_report.json"
++  ],
++  "published_aliases": [
++    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
++    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
++  ],
++  "sample_key": "chinese_long_reading_positive_v1",
++  "sample_name": "语文长文阅读正向样例",
++  "notes": [
++    "后续 human visual 复验链路应直接消费该 sample_dir 与 published aliases。",
++    "render_pair / visual_similarity / fidelity_veto / human_review_report 允许先以 staged placeholder 存在，随后覆盖更新。"
++  ]
++}
+
+--- /dev/null
++++ backend/tests/fixtures/pdf_to_word/chinese_positive/unified_manifest_roles_fixture.json
+@@ -0,0 +1,34 @@
++{
++  "contract_version": "pdf2word_chinese_positive_fixture/v1",
++  "generated_at": "2026-05-20T09:23:18+08:00",
++  "manifest_path": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
++  "required_samples": {
++    "chinese_grade5": {
++      "evaluation_role": "negative_guard",
++      "eligible_for_human_visual_95": false,
++      "include_in_suite_for_guard": true,
++      "gate_status": "negative_guard_excluded"
++    },
++    "chinese_long_reading_positive_v1": {
++      "evaluation_role": "positive_candidate",
++      "eligible_for_human_visual_95": true,
++      "count_in_positive_human_visual_95_average": true,
++      "required_artifacts": [
++        "render_pair.json",
++        "visual_similarity.json",
++        "fidelity_veto.json",
++        "human_review_report.json"
++      ],
++      "selected_pages_or_crops": [
++        1,
++        2,
++        3
++      ],
++      "gate_status": "artifact_missing"
++    }
++  },
++  "notes": [
++    "该 fixture 冻结语文 negative_guard / positive_candidate 的分工与关键资格字段。",
++    "positive sample 当前允许 gate_status=artifact_missing，因为真实视觉证据链将在后续任务重跑。"
++  ]
++}
+
+# Artifact inventory (copied or binary deliverables not expanded inline)
+# ADD artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf bytes=5285073 sha256=e34032a73e26a8abf8bc77d03afcb7e85b4da462ef67626147a08bd18a5484ae note=published source alias
+# ADD artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx bytes=16947 sha256=a6bc1e8fe9b18666139ef93e8133e009f12e7f20957c532ad82b808e32b1834b note=published output alias
+# ADD artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx bytes=16947 sha256=a6bc1e8fe9b18666139ef93e8133e009f12e7f20957c532ad82b808e32b1834b note=sample bundle DOCX copied from apple_baseline seed
+# ADD artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/pages.jsonl bytes=126234 sha256=5c7a32d03a1b4e999773ec7ed74c5f35613c71b857491e15993e39add3fc110a note=sample bundle pages copied from apple_baseline seed

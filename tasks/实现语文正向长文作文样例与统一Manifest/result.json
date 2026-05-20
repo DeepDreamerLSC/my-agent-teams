@@ -1,0 +1,75 @@
+{
+  "task_id": "实现语文正向长文作文样例与统一Manifest",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已落地独立语文长文阅读正向样例 bundle，并把 unified/final-gated/chinese manifests 接入 positive_candidate 体系；同时保留 chinese_grade5 为 negative_guard。当前语文正向样例仍为 staged seed，gate_status=artifact_missing，需下游重跑真实视觉证据链后才能计入全学科 human visual 95。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/README.final-gated.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/metrics.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/warnings.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/chinese_positive_artifact_contract.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive/unified_manifest_roles_fixture.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/output.docx",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例/pages.jsonl"
+  ],
+  "change_summary": {
+    "negative_guard_retained": "chinese_grade5",
+    "positive_candidate_added": {
+      "sample_key": "chinese_long_reading_positive_v1",
+      "sample_name": "语文长文阅读正向样例",
+      "evaluation_role": "positive_candidate",
+      "eligible_for_human_visual_95": true,
+      "count_in_positive_human_visual_95_average": true,
+      "selected_pages_or_crops": [
+        1,
+        2,
+        3
+      ],
+      "seed_profile": "apple_baseline",
+      "gate_status": "artifact_missing"
+    },
+    "published_aliases": [
+      "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-source.pdf",
+      "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/PDF转Word门禁样例-语文长文阅读正向-output.docx"
+    ],
+    "bundle_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+    "fixture_root": "/Users/linsuchang/Desktop/work/chiralium/backend/tests/fixtures/pdf_to_word/chinese_positive"
+  },
+  "gate_status": "artifact_missing",
+  "unfinished_items": [
+    "render_pair.json / visual_similarity.json / fidelity_veto.json / human_review_report.json 当前仍是 staged placeholder，需要后续任务按真实 PDF↔DOCX 渲染结果覆盖重跑。",
+    "作文/写作格页型尚未纳入本轮语文正向分母，仍需独立 composition sample。"
+  ],
+  "downstream_dependencies": [
+    "复验语文正向样例进入全学科95分母",
+    "升级FinalAcceptance为HumanVisual强依赖门禁"
+  ],
+  "artifacts": {
+    "patch": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现语文正向长文作文样例与统一Manifest/artifacts/Manifest-68dfd28f.patch",
+    "sample_bundle": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/语文正向样例",
+    "manifests": [
+      "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/final-gated-manifest.json",
+      "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/unified-sample-manifest.json",
+      "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-output-samples/chinese-samples-manifest.json"
+    ]
+  },
+  "tests": [
+    "python3 inline validation -> VALIDATION_OK（校验 16 个必需文件存在、JSON 可解析、两份 DOCX ZIP 结构可打开、manifest 中 chinese_grade5 仍为 negative_guard、chinese_long_reading_positive_v1 为 positive_candidate 且 gate_status=artifact_missing）"
+  ],
+  "risks": [
+    "当前 positive sample 只是 canonical seed bundle，不可据此宣称语文学科已通过人工视觉95。",
+    "render_pair / visual_similarity / human review 未重跑前，FinalAcceptance 仍不能把该样例作为最终通过证据。",
+    "作文/写作格能力声明仍缺单独样例支持。"
+  ],
+  "completed_at": "2026-05-20T10:04:21+08:00"
+}

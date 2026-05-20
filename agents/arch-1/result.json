@@ -1,0 +1,43 @@
+{
+  "task": "提交推送当前 agent 团队代码并优化 scripts 结构",
+  "agent": "arch-1",
+  "status": "done",
+  "completed_at": "2026-05-20T10:09:39+08:00",
+  "summary": [
+    "已提交并推送当前 my-agent-teams 状态到 origin/main。",
+    "已审视 scripts 目录，识别 task-watcher.sh、teamctl.sh、task_artifacts.py、create-task.sh 等超过或接近 500 行的维护热点。",
+    "已保留顶层入口兼容路径，新增 scripts/README.md 与 scripts/lib/README.md，按任务生命周期、watcher 控制面、通知沟通、配置工作区、报告诊断分组说明维护边界。",
+    "已将 task-watcher.sh 的通知、飞书推送、系统 chat 事件函数抽离到 scripts/lib/task_watcher_notifications.sh，降低主 watcher 文件耦合度且不改变对外入口。"
+  ],
+  "commits_pushed": [
+    {
+      "sha": "0797a18",
+      "message": "chore: checkpoint agent team state"
+    },
+    {
+      "sha": "87630a5",
+      "message": "chore: checkpoint task invariant timestamps"
+    },
+    {
+      "sha": "2a7f125",
+      "message": "refactor(scripts): modularize watcher notifications"
+    }
+  ],
+  "remote": "origin/main",
+  "files_changed_for_structure": [
+    "scripts/task-watcher.sh",
+    "scripts/lib/task_watcher_notifications.sh",
+    "scripts/README.md",
+    "scripts/lib/README.md"
+  ],
+  "verification": [
+    "find scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n",
+    "python3 -m py_compile scripts/*.py scripts/lib/*.py",
+    ".venv/bin/python -m pytest tests/test_task_watcher_push_reliability.py tests/test_claim_task_reserved.py tests/test_task_pool_and_queue_router.py tests/test_pool_task_gate.py tests/test_dispatch_task.py -q (49 passed)",
+    ".venv/bin/python -m pytest -q (123 passed)"
+  ],
+  "notes": [
+    "task-watcher.sh 仍是最大脚本，本次采取低风险增量拆分；README 中记录了后续按 runtime/routing/gate/queue 继续拆分的边界。",
+    "执行期间 task-watcher 持续更新 tasks 下部分运行态 task.json / transitions / artifacts；最终会随反馈 checkpoint 一并提交推送，避免仓库长期残留未提交状态。"
+  ]
+}
