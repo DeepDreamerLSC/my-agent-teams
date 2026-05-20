@@ -1,0 +1,10 @@
+{
+  "task_id": "升级FinalAcceptance为HumanVisual强依赖门禁",
+  "agent": "dev-1",
+  "status": "working",
+  "summary": "已读取任务说明，开始实现 FinalAcceptance 对 HumanVisual canonical artifacts 与 unified manifest 的强依赖 NO-GO 门禁。",
+  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/FinalAcceptance-HumanVisual-216b8f8b",
+  "branch": "task/FinalAcceptance-HumanVisual-216b8f8b",
+  "target_branch": "integration",
+  "started_at": "2026-05-20T10:16:45+08:00"
+}

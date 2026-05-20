@@ -3,6 +3,6 @@
   "agent": "dev-2",
   "agent_id": "dev-2",
   "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T09:11:03+08:00",
-  "summary": "dev-2 已读取 instruction.md 与 task.json，将在 Veto-96a0ce32 worktree 内按 write_scope 实施“可编辑表格结构 + 区域视觉 veto”联合门禁，重点覆盖五下科学与数学八年级表格页，并补齐对应 fixture/测试与 table_gate 产物。"
+  "acknowledged_at": "2026-05-20T10:23:19+08:00",
+  "summary": "dev-2 已重读 instruction 与 history/review，按 PM 仲裁进入最小返修：1）把 table_gate canonical 示例产物真正落到 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/；2）把联合 gate 接入实际 runtime consumer（docx_assembler / exercise 路径）并补定向回归后重写 result.json。"
 }

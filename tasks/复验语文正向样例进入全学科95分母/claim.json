@@ -1,0 +1,7 @@
+{
+  "task_id": "复验语文正向样例进入全学科95分母",
+  "agent": "qa-1",
+  "claimed_at": "2026-05-20T10:15:35+08:00",
+  "claim_status": "requested",
+  "reason": "watcher auto-continued after idle sweep"
+}

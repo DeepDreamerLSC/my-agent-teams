@@ -1,0 +1,62 @@
+{
+  "task_id": "实现表格可编辑结构与区域视觉Veto联合门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T10:16:00+08:00",
+  "status": "request_changes",
+  "summary": "本轮先落下了 `table_ir.py` 内的联合门禁 contract、3 组 pytest，以及科学/数学两份示例 JSON；相关单测与 py_compile 均通过。但按当前任务目标与交付口径，还不能放行：一方面 `artifacts/pdf2word/table_gate` 的 canonical 产物并未真正落到 write_scope 指向的 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/`，result.json 中列出的两个文件在该路径下不存在；另一方面新的 table gate helper 仍未接入实际运行链，`docx_assembler.py` / `exercise_docx_assembler.py` 未消费该 gate，当前 pipeline 仍不会真正执行“可编辑结构 + 区域视觉 veto”联合门禁。建议按下述最小返修项补齐后再复审。",
+  "blocking_findings": [
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate",
+      "finding": "result.json 声称已交付 `/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/五下科学_table_gate_ready.json` 与 `数学八年级_table_gate_failed.json`，但 reviewer 复核时该 canonical 目录不存在，实际产物只落在 worktree 私有路径 `/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/`。",
+      "recommendation": "请把两份 table_gate 示例产物真正落到 write_scope 约定的 canonical `artifacts/pdf2word/table_gate/` 目录，或统一修正任务交付/消费口径，确保下游 QA 与重跑链路读取到的不是 worktree 私有临时文件。",
+      "evidence": "`ls /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate` 返回 `No such file or directory`；同名 JSON 仅存在于 worktree `.../Veto-96a0ce32/artifacts/pdf2word/table_gate/` 下。"
+    },
+    {
+      "severity": "major",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/table_ir.py",
+      "finding": "本轮只新增了 `build_table_editable_visual_gate_result` / `write_table_editable_visual_gate_result` helper 与测试，但没有把 gate 接入实际运行链；`docx_assembler.py`、`exercise_docx_assembler.py` 未修改，代码库内也没有其他 consumer。当前 pipeline 仍不会真正执行该联合门禁。",
+      "recommendation": "请至少把 table gate 结果接到实际消费路径上（例如 docx assembler / exercise assembler 或明确的运行时门禁入口），让‘不能只凭 table XML 存在就宣称达标’成为真实运行约束，而不是仅存在于 helper 和示例 JSON。",
+      "evidence": "`rg` 检索显示 `build_table_editable_visual_gate_result` / `write_table_editable_visual_gate_result` 只出现在 `table_ir.py` 与 `test_pdf_to_word_table_ir_contract.py`；`docx_assembler.py`、`exercise_docx_assembler.py` 未出现在 patch diff 中，result.json 也主动标注‘尚未把 gate 结果自动接入 ... 运行链’。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁",
+      "finding": "任务目录当前没有 verify.json，且 task.json 标记 `qa_gate_state=skipped`。",
+      "recommendation": "本轮不单独阻塞；如后续 watcher/QA 需要完整留痕，可补写 verify.json。",
+      "evidence": "reviewer 审查时任务目录仅见 ack/result/task/transitions/artifacts，无 verify.json。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/table_ir.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/tests/test_pdf_to_word_table_ir_contract.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/五下科学_table_gate_ready.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate/数学八年级_table_gate_failed.json",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/exercise_docx_assembler.py"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-table-gate-review /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/table_ir.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/tests/test_pdf_to_word_table_ir_contract.py",
+      "result": "passed"
+    },
+    {
+      "command": "TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/tests/test_pdf_to_word_table_ir_contract.py -p no:cacheprovider -q",
+      "result": "9 passed, 4 warnings（既有 FastAPI `on_event` deprecation warnings，与本任务无关）"
+    },
+    {
+      "command": "ls /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate && find /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/artifacts/pdf2word/table_gate -maxdepth 1 -type f",
+      "result": "failed as expected for canonical path：canonical `table_gate` 目录不存在；两份 JSON 仅存在于 worktree 私有 artifacts 目录。"
+    },
+    {
+      "command": "rg -n \"build_table_editable_visual_gate_result|write_table_editable_visual_gate_result\" /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend /Users/linsuchang/Desktop/work/chiralium/backend",
+      "result": "只命中 `table_ir.py` 与 `test_pdf_to_word_table_ir_contract.py`，未发现 docx/exercise assembler 或其他运行时 consumer。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

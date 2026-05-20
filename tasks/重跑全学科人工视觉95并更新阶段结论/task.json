@@ -88,7 +88,7 @@
   ],
   "claim_max_concurrency": 1,
   "dependency_policy": "done_only",
-  "pool_timeout_minutes": 120,
+  "pool_timeout_minutes": 360,
   "pool_entered_at": "2026-05-20T08:09:56+08:00",
   "claimed_by": null,
   "claimed_at": null,

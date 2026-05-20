@@ -1,1 +1,3 @@
 {"from": "pending", "to": "pooled", "at": "2026-05-20T08:09:53+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-20T10:15:53+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "working", "at": "2026-05-20T10:17:28+08:00", "reason": "watcher observed ack.json"}

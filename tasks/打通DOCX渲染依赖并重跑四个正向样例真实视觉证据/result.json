@@ -1,0 +1,224 @@
+{
+  "task_id": "打通DOCX渲染依赖并重跑四个正向样例真实视觉证据",
+  "agent": "arch-1",
+  "status": "success",
+  "completed_at": "2026-05-20T10:29:59+08:00",
+  "summary": "已消除四个 positive_candidate 的 docx_renderer_unavailable 阻塞：render_pair.json 均为 success，visual_similarity.json 均进入真实可评分 scored_no_go；当前四个样例仍因真实相似度低于阈值/P0 veto 保持 no_go，未伪造 GO。",
+  "renderer_dependency": {
+    "preferred_native_converter": "soffice/libreoffice --headless --convert-to pdf",
+    "preferred_native_converter_status": "unavailable in current dev environment (which soffice/libreoffice 均为空)",
+    "active_fallback_renderer": "python_docx_text_fallback/v1",
+    "active_fallback_description": "使用 Python stdlib zip/xml 解析 DOCX 文本/表格结构，并用 Pillow 生成逐页 PNG；再用 pypdfium2 渲染 source PDF，形成真实 render_pair 与像素级相似度评分。",
+    "python": "/Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python",
+    "required_python_modules": [
+      "Pillow",
+      "pypdfium2"
+    ],
+    "reproduce_command": "PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py"
+  },
+  "samples": [
+    {
+      "sample_name": "五下科学",
+      "before": {
+        "render_pair_status": "docx_render_missing",
+        "render_pair_failure_code": "docx_renderer_unavailable",
+        "visual_similarity_status": "artifact_not_ready",
+        "artifact_ready_for_scoring": false,
+        "sample_verdict": "no_go"
+      },
+      "after": {
+        "render_pair_status": "success",
+        "render_pair_failure_code": null,
+        "visual_similarity_status": "scored_no_go",
+        "visual_similarity_failure_code": "visual_similarity_below_threshold",
+        "artifact_ready_for_scoring": true,
+        "visual_similarity_gate_passed": false,
+        "sample_verdict": "no_go",
+        "human_visual_decision": "no_go",
+        "eligible_for_human_visual_95": false,
+        "renderer_strategy": "python_docx_text_fallback/v1",
+        "fallback_used": true,
+        "matched_pages": 6,
+        "source_page_count": 6,
+        "docx_page_count": 6,
+        "overall_page_similarity_mean": 0.8847,
+        "min_page_similarity": 0.8718,
+        "blocking_reasons": [
+          "visual_similarity_below_threshold",
+          "p0_fidelity_veto_present"
+        ]
+      },
+      "artifacts": {
+        "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
+        "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
+        "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json",
+        "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json",
+        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/source_manifest.json",
+        "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair_artifacts"
+      }
+    },
+    {
+      "sample_name": "数学八年级",
+      "before": {
+        "render_pair_status": "docx_render_missing",
+        "render_pair_failure_code": "docx_renderer_unavailable",
+        "visual_similarity_status": "artifact_not_ready",
+        "artifact_ready_for_scoring": false,
+        "sample_verdict": "no_go"
+      },
+      "after": {
+        "render_pair_status": "success",
+        "render_pair_failure_code": null,
+        "visual_similarity_status": "scored_no_go",
+        "visual_similarity_failure_code": "visual_similarity_below_threshold",
+        "artifact_ready_for_scoring": true,
+        "visual_similarity_gate_passed": false,
+        "sample_verdict": "no_go",
+        "human_visual_decision": "no_go",
+        "eligible_for_human_visual_95": false,
+        "renderer_strategy": "python_docx_text_fallback/v1",
+        "fallback_used": true,
+        "matched_pages": 8,
+        "source_page_count": 8,
+        "docx_page_count": 8,
+        "overall_page_similarity_mean": 0.9128,
+        "min_page_similarity": 0.8958,
+        "blocking_reasons": [
+          "visual_similarity_below_threshold",
+          "p0_fidelity_veto_present"
+        ]
+      },
+      "artifacts": {
+        "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
+        "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
+        "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json",
+        "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json",
+        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/source_manifest.json",
+        "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair_artifacts"
+      }
+    },
+    {
+      "sample_name": "数学试卷",
+      "before": {
+        "render_pair_status": "docx_render_missing",
+        "render_pair_failure_code": "docx_renderer_unavailable",
+        "visual_similarity_status": "artifact_not_ready",
+        "artifact_ready_for_scoring": false,
+        "sample_verdict": "no_go"
+      },
+      "after": {
+        "render_pair_status": "success",
+        "render_pair_failure_code": null,
+        "visual_similarity_status": "scored_no_go",
+        "visual_similarity_failure_code": "visual_similarity_below_threshold",
+        "artifact_ready_for_scoring": true,
+        "visual_similarity_gate_passed": false,
+        "sample_verdict": "no_go",
+        "human_visual_decision": "no_go",
+        "eligible_for_human_visual_95": false,
+        "renderer_strategy": "python_docx_text_fallback/v1",
+        "fallback_used": true,
+        "matched_pages": 12,
+        "source_page_count": 12,
+        "docx_page_count": 12,
+        "overall_page_similarity_mean": 0.8984,
+        "min_page_similarity": 0.8827,
+        "blocking_reasons": [
+          "visual_similarity_below_threshold",
+          "p0_fidelity_veto_present"
+        ]
+      },
+      "artifacts": {
+        "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
+        "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
+        "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json",
+        "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json",
+        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/source_manifest.json",
+        "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair_artifacts"
+      }
+    },
+    {
+      "sample_name": "英语八年级",
+      "before": {
+        "render_pair_status": "docx_render_missing",
+        "render_pair_failure_code": "docx_renderer_unavailable",
+        "visual_similarity_status": "artifact_not_ready",
+        "artifact_ready_for_scoring": false,
+        "sample_verdict": "no_go"
+      },
+      "after": {
+        "render_pair_status": "success",
+        "render_pair_failure_code": null,
+        "visual_similarity_status": "scored_no_go",
+        "visual_similarity_failure_code": "visual_similarity_below_threshold",
+        "artifact_ready_for_scoring": true,
+        "visual_similarity_gate_passed": false,
+        "sample_verdict": "no_go",
+        "human_visual_decision": "no_go",
+        "eligible_for_human_visual_95": false,
+        "renderer_strategy": "python_docx_text_fallback/v1",
+        "fallback_used": true,
+        "matched_pages": 12,
+        "source_page_count": 12,
+        "docx_page_count": 12,
+        "overall_page_similarity_mean": 0.8947,
+        "min_page_similarity": 0.8839,
+        "blocking_reasons": [
+          "visual_similarity_below_threshold",
+          "p0_fidelity_veto_present"
+        ]
+      },
+      "artifacts": {
+        "render_pair": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
+        "visual_similarity": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
+        "fidelity_veto": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json",
+        "human_review_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json",
+        "source_manifest": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/source_manifest.json",
+        "render_pair_artifacts_root": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair_artifacts"
+      }
+    }
+  ],
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/page_renderer.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/workspace.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/fidelity_veto.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/tests/fixtures/pdf_to_word/render_pair/docx_text_fallback_contract.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/tests/fixtures/pdf_to_word/visual_similarity/scored_no_go_contract.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/source_manifest.json"
+  ],
+  "artifacts": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/DOCX-6529460c.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py"
+  ],
+  "tests": [
+    "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-docx /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/page_renderer.py backend/app/services/pdf_to_word/workspace.py backend/app/services/pdf_to_word/visual_similarity_gate.py backend/app/services/pdf_to_word/fidelity_veto.py -> passed",
+    "PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py -> generated 4 sample evidence chains",
+    "canonical visual evidence check: 4 render_pair.json status=success; 4 visual_similarity.json status!=artifact_not_ready; 4 artifact_ready_for_scoring=true; 4 sample_verdict=no_go -> passed",
+    "git diff --cached --check -> passed"
+  ],
+  "notes": [
+    "本轮解决的是 renderer unavailable / artifact_not_ready 阻塞，不代表人工视觉95恢复。",
+    "因为当前环境没有 LibreOffice/soffice，active renderer 是可复现的 DOCX 文本/表格 fallback PNG 渲染；source_manifest 已写明该本机依赖与复现命令。",
+    "四个样例 visual_similarity 均已真实计分但低于阈值，因此下游复验应以 scored_no_go/no_go 为当前事实。"
+  ]
+}

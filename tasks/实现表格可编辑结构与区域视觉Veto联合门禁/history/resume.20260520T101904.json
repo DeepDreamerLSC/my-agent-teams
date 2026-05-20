@@ -1,0 +1,14 @@
+{
+  "task_id": "实现表格可编辑结构与区域视觉Veto联合门禁",
+  "resumed_at": "2026-05-20T10:19:04+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "dev-2",
+  "reason": "review request_changes: canonical table_gate artifacts missing at write_scope path and runtime consumer not wired into actual pipeline",
+  "archived_files": [
+    "ack.20260520T101904.json",
+    "claim.20260520T101904.json",
+    "review.20260520T101904.json",
+    "review.20260520T101904.md",
+    "result.20260520T101904.json"
+  ]
+}

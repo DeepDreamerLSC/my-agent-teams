@@ -1,1 +1,4 @@
 {"from": "pending", "to": "pooled", "at": "2026-05-20T08:09:52+08:00", "reason": "pm queued task into claim pool"}
+{"from": "pooled", "to": "pooled", "at": "2026-05-20T10:14:50+08:00", "event": "dependencies_ready", "reason": "watcher observed all dependencies ready"}
+{"from": "pooled", "to": "dispatched", "at": "2026-05-20T10:15:35+08:00", "reason": "watcher confirmed claim.json"}
+{"from": "dispatched", "to": "working", "at": "2026-05-20T10:16:28+08:00", "reason": "watcher observed ack.json"}

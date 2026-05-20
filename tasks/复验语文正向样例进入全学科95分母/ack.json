@@ -1,0 +1,8 @@
+{
+  "task_id": "复验语文正向样例进入全学科95分母",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-20T10:16:20+08:00",
+  "summary": "qa-1 已读取 instruction.md，开始只读复验：核查语文正向样例的 sample_key / evaluation_role / eligible_for_human_visual_95，并确认 chinese_grade5 仍为 negative_guard 且未混入全学科95正向分母。"
+}
