@@ -1,0 +1,7 @@
+{
+  "task_id": "修正英语Fallback页事实并复核阅读顺序",
+  "agent": "dev-2",
+  "claimed_at": "2026-05-20T11:09:13+08:00",
+  "claim_status": "requested",
+  "reason": "watcher auto-continued after idle sweep"
+}

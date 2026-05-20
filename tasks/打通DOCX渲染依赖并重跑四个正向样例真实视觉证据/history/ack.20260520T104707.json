@@ -1,0 +1,9 @@
+{
+  "task_id": "打通DOCX渲染依赖并重跑四个正向样例真实视觉证据",
+  "agent": "arch-1",
+  "status": "acknowledged",
+  "ack_at": "2026-05-20T10:14:02+08:00",
+  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c",
+  "branch": "task/DOCX-6529460c",
+  "notes": "已读取 instruction.md；按四个 positive_candidate 打通真实 DOCX 渲染证据链，不伪造 ready/no_go。"
+}

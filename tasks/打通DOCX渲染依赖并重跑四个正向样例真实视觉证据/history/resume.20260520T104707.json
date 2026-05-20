@@ -1,0 +1,13 @@
+{
+  "task_id": "打通DOCX渲染依赖并重跑四个正向样例真实视觉证据",
+  "resumed_at": "2026-05-20T10:47:07+08:00",
+  "resumed_by": "pm-chief",
+  "assigned_agent": "arch-1",
+  "reason": "review request_changes: stale source_manifest notes, unstable /private/tmp reproduce_command provenance, and result.json status must be normalized to done",
+  "archived_files": [
+    "ack.20260520T104707.json",
+    "review.20260520T104707.json",
+    "review.20260520T104707.md",
+    "result.20260520T104707.json"
+  ]
+}

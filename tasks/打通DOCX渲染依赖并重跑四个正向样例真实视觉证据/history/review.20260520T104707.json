@@ -1,0 +1,77 @@
+{
+  "task_id": "打通DOCX渲染依赖并重跑四个正向样例真实视觉证据",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T10:45:42+08:00",
+  "status": "request_changes",
+  "summary": "审查未通过。代码与样例产物层面，四个 positive_candidate 已从 `docx_render_missing / artifact_not_ready` 推进到真实 `render_pair=success`、`visual_similarity=scored_no_go`，且 `human_review_report.sample_verdict` 均保持 `no_go`，没有伪造 GO；但 final-archive 内四份 `source_manifest.json` 仍保留“render_pair remains docx_render_missing”的过时说明，且 `docx_render_dependency.reproduce_command` 仍硬编码到 `/private/tmp/rerun_docx_visual_evidence.py`。这会把已解除的 blocker 重新写回 provenance，并让 QA 复现依赖临时路径，暂不能按当前交付收口。",
+  "blocking_findings": [
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/source_manifest.json",
+      "finding": "四个样例的 `source_manifest.json` 仍保留过时结论：最后一条 note 明确写着“the render_pair remains docx_render_missing in the current environment”，但同目录实际 `render_pair.json.status` 已全部是 `success`，`visual_similarity.json.artifact_ready_for_scoring` 也已全部为 `true`。这与本任务“消除 renderer unavailable 阻塞、进入真实可评分状态”的目标直接矛盾，会把已解除的 blocker 重新写进 final-archive provenance。",
+      "recommendation": "请回写/重生成四个 `source_manifest.json`，至少移除或改写该过时 note，明确当前事实应为：render_pair/visual_similarity 已 materialize 且进入真实评分，之所以仍是 `no_go` 是因为相似度阈值/P0 veto 未通过，而不是因为 `docx_render_missing`。",
+      "evidence": "reviewer 复核四个样例目录：`render_pair.json.status=success`、`visual_similarity.json.status=scored_no_go`、`visual_similarity.json.artifact_ready_for_scoring=true`；但四份 `source_manifest.json.notes[-1]` 全部仍为 “These artifacts do not restore human visual 95 on their own because the render_pair remains docx_render_missing in the current environment.”"
+    },
+    {
+      "severity": "high",
+      "file": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/*/source_manifest.json",
+      "finding": "四个 `source_manifest.json` 的 `docx_render_dependency.reproduce_command` 都指向 `/private/tmp/rerun_docx_visual_evidence.py`，而不是 task 目录下的稳定 artifact。与此同时，`result.json.renderer_dependency.reproduce_command` 已指向 `/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py`。当前 final-archive provenance 仍依赖临时目录路径，QA 复现不具备自包含/可持久性。",
+      "recommendation": "请把四个 `source_manifest.json`（以及生成它们的脚本）统一改为指向 task artifact 下的稳定脚本路径，或将可复现脚本落到 repo/task 可追踪位置后再引用，确保 result.json 与 source_manifest 的复现口径一致。",
+      "evidence": "task artifact 脚本 `.../tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py:224` 目前硬编码 `/private/tmp/rerun_docx_visual_evidence.py`；四份 `source_manifest.json.docx_render_dependency.reproduce_command` 与之保持同一临时路径，而 `result.json.renderer_dependency.reproduce_command` 已使用 task artifact 绝对路径。"
+    }
+  ],
+  "non_blocking_findings": [
+    {
+      "severity": "minor",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/result.json",
+      "finding": "当前 `result.json.status` 使用了非规范值 `success`。按 AGENTS.md 约束，`result.json.status` 应只使用 `done / failed / blocked`。",
+      "recommendation": "返修回提时一并把 `result.json.status` 规范化为 `done`，避免 watcher / review 链路继续累积口径分叉。",
+      "evidence": "task result 当前为 `\"status\": \"success\"`；AGENTS.md 已明确禁止使用 `success`、`completed`、`ok` 等非规范值。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/page_renderer.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/workspace.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/visual_similarity_gate.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/fidelity_veto.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/五下科学/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学八年级/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷/source_manifest.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/render_pair.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/visual_similarity.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/fidelity_veto.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/human_review_report.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级/source_manifest.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pycache-docx-review-2 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/page_renderer.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/workspace.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/visual_similarity_gate.py /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/DOCX-6529460c/backend/app/services/pdf_to_word/fidelity_veto.py",
+      "result": "passed"
+    },
+    {
+      "command": "python3 reviewer check: assert 4 samples all satisfy render_pair.status=success, visual_similarity.status!=artifact_not_ready, artifact_ready_for_scoring=true, human_review_report.sample_verdict=no_go",
+      "result": "passed（四个样例均已进入真实可评分 evidence，但结论保持 no_go）"
+    },
+    {
+      "command": "python3 reviewer check: compare each sample's render_pair.json / source_manifest.json for stale notes and reproduce_command provenance",
+      "result": "failed as expected for review：4/4 `source_manifest.json` 仍声称 `render_pair remains docx_render_missing`，且 4/4 `reproduce_command` 仍指向 `/private/tmp/rerun_docx_visual_evidence.py`。"
+    }
+  ],
+  "recommended_next_action": "dev"
+}

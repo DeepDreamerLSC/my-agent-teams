@@ -221,7 +221,7 @@ for sample_name, (subject, page_type) in SAMPLES.items():
             'fallback_renderer': 'python stdlib zip/xml DOCX text extractor + Pillow PNG renderer',
             'fallback_renderer_version': render_pair.get('renderer_strategy'),
             'render_dpi': RENDER_DPI,
-            'reproduce_command': 'PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /private/tmp/rerun_docx_visual_evidence.py',
+            'reproduce_command': 'PYTHONPATH=backend /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python /Users/linsuchang/Desktop/work/my-agent-teams/tasks/打通DOCX渲染依赖并重跑四个正向样例真实视觉证据/artifacts/rerun_docx_visual_evidence.py',
         },
         'updated_at': now,
     })

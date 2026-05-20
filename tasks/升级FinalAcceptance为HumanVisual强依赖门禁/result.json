@@ -1,0 +1,45 @@
+{
+  "task_id": "升级FinalAcceptance为HumanVisual强依赖门禁",
+  "agent": "dev-1",
+  "status": "done",
+  "summary": "已把 FinalAcceptance 升级为 HumanVisual 强依赖门禁：final_acceptance_summary 与 final_human_visual_acceptance 统一消费同一套 final-gated / unified / chinese manifests，并把工程 PASS 与 human visual 95 口径强隔离。当前产物明确输出 engineering PASS + human visual NO-GO，不再允许在缺真实视觉证据或样例未通过人审时给出可恢复95的误导性结论。",
+  "files_modified": [
+    "/Users/linsuchang/Desktop/work/chiralium/backend/app/services/pdf_to_word/model_eval_runner.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_manifest.py",
+    "/Users/linsuchang/Desktop/work/chiralium/backend/tests/test_pdf_to_word_fidelity_report.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_report.md",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md"
+  ],
+  "enforced_no_go_conditions": {
+    "generic_rules": [
+      "任一 positive_candidate 缺真实可计分的 canonical artifacts（render_pair / visual_similarity / fidelity_veto / human_review）时，强制 NO-GO。",
+      "缺语文学科 positive_candidate（eligible_for_human_visual_95=true）时，强制 NO-GO。",
+      "final-gated / unified / chinese subject manifest 的 sample/subject/role/eligibility 不一致时，强制 NO-GO。",
+      "任一 positive_candidate 的 visual_similarity / fidelity_veto / human_review 当前 verdict 不是 pass 时，强制 NO-GO。"
+    ],
+    "current_suite_blockers": [
+      "chinese_long_reading_positive_v1 当前仍是 staged/pending：render_pair=staged_positive_candidate_pending_generation，visual_similarity=artifact_missing，fidelity_veto=review_pending，human_review=pending。",
+      "science_grade5 / math_grade8 / math_exam / english_grade8 当前 manifest gate_status=human_review_failed，且 visual_similarity=scored_no_go、fidelity_veto=no_go、human_review=no_go。"
+    ]
+  },
+  "artifacts": {
+    "patch": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/升级FinalAcceptance为HumanVisual强依赖门禁/artifacts/FinalAcceptance-HumanVisual-216b8f8b.patch",
+    "final_acceptance_summary": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_summary.json",
+    "final_acceptance_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_acceptance_report.md",
+    "final_human_visual_acceptance": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance.json",
+    "final_human_visual_acceptance_report": "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-acceptance/final_human_visual_acceptance_report.md"
+  },
+  "tests": [
+    "python3 -m py_compile backend/app/services/pdf_to_word/model_eval_runner.py",
+    ".venv-mlx/bin/python -m pytest --noconftest backend/tests/test_pdf_to_word_fidelity_manifest.py backend/tests/test_pdf_to_word_fidelity_report.py  # 3 passed",
+    "说明：常规 pytest 入口会先加载 backend/tests/conftest.py，并受本地缺失 app 依赖（如 sqlalchemy / pydantic_settings）影响；因此本轮对新增 acceptance tests 采用 --noconftest 隔离验证。"
+  ],
+  "risks": [
+    "当前 final-acceptance 结论仍是 NO-GO；这不是代码缺陷，而是 suite 真实状态：4 个正向样例 human_review_failed，1 个语文正向样例 artifact_missing。",
+    "chinese_long_reading_positive_v1 仍未进入当前 engineering baseline 五样例，因此工程 summary 中其 engineering_gate_status 为 not_in_current_engineering_baseline；这不会放宽 human visual 门禁。",
+    "若后续需要把强依赖入口直接挂到 CLI / 正式流水线，还需在完整 app 依赖环境下补做一次常规 pytest/集成验证。"
+  ],
+  "completed_at": "2026-05-20T10:56:18+08:00"
+}

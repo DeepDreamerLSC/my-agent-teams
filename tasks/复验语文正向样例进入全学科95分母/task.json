@@ -16,7 +16,7 @@
   "review_round": 0,
   "max_review_rounds": 3,
   "test_required": false,
-  "status": "working",
+  "status": "blocked",
   "task_level": "execution",
   "owner_pm": "pm-chief",
   "domain": "quality",
@@ -53,7 +53,7 @@
   "parent_task_id": null,
   "integration_owner": "arch-1",
   "priority": "high",
-  "timeout_minutes": 30,
+  "timeout_minutes": 45,
   "lease_owner": "pm-chief",
   "lease_acquired_at": "2026-05-20T10:15:35+08:00",
   "lease_expires_at": "2026-05-20T10:15:35+08:00",
@@ -72,12 +72,12 @@
   "patch_capture_error": null,
   "result_summary": null,
   "last_error": null,
-  "merge_gate_state": null,
-  "rework_reason": null,
-  "last_gate_actor": null,
-  "last_gate_decision_at": null,
+  "merge_gate_state": "blocked",
+  "rework_reason": "execution",
+  "last_gate_actor": "qa-1",
+  "last_gate_decision_at": "2026-05-20T10:51:08+08:00",
   "created_at": "2026-05-20T08:09:52+08:00",
-  "updated_at": "2026-05-20T10:16:28+08:00",
+  "updated_at": "2026-05-20T10:51:08+08:00",
   "claim_policy": "pull",
   "claim_scope": [
     "qa-1"
@@ -103,5 +103,8 @@
   "session_health": null,
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-20T10:15:35+08:00",
-  "workspace_root": "/Users/linsuchang/Desktop/work/chiralium"
+  "workspace_root": "/Users/linsuchang/Desktop/work/chiralium",
+  "pm_notes": [
+    "2026-05-20 PM判定：该 blocked 结果作为语文正向样例当前基线保留；已新增后续开发任务“补齐语文正向样例真实视觉证据并统一Manifest页选择”，待其完成后再恢复本 QA 复验。"
+  ]
 }

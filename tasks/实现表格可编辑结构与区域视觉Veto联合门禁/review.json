@@ -1,0 +1,61 @@
+{
+  "task_id": "实现表格可编辑结构与区域视觉Veto联合门禁",
+  "reviewer": "review-1",
+  "reviewed_at": "2026-05-20T10:53:31+08:00",
+  "status": "approve",
+  "summary": "审查通过。上一轮两项阻塞都已修复：`artifacts/pdf2word/table_gate/` 下已落下五下科学 ready 与数学八年级 failed 两份 canonical gate 产物；联合 gate 也已接入实际 DOCX 运行链，`docx_assembler._DocxAssetBuilder.add_table_xml()` 现在会先把 payload 归一成 `NormalizedTableIR`，再执行“结构 + 区域视觉 veto”判定，仅在 `gate_passed=true` 时渲染 `<w:tbl>`，否则稳定降级为图片/审计文本。复跑 py_compile、两组 pytest、diff check 与 reviewer smoke 后，科学/数学样例 contract、运行时 consumer 与 artifact 落盘口径一致。由于当前任务目录仍无 `verify.json`，且 `qa_gate_state` 仍是 `skipped`，本轮建议进入下游 QA 复验，而不是直接最终收口。",
+  "blocking_findings": [],
+  "non_blocking_findings": [
+    {
+      "severity": "note",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/task.json",
+      "finding": "当前任务目录仍无 `verify.json`，且 `task.json.qa_gate_state=skipped`。",
+      "recommendation": "本轮 review 表示实现与 contract 审查通过；请按下游动作尽快触发 QA 复验，确认全学科 95 重跑消费 `table_gate` canonical 产物与运行时 gate 结果时口径一致。"
+    },
+    {
+      "severity": "note",
+      "file": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/docx_assembler.py",
+      "finding": "当前运行时 gate 已确保“无结构/无区域视觉证据时不再宣称 editable table 达标”，但真实 merged-cell Word XML 渲染仍未在本任务内完成。",
+      "recommendation": "保持与后续“实现可编辑Word表格渲染”任务衔接；在 merge 渲染真正落地前，继续依赖本轮 gate 的降级策略，避免仅凭 `<w:tbl>` 存在误报可编辑表格通过。"
+    }
+  ],
+  "files_reviewed": [
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/task.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/instruction.md",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/result.json",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/tasks/实现表格可编辑结构与区域视觉Veto联合门禁/artifacts/Veto-96a0ce32.patch",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/table_ir.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/app/services/pdf_to_word/exercise_docx_assembler.py",
+    "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32/backend/tests/test_pdf_to_word_table_ir_contract.py",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/五下科学_table_gate_ready.json",
+    "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/数学八年级_table_gate_failed.json"
+  ],
+  "test_evidence": [
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32 && PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX=/private/tmp/chiralium-pyc-table-gate-review2 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m py_compile backend/app/services/pdf_to_word/table_ir.py backend/app/services/pdf_to_word/docx_assembler.py backend/app/services/pdf_to_word/exercise_docx_assembler.py backend/tests/test_pdf_to_word_table_ir_contract.py",
+      "result": "passed"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32 && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_pdf_to_word_table_ir_contract.py backend/tests/test_pdf_exercise_docx_assembler.py -p no:cacheprovider -q",
+      "result": "14 passed, 4 warnings（warnings 为既有 FastAPI `on_event` deprecation warnings，与本任务无关）"
+    },
+    {
+      "command": "cd /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32 && TMPDIR=/private/tmp PYTHONDONTWRITEBYTECODE=1 /Users/linsuchang/Desktop/work/chiralium/backend/.venv/bin/python -m pytest backend/tests/test_model_eval_runner.py -k writes_output_structure -p no:cacheprovider -q",
+      "result": "1 passed, 15 deselected, 4 warnings"
+    },
+    {
+      "command": "git -C /Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/chiralium/Veto-96a0ce32 diff --check -- backend/app/services/pdf_to_word/table_ir.py backend/app/services/pdf_to_word/docx_assembler.py backend/tests/test_pdf_to_word_table_ir_contract.py",
+      "result": "passed"
+    },
+    {
+      "command": "reviewer smoke：用 `encode_docx_visual_payload(...) + build_docx_package(...)` 分别构造 ready / blocked table payload，并将 `table_gate_artifact_root` 指向 /private/tmp 临时目录",
+      "result": "通过：ready case 生成 `<w:tbl>` 且落盘 `smoke-ready_table_gate_ready.json`；blocked case 生成 `status=artifact_not_ready` 的 gate artifact，DOCX 中不再出现 `<w:tbl>`，而是稳定降级为 fallback 文本。"
+    },
+    {
+      "command": "python3 reviewer check: list /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/*.json",
+      "result": "通过：canonical 目录下可见 `五下科学_table_gate_ready.json` 与 `数学八年级_table_gate_failed.json`。"
+    }
+  ],
+  "recommended_next_action": "qa"
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "复验表格可编辑结构与区域视觉Veto门禁",
+  "agent": "qa-1",
+  "agent_id": "qa-1",
+  "status": "acknowledged",
+  "acknowledged_at": "2026-05-20T10:57:00+08:00",
+  "summary": "qa-1 已读取 instruction.md，开始只读复验：核查五下科学与数学八年级的 canonical table_gate 产物、runtime consumer 口径，以及结构/编辑性/区域视觉 veto 是否一致并可供全学科95重跑消费。"
+}
