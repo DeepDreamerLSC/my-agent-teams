@@ -38,7 +38,7 @@
     "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/reports/PDF转Word当前阶段与目标差距及优化计划.md"
   ],
   "depends_on": [
-    "复验正向样例视觉证据链与FinalArchive门禁",
+    "复验四个正向样例真实视觉证据重跑结果",
     "复验语文正向样例进入全学科95分母",
     "升级FinalAcceptance为HumanVisual强依赖门禁",
     "复验表格可编辑结构与区域视觉Veto门禁",

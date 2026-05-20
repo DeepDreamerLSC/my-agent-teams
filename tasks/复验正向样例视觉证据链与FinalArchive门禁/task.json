@@ -34,9 +34,7 @@
   "depends_on": [
     "补齐四个正向样例视觉证据链并接入FinalArchive"
   ],
-  "blocks": [
-    "重跑全学科人工视觉95并更新阶段结论"
-  ],
+  "blocks": [],
   "artifacts": [
     {
       "type": "instruction",
@@ -103,5 +101,8 @@
   "session_health": null,
   "control_plane_state": null,
   "control_plane_updated_at": "2026-05-20T09:09:42+08:00",
-  "workspace_root": "/Users/linsuchang/Desktop/work/chiralium"
+  "workspace_root": "/Users/linsuchang/Desktop/work/chiralium",
+  "pm_notes": [
+    "2026-05-20 PM判定：该 blocked 结果作为旧证据链基线保留，不再直接阻塞主链；后续以“打通DOCX渲染依赖并重跑四个正向样例真实视觉证据”→“复验四个正向样例真实视觉证据重跑结果”替换。"
+  ]
 }

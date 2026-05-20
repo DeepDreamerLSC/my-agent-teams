@@ -43,8 +43,12 @@
     "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/数学试卷",
     "/Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/final-archive/profiles/hybrid_experimental/英语八年级"
   ],
-  "depends_on": [],
-  "blocks": [],
+  "depends_on": [
+    "补齐四个正向样例视觉证据链并接入FinalArchive"
+  ],
+  "blocks": [
+    "复验四个正向样例真实视觉证据重跑结果"
+  ],
   "artifacts": [
     {
       "type": "instruction",
@@ -55,7 +59,7 @@
   "root_request_id": "打通DOCX渲染依赖并重跑四个正向样例真实视觉证据",
   "parent_task_id": null,
   "integration_owner": "arch-1",
-  "priority": "medium",
+  "priority": "high",
   "timeout_minutes": 30,
   "lease_owner": "pm-chief",
   "lease_acquired_at": "2026-05-20T10:09:38+08:00",
