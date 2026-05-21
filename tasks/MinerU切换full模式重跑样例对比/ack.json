@@ -1,7 +1,0 @@
-{
-  "task_id": "MinerU切换full模式重跑样例对比",
-  "agent": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T08:00:00+08:00",
-  "summary": "已重新读取任务指令，开始切换 MinerU 到 full 模式并通过统一框架重跑 5 个样例，再生成 full vs baseline / lite 对比结论。"
-}

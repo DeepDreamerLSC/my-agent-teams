@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐答案区教师版authoritative样例",
-  "status": "acknowledged",
-  "summary": "已开始执行；优先补真实样例 answer_section/answer_area authoritative 证据，先复核当前命中面并守住 student 默认输出不回归。",
-  "agent": "dev-2",
-  "acked_at": "2026-05-18T14:16:53+08:00"
-}

@@ -1,7 +1,0 @@
-{
-  "task_id": "预整理Hybrid回归抽检模板",
-  "agent": "qa-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-17T09:05:00+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始整理 Hybrid 回归抽检模板。将基于 hybrid-e2e-validation 数据、顺序校验器输出结构和现有 baseline 产物构建样例分组与检查清单框架。"
-}

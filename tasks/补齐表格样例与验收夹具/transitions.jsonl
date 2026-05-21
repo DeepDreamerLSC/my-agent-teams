@@ -1,6 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-19T12:10:47+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "pooled", "at": "2026-05-19T14:17:56+08:00", "event": "dependencies_ready", "reason": "watcher observed all dependencies ready"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-19T14:18:03+08:00", "reason": "watcher confirmed claim.json"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T14:20:43+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T14:32:19+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T14:40:35+08:00", "reason": "pm-chief accepted after review pass without qa; unlock 95 report and final PDF-to-Word closeout verification downstream"}

@@ -1,7 +1,0 @@
-{
-  "task_id": "排查Hybrid输出到ExerciseIR数据流转断裂",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-16T16:22:22+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始排查 accepted image/table candidates 从 hybrid PageIR 到 ExerciseIR / DOCX 的流转断点，并在完成后回写 result.json。"
-}

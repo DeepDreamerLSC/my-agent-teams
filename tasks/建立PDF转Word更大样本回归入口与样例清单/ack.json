@@ -1,7 +1,0 @@
-{
-  "task_id": "建立PDF转Word更大样本回归入口与样例清单",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已读取 task.json 与 instruction.md，开始实现更大样本回归入口、样例 manifest 与摘要产物。",
-  "acknowledged_at": "2026-05-18T09:27:20+08:00"
-}

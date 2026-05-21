@@ -1,4 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-18T07:27:50+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-18T07:28:29+08:00", "reason": "agent dev-2 claimed pooled task: dev-2承接高优先级输出变体任务，student/teacher/review 变体实现与验证"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-18T07:46:11+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-18T09:29:45+08:00", "reason": "task-watcher auto close after qa verify pass"}

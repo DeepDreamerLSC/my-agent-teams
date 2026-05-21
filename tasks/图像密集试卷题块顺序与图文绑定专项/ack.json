@@ -1,8 +1,0 @@
-{
-  "task_id": "图像密集试卷题块顺序与图文绑定专项",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T00:34:44+08:00",
-  "summary": "dev-2 已读取 instruction.md 并开始执行：将在 task-989897c8 worktree 内实现 image-dense 专项 gate、fixture 与回归测试，重点覆盖题块顺序异常、图像裁剪偏差与图文绑定异常。"
-}

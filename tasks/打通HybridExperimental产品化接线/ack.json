@@ -1,7 +1,0 @@
-{
-  "task_id": "打通HybridExperimental产品化接线",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-17T12:24:00+08:00",
-  "summary": "已重新读取 instruction.md 与 task.json，开始把 parser_backend=hybrid_experimental 从 parser_client 的 apple/mock 占位分支切到真实 HybridExperimentalPipeline，并补 service/API/integration 回归测试。"
-}

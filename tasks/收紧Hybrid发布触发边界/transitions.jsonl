@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-17T19:39:00+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T19:53:12+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T19:59:38+08:00", "reason": "watcher observed review fail"}
-{"from": "blocked", "to": "dispatched", "at": "2026-05-17T20:03:09+08:00", "reason": "resume-task: review驳回成立：default_mode=quality 被错误视为显式 quality 请求，需仅允许显式 mode=quality 放行 hybrid，并补 settings/service/skill/API 四层回归测试", "actor": "pm-chief"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T20:09:14+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T20:14:34+08:00", "reason": "task-watcher auto close after qa verify pass"}

@@ -1,7 +1,0 @@
-{
-  "task_id": "归档横评样例到artifacts目录",
-  "agent": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T20:47:00+08:00",
-  "summary": "已读取 instruction.md，开始归档横评样例到 artifacts/pdf2word/final-archive/，统一样例命名，归档报告和评测产物。"
-}

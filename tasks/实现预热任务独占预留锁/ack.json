@@ -1,7 +1,0 @@
-{
-  "task_id": "实现预热任务独占预留锁",
-  "agent": "dev-2",
-  "status": "acknowledged",
-  "summary": "已确认最新返修要求，将继续按 PM 冻结契约收敛 pre_reserved 字段与 reserve CLI。",
-  "acknowledged_at": "2026-05-19T15:06:03+08:00"
-}

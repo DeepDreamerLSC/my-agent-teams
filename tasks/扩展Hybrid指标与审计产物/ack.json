@@ -1,7 +1,0 @@
-{
-  "task_id": "扩展Hybrid指标与审计产物",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-16T15:22:52+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始基于真实 hybrid_experimental 管线产物生成完整审计文件，并将在完成后回写 result.json。"
-}

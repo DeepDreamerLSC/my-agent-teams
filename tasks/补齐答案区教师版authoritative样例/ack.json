@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐答案区教师版authoritative样例",
-  "status": "acknowledged",
-  "summary": "已复核真实 authoritative 五样例：当前 pages 重放下已能稳定得到 五下科学 answer_area=1/1、数学八年级 answer_section=1、数学试卷 answer_section=1；主要缺口是 final-archive 仍只有 student output，P2 目录缺少可复核 teacher/review authoritative 产物。接下来将先补基于现有 exercise detector/assembler 的真实样例 teacher/review 证据与逐样例说明，再补最小测试/代码收口并守住 student 无回归。",
-  "agent": "dev-1",
-  "acked_at": "2026-05-18T22:38:30+08:00"
-}

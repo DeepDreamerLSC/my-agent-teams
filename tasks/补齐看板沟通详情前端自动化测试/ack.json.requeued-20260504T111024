@@ -1,9 +1,0 @@
-{
-  "task_id": "补齐看板沟通详情前端自动化测试",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "working",
-  "acknowledged_at": "2026-05-04T09:05:00+08:00",
-  "acked_at": "2026-05-04T09:05:00+08:00",
-  "summary": "已读取 instruction.md；当前将补齐看板详情抽屉、状态时间线、沟通时间线与空态场景的前端自动化测试，并在 write_scope 内做必要小修。"
-}

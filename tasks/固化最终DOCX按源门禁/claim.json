@@ -1,7 +1,0 @@
-{
-  "task_id": "固化最终DOCX按源门禁",
-  "agent": "qa-1",
-  "claimed_at": "2026-05-18T07:05:43+08:00",
-  "reserved": true,
-  "reason": "前置QA已完成，开始执行 final DOCX 按源门禁验证"
-}

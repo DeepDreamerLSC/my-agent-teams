@@ -1,4 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-20T08:09:53+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-20T10:56:15+08:00", "reason": "reassign-task: upstream implementation closed; direct push high-priority downstream QA verification", "actor": "task-watcher"}
-{"from": "dispatched", "to": "working", "at": "2026-05-20T10:57:24+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "blocked", "at": "2026-05-20T11:33:49+08:00", "reason": "watcher observed result.json status=blocked"}

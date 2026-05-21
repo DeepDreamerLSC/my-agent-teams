@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-04-30T12:34:49+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-04-30T12:50:08+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-04-30T12:57:18+08:00", "reason": "watcher observed result.json status=done"}
-{"from": "ready_for_merge", "to": "dispatched", "at": "2026-05-06T06:50:29+08:00", "reason": "PM rework dispatch: review-1驳回：OCR结果未进入PPT skill主链路，ContextAssembler不解析图片，manifest未允许图片输入"}
-{"from": "dispatched", "to": "blocked", "at": "2026-05-06T06:55:38+08:00", "reason": "watcher observed result.json status=blocked"}
-{"from": "blocked", "to": "cancelled", "at": "2026-05-06T10:16:36+08:00", "reason": "PM superseded blocked narrow-scope task with expanded follow-up 补齐PPT图片OCR进入生成Skill主链路"}

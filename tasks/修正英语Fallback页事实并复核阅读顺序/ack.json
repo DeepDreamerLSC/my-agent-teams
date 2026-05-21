@@ -1,8 +1,0 @@
-{
-  "task_id": "修正英语Fallback页事实并复核阅读顺序",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T11:10:21+08:00",
-  "summary": "dev-2 已读取 instruction.md 与 task.json，确认将在 Fallback-41709d38 worktree 内按 write_scope 修正英语八年级 fallback 页事实口径，并复核阅读段落、选项区与题号顺序；聚焦 authoritative archive、final acceptance 与 visual evidence 三处一致性。"
-}

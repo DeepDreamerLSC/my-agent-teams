@@ -1,8 +1,0 @@
-{
-  "task_id": "升级visual_similarity为真实渲染对视觉证据",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-19T19:16:51+08:00",
-  "summary": "dev-2 已读取 instruction.md，开始在 visual_similarity-be6f0714 worktree 实现基于真实 render pair 的 visual_similarity artifact、fixture 与回归测试。"
-}

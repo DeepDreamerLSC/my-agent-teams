@@ -1,7 +1,0 @@
-{
-  "task_id": "执行PDF转Word表格收尾复验与95判定",
-  "agent": "qa-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 并开始执行收尾复验；将结合最终报告器、表格验收夹具、DOCX gate 与 frozen 95% 口径，输出 pass/fail、blocking_failures 与最终 go/no-go 建议。",
-  "acknowledged_at": "2026-05-19T15:55:12+08:00"
-}

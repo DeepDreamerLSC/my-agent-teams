@@ -1,7 +1,0 @@
-{
-  "task_id": "成本与耗时预算门禁",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与 write_scope，开始实现 visual gate 的成本/耗时预算门禁与降级策略。",
-  "started_at": "2026-05-19T23:51:46+08:00"
-}

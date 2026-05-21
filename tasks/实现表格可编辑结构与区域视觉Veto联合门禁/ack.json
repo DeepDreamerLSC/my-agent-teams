@@ -1,8 +1,0 @@
-{
-  "task_id": "实现表格可编辑结构与区域视觉Veto联合门禁",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T10:23:19+08:00",
-  "summary": "dev-2 已重读 instruction 与 history/review，按 PM 仲裁进入最小返修：1）把 table_gate canonical 示例产物真正落到 /Users/linsuchang/Desktop/work/chiralium/artifacts/pdf2word/table_gate/；2）把联合 gate 接入实际 runtime consumer（docx_assembler / exercise 路径）并补定向回归后重写 result.json。"
-}

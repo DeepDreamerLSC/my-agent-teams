@@ -1,7 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-17T22:44:41+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "pooled", "at": "2026-05-18T00:48:21+08:00", "reason": "pm raised priority after pooled timeout; waiting on upstream QA/release gate"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-18T07:05:43+08:00", "reason": "agent qa-1 claimed pooled task: 前置QA已完成，开始执行 final DOCX 按源门禁验证"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-18T07:34:45+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-18T07:36:27+08:00", "reason": "auto_close failed 3 times"}
-{"from": "blocked", "to": "ready_for_merge", "at": "2026-05-18T07:37:34+08:00", "reason": "watcher observed review pass and queued qa"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-18T07:37:36+08:00", "reason": "task-watcher auto close after qa verify pass"}

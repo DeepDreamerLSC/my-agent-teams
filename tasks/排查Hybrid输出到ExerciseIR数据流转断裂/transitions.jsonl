@@ -1,3 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-16T16:21:54+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-16T16:29:02+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-16T16:55:47+08:00", "reason": "PM acceptance: review approved, QA not required, deliverable accepted"}

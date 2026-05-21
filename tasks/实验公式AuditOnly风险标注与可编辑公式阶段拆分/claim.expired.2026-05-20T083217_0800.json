@@ -1,7 +1,0 @@
-{
-  "task_id": "实验公式AuditOnly风险标注与可编辑公式阶段拆分",
-  "agent": "dev-1",
-  "claimed_at": "2026-05-20T08:27:10+08:00",
-  "claim_status": "requested",
-  "reason": "watcher auto-reserved while dev-1 is working"
-}

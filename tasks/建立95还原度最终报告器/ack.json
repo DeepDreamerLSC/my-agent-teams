@@ -1,7 +1,0 @@
-{
-  "task_id": "建立95还原度最终报告器",
-  "agent": "qa-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与返修要求，开始在限定 write_scope 内修正 100 分制 contract、tables 维度归一化与对应测试/fixture。",
-  "acknowledged_at": "2026-05-19T15:22:50+08:00"
-}

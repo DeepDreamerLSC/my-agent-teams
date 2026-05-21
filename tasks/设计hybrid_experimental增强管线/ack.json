@@ -1,7 +1,0 @@
-{
-  "task_id": "设计hybrid_experimental增强管线",
-  "agent": "arch-1",
-  "status": "acknowledged",
-  "summary": "已重新读取 instruction.md。注意：task.json.write_scope 为空，而交付物要求写入 chiralium/design/pdf2word；将先产出设计草案并在 result.json 中标注 write_scope 阻塞，避免越权修改项目文件。",
-  "acked_at": "2026-05-15T15:21:28.816183+08:00"
-}

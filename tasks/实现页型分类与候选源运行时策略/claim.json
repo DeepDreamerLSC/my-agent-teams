@@ -1,7 +1,0 @@
-{
-  "task_id": "实现页型分类与候选源运行时策略",
-  "agent": "dev-1",
-  "claimed_at": "2026-05-17T22:45:41+08:00",
-  "reserved": true,
-  "reason": "watcher auto-continued after Adapter重构与GLM-OCR迁移"
-}

@@ -1,7 +1,0 @@
-{
-  "task_id": "评估是否放宽Hybrid发布承诺",
-  "agent": "qa-1",
-  "acknowledged_at": "2026-05-17T19:40:19+08:00",
-  "status": "working",
-  "note": "开始基于 final-acceptance、authoritative hybrid archive 与现有设计文档评估是否放宽 Hybrid 发布承诺，输出 owner/PM 可直接使用的决策文档。"
-}

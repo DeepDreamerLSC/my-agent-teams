@@ -1,7 +1,0 @@
-{
-  "task_id": "语文长文作文负样例口径重建",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已读取任务指令并确认 write_scope，将重建语文长文/作文/负样例口径，明确 negative/document_fallback 与 final-gated 正样例边界，并输出语文 manifest 与对 95 宣称纳入建议。",
-  "acknowledged_at": "2026-05-19T20:52:33+0800"
-}

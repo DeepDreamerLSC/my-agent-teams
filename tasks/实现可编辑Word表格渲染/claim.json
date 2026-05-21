@@ -1,7 +1,0 @@
-{
-  "task_id": "实现可编辑Word表格渲染",
-  "agent": "dev-1",
-  "claimed_at": "2026-05-19T12:15:14+08:00",
-  "claim_status": "requested",
-  "reason": "watcher auto-continued after Adapter重构与GLM-OCR迁移"
-}

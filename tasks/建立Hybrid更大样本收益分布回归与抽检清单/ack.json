@@ -1,7 +1,0 @@
-{
-  "task_id": "建立Hybrid更大样本收益分布回归与抽检清单",
-  "agent": "qa-1",
-  "status": "working",
-  "summary": "已认领并开始执行 Hybrid 收益分布回归任务。我将基于现有五样例 regression baseline、final-archive authoritative 归档和 phase3-paddle-quality 产物，按页型/来源/触发原因整理收益分布，并输出下一轮补样与人工抽检清单。",
-  "acknowledged_at": "2026-05-18T13:33:59+0800"
-}

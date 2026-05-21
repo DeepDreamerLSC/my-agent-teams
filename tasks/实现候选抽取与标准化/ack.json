@@ -1,7 +1,0 @@
-{
-  "task_id": "实现候选抽取与标准化",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T18:31:11+08:00",
-  "summary": "已读取 instruction.md，开始实现 CandidateExtractor，从 MinerU/PaddleOCR-VL pages.jsonl 抽取候选并标准化。"
-}

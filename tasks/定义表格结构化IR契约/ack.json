@@ -1,7 +1,0 @@
-{
-  "task_id": "定义表格结构化IR契约",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已重新认领并读取 instruction.md，开始定义 NormalizedTableIR 契约、fixture 与 contract test。",
-  "acknowledged_at": "2026-05-19T08:40:37+08:00"
-}

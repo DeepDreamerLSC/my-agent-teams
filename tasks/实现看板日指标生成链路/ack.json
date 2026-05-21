@@ -1,7 +1,0 @@
-{
-  "task_id": "实现看板日指标生成链路",
-  "agent_id": "dev-2",
-  "acknowledged_at": "2026-05-04T01:13:30+08:00",
-  "status": "accepted",
-  "notes": "已读取 instruction.md 与 task.json。将按最小可维护方案补齐 dashboard 级日指标生成链路：落地 task_metrics_daily / agent_metrics_daily 或等价宽表，支持按日期范围重建，不把分析结果误当任务事实源。"
-}

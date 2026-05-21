@@ -1,7 +1,0 @@
-{
-  "task_id": "对齐Hybrid默认候选与公式实验开关",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-17T16:44:08+08:00",
-  "summary": "已重新读取更新后的 instruction.md 并继续执行返工。保留 parser_client.py / hybrid_pipeline.py / inference_config.yaml 与既有测试中的核心收口，仅在 conversion_service.py 回收本任务越界引入的 formula service meta，并同步重跑指定测试。"
-}

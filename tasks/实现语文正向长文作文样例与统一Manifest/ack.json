@@ -1,7 +1,0 @@
-{
-  "task_id": "实现语文正向长文作文样例与统一Manifest",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已确认保持 chinese_grade5 为 negative_guard，并将新增独立语文 positive_candidate 样例与 unified manifest/fixture 路径，开始盘点现有样例基线并落地语文正向样例。",
-  "started_at": "2026-05-20T09:11:24+08:00"
-}

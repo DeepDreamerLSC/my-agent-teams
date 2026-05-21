@@ -1,7 +1,0 @@
-{
-  "task_id": "实现答案区识别与答案分节基础链路",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-17T21:19:47+08:00",
-  "summary": "已重新读取 instruction.md 并继续执行。本轮在现有 Exercise IR / assembler 结构上补接答案区识别与 AnswerSection 物化链路，优先覆盖答案页标题、题后答案/解析与未匹配答案 warning，不改 hybrid 发布逻辑。"
-}

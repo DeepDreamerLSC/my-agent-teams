@@ -1,4 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-19T19:16:17+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T19:17:47+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T20:03:34+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T20:09:39+08:00", "reason": "pm acceptance after review+qa approval; visual similarity real evidence baseline closed"}

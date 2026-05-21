@@ -1,7 +1,0 @@
-{
-  "task_id": "实现看板只读聚合视图",
-  "agent_id": "dev-2",
-  "acknowledged_at": "2026-05-04T23:16:30+08:00",
-  "status": "accepted",
-  "notes": "已读取 instruction.md 与 task.json。将按只读聚合原则实现 owner_pm/domain/task_level/parent_task_id/root_request_id 维度的聚合查询、API 与脚本，不改写 task 事实源，也不提前启动其他看板后端任务。"
-}

@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐QuestionRegion可判定性与跳过策略",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-16T14:41:06+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始补齐 question_region_detector 的可判定性门槛与跳过策略，并将在完成后回写 result.json。"
-}

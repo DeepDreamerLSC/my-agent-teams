@@ -1,7 +1,0 @@
-{
-  "task_id": "实现Hybrid题号顺序与阅读顺序校验器",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-17T09:52:00+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始在 order_resolver、question_region_detector、hybrid_validator 及对应测试中补齐 Hybrid 题号顺序与阅读顺序校验。"
-}

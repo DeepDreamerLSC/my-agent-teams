@@ -1,4 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-13T23:22:14+08:00", "reason": "watcher auto dispatch domain/epic task to arch-1"}
-{"from": "pending", "to": "dispatched", "at": "2026-05-13T23:23:21+08:00", "reason": "watcher auto dispatch domain/epic task to arch-1"}
-{"from": "pending", "to": "dispatched", "at": "2026-05-13T23:23:55+08:00", "reason": "watcher auto dispatch domain/epic task to arch-1"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-13T23:51:38+08:00", "reason": "watcher observed result.json status=success"}

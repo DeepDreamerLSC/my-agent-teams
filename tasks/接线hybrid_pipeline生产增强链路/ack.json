@@ -1,7 +1,0 @@
-{
-  "task_id": "接线hybrid_pipeline生产增强链路",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T23:04:52+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始在 hybrid_pipeline.py 内把 question-region、candidate extraction、filter、merge、validate 六段生产增强链路接线到现有子模块，并保持 disable enhancement 时的 baseline 透传行为。"
-}

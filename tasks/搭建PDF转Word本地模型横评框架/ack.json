@@ -1,8 +1,0 @@
-{
-  "task_id": "搭建PDF转Word本地模型横评框架",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-14T12:40:55+08:00",
-  "summary": "dev-1 已读取 instruction.md，开始执行 PDF 转 Word 本地模型横评框架任务。"
-}

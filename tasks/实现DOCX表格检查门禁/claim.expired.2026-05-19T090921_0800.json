@@ -1,7 +1,0 @@
-{
-  "task_id": "实现DOCX表格检查门禁",
-  "agent": "qa-1",
-  "claimed_at": "2026-05-19T09:03:50+08:00",
-  "claim_status": "requested",
-  "reason": "watcher auto-reserved while qa-1 is working"
-}

@@ -1,8 +1,0 @@
-{
-  "task_id": "设计语文正向样例与统一Manifest方案",
-  "agent": "qa-1",
-  "agent_id": "qa-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T08:11:04+08:00",
-  "summary": "qa-1 已读取 instruction.md 与 write_scope，开始在 Manifest-8d2dc7d4 worktree 梳理语文正向样例候选、negative_guard 边界与统一 manifest 字段方案。"
-}

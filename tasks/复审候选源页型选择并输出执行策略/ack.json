@@ -1,7 +1,0 @@
-{
-  "task_id": "复审候选源页型选择并输出执行策略",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与 task.json，开始基于 final-archive、hybrid-e2e-validation、model-eval 与已校准设计文档复审 MinerU / PaddleOCR-VL 的页型与候选类型分工，并将在 write_scope 内输出 Markdown 策略与结构化 JSON 摘要。",
-  "acknowledged_at": "2026-05-17T21:02:24+08:00"
-}

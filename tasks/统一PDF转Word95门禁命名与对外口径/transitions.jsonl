@@ -1,8 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-19T18:44:23+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T18:45:50+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T18:49:17+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-19T18:54:32+08:00", "reason": "watcher observed review fail"}
-{"from": "blocked", "to": "dispatched", "at": "2026-05-19T18:56:03+08:00", "reason": "resume-task: review rework: 统一 public_claim_policy/claim_policy 命名并修正 trailing whitespace 与验证描述", "actor": "pm-chief"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T18:58:19+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T19:07:13+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T19:11:03+08:00", "reason": "task-watcher auto close after review pass without qa"}

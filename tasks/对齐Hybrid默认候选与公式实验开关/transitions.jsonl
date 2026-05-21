@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-17T16:00:02+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T16:20:23+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T16:31:52+08:00", "reason": "watcher observed review fail"}
-{"from": "blocked", "to": "dispatched", "at": "2026-05-17T16:37:04+08:00", "reason": "resume-task: review 退回：保留核心实现，最小范围清理 conversion_service.py 越界改动后重提", "actor": "pm-chief"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T16:45:31+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T16:59:04+08:00", "reason": "task-watcher auto close after qa verify pass"}

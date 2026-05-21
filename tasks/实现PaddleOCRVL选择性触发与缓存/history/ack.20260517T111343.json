@@ -1,7 +1,0 @@
-{
-  "task_id": "实现PaddleOCRVL选择性触发与缓存",
-  "agent_id": "dev-2",
-  "acknowledged_at": "2026-05-17T10:33:00+08:00",
-  "status": "accepted",
-  "notes": "已读取 instruction.md 与 task.json，并已完成 quality/hybrid_experimental 模式下 PaddleOCR-VL 按页选择性触发、页级缓存、审计报告、定向 pytest 与 Phase 3 报告产物生成。"
-}

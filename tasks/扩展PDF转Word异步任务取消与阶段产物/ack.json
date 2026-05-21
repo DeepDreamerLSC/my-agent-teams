@@ -1,7 +1,0 @@
-{
-  "task_id": "扩展PDF转Word异步任务取消与阶段产物",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已认领并开始执行：补齐 PDF→Word 异步 job 的 cancel 语义、阶段 artifacts/history，并保持同步 convert 不回归。",
-  "acknowledged_at": "2026-05-18T13:32:35+08:00"
-}

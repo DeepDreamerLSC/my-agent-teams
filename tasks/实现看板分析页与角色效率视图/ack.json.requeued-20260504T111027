@@ -1,9 +1,0 @@
-{
-  "task_id": "实现看板分析页与角色效率视图",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "working",
-  "acknowledged_at": "2026-05-04T09:10:00+08:00",
-  "acked_at": "2026-05-04T09:10:00+08:00",
-  "summary": "已读取 instruction.md；当前将只在 dashboard 前端 write_scope 内补齐分析页与角色效率视图展示，并保持现有看板/甘特图/详情抽屉不回归。"
-}

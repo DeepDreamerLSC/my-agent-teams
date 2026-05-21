@@ -1,6 +1,0 @@
-{
-  "task_id": "补齐Skill文件解析开关同步",
-  "agent": "dev-2",
-  "claimed_at": "2026-05-06T11:45:27+08:00",
-  "reason": "PM按优先级派发：PDF转WordSkill前置依赖；dev-2完成上一条补修后续推"
-}

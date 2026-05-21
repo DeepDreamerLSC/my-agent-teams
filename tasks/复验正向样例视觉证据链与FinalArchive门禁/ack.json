@@ -1,8 +1,0 @@
-{
-  "task_id": "复验正向样例视觉证据链与FinalArchive门禁",
-  "agent": "qa-1",
-  "agent_id": "qa-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-20T09:12:31+08:00",
-  "summary": "qa-1 已读取 instruction.md，开始执行只读复验：逐样例核查 4 个 positive_candidate 的 canonical visual evidence 落盘情况，并确认 FinalArchive / final_human_visual_acceptance 在证据缺失时不会误判可恢复95。"
-}

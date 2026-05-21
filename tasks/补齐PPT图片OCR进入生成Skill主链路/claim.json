@@ -1,6 +1,0 @@
-{
-  "task_id": "补齐PPT图片OCR进入生成Skill主链路",
-  "agent": "dev-1",
-  "claimed_at": "2026-05-06T11:59:07+08:00",
-  "reason": "PM派发：PPT OCR主链路后续，无未满足依赖，dev-1当前无working任务"
-}

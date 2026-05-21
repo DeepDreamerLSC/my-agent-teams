@@ -1,9 +1,0 @@
-{
-  "task_id": "补齐PPT图片OCR进入生成Skill主链路",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "working",
-  "acknowledged_at": "2026-05-06T11:59:41+08:00",
-  "acked_at": "2026-05-06T11:59:41+08:00",
-  "summary": "已读取 instruction.md 与 task.json，开始在授权 write_scope 内补齐图片 OCR -> parsed_files/skill 输入 -> ppt_generator prompt 消费闭环，并保持 PDF/docx/xlsx 解析逻辑不回归。"
-}

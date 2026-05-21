@@ -1,8 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-20T10:13:09+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-05-20T10:15:13+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-20T10:30:12+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-20T10:45:59+08:00", "reason": "watcher observed review fail"}
-{"from": "blocked", "to": "dispatched", "at": "2026-05-20T10:47:07+08:00", "reason": "resume-task: review request_changes: stale source_manifest notes, unstable /private/tmp reproduce_command provenance, and result.json status must be normalized to done", "actor": "pm-chief"}
-{"from": "dispatched", "to": "working", "at": "2026-05-20T10:50:25+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-20T10:52:26+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-20T11:39:47+08:00", "reason": "pm close after review approved and qa passed"}

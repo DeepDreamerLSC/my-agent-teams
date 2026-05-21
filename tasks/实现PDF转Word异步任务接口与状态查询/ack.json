@@ -1,7 +1,0 @@
-{
-  "task_id": "实现PDF转Word异步任务接口与状态查询",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已重新读取任务指令并完成实现、自测与交付整理，异步 job API 与状态查询已落地。",
-  "acknowledged_at": "2026-05-18T09:04:41+08:00"
-}

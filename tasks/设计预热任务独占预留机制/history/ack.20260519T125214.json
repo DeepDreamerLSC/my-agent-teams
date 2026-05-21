@@ -1,9 +1,0 @@
-{
-  "task_id": "设计预热任务独占预留机制",
-  "agent": "arch-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-19T12:37:24+08:00",
-  "workspace": "/Users/linsuchang/Desktop/work/my-agent-teams/.runtime/worktrees/my-agent-teams/task-f2adfb6e",
-  "branch": "task/task-f2adfb6e",
-  "notes": "已确认任务说明与 write_scope；只修改 design/collaboration/预热任务独占预留机制.md。"
-}

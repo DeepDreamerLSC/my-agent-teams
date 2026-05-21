@@ -1,7 +1,0 @@
-{
-  "task_id": "改造Qwen3-VL为严格review_worker",
-  "agent": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T15:35:15+08:00",
-  "summary": "已读取 instruction.md，开始把 Qwen3-VL review 输出从正文 blocks 改造成严格 page_review JSON，并增强 normalizer 校验与兼容回退。"
-}

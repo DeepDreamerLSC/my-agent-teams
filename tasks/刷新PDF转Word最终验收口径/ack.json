@@ -1,7 +1,0 @@
-{
-  "task_id": "刷新PDF转Word最终验收口径",
-  "agent": "qa-1",
-  "acknowledged_at": "2026-05-17T19:05:38+08:00",
-  "status": "working",
-  "note": "开始刷新 final-acceptance 口径：同步 authoritative hybrid 五样例正式归档已闭合，同时保留默认发布边界不变。"
-}

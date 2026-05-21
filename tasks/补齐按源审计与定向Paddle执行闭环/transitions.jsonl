@@ -1,5 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-17T22:44:41+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "pooled", "at": "2026-05-18T00:48:21+08:00", "reason": "pm raised priority after pooled timeout; waiting on upstream QA/release gate"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-18T00:49:59+08:00", "reason": "agent dev-2 claimed pooled task: watcher auto-continued after MinerU切换full模式重跑样例对比"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-18T01:08:19+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-18T07:04:43+08:00", "reason": "task-watcher auto close after qa verify pass"}

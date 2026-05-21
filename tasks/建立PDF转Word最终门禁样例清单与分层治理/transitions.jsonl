@@ -1,4 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-19T18:44:39+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T18:46:41+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T19:02:37+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T19:05:02+08:00", "reason": "pm accepted QA-passed sample governance task and skipped extra review to unblock downstream render-pair/rubric consumers", "actor": "pm-chief"}

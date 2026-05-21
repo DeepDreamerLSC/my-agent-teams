@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-04-25T15:03:59+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-04-25T15:08:15+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-04-25T15:17:25+08:00", "reason": "watcher observed result.json status=done"}
-{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T11:35:15+08:00", "reason": "PM normalized ready_for_merge gate: review approved, waiting QA"}
-{"from": "ready_for_merge", "to": "ready_for_merge", "at": "2026-05-06T11:48:37+08:00", "reason": "PM cleared qa_pending after verify.json pass to unblock close-task.sh"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-06T11:48:37+08:00", "reason": "PM manual close after QA pass; auto close blocked by stale qa_pending gate"}

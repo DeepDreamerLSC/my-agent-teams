@@ -1,7 +1,0 @@
-{
-  "task_id": "固化最终DOCX按源门禁",
-  "agent": "qa-1",
-  "status": "working",
-  "summary": "已认领并开始执行 final DOCX 按源门禁验证。我将基于现有 P1 策略矩阵、按源审计产物和 final DOCX gate 入口，补齐 source-profile-aware 的常态化验收口径与报告。",
-  "acknowledged_at": "2026-05-18T07:06:13+0800"
-}

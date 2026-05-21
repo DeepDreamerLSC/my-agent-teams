@@ -1,7 +1,0 @@
-{
-  "task_id": "实现PageIR合并与校验器",
-  "agent": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-15T19:33:00+08:00",
-  "summary": "已读取 instruction.md，实现 PageIR 合并器、页级校验器及对应测试。"
-}

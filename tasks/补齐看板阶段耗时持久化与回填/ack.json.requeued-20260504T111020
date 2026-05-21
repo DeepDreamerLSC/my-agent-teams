@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐看板阶段耗时持久化与回填",
-  "agent_id": "dev-2",
-  "acknowledged_at": "2026-05-04T01:26:30+08:00",
-  "status": "accepted",
-  "notes": "已读取 instruction.md 与 task.json。将只在 write_scope 内补齐 task_stage_durations 持久化与回填链路，并让 query 层优先读取持久化阶段耗时。"
-}

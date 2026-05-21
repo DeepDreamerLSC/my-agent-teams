@@ -1,7 +1,0 @@
-{
-  "task_id": "英语阅读段落与选项区视觉门禁",
-  "agent": "dev-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与 write_scope，开始实现英语阅读段落、选项缩进、题干-选项距离的专项视觉门禁。",
-  "started_at": "2026-05-19T23:20:26+08:00"
-}

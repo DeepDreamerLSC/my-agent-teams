@@ -1,7 +1,0 @@
-{
-  "task_id": "排查王开订单图包生成skill失败",
-  "agent_id": "dev-2",
-  "acknowledged_at": "2026-05-05T13:48:38+08:00",
-  "status": "accepted",
-  "notes": "已读取 instruction.md 与 task.json。将严格从生产 chat_logs 中已知的三次 `skill:order-print-image-pack` 报错起查，只读核对同 session 上下文、上传 xlsx 与 skill 代码，优先定位 `invalid literal for int() with base 10: '0.5'` 的最短根因路径。"
-}

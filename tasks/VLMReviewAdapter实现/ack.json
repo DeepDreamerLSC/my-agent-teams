@@ -1,8 +1,0 @@
-{
-  "task_id": "VLMReviewAdapter实现",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-14T21:17:43+08:00",
-  "summary": "dev-1 已读取 instruction.md，开始执行 VLMReviewAdapter 实现任务。"
-}

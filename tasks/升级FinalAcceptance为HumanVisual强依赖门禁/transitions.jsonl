@@ -1,5 +1,0 @@
-{"from": "pending", "to": "pooled", "at": "2026-05-20T08:09:53+08:00", "reason": "pm queued task into claim pool"}
-{"from": "pooled", "to": "dispatched", "at": "2026-05-20T10:15:53+08:00", "reason": "watcher confirmed claim.json"}
-{"from": "dispatched", "to": "working", "at": "2026-05-20T10:17:28+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-20T10:57:17+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-20T11:09:13+08:00", "reason": "pm close after review approved and qa skipped"}

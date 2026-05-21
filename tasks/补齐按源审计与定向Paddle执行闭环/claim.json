@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐按源审计与定向Paddle执行闭环",
-  "agent": "dev-2",
-  "claimed_at": "2026-05-18T00:49:59+08:00",
-  "reserved": true,
-  "reason": "watcher auto-continued after MinerU切换full模式重跑样例对比"
-}

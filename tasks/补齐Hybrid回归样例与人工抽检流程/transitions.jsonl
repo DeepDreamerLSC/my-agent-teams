@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-17T09:11:43+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T09:15:14+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-17T09:22:15+08:00", "reason": "watcher observed review fail"}
-{"from": "blocked", "to": "dispatched", "at": "2026-05-17T09:24:04+08:00", "reason": "resume-task: review 驳回：正式 QA 基线文档缺少 media_count / has_drawing / has_table_xml 指标，且 Step 7 字段名应为 review_rejected_count；请做最小文档修正后重新提交", "actor": "pm-chief"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-17T09:28:12+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-17T09:30:37+08:00", "reason": "pm close after review approve; qa skipped by task design"}

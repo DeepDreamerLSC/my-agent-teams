@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-05T16:54:43+08:00", "reason": "watcher auto-claimed pending execution task"}
-{"from": "dispatched", "to": "working", "at": "2026-05-05T16:55:35+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-05T17:05:20+08:00", "reason": "watcher observed result.json status=done"}
-{"from": "ready_for_merge", "to": "dispatched", "at": "2026-05-06T06:50:29+08:00", "reason": "PM rework dispatch: review-1驳回：最终完成飞书通知只覆盖auto_close路径，需覆盖PM手工close-task.sh等所有进入done的路径"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-06T06:54:05+08:00", "reason": "watcher observed result.json status=done"}
-{"from": "ready_for_merge", "to": "cancelled", "at": "2026-05-06T10:18:14+08:00", "reason": "PM superseded review-rejected task with focused follow-up 补修taskwatcher历史Done通知去重"}

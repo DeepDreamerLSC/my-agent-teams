@@ -1,5 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-14T18:40:30+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-14T20:49:35+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "blocked", "at": "2026-05-14T21:03:16+08:00", "reason": "watcher observed review fail"}
-{"from": "dispatched", "to": "ready_for_merge", "at": "2026-05-14T21:03:55+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-14T21:16:18+08:00", "reason": "task-watcher auto close after qa verify pass"}

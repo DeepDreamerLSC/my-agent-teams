@@ -1,7 +1,0 @@
-{
-  "task_id": "归档Hybrid最终Word五样例",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已读取 instruction.md 与 task.json，开始基于 hybrid-e2e-validation 的真实 merged pages 补齐 hybrid_experimental 五样例 authoritative final DOCX 归档、profile manifest、archive 索引与逐样例发布证据报告。",
-  "acknowledged_at": "2026-05-17T18:49:30+08:00"
-}

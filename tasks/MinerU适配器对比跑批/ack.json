@@ -1,7 +1,0 @@
-{
-  "task_id": "MinerU适配器对比跑批",
-  "agent": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-14T16:56:16.838791+08:00",
-  "summary": "已读取 task.json 与 instruction.md，开始执行 MinerU 对比跑批；先确认适配器可用性、基线产物与样例路径，再生成 mineru 跑批结果和 comparison_report.json。"
-}

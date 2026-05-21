@@ -1,8 +1,0 @@
-{
-  "task_id": "实现PDF与DOCX渲染对生成器",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-19T19:06:41+08:00",
-  "summary": "dev-2 已读取 instruction.md 与本轮 rework 仲裁，开始仅修复默认 LibreOffice/soffice 超时的显式失败语义、fixture contract 与回归测试。"
-}

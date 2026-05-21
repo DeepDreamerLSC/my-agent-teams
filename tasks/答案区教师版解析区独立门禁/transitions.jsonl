@@ -1,6 +1,0 @@
-{"from": "pending", "to": "dispatched", "at": "2026-05-19T21:34:51+08:00", "reason": "pm dispatch"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T21:35:51+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "dispatched", "at": "2026-05-19T21:38:44+08:00", "reason": "resume-task: 优先级调整：先让路给科学实验页关键区域门禁返修，答案区任务顺延", "actor": "pm-chief"}
-{"from": "dispatched", "to": "working", "at": "2026-05-19T22:12:14+08:00", "reason": "watcher observed ack.json"}
-{"from": "working", "to": "ready_for_merge", "at": "2026-05-19T23:19:09+08:00", "reason": "watcher observed result.json status=success"}
-{"from": "ready_for_merge", "to": "done", "at": "2026-05-19T23:45:10+08:00", "reason": "review and QA passed; PM accepted answer/teacher/analysis independent gate deliverable"}

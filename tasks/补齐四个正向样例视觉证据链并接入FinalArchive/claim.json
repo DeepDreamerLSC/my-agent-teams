@@ -1,7 +1,0 @@
-{
-  "task_id": "补齐四个正向样例视觉证据链并接入FinalArchive",
-  "agent": "dev-1",
-  "claimed_at": "2026-05-20T08:11:32+08:00",
-  "claim_status": "requested",
-  "reason": "watcher auto-continued after idle sweep"
-}

@@ -1,9 +1,0 @@
-{
-  "task_id": "修正taskwatcher仅在任务最终完成后发飞书通知",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "working",
-  "acknowledged_at": "2026-05-06T09:20:00+08:00",
-  "acked_at": "2026-05-06T09:20:00+08:00",
-  "summary": "已按返工要求复核 review.md。当前修复方向是统一在 watcher 观察到任务进入 done 终态时补发最终完成类飞书通知，从而覆盖 auto_close 与 PM 手工 close-task 等所有合法 done 路径；并同步 README 描述。"
-}

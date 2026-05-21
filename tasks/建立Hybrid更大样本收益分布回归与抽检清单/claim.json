@@ -1,7 +1,0 @@
-{
-  "task_id": "建立Hybrid更大样本收益分布回归与抽检清单",
-  "agent": "qa-1",
-  "claimed_at": "2026-05-18T13:32:28+08:00",
-  "reserved": true,
-  "reason": "基于现有 artifacts 执行 Hybrid 收益分布回归与抽检清单整理"
-}

@@ -1,7 +1,0 @@
-{
-  "task_id": "建立PDF转Word最终门禁样例清单与分层治理",
-  "agent": "qa-1",
-  "status": "acknowledged",
-  "summary": "已读取 instruction.md，开始建立 final-gated manifest 与样例分层治理文档。",
-  "acknowledged_at": "2026-05-19T18:45:21+08:00"
-}

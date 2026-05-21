@@ -1,9 +1,0 @@
-{
-  "task_id": "增强看板卡片责任链与筛选器",
-  "agent": "dev-1",
-  "agent_id": "dev-1",
-  "status": "working",
-  "acknowledged_at": "2026-05-04T09:20:00+08:00",
-  "acked_at": "2026-05-04T09:20:00+08:00",
-  "summary": "已按看板任务队列顺序开始执行第 1 项：增强看板卡片责任链与筛选器；当前仅在 dashboard 前端 write_scope 内补齐责任链展示与筛选器能力。"
-}

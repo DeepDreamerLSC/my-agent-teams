@@ -1,8 +1,0 @@
-{
-  "task_id": "数学公式图形表格页专项视觉门禁",
-  "agent": "dev-2",
-  "agent_id": "dev-2",
-  "status": "acknowledged",
-  "acknowledged_at": "2026-05-19T20:47:41+08:00",
-  "summary": "dev-2 已读取 instruction.md，开始在 task-5d9bc040 worktree 实现 math_visual_gate、数学专项 fixture 与回归测试，并对齐共性 visual_similarity/veto 接口语义。"
-}

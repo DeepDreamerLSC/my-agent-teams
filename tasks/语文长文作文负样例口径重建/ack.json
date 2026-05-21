@@ -1,7 +1,0 @@
-{
-  "task_id": "语文长文作文负样例口径重建",
-  "agent": "arch-1",
-  "status": "working",
-  "summary": "已收到恢复/返修指令并读取归档 review。唯一阻塞项为 chinese-samples-manifest.json 中 canonical sample_key 需与 final-gated-manifest 对齐为 chinese_grade5；将保留 canonical key，并用 entry_id/record_role/sample_generation 表达 supplemental/current policy entry。",
-  "acknowledged_at": "2026-05-19T21:28:28+0800"
-}
