@@ -70,6 +70,44 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
             '## 下游动作', 'review',
         ]) + '\n', encoding='utf-8')
 
+    def _write_working_busy_task(self) -> None:
+        self._write_task('working-a', {
+            'id': 'working-a', 'title': '当前执行', 'status': 'working',
+            'assigned_agent': 'dev-1', 'task_type': 'development', 'domain': 'development',
+            'write_scope': ['/tmp/y'],
+        })
+
+    def test_pool_view_and_router_expose_working_busy_fields(self):
+        self._write_working_busy_task()
+        view_completed = subprocess.run(
+            ['python3', str(POOL_VIEW), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        view_payload = json.loads(view_completed.stdout)
+        pooled_row = next(item for item in view_payload if item['task_id'] == 'pooled-a')
+        agent_view = next(item for item in pooled_row['by_agent'] if item['agent_id'] == 'dev-1')
+        self.assertEqual(agent_view['busy_level'], 'hard_busy')
+        self.assertEqual(agent_view['busy_primary_reason'], 'working:working-a')
+        self.assertEqual(agent_view['busy_reason_codes'], ['working:working-a'])
+        self.assertEqual(agent_view['busy_execute_route'], 'queue_only')
+        self.assertEqual(agent_view['busy_remind_route'], 'queue_only')
+        self.assertEqual(agent_view['busy_preheat_route'], 'queue_only')
+        self.assertTrue(agent_view['busy_queue_only'])
+
+        router_completed = subprocess.run(
+            ['python3', str(POOL_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--agent', 'dev-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        router_payload = json.loads(router_completed.stdout)
+        self.assertEqual(router_payload['next_task_id'], 'pooled-a')
+        self.assertEqual(router_payload['next_task_busy_level'], 'hard_busy')
+        self.assertEqual(router_payload['next_task_busy_reason_codes'], ['working:working-a'])
+        self.assertEqual(router_payload['next_task_busy_diagnostic']['busy_level'], 'hard_busy')
+        self.assertEqual(router_payload['next_task_busy_diagnostic']['busy_reason_codes'], ['working:working-a'])
+        self.assertEqual(router_payload['next_task_delivery_route'], 'queue_only')
+        self.assertEqual(router_payload['next_task_remind_route'], 'queue_only')
+        self.assertEqual(router_payload['next_task_preheat_route'], 'queue_only')
+
     def test_pool_router_selects_next_task_for_agent(self):
         completed = subprocess.run(
             ['python3', str(POOL_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--agent', 'dev-1', '--next'],
@@ -116,6 +154,46 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         qa_payload = json.loads(qa.stdout)
         self.assertIn('quality-task', [row['task_id'] for row in review_payload['rows']])
         self.assertIn('quality-task', [row['task_id'] for row in qa_payload['rows']])
+
+
+    def test_pool_view_does_not_mark_qa_idle_for_pending_qa_gate(self):
+        self._write_task('qa-pool', {
+            'id': 'qa-pool', 'title': '待QA池任务', 'status': 'pooled', 'priority': 'medium',
+            'claim_scope': ['qa-1'], 'pool_entered_at': '2026-05-09T10:00:00+08:00',
+            'task_type': 'verification', 'domain': 'quality', 'write_scope': ['/tmp/qa'],
+        })
+        self._write_task('qa-gated', {
+            'id': 'qa-gated', 'title': '待QA任务', 'status': 'ready_for_merge', 'priority': 'medium',
+            'assigned_agent': 'dev-2', 'claim_scope': ['dev-2'], 'task_type': 'development', 'domain': 'development',
+            'review_required': True, 'test_required': True, 'review_gate_state': 'approved', 'qa_gate_state': 'pending',
+            'merge_gate_state': 'qa_pending', 'write_scope': ['/tmp/qa-gated'],
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_VIEW), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        pooled_row = next(item for item in payload if item['task_id'] == 'qa-pool')
+        agent_view = next(item for item in pooled_row['by_agent'] if item['agent_id'] == 'qa-1')
+        self.assertEqual(agent_view['busy_level'], 'idle')
+        self.assertEqual(agent_view['busy_reason_codes'], [])
+        self.assertTrue(agent_view['busy_can_direct_execute'])
+        self.assertEqual(agent_view['busy_execute_route'], 'direct')
+
+    def test_queue_router_qa_queue_ignores_dev_only_claim_scope(self):
+        self._write_task('qa-gated', {
+            'id': 'qa-gated', 'title': '待QA任务', 'status': 'ready_for_merge', 'priority': 'medium',
+            'assigned_agent': 'dev-2', 'claim_scope': ['dev-2'], 'task_type': 'development', 'domain': 'development',
+            'review_required': True, 'test_required': True, 'review_gate_state': 'approved', 'qa_gate_state': 'pending',
+            'merge_gate_state': 'qa_pending', 'write_scope': ['/tmp/qa-gated'],
+        })
+        completed = subprocess.run(
+            ['python3', str(QUEUE_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--queue', 'qa', '--agent', 'qa-1', '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload['next_task_id'], 'qa-gated')
+        self.assertIn('qa-gated', [row['task_id'] for row in payload['rows']])
 
     def test_queue_router_skips_review_task_with_terminal_review_artifact(self):
         review_dir = self.tasks_root / 'review-task'

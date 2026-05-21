@@ -32,6 +32,15 @@ def _load_pool_rows(tasks_root: str, config: str, agent: str) -> list[dict]:
     return json.loads(completed.stdout)
 
 
+def _pick_agent_diagnostic(row: dict | None, agent: str) -> dict | None:
+    if not row:
+        return None
+    for item in row.get("by_agent") or []:
+        if item.get("agent_id") == agent:
+            return item
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Select the next pooled task for an agent")
     parser.add_argument("--tasks-root", default=str(Path.home() / "Desktop/work/my-agent-teams/tasks"))
@@ -46,11 +55,29 @@ def main() -> int:
     if args.explain:
         rows = [row for row in rows if row["task_id"] == args.explain]
     next_row = next((row for row in rows if args.agent in (row.get("eligible_agents") or [])), None)
+    next_diag = _pick_agent_diagnostic(next_row, args.agent)
+    next_task = dict(next_row) if next_row else None
+    if next_task and next_diag:
+        next_task["selected_agent"] = args.agent
+        next_task["selected_agent_busy_diagnostic"] = next_diag
 
     payload = {
         "agent": args.agent,
         "next_task_id": next_row["task_id"] if next_row else None,
-        "next_task": next_row,
+        "next_task": next_task,
+        "next_task_busy_level": next_diag.get("busy_level") if next_diag else None,
+        "next_task_busy_primary_reason": next_diag.get("busy_primary_reason") if next_diag else None,
+        "next_task_busy_reason_codes": next_diag.get("busy_reason_codes") if next_diag else None,
+        "next_task_busy_hard_reason_codes": next_diag.get("busy_hard_reason_codes") if next_diag else None,
+        "next_task_busy_soft_reason_codes": next_diag.get("busy_soft_reason_codes") if next_diag else None,
+        "next_task_delivery_route": next_diag.get("busy_execute_route") if next_diag else None,
+        "next_task_remind_route": next_diag.get("busy_remind_route") if next_diag else None,
+        "next_task_preheat_route": next_diag.get("busy_preheat_route") if next_diag else None,
+        "next_task_can_direct_execute": next_diag.get("busy_can_direct_execute") if next_diag else None,
+        "next_task_can_direct_remind": next_diag.get("busy_can_direct_remind") if next_diag else None,
+        "next_task_queue_only": next_diag.get("busy_queue_only") if next_diag else None,
+        "next_task_non_interrupt": bool(next_diag and next_diag.get("busy_level") != "idle") if next_diag else None,
+        "next_task_busy_diagnostic": next_diag,
         "rows": rows if args.json or args.explain else None,
     }
 

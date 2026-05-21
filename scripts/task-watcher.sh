@@ -431,6 +431,44 @@ session_health_state() {
     echo "idle_session"
 }
 
+
+mark_dispatch_delivery_deferred_until_idle() {
+    local task_dir="$1"
+    local reason="${2:-agent busy; defer delivery until idle}"
+    local session_health="${3:-unknown}"
+    python3 - "$task_dir" "$reason" "$session_health" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+reason = sys.argv[2].strip() or 'agent busy; defer delivery until idle'
+session_health = sys.argv[3].strip() or 'unknown'
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+now = datetime.now().astimezone().isoformat(timespec='seconds')
+
+task['last_delivery_state'] = 'deferred_agent_busy'
+task['last_delivery_error'] = None
+task['delivery_deferred_until'] = 'agent_idle'
+task['delivery_deferred_reason'] = reason
+task['delivery_deferred_at'] = now
+task['delivery_deferred_by'] = 'task-watcher'
+task['session_health'] = session_health
+task['control_plane_state'] = 'delivery_deferred'
+task['control_plane_updated_at'] = now
+task['updated_at'] = now
+
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+PY
+}
+
 record_dispatch_delivery_attempt() {
     local task_dir="$1"
     local delivery_state="$2"
@@ -471,6 +509,18 @@ else:
     if str(task.get('control_plane_state') or '') in {'delivery_failed', 'session_unhealthy'}:
         task['control_plane_state'] = None
         task['control_plane_updated_at'] = now
+
+# Any real delivery attempt consumes/ends a previous non-interrupt deferral.
+for key in (
+    'delivery_deferred_until',
+    'delivery_deferred_reason',
+    'delivery_deferred_at',
+    'delivery_deferred_by',
+):
+    task.pop(key, None)
+if str(task.get('control_plane_state') or '') == 'delivery_deferred':
+    task['control_plane_state'] = None
+    task['control_plane_updated_at'] = now
 
 task['dispatch_delivery_attempt_count'] = attempt_count
 task['dispatch_delivery_retry_count'] = retry_count
@@ -844,6 +894,61 @@ for task_path in tasks_root.glob('*/task.json'):
         count += 1
 print(count)
 PY
+}
+
+
+agent_has_other_working_task() {
+    local agent_id="$1"
+    local current_task_id="${2:-}"
+    python3 - "$TASKS_ROOT" "$agent_id" "$current_task_id" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+tasks_root = Path(sys.argv[1])
+agent_id = sys.argv[2]
+current_task_id = sys.argv[3]
+for task_path in tasks_root.glob('*/task.json'):
+    try:
+        task = json.loads(task_path.read_text(encoding='utf-8'))
+    except Exception:
+        continue
+    task_id = str(task.get('id') or task_path.parent.name)
+    if task_id == current_task_id:
+        continue
+    if str(task.get('assigned_agent') or '') == agent_id and str(task.get('status') or '') == 'working':
+        print(task_id)
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+task_delivery_deferred_until_idle() {
+    local task_dir="$1"
+    local state until
+    state=$(task_json_pick "$task_dir" last_delivery_state 2>/dev/null || true)
+    until=$(task_json_pick "$task_dir" delivery_deferred_until 2>/dev/null || true)
+    [ "$state" = "deferred_agent_busy" ] || [ "$until" = "agent_idle" ]
+}
+
+deliver_reserved_task_ready_notice() {
+    local task_dir="$1"
+    local task_id="$2"
+    local agent_id="$3"
+    local notice_key="${task_id}_reserved_ready_notice"
+    local now last_notice workspace_payload workspace_hint
+
+    now=$(date +%s)
+    last_notice=$(cat "$STATE_DIR/$notice_key" 2>/dev/null || echo 0)
+    if [ $(( now - ${last_notice:-0} )) -lt "$RESEND_COOLDOWN_SECONDS" ]; then
+        return 0
+    fi
+
+    workspace_payload=$(prepare_task_workspace_payload "$task_dir")
+    workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$agent_id" "你已有预留任务可开始：${task_id}。请读取 ${TASKS_ROOT}/${task_id}/instruction.md，确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}" || true
+    emit_system_chat_event nudge "$task_id" "预留任务已成为 ${agent_id} 的下一条可执行任务，已在空闲后提醒 ack。" "$agent_id" info nudge
+    echo "$now" > "$STATE_DIR/$notice_key"
 }
 
 reserved_task_for_agent() {
@@ -1221,14 +1326,7 @@ auto_push_next_task_for_agent() {
         if [ "${working_count:-0}" -eq 0 ]; then
             reserved_task=$(reserved_task_for_agent "$agent_id" 2>/dev/null || true)
             if [ -n "$reserved_task" ]; then
-                reserved_notice_key="${reserved_task}_reserved_ready_notice"
-                now=$(date +%s)
-                last_notice=$(cat "$STATE_DIR/$reserved_notice_key" 2>/dev/null || echo 0)
-                if [ $(( now - last_notice )) -gt "$RESEND_COOLDOWN_SECONDS" ]; then
-                    notify_agent "$agent_id" "你已有预留任务可开始：${reserved_task}。请读取 ${TASKS_ROOT}/${reserved_task}/instruction.md，确认后写 ack.json 开始执行。"
-                    emit_system_chat_event nudge "$reserved_task" "预留任务已成为 ${agent_id} 的下一条可执行任务，已提醒 ack。" "$agent_id" info nudge
-                    echo "$now" > "$STATE_DIR/$reserved_notice_key"
-                fi
+                deliver_reserved_task_ready_notice "$TASKS_ROOT/$reserved_task" "$reserved_task" "$agent_id"
                 return 0
             fi
         fi
@@ -1282,12 +1380,10 @@ auto_reserve_next_task_for_agent() {
     local claim_payload=""
     if CLAIM_AGENT_ID="$agent_id" TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" "$WORKSPACE_ROOT/scripts/claim-task.sh" "$next_task" "$reason" >/dev/null 2>&1 \
         && claim_payload=$(confirm_claim_request "$task_dir" "$next_task" 2>/dev/null); then
-        local workspace_hint=""
-        workspace_hint=$(workspace_hint_from_payload "$claim_payload")
-        deliver_execution_instruction_and_record "$task_dir" "$next_task" "$agent_id" "已为你预留下一条任务：${next_task}。当前任务完成前不要写该任务 ack；完成当前主线后再读取 ${TASKS_ROOT}/${next_task}/instruction.md 并确认开始。${workspace_hint:+ ${workspace_hint}}" || true
-        emit_system_chat_event nudge "$next_task" "watcher 已为 ${agent_id} 预留下一条任务，等待当前 working 完成后 ack。" "$agent_id" info nudge
-        sync_task_board "$task_dir" "auto-reserve-dev"
-        log "${next_task}: 已为 ${agent_id} 预留下一条任务（trigger=${trigger_task_id:-idle sweep}）"
+        mark_dispatch_delivery_deferred_until_idle "$task_dir" "watcher auto-reserved while ${agent_id} is working; tmux delivery deferred until agent idle" "$(session_health_state "$agent_id")"
+        emit_system_chat_event nudge "$next_task" "watcher 已为 ${agent_id} 预留下一条任务；因 agent 当前 working，tmux 执行通知已延后到空闲后触达。" "$agent_id" info nudge
+        sync_task_board "$task_dir" "auto-reserve-dev-deferred"
+        log "${next_task}: 已为 ${agent_id} 非打断预留下一条任务，投递延后到空闲后（trigger=${trigger_task_id:-idle sweep}）"
         return 0
     fi
     return 1
@@ -3268,6 +3364,16 @@ run_task_watcher_loop() {
 
         # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令
         if [ "$current_status" = "dispatched" ] && [ ! -f "$task_dir/ack.json" ]; then
+            if task_delivery_deferred_until_idle "$task_dir"; then
+                agent_session=$(task_json_pick "$task_dir" assigned_agent)
+                if agent_has_other_working_task "$agent_session" "$task_id" >/dev/null 2>&1; then
+                    log "$task_id: 非打断预留投递等待 ${agent_session} 空闲，跳过 ack 超时回池/重发"
+                    continue
+                fi
+                deliver_reserved_task_ready_notice "$task_dir" "$task_id" "$agent_session"
+                current_status=$(get_task_status "$task_dir")
+                continue
+            fi
             if returned_agent=$(return_reserved_to_pool_if_timed_out "$task_dir" "$task_id" 2>/dev/null); then
                 notify_pm "[task-watcher] $task_id 预留后超时未 ack，已回退到 pooled。"
                 if [ -n "$returned_agent" ]; then

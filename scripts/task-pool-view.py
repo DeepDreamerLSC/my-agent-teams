@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,75 @@ def age_minutes(value: str | None, now: datetime) -> int:
 
 def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def default_busy_diagnostic(agent_id: str, *, error: str | None = None) -> dict:
+    diag = {
+        "agent_id": agent_id,
+        "role": "",
+        "busy_level": "idle",
+        "primary_reason": "idle",
+        "reason_codes": [],
+        "hard_reason_codes": [],
+        "soft_reason_codes": [],
+        "hard_task_ids": [],
+        "soft_task_ids": [],
+        "hard_task_count": 0,
+        "soft_task_count": 0,
+        "counts": {},
+        "capacity": {},
+        "routes": {
+            "execute": "direct",
+            "remind": "direct",
+            "preheat": "direct",
+            "broadcast": "direct",
+            "critical": "override",
+        },
+        "can_direct_execute": True,
+        "can_direct_remind": True,
+        "queue_only": False,
+    }
+    if error:
+        diag["helper_error"] = error
+    return diag
+
+
+def load_agent_busy_diagnostic(agent_id: str, tasks_root: Path, config_path: Path) -> dict:
+    helper_path = SCRIPT_DIR / "lib" / "agent_availability.sh"
+    if not helper_path.exists():
+        return default_busy_diagnostic(agent_id, error="helper_missing")
+    try:
+        completed = subprocess.run(
+            [
+                "bash",
+                str(helper_path),
+                "json",
+                agent_id,
+                str(tasks_root),
+                str(config_path),
+            ],
+            cwd=str(SCRIPT_DIR.parent),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        payload = json.loads(completed.stdout)
+        if not isinstance(payload, dict):
+            return default_busy_diagnostic(agent_id, error="helper_non_dict")
+        return payload
+    except Exception as exc:
+        return default_busy_diagnostic(agent_id, error=f"helper_error:{exc.__class__.__name__}")
+
+
+def load_task_records(tasks_root: Path) -> list[tuple[Path, dict]]:
+    records: list[tuple[Path, dict]] = []
+    for task_path in sorted(tasks_root.glob("*/task.json")):
+        try:
+            payload = load_json(task_path)
+        except Exception:
+            continue
+        records.append((task_path.parent, payload))
+    return records
 
 
 def default_claim_scope(task: dict, agents: dict[str, dict]) -> list[str]:
@@ -99,19 +169,17 @@ def resolve_scope_paths(task: dict, config: dict) -> list[Path]:
     return resolved
 
 
-def active_tasks_by_agent(tasks_root: Path) -> dict[str, list[dict]]:
+def active_tasks_by_agent(task_records: list[tuple[Path, dict]] | Path) -> dict[str, list[dict]]:
+    if isinstance(task_records, Path):
+        task_records = load_task_records(task_records)
     result: dict[str, list[dict]] = {}
-    for task_path in tasks_root.glob("*/task.json"):
-        try:
-            payload = load_json(task_path)
-        except Exception:
-            continue
+    for task_dir, payload in task_records:
         if str(payload.get("status") or "") not in {"dispatched", "working"}:
             continue
         agent = str(payload.get("assigned_agent") or "").strip()
         if not agent:
             continue
-        result.setdefault(agent, []).append({"id": payload.get("id") or task_path.parent.name, "task": payload})
+        result.setdefault(agent, []).append({"id": payload.get("id") or task_dir.name, "task": payload})
     return result
 
 
@@ -269,12 +337,24 @@ def mature_pending_count(tasks_root: Path) -> int:
     return count
 
 
-def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path) -> dict:
+def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path, busy_map: dict[str, dict]) -> dict:
     pool_agents = sorted(agent_id for agent_id, payload in agents.items() if is_pool_agent(agent_id, payload or {}))
-    idle_agents = [
-        agent_id for agent_id in pool_agents
-        if not active_by_agent.get(agent_id)
-    ]
+    busy_level_counts = {"idle": 0, "soft_busy": 0, "hard_busy": 0}
+    deferred_agents: list[str] = []
+    digest_agents: list[str] = []
+    queue_only_agents: list[str] = []
+    for agent_id in pool_agents:
+        diag = busy_map.get(agent_id) or {}
+        level = str(diag.get("busy_level") or "idle")
+        busy_level_counts[level] = busy_level_counts.get(level, 0) + 1
+        routes = diag.get("routes") or {}
+        if level != "idle":
+            deferred_agents.append(agent_id)
+        if str(routes.get("remind") or "") == "digest":
+            digest_agents.append(agent_id)
+        if str(routes.get("execute") or "") == "queue_only":
+            queue_only_agents.append(agent_id)
+    idle_agents = [agent_id for agent_id in pool_agents if (busy_map.get(agent_id) or {}).get("busy_level") == "idle"]
     active_rows = [item for items in active_by_agent.values() for item in items]
     reserved_count = sum(1 for item in active_rows if str((item.get("task") or {}).get("status") or "") == "dispatched")
     working_count = sum(1 for item in active_rows if str((item.get("task") or {}).get("status") or "") == "working")
@@ -292,6 +372,15 @@ def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: di
         "definition_blocked_count": sum(1 for row in rows if row.get("definition_blockers")),
         "idle_agents": idle_agents,
         "idle_agent_count": len(idle_agents),
+        "busy_level_counts": busy_level_counts,
+        "soft_busy_agent_count": busy_level_counts.get("soft_busy", 0),
+        "hard_busy_agent_count": busy_level_counts.get("hard_busy", 0),
+        "deferred_agents": deferred_agents,
+        "deferred_agent_count": len(deferred_agents),
+        "digest_agents": digest_agents,
+        "digest_agent_count": len(digest_agents),
+        "queue_only_agents": queue_only_agents,
+        "queue_only_agent_count": len(queue_only_agents),
         "reserved_count": reserved_count,
         "working_count": working_count,
         "artifact_invalid_count": artifact_invalid_count(tasks_root),
@@ -300,7 +389,7 @@ def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: di
     }
 
 
-def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path, default_concurrency: int, now: datetime, config: dict) -> dict:
+def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], busy_map: dict[str, dict], tasks_root: Path, default_concurrency: int, now: datetime, config: dict) -> dict:
     scope = default_claim_scope(task, agents)
     by_agent = []
     eligible = []
@@ -308,13 +397,47 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
     definition_blockers = pool_gate_blockers(task, task_dir)
     for agent_id in scope:
         can_claim, reasons = agent_acceptance(task, task_dir, agent_id, agents, active_by_agent, tasks_root, default_concurrency, config)
-        by_agent.append({"agent_id": agent_id, "can_claim": can_claim, "reasons": reasons})
+        busy_diag = busy_map.get(agent_id) or default_busy_diagnostic(agent_id)
+        by_agent.append({
+            "agent_id": agent_id,
+            "can_claim": can_claim,
+            "reasons": reasons,
+            "busy_level": busy_diag.get("busy_level", "idle"),
+            "busy_primary_reason": busy_diag.get("primary_reason", "idle"),
+            "busy_reason_codes": busy_diag.get("reason_codes", []),
+            "busy_hard_reason_codes": busy_diag.get("hard_reason_codes", []),
+            "busy_soft_reason_codes": busy_diag.get("soft_reason_codes", []),
+            "busy_hard_task_ids": busy_diag.get("hard_task_ids", []),
+            "busy_soft_task_ids": busy_diag.get("soft_task_ids", []),
+            "busy_execute_route": (busy_diag.get("routes") or {}).get("execute", "direct"),
+            "busy_remind_route": (busy_diag.get("routes") or {}).get("remind", "direct"),
+            "busy_preheat_route": (busy_diag.get("routes") or {}).get("preheat", "direct"),
+            "busy_broadcast_route": (busy_diag.get("routes") or {}).get("broadcast", "direct"),
+            "busy_critical_route": (busy_diag.get("routes") or {}).get("critical", "override"),
+            "busy_can_direct_execute": bool(busy_diag.get("can_direct_execute", False)),
+            "busy_can_direct_remind": bool(busy_diag.get("can_direct_remind", False)),
+            "busy_queue_only": bool(busy_diag.get("queue_only", False)),
+        })
         if can_claim:
             eligible.append(agent_id)
         else:
             blocked_reasons.update(reasons)
     wait = age_minutes(str(task.get("pool_entered_at") or task.get("created_at") or ""), now)
     priority = str(task.get("priority") or "medium").strip().lower()
+    claim_busy_counts = {"idle": 0, "soft_busy": 0, "hard_busy": 0}
+    claim_deferred_agents: list[str] = []
+    claim_digest_agents: list[str] = []
+    claim_queue_only_agents: list[str] = []
+    for item in by_agent:
+        level = str(item.get("busy_level") or "idle")
+        claim_busy_counts[level] = claim_busy_counts.get(level, 0) + 1
+        if level != "idle":
+            claim_deferred_agents.append(item["agent_id"])
+        if str(item.get("busy_remind_route") or "") == "digest":
+            claim_digest_agents.append(item["agent_id"])
+        if str(item.get("busy_execute_route") or "") == "queue_only":
+            claim_queue_only_agents.append(item["agent_id"])
+
     if definition_blockers:
         next_action = "定义未完成，需 PM 补齐 Pool Gate"
         gate_stage = "definition"
@@ -322,7 +445,12 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
         active = active_by_agent.get(eligible[0], [])
         has_working = any(str(item["task"].get("status") or "") == "working" for item in active)
         action = "可预留" if has_working else "可认领"
-        next_action = f"{eligible[0]} {action}，等待自动续推或手动 claim"
+        selected_diag = next((item for item in by_agent if item["agent_id"] == eligible[0]), {})
+        next_action = (
+            f"{eligible[0]} {action}，busy_level={selected_diag.get('busy_level', 'idle')} "
+            f"execute={selected_diag.get('busy_execute_route', 'direct')} "
+            f"remind={selected_diag.get('busy_remind_route', 'direct')}，等待自动续推或手动 claim"
+        )
         gate_stage = "claim_ready"
     elif blocked_reasons:
         next_action = "不可认领，需处理：" + ",".join(sorted(blocked_reasons))
@@ -344,6 +472,13 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
         "claim_scope": scope,
         "eligible_agents": eligible,
         "by_agent": by_agent,
+        "claim_scope_busy_level_counts": claim_busy_counts,
+        "claim_scope_deferred_agents": claim_deferred_agents,
+        "claim_scope_deferred_agent_count": len(claim_deferred_agents),
+        "claim_scope_digest_agents": claim_digest_agents,
+        "claim_scope_digest_agent_count": len(claim_digest_agents),
+        "claim_scope_queue_only_agents": claim_queue_only_agents,
+        "claim_scope_queue_only_agent_count": len(claim_queue_only_agents),
         "definition_blockers": definition_blockers,
         "blocked_reasons": sorted(blocked_reasons),
         "gate_stage": gate_stage,
@@ -362,11 +497,15 @@ def human_print(rows: list[dict], agent_filter: str | None, summary: dict | None
     )
     print(f"任务池 | 可认领 {pooled - blocked} | 阻塞 {blocked} | 超时 {timed_out}")
     if summary:
+        busy_counts = summary.get("busy_level_counts") or {}
         print(
-            f"池健康 | idle {summary.get('idle_agent_count', 0)} | reserved {summary.get('reserved_count', 0)} | "
+            f"池健康 | idle {busy_counts.get('idle', summary.get('idle_agent_count', 0))} | "
+            f"soft_busy {busy_counts.get('soft_busy', summary.get('soft_busy_agent_count', 0))} | "
+            f"hard_busy {busy_counts.get('hard_busy', summary.get('hard_busy_agent_count', 0))} | "
+            f"deferred {summary.get('deferred_agent_count', 0)} | digest {summary.get('digest_agent_count', 0)} | "
+            f"queue_only {summary.get('queue_only_agent_count', 0)} | reserved {summary.get('reserved_count', 0)} | "
             f"working {summary.get('working_count', 0)} | dependency_wait {summary.get('pool_waiting_dependency_count', 0)} | "
-            f"definition_blocked {summary.get('definition_blocked_count', 0)} | "
-            f"artifact_invalid {summary.get('artifact_invalid_count', 0)}"
+            f"definition_blocked {summary.get('definition_blocked_count', 0)} | artifact_invalid {summary.get('artifact_invalid_count', 0)}"
         )
     print()
     for row in rows:
@@ -378,7 +517,12 @@ def human_print(rows: list[dict], agent_filter: str | None, summary: dict | None
             print(f"[{row['priority']}] {row['title']}")
             print(f"  scope: {', '.join(row['claim_scope']) or '[]'}")
             print(f"  wait: {row['pool_wait_minutes']}m")
-            print(f"  {agent_filter}: {state}")
+            print(
+                f"  {agent_filter}: {state} | busy_level={agent_view['busy_level']} | "
+                f"execute={agent_view['busy_execute_route']} | remind={agent_view['busy_remind_route']}"
+            )
+            if agent_view["busy_level"] != "idle":
+                print(f"  non-interrupt: {agent_view['busy_primary_reason']} / {', '.join(agent_view['busy_reason_codes']) or 'idle'}")
             print(f"  next: {row['next_action']}")
             print()
         else:
@@ -386,7 +530,13 @@ def human_print(rows: list[dict], agent_filter: str | None, summary: dict | None
             print(f"  scope: {', '.join(row['claim_scope']) or '[]'}")
             print(f"  wait: {row['pool_wait_minutes']}m")
             if row["eligible_agents"]:
-                print(f"  candidates: {', '.join(row['eligible_agents'])}")
+                candidates = []
+                for item in row["by_agent"]:
+                    mark = "可认领" if item["can_claim"] else "不可认领"
+                    candidates.append(
+                        f"{item['agent_id']}[{mark}|busy_level={item['busy_level']}|execute={item['busy_execute_route']}|remind={item['busy_remind_route']}]"
+                    )
+                print(f"  candidates: {'; '.join(candidates)}")
             else:
                 print(f"  blocked: {', '.join(row['blocked_reasons']) or 'no_eligible_agent'}")
             print(f"  next: {row['next_action']}")
@@ -405,19 +555,23 @@ def main() -> int:
     args = parser.parse_args()
 
     tasks_root = Path(args.tasks_root).expanduser().resolve()
-    config = load_json(Path(args.config).expanduser().resolve())
+    config_path = Path(args.config).expanduser().resolve()
+    config = load_json(config_path)
     agents = config.get("agents") or {}
     default_concurrency = int((config.get("task_pool") or {}).get("default_claim_max_concurrency", 1))
-    wip_limits = config.get("wip_limits") or {}
-    active_by_agent = active_tasks_by_agent(tasks_root)
+    task_records = load_task_records(tasks_root)
+    active_by_agent = active_tasks_by_agent(task_records)
     now = datetime.now().astimezone()
+    pool_agents = sorted(agent_id for agent_id, payload in agents.items() if is_pool_agent(agent_id, payload or {}))
+    busy_map = {agent_id: load_agent_busy_diagnostic(agent_id, tasks_root, config_path) for agent_id in pool_agents}
 
     rows = []
-    for task_dir, task in pooled_tasks(tasks_root):
-        task["__wip_limits__"] = wip_limits
-        rows.append(build_row(task_dir, task, agents, active_by_agent, tasks_root, default_concurrency, now, config))
+    for task_dir, task in task_records:
+        if str(task.get("status") or "") != "pooled":
+            continue
+        rows.append(build_row(task_dir, task, agents, active_by_agent, busy_map, tasks_root, default_concurrency, now, config))
     rows.sort(key=lambda row: (-PRIORITY_RANK.get(row["priority"], 0), -row["pool_wait_minutes"], row["task_id"]))
-    summary = build_summary(rows, agents, active_by_agent, tasks_root)
+    summary = build_summary(rows, agents, active_by_agent, tasks_root, busy_map)
 
     if args.explain:
         rows = [row for row in rows if row["task_id"] == args.explain]

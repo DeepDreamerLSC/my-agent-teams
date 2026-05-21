@@ -23,13 +23,55 @@ def load_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def agent_role(config: dict, agent_id: str) -> str:
+    agents = config.get("agents") or {}
+    payload = agents.get(agent_id) or {}
+    return str((payload or {}).get("role") or "").strip().lower()
+
+
+def qa_agent_matches(task: dict, agent: str, config: dict) -> bool:
+    explicit = [
+        str(item).strip()
+        for item in (
+            task.get("qa_agent"),
+            task.get("qa_assignee"),
+            task.get("qa_owner"),
+            task.get("verify_agent"),
+            task.get("verify_owner"),
+            task.get("tester"),
+        )
+        if item is not None and str(item).strip()
+    ]
+    if explicit:
+        return agent in explicit
+
+    claim_scope = [
+        str(item).strip()
+        for item in (task.get("claim_scope") or [])
+        if item is not None and str(item).strip()
+    ]
+    scoped_qa = [item for item in claim_scope if agent_role(config, item) == "qa" or item.startswith("qa-")]
+    if scoped_qa:
+        return agent in scoped_qa
+
+    return agent_role(config, agent) == "qa"
+
+
 def parse_iso(value: str | None) -> datetime:
+    default_tz = datetime.now().astimezone().tzinfo
+    earliest = datetime.min.replace(tzinfo=default_tz)
     if not value:
-        return datetime.max
+        return earliest
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except Exception:
-        return datetime.max
+        return earliest
+    if parsed.tzinfo is None:
+        try:
+            parsed = parsed.replace(tzinfo=default_tz)
+        except Exception:
+            pass
+    return parsed
 
 
 def review_artifact_terminal(task_dir: Path) -> bool:
@@ -136,7 +178,7 @@ def _artifact_stale_after_current_result(task_dir: Path, artifact_path: Path, pa
     return False
 
 
-def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
+def candidate_rows(tasks_root: Path, queue_kind: str, agent: str, config: dict) -> list[dict]:
     rows = []
     for task_path in tasks_root.glob("*/task.json"):
         try:
@@ -170,9 +212,7 @@ def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
                 continue
             if qa_artifact_terminal(task_path.parent):
                 continue
-            claim_scope = task.get("claim_scope") if isinstance(task.get("claim_scope"), list) else []
-            scope = [str(item).strip() for item in claim_scope if str(item).strip()]
-            if scope and agent not in scope:
+            if not qa_agent_matches(task, agent, config):
                 continue
             queued_at = str(task.get("last_gate_decision_at") or task.get("updated_at") or task.get("created_at") or "")
         rows.append({
@@ -188,13 +228,19 @@ def candidate_rows(tasks_root: Path, queue_kind: str, agent: str) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Select next review/QA queue candidate")
     parser.add_argument("--tasks-root", default=str(Path.home() / "Desktop/work/my-agent-teams/tasks"))
+    parser.add_argument(
+        "--config",
+        default=str(Path(__file__).resolve().parents[1] / "config.json"),
+        help="workspace config.json path",
+    )
     parser.add_argument("--queue", choices=["review", "qa"], required=True)
     parser.add_argument("--agent", required=True)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--next", action="store_true")
     args = parser.parse_args()
 
-    rows = candidate_rows(Path(args.tasks_root).expanduser().resolve(), args.queue, args.agent)
+    config = load_json(Path(args.config).expanduser().resolve())
+    rows = candidate_rows(Path(args.tasks_root).expanduser().resolve(), args.queue, args.agent, config)
     payload = {
         "agent": args.agent,
         "queue": args.queue,
