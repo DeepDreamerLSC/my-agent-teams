@@ -306,6 +306,56 @@ def _normalize_result_status(value: Any) -> tuple[str, bool]:
     return mapping.get(normalized, "invalid"), normalized == "success"
 
 
+def _normalize_outcome_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "pass" if value else "fail"
+    if value is None:
+        return "invalid"
+    normalized = str(value).strip().lower().replace('_', '-')
+    if normalized in {"pass", "passed", "approve", "approved", "ok", "true", "1", "success", "done", "go"}:
+        return "pass"
+    if normalized in {"fail", "failed", "false", "0", "reject", "rejected", "error", "qa-failed", "no-go"}:
+        return "fail"
+    if normalized == "blocked":
+        return "blocked"
+    return "invalid"
+
+
+def _normalize_result_outcome(payload: dict[str, Any]) -> str:
+    for key in ("conclusion", "verdict", "result", "pass", "ok"):
+        status = _normalize_outcome_value(payload.get(key))
+        if status != "invalid":
+            return status
+
+    acceptance = payload.get("acceptance_criteria")
+    if isinstance(acceptance, dict) and acceptance:
+        saw_any = False
+        saw_blocked = False
+        all_pass = True
+        for item in acceptance.values():
+            if isinstance(item, dict):
+                raw = item.get("status") or item.get("result") or item.get("conclusion")
+            else:
+                raw = item
+            status = _normalize_outcome_value(raw)
+            if status == "invalid":
+                continue
+            saw_any = True
+            if status == "fail":
+                return "fail"
+            if status == "blocked":
+                saw_blocked = True
+                all_pass = False
+            elif status != "pass":
+                all_pass = False
+        if saw_any:
+            if saw_blocked:
+                return "blocked"
+            if all_pass:
+                return "pass"
+    return "invalid"
+
+
 def parse_result(task_dir: Path) -> dict[str, Any]:
     ctx = task_context(task_dir)
     path = task_dir / "result.json"
@@ -319,18 +369,23 @@ def parse_result(task_dir: Path) -> dict[str, Any]:
         result["errors"].append(error)
         return result
     norm_status, legacy_mapped = _normalize_result_status(payload.get("status"))
+    task_type = str(ctx.task.get("task_type") or "").strip().lower()
+    outcome_status = _normalize_result_outcome(payload)
     _mark_round_status(result, payload, ctx)
     result.update({
         "task_id": payload.get("task_id"),
         "agent": payload.get("agent") or payload.get("agent_id"),
         "summary": payload.get("summary") or payload.get("message") or "",
         "legacy_mapped": legacy_mapped,
+        "outcome_status": outcome_status,
         "finished_at": payload.get("finished_at") or payload.get("completed_at") or payload.get("reported_at"),
     })
     if payload.get("task_id") not in (None, ctx.task.get("id")):
         result["errors"].append("task_id_mismatch")
     if ctx.task.get("assigned_agent") and result.get("agent") not in (None, ctx.task.get("assigned_agent")):
         result["errors"].append("agent_mismatch")
+    if task_type == "verification" and outcome_status == "invalid":
+        result["warnings"].append("verification_outcome_missing")
     if norm_status == "invalid":
         result["errors"].append("unknown_or_missing_status")
     if not isinstance(result.get("summary"), str) or not result.get("summary", "").strip():

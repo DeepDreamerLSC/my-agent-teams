@@ -107,6 +107,21 @@ def parse_verify_state(task_dir: Path) -> str:
     return 'pending'
 
 
+def parse_result_state(task_dir: Path) -> str:
+    result = task_artifacts.parse_result(task_dir)
+    normalized = str(result.get('normalized_status') or '').strip().lower()
+    outcome = str(result.get('outcome_status') or '').strip().lower()
+    if normalized in {'failed', 'blocked'}:
+        return 'fail' if normalized == 'failed' else 'blocked'
+    if outcome in {'fail', 'blocked'}:
+        return outcome
+    if normalized == 'success':
+        return 'pass'
+    if normalized in {'missing', 'pending'}:
+        return 'missing'
+    return 'pending'
+
+
 task_dir = Path(sys.argv[1]).expanduser().resolve()
 summary_arg = sys.argv[2]
 reason = sys.argv[3].strip() or 'manual close via close-task.sh'
@@ -127,10 +142,12 @@ if current_status != 'ready_for_merge':
 
 review_required = bool(task.get('review_required'))
 test_required = bool(task.get('test_required'))
+task_type = str(task.get('task_type') or '').strip().lower()
 review_level = str(task.get('review_level') or '').strip().lower()
 merge_gate_state = str(task.get('merge_gate_state') or '').strip()
 review_state = parse_review_state(task_dir, review_level)
 verify_state = parse_verify_state(task_dir)
+result_state = parse_result_state(task_dir)
 
 if merge_gate_state == 'review_pending' and not (review_required and review_state == 'pass'):
     fail(f'task merge_gate_state still pending: {merge_gate_state}')
@@ -145,6 +162,8 @@ if review_required and review_state != 'pass':
     fail(f'review is not approved: {review_state}')
 if test_required and verify_state != 'pass':
     fail(f'qa verify is not passed: {verify_state}')
+if task_type == 'verification' and result_state in {'fail', 'blocked'}:
+    fail(f'verification result is negative ({result_state}); route to blocked/rework instead of close')
 
 summary = summary_arg.strip() if summary_arg.strip() else str(task.get('result_summary') or '').strip()
 if not summary:

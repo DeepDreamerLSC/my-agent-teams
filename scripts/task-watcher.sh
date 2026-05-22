@@ -3164,7 +3164,14 @@ auto_dispatch_qa() {
 auto_close_review_only_task() {
     local task_dir="$1"
     local task_id="$2"
-    local result_summary
+    local result_summary task_type result_status result_outcome
+    task_type=$(task_json_pick "$task_dir" task_type)
+    result_status=$(artifact_pick result "$task_dir" normalized_status 2>/dev/null || true)
+    result_outcome=$(artifact_pick result "$task_dir" outcome_status 2>/dev/null || true)
+    if [ "$task_type" = "verification" ] && { [ "$result_status" = "failed" ] || [ "$result_status" = "blocked" ] || [ "$result_outcome" = "fail" ] || [ "$result_outcome" = "blocked" ]; }; then
+        log "$task_id: 复验结论为负，禁止自动收口"
+        return 2
+    fi
     result_summary=$(json_pick "$task_dir/result.json" summary)
     if [ -z "$result_summary" ]; then
         result_summary="${task_id} 审查已通过并自动收口。"
@@ -3705,20 +3712,36 @@ run_task_watcher_loop() {
                         fi
                     else
                         auto_close_policy=$(task_json_pick "$task_dir" auto_close_policy)
+                        task_type=$(task_json_pick "$task_dir" task_type)
+                        result_status=$(artifact_pick result "$task_dir" normalized_status 2>/dev/null || true)
+                        result_outcome=$(artifact_pick result "$task_dir" outcome_status 2>/dev/null || true)
+                        verification_negative=0
+                        if [ "$task_type" = "verification" ] && { [ "$result_status" = "failed" ] || [ "$result_status" = "blocked" ] || [ "$result_outcome" = "fail" ] || [ "$result_outcome" = "blocked" ]; }; then
+                            verification_negative=1
+                        fi
                         if [ "$review_route_pending" -eq 1 ]; then
                             gate_decision_at=$(now_iso)
-                            set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "skipped"
-                            if [ "$auto_close_policy" = "review_pass_only" ]; then
-                                if ! auto_close_review_only_task "$task_dir" "$task_id"; then
-                                    notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
-                                    emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
-                                fi
+                            if [ "$verification_negative" -eq 1 ]; then
+                                set_task_gate_state "$task_dir" "blocked" "watcher observed review pass confirming verification fail" "blocked" "verification" "review" "$gate_decision_at" "approved" "skipped"
+                                current_status="blocked"
+                                notify_pm "[task-watcher] $task_id 复验结论未通过且审查已确认，请回退开发补修，不会自动收口。"
+                                emit_system_chat_event watcher "$task_id" "复验结论未通过且审查已确认，任务已回到 blocked，需继续开发补修。" "$PM_SESSION" degraded notify
                             else
-                                notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
-                                emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "skipped"
+                                if [ "$auto_close_policy" = "review_pass_only" ]; then
+                                    if ! auto_close_review_only_task "$task_dir" "$task_id"; then
+                                        notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
+                                        emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
+                                    fi
+                                else
+                                    notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
+                                    emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                fi
                             fi
                         fi
-                        if [ "$auto_close_policy" != "review_pass_only" ] && [ "$review_push_pending" -eq 1 ]; then
+                        if [ "$verification_negative" -eq 1 ] && [ "$review_push_pending" -eq 1 ]; then
+                            push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【复验失败待补修】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "审查已确认失败结论，请回退开发继续修复" || log "$task_id: verification fail 事件飞书补推待重试"
+                        elif [ "$auto_close_policy" != "review_pass_only" ] && [ "$review_push_pending" -eq 1 ]; then
                             push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查通过待收口】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "无需 QA，等待 PM 最终验收" || log "$task_id: review close-wait 事件飞书补推待重试"
                         fi
                     fi
