@@ -51,6 +51,9 @@ RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
 DISPATCH_FAILURE_THRESHOLD="${DISPATCH_FAILURE_THRESHOLD:-3}"
 WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
 WORKING_REASSIGN_GRACE_SECONDS="${WORKING_REASSIGN_GRACE_SECONDS:-900}"
+ACK_NO_PROGRESS_REMINDER_SECONDS="${ACK_NO_PROGRESS_REMINDER_SECONDS:-900}"
+ACK_NO_PROGRESS_REPOOL_SECONDS="${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}"
+ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS="${ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS:-1800}"
 TASK_WATCHER_TEST_MODE="${TASK_WATCHER_TEST_MODE:-0}"
 NOTIFY_RETRY_COOLDOWN_SECONDS="${NOTIFY_RETRY_COOLDOWN_SECONDS:-$RESEND_COOLDOWN_SECONDS}"
 
@@ -268,6 +271,211 @@ task_has_current_round_progress_artifact() {
     fi
 
     return 1
+}
+
+task_workspace_has_changes() {
+    local task_dir="$1"
+    python3 - "$task_dir/task.json" <<'PY'
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+workspace = str(task.get('workspace_path') or task.get('worktree_path') or '').strip()
+if not workspace:
+    raise SystemExit(1)
+workspace_path = Path(workspace)
+if not workspace_path.exists():
+    raise SystemExit(1)
+
+completed = subprocess.run(
+    ['git', '-C', str(workspace_path), 'status', '--porcelain', '--untracked-files=all'],
+    capture_output=True,
+    text=True,
+    check=False,
+)
+if completed.returncode != 0:
+    raise SystemExit(1)
+if completed.stdout.strip():
+    print('1')
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+task_has_effective_progress() {
+    local task_dir="$1"
+    local reference_epoch="${2:-0}"
+    local artifact artifact_epoch
+    for artifact in result.json review.json design-review.json review.md design-review.md verify.json; do
+        if [ -f "$task_dir/$artifact" ]; then
+            artifact_epoch=$(stat -f %m "$task_dir/$artifact" 2>/dev/null || echo 0)
+            if [ "${artifact_epoch:-0}" -gt "${reference_epoch:-0}" ]; then
+                return 0
+            fi
+        fi
+    done
+    task_workspace_has_changes "$task_dir" && return 0
+    return 1
+}
+
+task_clear_working_timeout_state() {
+    local task_id="$1"
+    rm -f \
+        "$STATE_DIR/${task_id}_working_timeout_notice" \
+        "$STATE_DIR/${task_id}_working_timeout_push" \
+        "$(notification_retry_flag "${task_id}_working_timeout_push")" \
+        "$STATE_DIR/${task_id}_working_timeout_grace_started" \
+        "$STATE_DIR/${task_id}_working_no_progress_reminder"
+}
+
+task_no_progress_repool_cooldown_active() {
+    local task_dir="$1"
+    local agent_id="$2"
+    python3 - "$task_dir/task.json" "$agent_id" "$ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS" <<'PY'
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+
+task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+agent_id = sys.argv[2].strip()
+cooldown_seconds = int(sys.argv[3] or 0)
+if cooldown_seconds <= 0:
+    raise SystemExit(1)
+if str(task.get('status') or '') != 'pooled':
+    raise SystemExit(1)
+if str(task.get('last_no_progress_repool_agent') or '').strip() != agent_id:
+    raise SystemExit(1)
+until_raw = str(task.get('no_progress_repool_until') or '').strip()
+if not until_raw:
+    raise SystemExit(1)
+try:
+    until = datetime.fromisoformat(until_raw.replace('Z', '+00:00'))
+except Exception:
+    raise SystemExit(1)
+now = datetime.now().astimezone()
+if until.tzinfo is None:
+    until = until.astimezone()
+if now < until:
+    print(until_raw)
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+notify_working_no_progress_if_needed() {
+    local task_dir="$1"
+    local task_id="$2"
+    local assigned_agent="$3"
+    local working_since="$4"
+    local reminder_key="${task_id}_working_no_progress_reminder"
+    local now elapsed
+
+    [ -n "$assigned_agent" ] || return 1
+    [ -n "$working_since" ] && [ "$working_since" -gt 0 ] || return 1
+    now=$(date +%s)
+    elapsed=$(( now - working_since ))
+    [ "$elapsed" -ge "${ACK_NO_PROGRESS_REMINDER_SECONDS:-900}" ] || return 1
+    if is_notified "$reminder_key" && ! is_file_newer_than_notified "$reminder_key" "$task_dir/ack.json"; then
+        return 0
+    fi
+
+    notify_agent "$assigned_agent" "任务 ${task_id} 已 ack ${elapsed} 秒但仍未检测到实际进展（result/review/verify 工件或 workspace 变更）。请尽快开始执行，否则将自动回池。"
+    emit_system_chat_event nudge "$task_id" "ack 后无实际进展，已发送推进提醒。" "$assigned_agent" info nudge
+    mark_notified "$reminder_key"
+    return 0
+}
+
+requeue_working_task_to_pool_if_no_progress() {
+    local task_dir="$1"
+    local task_id="$2"
+    local working_since="$3"
+    local reason="${4:-ack 后无实际进展}"
+    local now
+
+    [ -n "$working_since" ] && [ "$working_since" -gt 0 ] || return 1
+    now=$(date +%s)
+    [ $(( now - working_since )) -ge "${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}" ] || return 1
+
+    python3 - "$task_dir" "$task_id" "$reason" "$ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS" <<'PY'
+import json
+import os
+import sys
+import tempfile
+from datetime import datetime, timedelta
+from pathlib import Path
+
+task_dir = Path(sys.argv[1])
+task_id = sys.argv[2]
+reason = sys.argv[3].strip()
+cooldown_seconds = int(sys.argv[4] or 0)
+task_path = task_dir / 'task.json'
+task = json.loads(task_path.read_text(encoding='utf-8'))
+if str(task.get('status') or '') != 'working':
+    raise SystemExit(1)
+
+now = datetime.now().astimezone()
+now_iso = now.isoformat(timespec='seconds')
+previous_agent = str(task.get('assigned_agent') or '')
+cooldown_until = now + timedelta(seconds=max(0, cooldown_seconds))
+cooldown_until_iso = cooldown_until.astimezone().isoformat(timespec='seconds')
+
+task['last_no_progress_repool_agent'] = previous_agent or None
+task['last_no_progress_repool_at'] = now_iso
+task['last_no_progress_repool_reason'] = reason
+task['no_progress_repool_until'] = cooldown_until_iso
+task['assigned_agent'] = task.get('pre_claim_assigned_agent') or 'auto'
+task['status'] = 'pooled'
+task['pool_entered_at'] = now_iso
+task['updated_at'] = now_iso
+task['last_delivery_state'] = 'no_progress_requeue'
+task['last_delivery_error'] = reason
+task['last_delivery_attempt_at'] = now_iso
+task['session_health'] = None
+task['control_plane_state'] = 'no_progress_requeue'
+task['control_plane_updated_at'] = now_iso
+task['dispatch_delivery_attempt_count'] = 0
+task['dispatch_delivery_retry_count'] = 0
+task['dispatch_delivery_consecutive_failures'] = 0
+for key in (
+    'claimed_by',
+    'claimed_at',
+    'claim_reason',
+    'reserved_by',
+    'reserved_at',
+    'reserved_reason',
+    'delivery_deferred_until',
+    'delivery_deferred_reason',
+    'delivery_deferred_at',
+    'delivery_deferred_by',
+    'lease_owner',
+    'lease_acquired_at',
+    'lease_expires_at',
+):
+    task.pop(key, None)
+with tempfile.NamedTemporaryFile('w', delete=False, dir=str(task_dir), encoding='utf-8') as tmp:
+    json.dump(task, tmp, ensure_ascii=False, indent=2)
+    tmp.write('\n')
+os.replace(tmp.name, task_path)
+ack_path = task_dir / 'ack.json'
+if ack_path.exists():
+    ack_path.rename(task_dir / f"ack.requeued.{now_iso.replace(':', '').replace('+', '_')}.json")
+claim_path = task_dir / 'claim.json'
+if claim_path.exists():
+    claim_path.rename(task_dir / f"claim.requeued.{now_iso.replace(':', '').replace('+', '_')}.json")
+with (task_dir / 'transitions.jsonl').open('a', encoding='utf-8') as fp:
+    fp.write(json.dumps({
+        'from': 'working',
+        'to': 'pooled',
+        'at': now_iso,
+        'reason': reason,
+        'previous_agent': previous_agent or None,
+        'cooldown_until': cooldown_until_iso,
+    }, ensure_ascii=False) + '\n')
+print(previous_agent or '')
+PY
 }
 
 agent_has_working_signal() {
@@ -1244,6 +1452,7 @@ claim_agent_can_accept_task() {
     is_agent_in_claim_scope "$task_dir" "$agent_id" || return 1
     claim_dependencies_ready "$task_dir" || return 1
     claim_scope_conflict_free "$task_dir" "$agent_id" >/dev/null 2>&1 || return 1
+    task_no_progress_repool_cooldown_active "$task_dir" "$agent_id" && return 1
 
     local working_count active_count reserved_count limits working_limit reserved_limit active_limit
     working_count=$(working_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
@@ -3698,7 +3907,34 @@ run_task_watcher_loop() {
 
         if [ "$current_status" = "working" ] && [ ! -f "$task_dir/result.json" ]; then
             working_since=$(task_working_reference_epoch "$task_dir")
+            assigned_agent=$(task_json_pick "$task_dir" assigned_agent)
             now=$(date +%s)
+            if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && ! task_has_effective_progress "$task_dir" "$working_since"; then
+                elapsed_since_ack=$(( now - working_since ))
+                if [ "$elapsed_since_ack" -ge "${ACK_NO_PROGRESS_REMINDER_SECONDS:-900}" ]; then
+                    no_progress_reminder_key="${task_id}_working_no_progress_reminder"
+                    if ! is_notified "$no_progress_reminder_key" || ! is_file_newer_than_notified "$no_progress_reminder_key" "$task_dir/ack.json"; then
+                        notify_working_no_progress_if_needed "$task_dir" "$task_id" "$assigned_agent" "$working_since" || true
+                    fi
+                fi
+                if [ "$elapsed_since_ack" -ge "${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}" ]; then
+                    if returned_agent=$(requeue_working_task_to_pool_if_no_progress "$task_dir" "$task_id" "$working_since" 2>/dev/null); then
+                        if [ -n "$returned_agent" ]; then
+                            notify_agent "$returned_agent" "任务 ${task_id} 已 ack 超过 ${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800} 秒且未发现实际进展，现已自动回池。"
+                        fi
+                        notify_pm "[task-watcher] $task_id ack 后 ${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800} 秒仍无实际进展，已回退到 pooled。"
+                        if [ -n "$returned_agent" ]; then
+                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已从 ${returned_agent} 回退到 pooled。" "$PM_SESSION" degraded notify
+                        else
+                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已回退到 pooled。" "$PM_SESSION" degraded notify
+                        fi
+                        task_clear_working_timeout_state "$task_id"
+                        sync_task_board "$task_dir" "working-no-progress-requeued"
+                        current_status="pooled"
+                        continue
+                    fi
+                fi
+            fi
             if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
                 working_timeout_key="${task_id}_working_timeout_notice"
                 working_timeout_push_key="${task_id}_working_timeout_push"
