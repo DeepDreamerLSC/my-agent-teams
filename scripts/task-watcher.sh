@@ -50,6 +50,7 @@ DISPATCH_RESEND_AFTER_SECONDS="${DISPATCH_RESEND_AFTER_SECONDS:-300}"
 RESEND_COOLDOWN_SECONDS="${RESEND_COOLDOWN_SECONDS:-300}"
 DISPATCH_FAILURE_THRESHOLD="${DISPATCH_FAILURE_THRESHOLD:-3}"
 WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
+WORKING_REASSIGN_GRACE_SECONDS="${WORKING_REASSIGN_GRACE_SECONDS:-900}"
 TASK_WATCHER_TEST_MODE="${TASK_WATCHER_TEST_MODE:-0}"
 NOTIFY_RETRY_COOLDOWN_SECONDS="${NOTIFY_RETRY_COOLDOWN_SECONDS:-$RESEND_COOLDOWN_SECONDS}"
 
@@ -1828,6 +1829,16 @@ is_notified() {
 mark_notified() {
     local key="$1"
     echo "$(date +%s)" > "$STATE_DIR/$key"
+}
+
+notified_epoch() {
+    local key="$1"
+    local flag="$STATE_DIR/$key"
+    if [ ! -f "$flag" ]; then
+        echo 0
+        return 0
+    fi
+    cat "$flag" 2>/dev/null || echo 0
 }
 
 final_done_transition_epoch() {
@@ -3632,14 +3643,21 @@ run_task_watcher_loop() {
             if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
                 working_timeout_key="${task_id}_working_timeout_notice"
                 working_timeout_push_key="${task_id}_working_timeout_push"
+                working_grace_key="${task_id}_working_timeout_grace_started"
                 if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key"; then
                     if ! is_notified "$working_timeout_key"; then
                         notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
                         emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
                         log "$task_id: working 超时已通知 PM 介入，等待飞书送达"
                         mark_notified "$working_timeout_key"
+                        mark_notified "$working_grace_key"
                     fi
                     push_task_event_with_retry "$working_timeout_push_key" "" "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查" || true
+                fi
+                working_grace_started=$(notified_epoch "$working_grace_key")
+                if [ "${working_grace_started:-0}" -gt 0 ] && [ $(( now - working_grace_started )) -lt "$WORKING_REASSIGN_GRACE_SECONDS" ]; then
+                    log "$task_id: working 超时已进入 PM 观察窗口（${WORKING_REASSIGN_GRACE_SECONDS}s），暂不建议转派"
+                    continue
                 fi
             fi
         fi

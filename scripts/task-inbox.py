@@ -63,7 +63,7 @@ def recommended_action(reason_type: str, gate: str, status: str) -> str:
         return '使用 resume-task.sh 正规恢复，归档旧工件并清理 sentinel'
     if reason_type == 'timeout':
         if status == 'working':
-            return '联系执行者确认进展，必要时转 blocked 或拆补修任务'
+            return '先催办并进入观察窗口；仅在观察后仍无 diff/产物/活动时再决定转派或转 blocked'
         if status == 'dispatched':
             return '确认 agent 是否已看到任务，必要时重新派发或改派'
         if status == 'pooled':

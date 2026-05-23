@@ -115,6 +115,7 @@ clear_keys = {
     f'{prefix}verify_route',
     f'{prefix}working_timeout_notice',
     f'{prefix}working_timeout_push',
+    f'{prefix}working_timeout_grace_started',
     f'{prefix}review_queue_waiting_notice',
     f'{prefix}qa_queue_waiting_notice',
     f'{prefix}done_notice',

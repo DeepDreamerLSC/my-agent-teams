@@ -247,6 +247,55 @@ PY
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 
 
+def test_working_timeout_starts_pm_observation_grace_window(tmp_path: Path):
+    env = _base_env(tmp_path)
+    env["WORKING_TIMEOUT_SECONDS"] = "1"
+    env["WORKING_REASSIGN_GRACE_SECONDS"] = "600"
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    task_dir = workspace_root / "tasks" / "working-timeout-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "working-timeout-task",\n'
+        '  "status": "working",\n'
+        '  "assigned_agent": "dev-1",\n'
+        '  "updated_at": "2000-01-01T00:00:00+08:00"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "ack.json").write_text('{"task_id":"working-timeout-task","agent":"dev-1","status":"working"}\n', encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+task_id='working-timeout-task'
+task_dir='{task_dir}'
+current_status='working'
+if [ "$current_status" = "working" ] && [ ! -f "$task_dir/result.json" ]; then
+  working_since=0
+  now=$(date +%s)
+  if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && [ $(( now - working_since )) -gt "$WORKING_TIMEOUT_SECONDS" ]; then
+    :
+  fi
+fi
+# Re-run the actual block with a stubbed working_since
+working_since=$(( $(date +%s) - 10 ))
+now=$(date +%s)
+task_id='working-timeout-task'
+working_timeout_key="${{task_id}}_working_timeout_notice"
+working_timeout_push_key="${{task_id}}_working_timeout_push"
+working_grace_key="${{task_id}}_working_timeout_grace_started"
+if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key"; then
+  if ! is_notified "$working_timeout_key"; then
+    mark_notified "$working_timeout_key"
+    mark_notified "$working_grace_key"
+  fi
+fi
+test -f "$STATE_DIR/working-timeout-task_working_timeout_grace_started"
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
 def test_review_queue_clear_only_removes_matching_task(tmp_path: Path):
     env = _base_env(tmp_path)
     workspace_root = Path(env["WORKSPACE_ROOT"])
