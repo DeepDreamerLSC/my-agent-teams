@@ -249,6 +249,35 @@ agent_has_working_signal() {
     printf '%s\n' "${is_working:-0}"
 }
 
+should_pause_working_timeout_escalation() {
+    local task_dir="$1"
+    local agent_session="$2"
+    local grace_key="${3:-}"
+    local now="${4:-$(date +%s)}"
+
+    if [ -n "$grace_key" ]; then
+        local grace_started
+        grace_started=$(notified_epoch "$grace_key")
+        if [ "${grace_started:-0}" -gt 0 ] && [ $(( now - grace_started )) -lt "$WORKING_REASSIGN_GRACE_SECONDS" ]; then
+            return 0
+        fi
+    fi
+
+    if task_has_progress_artifact "$task_dir"; then
+        return 0
+    fi
+
+    if [ -n "$agent_session" ]; then
+        local session_health
+        session_health=$(session_health_state "$agent_session")
+        if [ "$session_health" = "working_signal" ]; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 json_pick() {
     local json_file="$1"
     shift
@@ -3655,7 +3684,7 @@ run_task_watcher_loop() {
                     push_task_event_with_retry "$working_timeout_push_key" "" "【任务超时】" "$task_id" "持续 working 超过 $((WORKING_TIMEOUT_SECONDS / 60)) 分钟" "请 PM 介入检查" || true
                 fi
                 working_grace_started=$(notified_epoch "$working_grace_key")
-                if [ "${working_grace_started:-0}" -gt 0 ] && [ $(( now - working_grace_started )) -lt "$WORKING_REASSIGN_GRACE_SECONDS" ]; then
+                if should_pause_working_timeout_escalation "$task_dir" "$(task_json_pick "$task_dir" assigned_agent)" "$working_grace_key" "$now"; then
                     log "$task_id: working 超时已进入 PM 观察窗口（${WORKING_REASSIGN_GRACE_SECONDS}s），暂不建议转派"
                     continue
                 fi

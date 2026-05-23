@@ -296,6 +296,34 @@ test -f "$STATE_DIR/working-timeout-task_working_timeout_grace_started"
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 
 
+def test_working_timeout_observation_helper_pauses_when_progress_artifact_exists(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    task_dir = workspace_root / "tasks" / "working-progress-task"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        '{\n'
+        '  "id": "working-progress-task",\n'
+        '  "status": "working",\n'
+        '  "assigned_agent": "dev-1",\n'
+        '  "updated_at": "2000-01-01T00:00:00+08:00"\n'
+        '}\n',
+        encoding="utf-8",
+    )
+    (task_dir / "ack.json").write_text('{"task_id":"working-progress-task","agent":"dev-1","status":"working"}\n', encoding="utf-8")
+    (task_dir / "result.json").write_text('{"task_id":"working-progress-task","agent":"dev-1","status":"success","summary":"done"}\n', encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+mark_notified working-progress-task_working_timeout_grace_started
+should_pause_working_timeout_escalation '{task_dir}' 'dev-1' 'working-progress-task_working_timeout_grace_started' 9999999999
+rm -f "$STATE_DIR/working-progress-task_working_timeout_grace_started"
+should_pause_working_timeout_escalation '{task_dir}' 'dev-1' '' 9999999999
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
 def test_review_queue_clear_only_removes_matching_task(tmp_path: Path):
     env = _base_env(tmp_path)
     workspace_root = Path(env["WORKSPACE_ROOT"])
