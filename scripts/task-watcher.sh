@@ -240,6 +240,36 @@ task_has_progress_artifact() {
     [ -f "$task_dir/result.json" ] || [ -f "$task_dir/review.json" ] || [ -f "$task_dir/design-review.json" ] || [ -f "$task_dir/review.md" ] || [ -f "$task_dir/design-review.md" ] || [ -f "$task_dir/verify.json" ]
 }
 
+task_has_current_round_progress_artifact() {
+    local task_dir="$1"
+    local artifact
+    local status
+    local current_round
+
+    artifact="result"
+    status=$(artifact_pick "$artifact" "$task_dir" normalized_status 2>/dev/null || true)
+    current_round=$(artifact_pick "$artifact" "$task_dir" is_current_round 2>/dev/null || true)
+    if [ "$status" != "missing" ] && [ "$status" != "invalid" ] && [ "$current_round" != "false" ]; then
+        return 0
+    fi
+
+    artifact="review"
+    status=$(artifact_pick "$artifact" "$task_dir" normalized_status 2>/dev/null || true)
+    current_round=$(artifact_pick "$artifact" "$task_dir" is_current_round 2>/dev/null || true)
+    if [ "$status" != "missing" ] && [ "$status" != "invalid" ] && [ "$current_round" != "false" ]; then
+        return 0
+    fi
+
+    artifact="verify"
+    status=$(artifact_pick "$artifact" "$task_dir" normalized_status 2>/dev/null || true)
+    current_round=$(artifact_pick "$artifact" "$task_dir" is_current_round 2>/dev/null || true)
+    if [ "$status" != "missing" ] && [ "$status" != "invalid" ] && [ "$current_round" != "false" ]; then
+        return 0
+    fi
+
+    return 1
+}
+
 agent_has_working_signal() {
     local agent_session="$1"
     local is_working=0
@@ -263,7 +293,7 @@ should_pause_working_timeout_escalation() {
         fi
     fi
 
-    if task_has_progress_artifact "$task_dir"; then
+    if task_has_current_round_progress_artifact "$task_dir"; then
         return 0
     fi
 
