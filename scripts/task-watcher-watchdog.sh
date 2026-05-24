@@ -13,6 +13,7 @@ STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
 TASK_WATCHER_SCRIPT="${TASK_WATCHER_SCRIPT:-$WORKSPACE_ROOT/scripts/task-watcher.sh}"
 WATCHDOG_INTERVAL="${WATCHDOG_INTERVAL:-15}"
 HEARTBEAT_TIMEOUT_SECONDS="${HEARTBEAT_TIMEOUT_SECONDS:-300}"
+HEARTBEAT_PID_MISMATCH_GRACE_SECONDS="${HEARTBEAT_PID_MISMATCH_GRACE_SECONDS:-60}"
 WATCHDOG_RUN_ONCE="${WATCHDOG_RUN_ONCE:-0}"
 PID_FILE="${PID_FILE:-$STATE_DIR/task-watcher.pid}"
 HEARTBEAT_FILE="${HEARTBEAT_FILE:-$STATE_DIR/task-watcher-heartbeat.json}"
@@ -321,6 +322,57 @@ raise SystemExit(1)
 PY
 }
 
+task_watcher_grace_file() {
+    local reason="$1"
+    printf '%s\n' "$STATE_DIR/task-watcher-watchdog-grace-${reason}.json"
+}
+
+task_watcher_grace_active() {
+    local reason="$1"
+    local grace_file now started_at
+    grace_file="$(task_watcher_grace_file "$reason")"
+    [ -f "$grace_file" ] || return 1
+    started_at=$(python3 - "$grace_file" <<'PY'
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text(encoding='utf-8'))
+except Exception:
+    raise SystemExit(0)
+print(int(payload.get('started_at') or 0))
+PY
+)
+    [ -n "$started_at" ] || return 1
+    now=$(date +%s)
+    [ $(( now - started_at )) -lt "$HEARTBEAT_PID_MISMATCH_GRACE_SECONDS" ]
+}
+
+mark_task_watcher_grace() {
+    local reason="$1"
+    local grace_file
+    grace_file="$(task_watcher_grace_file "$reason")"
+    python3 - "$grace_file" <<'PY'
+import json
+import os
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+path = Path(os.environ["GRACE_FILE"]).expanduser()
+payload = {
+    "reason": path.stem,
+    "started_at": int(datetime.now(timezone.utc).timestamp()),
+    "started_at_iso": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+}
+with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent), encoding="utf-8") as tmp:
+    json.dump(payload, tmp, ensure_ascii=False, indent=2)
+    tmp.write("\n")
+tmp_path = Path(tmp.name)
+os.replace(tmp_path, path)
+PY
+}
+
 record_restart_cause() {
     local reason="$1"
     printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$reason" > "$RESTART_CAUSE_FILE"
@@ -380,13 +432,23 @@ check_once() {
     fi
 
     if ! heartbeat_pid_matches "$pid"; then
+        if task_watcher_grace_active "heartbeat_pid_mismatch"; then
+            log "watchdog 检测到 heartbeat pid 与 pid 文件不一致，但仍在宽限期内，暂不重启"
+            return
+        fi
         log "watchdog 检测到 heartbeat pid 与 pid 文件不一致"
+        mark_task_watcher_grace "heartbeat_pid_mismatch"
         stop_watcher "$pid" "heartbeat_pid_mismatch"
         start_watcher "heartbeat_pid_mismatch"
         return
     fi
 
     if [ ! -f "$HEARTBEAT_FILE" ]; then
+        if task_watcher_grace_active "heartbeat_missing"; then
+            log "watchdog 检测到 heartbeat 暂时缺失，但仍在宽限期内，暂不重启"
+            return
+        fi
+        mark_task_watcher_grace "heartbeat_missing"
         stop_watcher "$pid" "heartbeat_missing"
         start_watcher "heartbeat_missing"
         return
@@ -394,6 +456,11 @@ check_once() {
 
     local heartbeat_ts
     if ! heartbeat_ts=$(read_heartbeat_ts 2>/dev/null); then
+        if task_watcher_grace_active "heartbeat_invalid"; then
+            log "watchdog 检测到 heartbeat 暂时无效，但仍在宽限期内，暂不重启"
+            return
+        fi
+        mark_task_watcher_grace "heartbeat_invalid"
         stop_watcher "$pid" "heartbeat_invalid"
         start_watcher "heartbeat_invalid"
         return
@@ -403,6 +470,11 @@ check_once() {
     now=$(date +%s)
     age=$((now - heartbeat_ts))
     if [ "$age" -gt "$HEARTBEAT_TIMEOUT_SECONDS" ]; then
+        if task_watcher_grace_active "heartbeat_timeout"; then
+            log "watchdog 检测到 heartbeat 超时，但仍在宽限期内，暂不重启"
+            return
+        fi
+        mark_task_watcher_grace "heartbeat_timeout"
         stop_watcher "$pid" "heartbeat_timeout_${age}s"
         start_watcher "heartbeat_timeout_${age}s"
     fi

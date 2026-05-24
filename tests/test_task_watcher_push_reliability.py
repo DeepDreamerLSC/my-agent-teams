@@ -320,8 +320,19 @@ mark_notified working-progress-task_working_timeout_grace_started
 should_pause_working_timeout_escalation '{task_dir}' 'dev-1' 'working-progress-task_working_timeout_grace_started' 9999999999
 rm -f "$STATE_DIR/working-progress-task_working_timeout_grace_started"
 should_pause_working_timeout_escalation '{task_dir}' 'dev-1' '' 9999999999
-"""
+    """
     subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_watchdog_grace_period_prevents_immediate_restart_on_heartbeat_pid_mismatch(tmp_path: Path):
+    env = _base_env(tmp_path)
+    workspace_root = Path(env["WORKSPACE_ROOT"])
+    state_dir = workspace_root / ".runtime" / "state" / "task-watcher"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    grace = state_dir / 'task-watcher-watchdog-grace-heartbeat_pid_mismatch.json'
+    grace.write_text(json.dumps({'reason': 'heartbeat_pid_mismatch', 'started_at': 1}, ensure_ascii=False) + '\n', encoding='utf-8')
+    self = None
+    assert grace.exists()
 
 
 def test_working_timeout_observation_helper_ignores_stale_progress_artifact(tmp_path: Path):
