@@ -31,8 +31,10 @@ usage() {
 usage: scripts/teamctl.sh <command> [options]
 
 Commands:
+  init            创建 .venv、安装看板依赖，并执行 bootstrap --render-config
   bootstrap       初始化本机目录、config.local、agent 文件、tasks symlink、看板库
   doctor          检查迁移就绪度和运行依赖
+  up              启动 agents、watcher、dashboard
   start-agents    按 config 创建 tmux session 并进入 agent workdir 启动 CLI
   stop-agents     停止 config 中声明的 agent tmux session（危险操作：需要人工确认）
   restart-agents  重启所有 agent tmux session（危险操作：需要人工确认）
@@ -192,6 +194,44 @@ bootstrap() {
   log "bootstrap complete: $WORKSPACE_ROOT"
 }
 
+ensure_workspace_venv() {
+  local venv_dir="$WORKSPACE_ROOT/.venv"
+  if [ -x "$venv_dir/bin/python" ]; then
+    log "venv exists: $venv_dir"
+    return 0
+  fi
+  need_cmd python3 || {
+    err "python3 not found"
+    return 1
+  }
+  python3 -m venv "$venv_dir"
+  log "created venv: $venv_dir"
+}
+
+install_dashboard_requirements() {
+  local requirements_file="$WORKSPACE_ROOT/dashboard/requirements.txt"
+  local python_bin="$WORKSPACE_ROOT/.venv/bin/python"
+  if [ ! -f "$requirements_file" ]; then
+    warn "dashboard requirements not found: $requirements_file"
+    return 0
+  fi
+  if [ ! -x "$python_bin" ]; then
+    err "venv python missing: $python_bin"
+    return 1
+  fi
+  "$python_bin" -m pip install -r "$requirements_file"
+}
+
+init() {
+  local previous_render_config="${RENDER_CONFIG:-0}"
+  ensure_workspace_venv
+  install_dashboard_requirements
+  RENDER_CONFIG=1
+  bootstrap
+  RENDER_CONFIG="$previous_render_config"
+  log "init complete"
+}
+
 check_file() {
   local label="$1" path="$2"
   if [ -e "$path" ]; then
@@ -322,6 +362,12 @@ status_cmd() {
   done
 }
 
+up() {
+  start_agents
+  start_watcher
+  start_dashboard
+}
+
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   COMMAND="${1:-}"
   if [ -z "$COMMAND" ]; then
@@ -340,8 +386,10 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   done
 
   case "$COMMAND" in
+    init) init ;;
     bootstrap) bootstrap ;;
     doctor) doctor ;;
+    up) up ;;
     start-agents) start_agents ;;
     stop-agents) stop_agents ;;
     restart-agents) restart_agents ;;

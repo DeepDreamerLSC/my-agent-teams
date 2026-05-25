@@ -3,6 +3,45 @@
 > 基于 OpenClaw + tmux 的多智能体协作框架
 > 通过文件系统做状态管理，tmux 做消息通道，watcher 做状态监控，实现 AI agent 之间的任务派发、执行、审查和集成。
 
+## 5 分钟开始
+
+先准备这些依赖：
+
+- `git`
+- `python3`（建议 3.10+）
+- `tmux`
+- `codex` 或 `claude` CLI（至少装一个，并且命令行里可直接运行）
+
+最短启动流程：
+
+```bash
+git clone <repo-url>
+cd my-agent-teams
+
+scripts/teamctl.sh init
+scripts/teamctl.sh doctor
+scripts/teamctl.sh up
+scripts/teamctl.sh status
+```
+
+说明：
+
+- `init` 会自动创建 `.venv`、安装看板依赖，并执行 `bootstrap --render-config`。
+- `config.local.json` 会自动生成；飞书配置可以后补，不影响本地先跑通。
+- `up` 会依次启动 `agents`、`watcher`、`dashboard`。
+- 看板默认地址是 [http://127.0.0.1:5001/](http://127.0.0.1:5001/)。
+
+如果你准备让 Codex 走本仓库自带的 Responses Gateway，先在 `up` 之前额外执行：
+
+```bash
+scripts/teamctl.sh init-codex-gateway-config
+export OPENAI_API_KEY='sk-...'
+export CODEX_GATEWAY_API_KEY='local-random-token'
+scripts/teamctl.sh start-codex-gateway
+scripts/teamctl.sh install-codex-profile
+export CODEX_CMD='codex -p dev-team'
+```
+
 ## 这是什么
 
 一个让多个 AI agent（Claude Code / Codex）协同完成开发任务的框架。
@@ -40,15 +79,15 @@ PM（pm-chief）— 需求分析、任务拆解、进度跟踪、决策通知
 - `T-001` 这类旧编号和纯英文 slug 不允许用于新建任务
 
 
-## 新电脑迁移 / 顶层控制脚本
+## 顶层控制脚本
 
 推荐优先使用顶层控制脚本 `scripts/teamctl.sh`，避免手工改路径。
 
 ```bash
 cd /path/to/my-agent-teams
 
-# 1) 初始化本机目录、config.local、agent 文件、tasks symlink、看板库
-scripts/teamctl.sh bootstrap --render-config
+# 1) 首次初始化：创建 .venv、安装依赖、渲染本机路径、生成 agent 文件
+scripts/teamctl.sh init
 
 # 2) 检查依赖、路径、agent 文件、tmux session、项目根目录
 scripts/teamctl.sh doctor
@@ -60,22 +99,18 @@ scripts/teamctl.sh start-codex-gateway
 scripts/teamctl.sh install-codex-profile
 export CODEX_CMD='codex -p dev-team'
 
-# 4) 启动 agent 团队（按 config 中 runtime 选择 codex / claude）
-scripts/teamctl.sh start-agents
+# 4) 启动 agents、watcher、dashboard
+scripts/teamctl.sh up
 
-# 5) 启动 watcher / dashboard
-scripts/teamctl.sh start-watcher
-scripts/teamctl.sh start-dashboard
-
-# 6) 查看状态
+# 5) 查看状态
 scripts/teamctl.sh status
 
-# 7) 同步人力数据到飞书甘特图（需先完成飞书 CLI 配置）
+# 6) 同步人力数据到飞书甘特图（需先完成飞书 CLI 配置）
 scripts/sync-gantt-to-feishu.sh
 ```
 
 说明：
-- `--render-config` 会按当前 checkout 路径重写 `config.json` 中的本机路径；如只想检查不重写，先运行 `scripts/teamctl.sh doctor`。
+- `init` 内部会执行 `bootstrap --render-config`，按当前 checkout 路径重写 `config.json` 中的本机路径。
 - 飞书密钥仍放在被 git 忽略的 `config.local.json`。
 - Codex Gateway 本机配置默认写入被 git 忽略的 `config/codex-responses-gateway.json`；示例见 `config/codex-responses-gateway.example.json`。
 - 如开罗尔项目不在默认相邻目录，可在 bootstrap 前设置：
