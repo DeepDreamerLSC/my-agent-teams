@@ -14,6 +14,109 @@ from pathlib import Path
 from typing import Any
 
 
+TEAM_SPECS: dict[str, list[tuple[str, str, str, str]]] = {
+    "small": [
+        ("pm-chief", "PM", "pm", "claude_code"),
+        ("arch-1", "Architect / Integrator", "architect", "codex"),
+        ("dev-1", "Full-stack Dev 1", "fullstack_dev", "codex"),
+        ("qa-1", "QA", "qa", "claude_code"),
+    ],
+    "medium": [
+        ("pm-chief", "PM", "pm", "claude_code"),
+        ("arch-1", "Architect / Integrator", "architect", "codex"),
+        ("dev-1", "Full-stack Dev 1", "fullstack_dev", "codex"),
+        ("dev-2", "Full-stack Dev 2", "fullstack_dev", "codex"),
+        ("dev-3", "Full-stack Dev 3", "fullstack_dev", "codex"),
+        ("qa-1", "QA", "qa", "claude_code"),
+        ("review-1", "Reviewer / Integrator", "reviewer", "codex"),
+    ],
+    "large": [
+        ("pm-chief", "PM", "pm", "claude_code"),
+        ("arch-1", "Architect / Integrator 1", "architect", "codex"),
+        ("arch-2", "Architect / Integrator 2", "architect", "codex"),
+        ("dev-1", "Full-stack Dev 1", "fullstack_dev", "codex"),
+        ("dev-2", "Full-stack Dev 2", "fullstack_dev", "codex"),
+        ("dev-3", "Full-stack Dev 3", "fullstack_dev", "codex"),
+        ("dev-4", "Full-stack Dev 4", "fullstack_dev", "codex"),
+        ("dev-5", "Full-stack Dev 5", "fullstack_dev", "codex"),
+        ("dev-6", "Full-stack Dev 6", "fullstack_dev", "codex"),
+        ("qa-1", "QA 1", "qa", "claude_code"),
+        ("qa-2", "QA 2", "qa", "claude_code"),
+        ("review-1", "Reviewer / Integrator 1", "reviewer", "codex"),
+        ("review-2", "Reviewer / Integrator 2", "reviewer", "codex"),
+    ],
+}
+
+
+def agent_payload(agent_id: str, name: str, role: str, runtime: str) -> dict[str, Any]:
+    home_team = "coordination" if role in {"pm", "architect"} else "quality" if role in {"qa", "reviewer"} else "development"
+    if role == "pm":
+        domains = ["development", "quality"]
+        permissions = {
+            "task_dispatch": True,
+            "task_reassign": True,
+            "task_cancel": True,
+            "integration_gate": False,
+            "cross_domain_coordination": True,
+        }
+    elif role == "architect":
+        domains = ["development", "frontend", "backend", "quality"]
+        permissions = {
+            "task_dispatch": False,
+            "task_reassign": False,
+            "task_cancel": False,
+            "integration_gate": True,
+            "cross_domain_coordination": False,
+        }
+    else:
+        domains = ["quality"] if role in {"qa", "reviewer"} else ["development", "frontend", "backend"]
+        permissions = {
+            "task_dispatch": False,
+            "task_reassign": False,
+            "task_cancel": False,
+            "integration_gate": False,
+            "cross_domain_coordination": False,
+        }
+    payload: dict[str, Any] = {
+        "name": name,
+        "role": role,
+        "tmux_session": agent_id,
+        "home_team": home_team,
+        "domains": domains,
+        "permissions": permissions,
+        "runtime": runtime,
+        "guidance_file": "CLAUDE.md" if runtime == "claude_code" else "AGENT.md",
+    }
+    if role in {"qa", "reviewer"}:
+        payload["can_support"] = ["frontend", "backend"]
+        payload["borrow_policy"] = "borrowed_by_task"
+    return payload
+
+
+def apply_team_profile(config: dict[str, Any], team_size: str) -> None:
+    specs = TEAM_SPECS[team_size]
+    agents = {agent_id: agent_payload(agent_id, name, role, runtime) for agent_id, name, role, runtime in specs}
+    dev_agents = [agent_id for agent_id, payload in agents.items() if payload["role"] == "fullstack_dev"]
+    quality_agents = [agent_id for agent_id, payload in agents.items() if payload["role"] in {"qa", "reviewer"}]
+    reviewer = next((agent_id for agent_id, payload in agents.items() if payload["role"] == "reviewer"), "arch-1")
+    tester = next((agent_id for agent_id, payload in agents.items() if payload["role"] == "qa"), "qa-1")
+
+    config["team_profile"] = team_size
+    config["agents"] = agents
+    orchestration = config.setdefault("orchestration", {})
+    orchestration["root_pm"] = "pm-chief"
+    orchestration["integration_owner"] = "arch-1"
+    orchestration["domains"] = {
+        "development": dev_agents,
+        "quality": quality_agents,
+    }
+    domain_policies = config.setdefault("domain_policies", {})
+    for domain in ("development", "quality"):
+        domain_policies.setdefault(domain, {})
+        domain_policies[domain]["default_reviewer"] = reviewer
+        domain_policies[domain]["default_tester"] = tester
+
+
 def rewrite_path(value: Any, *, old_workspace: str, workspace: Path, work_parent: Path, prod_parent: Path) -> Any:
     if not isinstance(value, str) or not value:
         return value
@@ -107,6 +210,7 @@ def main() -> int:
     parser.add_argument("--workspace-root", default=None)
     parser.add_argument("--work-parent", default=None)
     parser.add_argument("--prod-parent", default=None)
+    parser.add_argument("--team-size", choices=sorted(TEAM_SPECS), default=None)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -119,6 +223,8 @@ def main() -> int:
     config = json.loads(input_path.read_text(encoding="utf-8"))
     old_workspace = str(config.get("workspace_root") or "")
     rendered = recursive_rewrite(config, old_workspace=old_workspace, workspace=workspace, work_parent=work_parent, prod_parent=prod_parent)
+    if args.team_size:
+        apply_team_profile(rendered, args.team_size)
     apply_canonical_paths(rendered, workspace=workspace, work_parent=work_parent, prod_parent=prod_parent)
     if args.dry_run:
         print(json.dumps(rendered, ensure_ascii=False, indent=2))

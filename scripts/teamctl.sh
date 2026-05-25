@@ -16,6 +16,7 @@ DEFAULT_WORK_PARENT="${DEFAULT_WORK_PARENT:-$(cd "$WORKSPACE_ROOT/.." && pwd)}"
 START_ATTACH="${START_ATTACH:-0}"
 START_FORCE="${START_FORCE:-0}"
 RENDER_CONFIG="${RENDER_CONFIG:-0}"
+TEAM_SIZE="${TEAM_SIZE:-}"
 WATCHER_INTERVAL="${WATCHER_INTERVAL:-5}"
 DASHBOARD_HOST="${TASK_BOARD_HOST:-127.0.0.1}"
 DASHBOARD_PORT="${TASK_BOARD_PORT:-5001}"
@@ -35,6 +36,8 @@ Commands:
   bootstrap       初始化本机目录、config.local、agent 文件、tasks symlink、看板库
   doctor          检查迁移就绪度和运行依赖
   up              启动 agents、watcher、dashboard
+  sessions        列出 config 中声明的 agent tmux session
+  attach [agent]  进入 agent 对应的 tmux session；不传默认进入第一个 agent
   start-agents    按 config 创建 tmux session 并进入 agent workdir 启动 CLI
   stop-agents     停止 config 中声明的 agent tmux session（危险操作：需要人工确认）
   restart-agents  重启所有 agent tmux session（危险操作：需要人工确认）
@@ -53,12 +56,14 @@ Commands:
 Options:
   --attach        start-agents 创建后自动 attach 第一个 session
   --force         restart-services 在服务当前未运行时也尝试重新拉起
+  --team <size>   init/bootstrap --render-config 时选择团队规模：small（默认）/ medium / large
   --render-config bootstrap 时按当前 checkout 重写 config.json 本机路径
   -h, --help      显示帮助
 
 Environment overrides:
   WORKSPACE_ROOT, CONFIG_PATH, CONFIG_LOCAL_PATH, TASKS_ROOT, AGENTS_ROOT,
   DEFAULT_WORK_PARENT, CODEX_CMD, CLAUDE_CMD, START_ATTACH=1, START_FORCE=1,
+  TEAM_SIZE=small|medium|large,
   CODEX_GATEWAY_CONFIG, CODEX_GATEWAY_HOST, CODEX_GATEWAY_PORT, CODEX_GATEWAY_API_KEY_ENV
 EOF_USAGE
 }
@@ -69,6 +74,13 @@ err() { printf '[teamctl][ERROR] %s\n' "$*" >&2; }
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+validate_team_size() {
+  case "${1:-}" in
+    small|medium|large) return 0 ;;
+    *) err "invalid team size: ${1:-}; expected small, medium, or large"; return 1 ;;
+  esac
 }
 
 workspace_python() {
@@ -177,11 +189,17 @@ render_config_if_requested() {
     warn "render-local-config.py not found; skip config render"
     return 0
   fi
+  local team_args=()
+  if [ -n "$TEAM_SIZE" ]; then
+    validate_team_size "$TEAM_SIZE" || return 1
+    team_args=(--team-size "$TEAM_SIZE")
+  fi
   python3 "$SCRIPT_DIR/render-local-config.py" \
     --input "$CONFIG_PATH" \
     --output "$CONFIG_PATH" \
     --workspace-root "$WORKSPACE_ROOT" \
-    --work-parent "$DEFAULT_WORK_PARENT"
+    --work-parent "$DEFAULT_WORK_PARENT" \
+    "${team_args[@]}"
 }
 
 bootstrap() {
@@ -224,11 +242,14 @@ install_dashboard_requirements() {
 
 init() {
   local previous_render_config="${RENDER_CONFIG:-0}"
+  local previous_team_size="${TEAM_SIZE:-}"
   ensure_workspace_venv
   install_dashboard_requirements
   RENDER_CONFIG=1
+  TEAM_SIZE="${TEAM_SIZE:-small}"
   bootstrap
   RENDER_CONFIG="$previous_render_config"
+  TEAM_SIZE="$previous_team_size"
   log "init complete"
 }
 
@@ -362,6 +383,59 @@ status_cmd() {
   done
 }
 
+sessions_cmd() {
+  echo "agent tmux sessions:"
+  agent_rows | while IFS=$'\t' read -r agent_id session runtime workdir guidance; do
+    [ -n "$agent_id" ] || continue
+    if tmux has-session -t "$session" 2>/dev/null; then state=running; else state=stopped; fi
+    printf '  - %-10s session=%-12s runtime=%-12s state=%s\n' "$agent_id" "$session" "$runtime" "$state"
+  done
+}
+
+resolve_attach_session() {
+  local target="${1:-}"
+  python3 - "$CONFIG_PATH" "$target" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+target = str(sys.argv[2] or "").strip()
+agents = config.get("agents") or {}
+if not agents:
+    raise SystemExit(1)
+if not target:
+    first_id, first_payload = next(iter(agents.items()))
+    print(str((first_payload or {}).get("tmux_session") or first_id))
+    raise SystemExit(0)
+if target in agents:
+    print(str((agents[target] or {}).get("tmux_session") or target))
+    raise SystemExit(0)
+for agent_id, payload in agents.items():
+    session = str((payload or {}).get("tmux_session") or agent_id)
+    if target == session:
+        print(session)
+        raise SystemExit(0)
+raise SystemExit(2)
+PY
+}
+
+attach_session_cmd() {
+  local target="${1:-}" session=""
+  session="$(resolve_attach_session "$target" 2>/dev/null || true)"
+  if [ -z "$session" ]; then
+    err "unknown agent or session: ${target:-<default>}"
+    sessions_cmd >&2 || true
+    return 1
+  fi
+  if ! tmux has-session -t "$session" 2>/dev/null; then
+    err "tmux session not running: $session"
+    sessions_cmd >&2 || true
+    return 1
+  fi
+  exec tmux attach -t "$session"
+}
+
 up() {
   start_agents
   start_watcher
@@ -375,13 +449,25 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     exit 2
   fi
   shift || true
+  POSITIONAL=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --attach) START_ATTACH=1; shift ;;
       --force) START_FORCE=1; shift ;;
+      --team)
+        if [ $# -lt 2 ]; then
+          err "--team requires one of: small, medium, large"
+          usage >&2
+          exit 2
+        fi
+        TEAM_SIZE="$2"
+        shift 2
+        ;;
+      --team=*) TEAM_SIZE="${1#--team=}"; shift ;;
       --render-config) RENDER_CONFIG=1; shift ;;
       -h|--help) usage; exit 0 ;;
-      *) err "unknown option: $1"; usage >&2; exit 2 ;;
+      --*) err "unknown option: $1"; usage >&2; exit 2 ;;
+      *) POSITIONAL+=("$1"); shift ;;
     esac
   done
 
@@ -390,6 +476,8 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     bootstrap) bootstrap ;;
     doctor) doctor ;;
     up) up ;;
+    sessions) sessions_cmd ;;
+    attach) attach_session_cmd "${POSITIONAL[0]:-}" ;;
     start-agents) start_agents ;;
     stop-agents) stop_agents ;;
     restart-agents) restart_agents ;;

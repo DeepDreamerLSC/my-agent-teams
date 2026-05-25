@@ -18,11 +18,27 @@
 git clone <repo-url>
 cd my-agent-teams
 
+# 默认创建小团队
 scripts/teamctl.sh init
 scripts/teamctl.sh doctor
 scripts/teamctl.sh up
 scripts/teamctl.sh status
 ```
+
+如需更高并发，初始化时选择团队规模：
+
+```bash
+scripts/teamctl.sh init --team medium
+scripts/teamctl.sh init --team large
+```
+
+团队规模：
+
+| 规模 | 人数 | 配置 | 适合场景 |
+| --- | ---: | --- | --- |
+| `small`（默认） | 4 | PM 1 + 架构/集成 1 + 开发 1 + QA 1 | 小功能、修复、轻量并行 |
+| `medium` | 7 | PM 1 + 架构/集成 1 + 开发 3 + QA 1 + Review 1 | 常规多任务并行 |
+| `large` | 13 | PM 1 + 架构/集成 2 + 开发 6 + QA 2 + Review 2 | 多模块、高并发交付 |
 
 说明：
 
@@ -30,6 +46,12 @@ scripts/teamctl.sh status
 - `config.local.json` 会自动生成；飞书配置可以后补，不影响本地先跑通。
 - `up` 会依次启动 `agents`、`watcher`、`dashboard`。
 - 看板默认地址是 [http://127.0.0.1:5001/](http://127.0.0.1:5001/)。
+- 查看和进入 agent 的 tmux 会话：
+  ```bash
+  scripts/teamctl.sh sessions
+  scripts/teamctl.sh attach pm-chief
+  scripts/teamctl.sh attach dev-1
+  ```
 
 如果你准备让 Codex 走本仓库自带的 Responses Gateway，先在 `up` 之前额外执行：
 
@@ -56,16 +78,9 @@ Agent 之间不直接对话。
 状态变更通过 watcher 脚本自动检测和通知。
 ```
 
-### 当前团队配置
+### 团队拓扑
 
-```
-PM（pm-chief）— 需求分析、任务拆解、进度跟踪、决策通知
-├── 架构师/集成者（arch-1）— 方案设计、接口契约、集成、部署
-├── 全栈开发（dev-1）— 前后端任务实现
-├── 全栈开发（dev-2）— 前后端任务实现
-├── 测试（qa-1）— 功能验证、回归测试
-└── 审查（review-1）— 代码审查、质量把关
-```
+`scripts/teamctl.sh init` 默认生成 `small` 团队；`--team medium` / `--team large` 会在初始化时重写 `config.json` 中的 agent 拓扑、默认 reviewer/tester 和 tmux session 列表。后续用 `scripts/teamctl.sh sessions` 查看会话，用 `scripts/teamctl.sh attach <agent-id>` 进入对应 tmux session。
 
 ### 工作目录隔离（当前方案）
 
@@ -88,6 +103,8 @@ cd /path/to/my-agent-teams
 
 # 1) 首次初始化：创建 .venv、安装依赖、渲染本机路径、生成 agent 文件
 scripts/teamctl.sh init
+# 可选：scripts/teamctl.sh init --team medium
+# 可选：scripts/teamctl.sh init --team large
 
 # 2) 检查依赖、路径、agent 文件、tmux session、项目根目录
 scripts/teamctl.sh doctor
@@ -105,7 +122,11 @@ scripts/teamctl.sh up
 # 5) 查看状态
 scripts/teamctl.sh status
 
-# 6) 同步人力数据到飞书甘特图（需先完成飞书 CLI 配置）
+# 6) 查看或进入 agent tmux session
+scripts/teamctl.sh sessions
+scripts/teamctl.sh attach pm-chief
+
+# 7) 同步人力数据到飞书甘特图（需先完成飞书 CLI 配置）
 scripts/sync-gantt-to-feishu.sh
 ```
 

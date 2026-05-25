@@ -13,6 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GATEWAY = REPO_ROOT / 'scripts' / 'codex-responses-gateway.py'
 INSTALL_PROFILE = REPO_ROOT / 'scripts' / 'install-codex-gateway-profile.py'
 TEAMCTL = REPO_ROOT / 'scripts' / 'teamctl.sh'
+RENDER_CONFIG = REPO_ROOT / 'scripts' / 'render-local-config.py'
 EXAMPLE_CONFIG = REPO_ROOT / 'config' / 'codex-responses-gateway.example.json'
 
 
@@ -162,3 +163,40 @@ def test_teamctl_shell_syntax_includes_gateway_commands():
     content = TEAMCTL.read_text(encoding='utf-8')
     assert 'start-codex-gateway' in content
     assert 'install-codex-profile' in content
+    assert 'sessions)' in content
+    assert 'attach)' in content
+    assert '--team <size>' in content
+
+
+def _render_team_profile(tmp_path: Path, team_size: str) -> dict:
+    completed = subprocess.run([
+        sys.executable,
+        str(RENDER_CONFIG),
+        '--input', str(REPO_ROOT / 'config.json'),
+        '--workspace-root', str(tmp_path / 'workspace'),
+        '--team-size', team_size,
+        '--dry-run',
+    ], cwd=str(REPO_ROOT), capture_output=True, text=True, check=True)
+    return json.loads(completed.stdout)
+
+
+def test_render_local_config_team_profiles(tmp_path):
+    small = _render_team_profile(tmp_path, 'small')
+    assert small['team_profile'] == 'small'
+    assert list(small['agents']) == ['pm-chief', 'arch-1', 'dev-1', 'qa-1']
+    assert small['domain_policies']['development']['default_reviewer'] == 'arch-1'
+    assert small['domain_policies']['development']['default_tester'] == 'qa-1'
+
+    medium = _render_team_profile(tmp_path, 'medium')
+    assert medium['team_profile'] == 'medium'
+    assert len(medium['agents']) == 7
+    assert {'dev-3', 'review-1'}.issubset(medium['agents'])
+    assert medium['domain_policies']['development']['default_reviewer'] == 'review-1'
+
+    large = _render_team_profile(tmp_path, 'large')
+    assert large['team_profile'] == 'large'
+    assert len(large['agents']) == 13
+    assert {'arch-2', 'dev-6', 'qa-2', 'review-2'}.issubset(large['agents'])
+    assert large['orchestration']['domains']['development'] == [
+        'dev-1', 'dev-2', 'dev-3', 'dev-4', 'dev-5', 'dev-6'
+    ]
