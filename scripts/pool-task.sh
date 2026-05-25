@@ -5,6 +5,7 @@ TASK_FILE="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$WORKSPACE_ROOT/scripts/lib/agent_config.py}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 FORCE_RESET_ACTIVE="${FORCE_RESET_ACTIVE:-0}"
@@ -23,6 +24,7 @@ from pathlib import Path
 
 AUTO_ASSIGNED = {'auto', 'auto-dev', 'unassigned'}
 sys.path.insert(0, str(Path(sys.argv[4]).resolve() / 'scripts' / 'lib'))
+from agent_config import default_claim_scope  # type: ignore
 from task_pool_rules import pool_gate_blockers  # type: ignore
 
 task_path = Path(sys.argv[1]).resolve()
@@ -77,12 +79,7 @@ if assigned_agent not in AUTO_ASSIGNED:
     task['assigned_agent'] = 'auto'
 
 if not task.get('claim_scope'):
-    if task_type == 'verification':
-        task['claim_scope'] = ['qa-1']
-    elif task_type == 'design':
-        task['claim_scope'] = ['arch-1']
-    else:
-        task['claim_scope'] = ['dev-1', 'dev-2']
+    task['claim_scope'] = default_claim_scope(task, config)
 
 blockers = pool_gate_blockers(task, task_dir)
 if not task.get('claim_scope'):
@@ -127,7 +124,9 @@ echo "pooled ${TASK_ID}"
 if [ -x "$SEND_CHAT_SCRIPT" ]; then
   TITLE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("title") or "")' "$TASK_DIR/task.json")
   ANNOUNCE_MESSAGE="任务入池：${TITLE}（待认领）"
-  if ! TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="pm-chief" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "${PRIORITY:-medium}" >/dev/null 2>&1; then
+  CHAT_FROM_AGENT="$(python3 "$AGENT_CONFIG_PY" root-pm --config "$CONFIG_PATH" 2>/dev/null || true)"
+  CHAT_FROM_AGENT="${CHAT_FROM_AGENT:-pm}"
+  if ! TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="$CHAT_FROM_AGENT" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "${PRIORITY:-medium}" >/dev/null 2>&1; then
     echo "WARNING: pooled task announce failed for ${TASK_ID}" >&2
     TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="watcher" "$SEND_CHAT_SCRIPT" watcher "$TASK_ID" "任务已进入 pooled，但 ChatHub 入池公告写入失败，请检查 send-chat / ingest 链路。" --type notify --severity degraded --source-type system --source-name task-pool >/dev/null 2>&1 || true
   fi

@@ -130,6 +130,10 @@ class ClaimTaskReservedTests(unittest.TestCase):
         return json.loads(completed.stdout)
 
     def test_watcher_auto_pools_pending_pull_task(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["agents"]["dev-2"] = {"role": "fullstack_dev"}
+        config["agents"]["dev-3"] = {"role": "fullstack_dev"}
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         target_dir = self._write_task("pending-pull-task", {
             "status": "pending",
             "assigned_agent": "auto",
@@ -157,7 +161,7 @@ class ClaimTaskReservedTests(unittest.TestCase):
         self.assertEqual(task["status"], "pooled")
         self.assertEqual(task["assigned_agent"], "auto")
         self.assertEqual(task["claim_policy"], "pull")
-        self.assertEqual(task["claim_scope"], ["dev-1"])
+        self.assertEqual(task["claim_scope"], ["dev-1", "dev-2", "dev-3"])
         self.assertTrue(task.get("pool_entered_at"))
         self.assertIn("watcher auto queued pending pull/auto task into claim pool", transitions)
 

@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CHAT_ROOT="${CHAT_ROOT:-$WORKSPACE_ROOT/chat}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 DAYS="1"
 LIMIT="20"
 SHOW_ALL="false"
@@ -49,12 +50,15 @@ if [ "$SHOW_METRICS" = "true" ] && [ -x "$WORKSPACE_ROOT/scripts/chat-metrics.py
   echo
 fi
 
-python3 - "$CHAT_ROOT" "$DAYS" "$LIMIT" "$SHOW_ALL" "$SEVERITY_FILTER" "$INCLUDE_SYSTEM" <<'PY'
+python3 - "$CHAT_ROOT" "$DAYS" "$LIMIT" "$SHOW_ALL" "$SEVERITY_FILTER" "$INCLUDE_SYSTEM" "$CONFIG_PATH" "$SCRIPT_DIR/lib" <<'PY'
 import json
 import sys
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
+
+sys.path.insert(0, sys.argv[8])
+from agent_config import FALLBACK_AGENTS, load_config, root_pm  # type: ignore
 
 chat_root = Path(sys.argv[1])
 days = max(1, int(sys.argv[2]))
@@ -62,7 +66,19 @@ limit = max(1, int(sys.argv[3]))
 show_all = sys.argv[4].strip().lower() == 'true'
 severity_filter = sys.argv[5].strip()
 include_system = sys.argv[6].strip().lower() == 'true'
+config_path = Path(sys.argv[7]).expanduser().resolve()
 cutoff = datetime.now().astimezone() - timedelta(days=days)
+
+config = load_config(config_path)
+pm_ids = {root_pm(config)}
+for agent_id, payload in (config.get('agents') or {}).items():
+    if isinstance(payload, dict) and str(payload.get('role') or '').strip().lower() == 'pm':
+        pm_ids.add(str(agent_id).strip())
+for agent_id, payload in FALLBACK_AGENTS.items():
+    if str(payload.get('role') or '').strip().lower() == 'pm':
+        pm_ids.add(str(agent_id).strip())
+pm_ids = {item for item in pm_ids if item}
+pm_mentions = {f'@{agent_id}' for agent_id in pm_ids}
 
 bases = [chat_root / 'general', chat_root / 'tasks']
 if include_system:
@@ -115,10 +131,10 @@ def is_actionable(row):
         return False
     if show_all:
         return True
-    if row.get('to') == 'pm-chief':
+    if row.get('to') in pm_ids:
         return True
     msg = str(row.get('msg') or '')
-    if '@pm-chief' in msg:
+    if any(marker in msg for marker in pm_mentions):
         return True
     if row.get('priority') == 'critical':
         return True

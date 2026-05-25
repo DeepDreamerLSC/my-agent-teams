@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="${LIB_DIR:-$SCRIPT_DIR/lib}"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 
 TASK_DIR=""
 SUMMARY=""
@@ -58,7 +60,7 @@ if [ -z "$TASK_DIR" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" "$LIB_DIR" <<'PY'
+python3 - "$TASK_DIR" "$SUMMARY" "$REASON" "$DRY_RUN" "$LIB_DIR" "$CONFIG_PATH" <<'PY'
 import json
 import os
 import sys
@@ -67,6 +69,7 @@ from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, sys.argv[5])
+from agent_config import load_config, root_pm  # type: ignore
 import task_artifacts  # type: ignore
 
 
@@ -126,6 +129,8 @@ task_dir = Path(sys.argv[1]).expanduser().resolve()
 summary_arg = sys.argv[2]
 reason = sys.argv[3].strip() or 'manual close via close-task.sh'
 dry_run = sys.argv[4] == '1'
+config_path = Path(sys.argv[6]).expanduser().resolve()
+root_pm_id = root_pm(load_config(config_path))
 
 task_json_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
@@ -182,7 +187,7 @@ updated_task['updated_at'] = now
 updated_task['result_summary'] = summary
 updated_task['merge_gate_state'] = 'closed'
 updated_task['rework_reason'] = None
-updated_task['last_gate_actor'] = 'watcher' if 'watcher' in reason else 'pm-chief'
+updated_task['last_gate_actor'] = 'watcher' if 'watcher' in reason else root_pm_id
 updated_task['last_gate_decision_at'] = now
 
 preview = {

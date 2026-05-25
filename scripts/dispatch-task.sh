@@ -28,6 +28,7 @@ from typing import Optional
 
 sys.path.insert(0, str(Path(sys.argv[6]).resolve() / "scripts" / "lib"))
 from task_quality_rules import derive_quality_gate_mode, validate_task_type_gate_template  # type: ignore
+from agent_config import default_reviewer, default_reviewers, integration_owner, root_pm  # type: ignore
 
 ACTIVE_DISPATCH_STATUSES = {'dispatched', 'working', 'ready_for_merge', 'blocked'}
 AUTO_ASSIGNED_AGENTS = {'auto', 'auto-dev', 'unassigned'}
@@ -36,7 +37,7 @@ ROLE_WIP_KEYS = {
     'reviewer': 'reviewer',
     'qa': 'qa',
     'architect': 'architect',
-    'pm': 'pm-chief',
+    'pm': 'pm',
 }
 TASK_TYPE_ALIASES = {
     'investigation': 'investigation',
@@ -131,14 +132,14 @@ def scopes_overlap(path_a: Path, path_b: Path) -> bool:
     return path_a == path_b or is_relative_to(path_a, path_b) or is_relative_to(path_b, path_a)
 
 
-def validate_and_resolve_scope(raw_paths: list[str], *, dev_root: Path, prod_root: Optional[Path], target_environment: str, assigned_agent: str) -> list[tuple[str, Path]]:
+def validate_and_resolve_scope(raw_paths: list[str], *, dev_root: Path, prod_root: Optional[Path], target_environment: str, assigned_agent: str, prod_write_owner: str) -> list[tuple[str, Path]]:
     resolved_scope: list[tuple[str, Path]] = []
     for raw_path in raw_paths:
         p = Path(raw_path).expanduser()
         resolved = p.resolve() if p.is_absolute() else ((prod_root if target_environment == 'prod' and prod_root is not None else dev_root) / p).resolve()
         if prod_root is not None and str(resolved).startswith(str(prod_root)):
-            if assigned_agent != 'pm-chief':
-                raise SystemExit(f'prod write_scope requires pm-chief: {raw_path}')
+            if assigned_agent != prod_write_owner:
+                raise SystemExit(f'prod write_scope requires {prod_write_owner}: {raw_path}')
         elif not str(resolved).startswith(str(dev_root)):
             raise SystemExit(f'write_scope outside project dev_root: {raw_path}')
         resolved_scope.append((raw_path, resolved))
@@ -166,6 +167,7 @@ def find_scope_conflicts(tasks_root: Path, current_task_id: str, candidate_scope
             prod_root=prod_root,
             target_environment=str(task_data.get('target_environment') or 'dev'),
             assigned_agent=str(task_data.get('assigned_agent') or ''),
+            prod_write_owner=root_pm_id,
         )
         for raw_a, resolved_a in candidate_scope:
             for raw_b, resolved_b in other_resolved_scope:
@@ -181,6 +183,8 @@ force_direct_dispatch = parse_bool(sys.argv[4])
 direct_dispatch_reason = str(sys.argv[5] or '').strip()
 task = json.loads(task_path.read_text(encoding='utf-8'))
 config = json.loads(config_path.read_text(encoding='utf-8'))
+root_pm_id = root_pm(config)
+integration_owner_id = integration_owner(config)
 
 if task.get('status') != 'pending':
     raise SystemExit(f"task status is {task.get('status')}, expected pending")
@@ -211,6 +215,8 @@ wip_key = ROLE_WIP_KEYS.get(agent_role)
 role_limit = wip_limits.get(assigned_agent)
 if role_limit in (None, '') and wip_key:
     role_limit = wip_limits.get(wip_key)
+if role_limit in (None, '') and agent_role == 'pm' and root_pm_id:
+    role_limit = wip_limits.get(root_pm_id)
 if role_limit not in (None, ''):
     active_count = 0
     for other_task_json in sorted(task_path.parent.parent.glob('*/task.json')):
@@ -232,12 +238,12 @@ if target_environment not in {'dev', 'prod'}:
     raise SystemExit('target_environment invalid')
 if execution_mode == 'dev' and target_environment != 'dev':
     raise SystemExit('execution_mode=dev requires target_environment=dev')
-if execution_mode == 'deploy' and assigned_agent != 'arch-1':
-    raise SystemExit('deploy tasks can only be assigned to arch-1')
-if target_environment == 'prod' and assigned_agent != 'arch-1':
-    raise SystemExit('prod tasks can only be assigned to arch-1')
-if task_level == 'integration' and assigned_agent != 'arch-1':
-    raise SystemExit('integration tasks must be assigned to arch-1')
+if execution_mode == 'deploy' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'deploy tasks can only be assigned to {integration_owner_id}')
+if target_environment == 'prod' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'prod tasks can only be assigned to {integration_owner_id}')
+if task_level == 'integration' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'integration tasks must be assigned to {integration_owner_id}')
 
 project_cfg = projects[project]
 dev_root = Path(project_cfg['dev_root']).expanduser().resolve()
@@ -250,6 +256,7 @@ resolved_scope = validate_and_resolve_scope(
     prod_root=prod_root,
     target_environment=target_environment,
     assigned_agent=assigned_agent,
+    prod_write_owner=root_pm_id,
 )
 conflicts = find_scope_conflicts(task_path.parent.parent, str(task.get('id')), resolved_scope)
 if conflicts and not allow_conflicts:
@@ -279,8 +286,8 @@ if read_only and write_scope_items:
     raise SystemExit('read_only task must not declare write_scope')
 if task_type == 'development' and not write_scope_items:
     raise SystemExit('development task requires non-empty write_scope')
-if task_type == 'integration' and assigned_agent != 'arch-1':
-    raise SystemExit('integration task_type must be assigned to arch-1')
+if task_type == 'integration' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'integration task_type must be assigned to {integration_owner_id}')
 if task_type == 'deployment' and execution_mode != 'deploy':
     raise SystemExit('deployment task_type requires execution_mode=deploy')
 
@@ -291,8 +298,8 @@ task['downstream_action'] = downstream_action
 
 owner_approval_required = parse_bool(task.get('owner_approval_required'))
 if execution_mode == 'deploy' or target_environment == 'prod' or task_type == 'deployment':
-    if assigned_agent != 'arch-1':
-        raise SystemExit('prod/deploy tasks must be assigned to arch-1')
+    if assigned_agent != integration_owner_id:
+        raise SystemExit(f'prod/deploy tasks must be assigned to {integration_owner_id}')
     if not owner_approval_required:
         raise SystemExit('prod/deploy tasks require owner_approval_required=true before dispatch')
     approved_by = str(task.get('owner_approved_by') or '').strip()
@@ -315,12 +322,8 @@ else:
     if existing_reviewers:
         reviewers = dedupe([str(item).strip() for item in existing_reviewers if str(item).strip()])
     else:
-        primary_reviewer = (
-            task.get('reviewer')
-            or config.get('domain_policies', {}).get(task.get('domain'), {}).get('default_reviewer')
-            or config.get('domain_policies', {}).get('development', {}).get('default_reviewer')
-        )
-        reviewers = [primary_reviewer] if review_level == 'standard' and primary_reviewer else dedupe([primary_reviewer or 'review-1', 'arch-1'])
+        primary_reviewer = str(task.get('reviewer') or '').strip() or default_reviewer(config, str(task.get('domain') or ''))
+        reviewers = [primary_reviewer] if review_level == 'standard' and primary_reviewer else default_reviewers(config, str(task.get('domain') or ''), review_level)
     if review_level == 'complex' and len(reviewers) < 2:
         raise SystemExit('review_level=complex requires at least two reviewers before dispatch')
     task['reviewers'] = reviewers
@@ -384,12 +387,14 @@ print(json.dumps({
     'task_type': task.get('task_type'),
     'direct_dispatch_override': direct_dispatch_override,
     'direct_dispatch_reason': direct_dispatch_reason,
+    'root_pm': root_pm_id,
 }, ensure_ascii=False))
 PY
 )
 
 TASK_ID=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["task_id"])' <<< "$DISPATCH_OUTPUT")
 TASK_TYPE=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("task_type") or "unknown")' <<< "$DISPATCH_OUTPUT")
+ROOT_PM_AGENT=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("root_pm") or "")' <<< "$DISPATCH_OUTPUT")
 echo "dispatched ${TASK_ID}"
 if [ "$ALLOW_WRITE_SCOPE_CONFLICT" = "1" ]; then
   python3 -c 'import json,sys; payload=json.load(sys.stdin); conflicts=payload.get("conflicts") or []; [print(f"WARNING: {item}", file=sys.stderr) for item in conflicts]' <<< "$DISPATCH_OUTPUT"
@@ -464,5 +469,5 @@ if [ -x "$SEND_CHAT_SCRIPT" ]; then
   TITLE=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("title") or "")' "$TASK_JSON")
   TARGET_ENVIRONMENT=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("target_environment") or "")' "$TASK_JSON")
   ANNOUNCE_MESSAGE="任务公告：${TITLE}（类型：${TASK_TYPE}，执行者：${ASSIGNED_AGENT}，环境：${TARGET_ENVIRONMENT:-dev}）"
-  TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="pm-chief" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "$PRIORITY"
+  TASKS_ROOT="${WORKSPACE_ROOT}/tasks" CHAT_FROM="$ROOT_PM_AGENT" "$SEND_CHAT_SCRIPT" announce "$TASK_ID" "$ANNOUNCE_MESSAGE" --priority "$PRIORITY"
 fi

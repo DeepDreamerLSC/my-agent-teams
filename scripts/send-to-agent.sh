@@ -1,12 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-SESSION="${1:-}"
+TARGET="${1:-}"
 shift || true
 MESSAGE="$*"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 INSERT_WAIT_SECONDS="${SEND_TO_AGENT_INSERT_WAIT_SECONDS:-0.5}"
 POST_SEND_WAIT_SECONDS="${SEND_TO_AGENT_POST_SEND_WAIT_SECONDS:-0.1}"
 ACK_WAIT_SECONDS="${SEND_TO_AGENT_ACK_WAIT_SECONDS:-10}"
@@ -14,41 +15,23 @@ TIMEOUT_SECONDS="${SEND_TO_AGENT_TIMEOUT_SECONDS:-15}"
 RETRY_LIMIT="${SEND_TO_AGENT_RETRY_LIMIT:-1}"
 RESPONSE_REGEX="${SEND_TO_AGENT_RESPONSE_REGEX:-Working|• Working|⏺|✻|thinking|Thinking|Esc to interrupt}"
 
-if [ -z "$SESSION" ] || [ -z "$MESSAGE" ]; then
-  echo "usage: send-to-agent.sh <session> <message>" >&2
+if [ -z "$TARGET" ] || [ -z "$MESSAGE" ]; then
+  echo "usage: send-to-agent.sh <agent-or-session> <message>" >&2
   exit 2
 fi
 
+TARGET_INFO="$TARGET"$'\t'"$TARGET"$'\tunknown'
+if [ -r "$AGENT_CONFIG_PY" ]; then
+  TARGET_INFO="$(python3 "$AGENT_CONFIG_PY" resolve-target "$TARGET" --config "$CONFIG_PATH" 2>/dev/null || printf '%s\t%s\tunknown\n' "$TARGET" "$TARGET")"
+fi
+IFS=$'\t' read -r AGENT_ID SESSION RUNTIME <<< "$TARGET_INFO"
+SESSION="${SESSION:-$TARGET}"
+RUNTIME="${RUNTIME:-unknown}"
+
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-  echo "tmux session not found: $SESSION" >&2
+  echo "tmux session not found: $SESSION (target=$TARGET)" >&2
   exit 1
 fi
-
-RUNTIME=$(python3 - "$CONFIG_PATH" "$SESSION" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config_path = Path(sys.argv[1]).expanduser()
-session = sys.argv[2]
-if not config_path.exists():
-    print('unknown')
-    raise SystemExit(0)
-try:
-    config = json.loads(config_path.read_text(encoding='utf-8'))
-except Exception:
-    print('unknown')
-    raise SystemExit(0)
-agents = config.get('agents') or {}
-agent = agents.get(session) or {}
-if not agent:
-    for payload in agents.values():
-        if isinstance(payload, dict) and payload.get('tmux_session') == session:
-            agent = payload
-            break
-print((agent or {}).get('runtime') or 'unknown')
-PY
-)
 
 run_tmux_with_timeout() {
   tmux "$@" &
@@ -101,7 +84,7 @@ while [ "$attempt" -le "$RETRY_LIMIT" ]; do
 
   after_pane=$(tmux capture-pane -t "$SESSION" -p -S -80 2>/dev/null || true)
   if pane_acknowledged "$before_pane" "$after_pane" "$RUNTIME"; then
-    echo "delivered to $SESSION (runtime=$RUNTIME, attempt=$((attempt + 1)))"
+    echo "delivered to $SESSION (target=$TARGET, runtime=$RUNTIME, attempt=$((attempt + 1)))"
     exit 0
   fi
 

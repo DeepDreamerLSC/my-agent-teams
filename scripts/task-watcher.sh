@@ -13,8 +13,26 @@ LEGACY_STATE_DIR="${LEGACY_STATE_DIR:-$LEGACY_OPENCLAW_ROOT/.task-watcher}"
 LEGACY_LOG_DIR="${LEGACY_LOG_DIR:-$LEGACY_OPENCLAW_ROOT/logs}"
 
 TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
-PM_SESSION="${PM_SESSION:-pm-chief}"
-QA_SESSION="${QA_SESSION:-qa-1}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
+
+agent_config_value() {
+    local command="$1"
+    shift || true
+    [ -r "$AGENT_CONFIG_PY" ] || return 1
+    python3 "$AGENT_CONFIG_PY" "$command" --config "$CONFIG_PATH" "$@" 2>/dev/null
+}
+
+PM_AGENT_ID="${PM_AGENT_ID:-${PM_SESSION:-}}"
+if [ -z "$PM_AGENT_ID" ]; then
+    PM_AGENT_ID="$(agent_config_value root-pm || true)"
+fi
+PM_AGENT_ID="${PM_AGENT_ID:-}"
+INTEGRATION_OWNER_AGENT_ID="${INTEGRATION_OWNER_AGENT_ID:-}"
+if [ -z "$INTEGRATION_OWNER_AGENT_ID" ]; then
+    INTEGRATION_OWNER_AGENT_ID="$(agent_config_value integration-owner || true)"
+fi
+INTEGRATION_OWNER_AGENT_ID="${INTEGRATION_OWNER_AGENT_ID:-}"
 PUSH_SCRIPT="${PUSH_SCRIPT:-}"
 USER_ID="${USER_ID:-}"
 LEGACY_PROJECT_OMX_STATE_DIR="${LEGACY_PROJECT_OMX_STATE_DIR:-$WORKSPACE_ROOT/.omx/state/task-watcher}"
@@ -31,7 +49,6 @@ TASK_POOL_ROUTER="${TASK_POOL_ROUTER:-$WORKSPACE_ROOT/scripts/task-pool-router.p
 TASK_QUEUE_ROUTER="${TASK_QUEUE_ROUTER:-$WORKSPACE_ROOT/scripts/task-queue-router.py}"
 REASSIGN_TASK_SCRIPT="${REASSIGN_TASK_SCRIPT:-$WORKSPACE_ROOT/scripts/reassign-task.sh}"
 ENSURE_TASK_WORKSPACE_PY="${ENSURE_TASK_WORKSPACE_PY:-$WORKSPACE_ROOT/scripts/ensure-task-workspace.py}"
-CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AUTO_ASSIGN_MARKERS="${AUTO_ASSIGN_MARKERS:-auto,auto-dev,unassigned}"
 ARCH_AUTO_DISPATCH="${ARCH_AUTO_DISPATCH:-1}"
 DEV_AUTO_CLAIM="${DEV_AUTO_CLAIM:-1}"
@@ -143,15 +160,54 @@ print(datetime.now().astimezone().isoformat(timespec='seconds'))
 PY
 }
 
-legacy_send_tmux() {
-    local session="$1"
-    local msg="$2"
-    local is_codex=0
-    case "$session" in
-        arch-1|dev-1|dev-2|review-1|pm-chief) is_codex=1 ;;
-    esac
+resolve_agent_session() {
+    local target="$1"
+    if [ -n "$target" ] && [ -r "$AGENT_CONFIG_PY" ]; then
+        python3 "$AGENT_CONFIG_PY" resolve-session "$target" --config "$CONFIG_PATH" 2>/dev/null || printf '%s\n' "$target"
+    else
+        printf '%s\n' "$target"
+    fi
+}
 
-    if [ "$is_codex" = "1" ]; then
+resolve_agent_runtime() {
+    local target="$1"
+    if [ -n "$target" ] && [ -r "$AGENT_CONFIG_PY" ]; then
+        python3 "$AGENT_CONFIG_PY" resolve-runtime "$target" --config "$CONFIG_PATH" 2>/dev/null || printf 'unknown\n'
+    else
+        printf 'unknown\n'
+    fi
+}
+
+default_tester_agent() {
+    local task_dir="${1:-}"
+    local domain=""
+    if [ -n "$task_dir" ]; then
+        domain=$(task_json_pick "$task_dir" domain 2>/dev/null || true)
+    fi
+    agent_config_value default-tester --domain "$domain" || true
+}
+
+is_integration_owner_planning_task() {
+    local assigned_agent="$1"
+    local task_level="$2"
+    local integration_owner="${INTEGRATION_OWNER_AGENT_ID:-}"
+    [ -n "$integration_owner" ] || integration_owner="$(agent_config_value integration-owner || true)"
+    [ -n "$integration_owner" ] || return 1
+    [ "$assigned_agent" = "$integration_owner" ] || return 1
+    case "$task_level" in
+        domain|epic) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+legacy_send_tmux() {
+    local target="$1"
+    local msg="$2"
+    local session runtime
+    session="$(resolve_agent_session "$target")"
+    runtime="$(resolve_agent_runtime "$target")"
+
+    if [ "$runtime" = "codex" ]; then
         tmux send-keys -t "$session" i 2>/dev/null &
         local pid=$!
         sleep 0.3
@@ -480,9 +536,11 @@ PY
 
 agent_has_working_signal() {
     local agent_session="$1"
+    local tmux_session
+    tmux_session="$(resolve_agent_session "$agent_session")"
     local is_working=0
-    if [ -n "$agent_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
-        is_working=$(tmux capture-pane -t "$agent_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
+    if [ -n "$tmux_session" ] && tmux has-session -t "$tmux_session" 2>/dev/null; then
+        is_working=$(tmux capture-pane -t "$tmux_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
     fi
     printf '%s\n' "${is_working:-0}"
 }
@@ -607,6 +665,7 @@ task_json_pick() {
 
 task_reviewers() {
     local task_dir="$1"
+    local explicit_reviewers review_level domain
     python3 - "$task_dir/task.json" <<'PY'
 import json
 import sys
@@ -614,21 +673,37 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 payload = json.loads(path.read_text(encoding='utf-8'))
-review_level = str(payload.get('review_level') or '').strip().lower()
 reviewers = payload.get('reviewers') if isinstance(payload.get('reviewers'), list) else []
 reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
 if not reviewers:
     reviewer = str(payload.get('reviewer') or '').strip()
     if reviewer:
         reviewers = [reviewer]
-if not reviewers:
-    if review_level == 'complex':
-        reviewers = ['review-1', 'arch-1']
-    elif review_level == 'standard':
-        reviewers = ['review-1']
 for reviewer in reviewers:
     print(reviewer)
 PY
+    explicit_reviewers=$(python3 - "$task_dir/task.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding='utf-8'))
+reviewers = payload.get('reviewers') if isinstance(payload.get('reviewers'), list) else []
+reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
+if not reviewers:
+    reviewer = str(payload.get('reviewer') or '').strip()
+    if reviewer:
+        reviewers = [reviewer]
+print("1" if reviewers else "")
+PY
+)
+    [ -n "$explicit_reviewers" ] && return 0
+    review_level=$(task_json_pick "$task_dir" review_level 2>/dev/null || true)
+    review_level="${review_level:-standard}"
+    [ "$review_level" = "skip" ] && return 0
+    domain=$(task_json_pick "$task_dir" domain 2>/dev/null || true)
+    agent_config_value default-reviewers --domain "$domain" --review-level "$review_level" || true
 }
 
 task_quality_gate_mode() {
@@ -682,11 +757,13 @@ PY
 
 session_health_state() {
     local agent_session="$1"
+    local tmux_session
     if [ -z "$agent_session" ]; then
         echo "unknown"
         return 0
     fi
-    if ! tmux has-session -t "$agent_session" 2>/dev/null; then
+    tmux_session="$(resolve_agent_session "$agent_session")"
+    if ! tmux has-session -t "$tmux_session" 2>/dev/null; then
         echo "missing_session"
         return 0
     fi
@@ -850,9 +927,10 @@ deliver_execution_instruction_and_record() {
     local task_id="$2"
     local agent_session="$3"
     local message="$4"
-    local session_health output rc attempts delivery_state delivery_error
+    local session_health output rc attempts delivery_state delivery_error tmux_session
 
     session_health=$(session_health_state "$agent_session")
+    tmux_session="$(resolve_agent_session "$agent_session")"
     output=""
     rc=0
     if [ -x "$SEND_SCRIPT" ]; then
@@ -866,7 +944,7 @@ deliver_execution_instruction_and_record() {
     if [ "$rc" -eq 0 ]; then
         delivery_state="delivered"
         delivery_error=""
-        log "$task_id: 投递成功 -> ${agent_session} | $(truncate_utf8 "$output" 160)"
+        log "$task_id: 投递成功 -> ${agent_session}/${tmux_session} | $(truncate_utf8 "$output" 160)"
     else
         if [ "$session_health" = "missing_session" ]; then
             delivery_state="session_unhealthy"
@@ -874,10 +952,10 @@ deliver_execution_instruction_and_record() {
             delivery_state="delivery_failed"
         fi
         delivery_error=$(truncate_utf8 "$output" 240)
-        if [ "$session_health" != "missing_session" ] && tmux has-session -t "$agent_session" 2>/dev/null; then
+        if [ "$session_health" != "missing_session" ] && tmux has-session -t "$tmux_session" 2>/dev/null; then
             legacy_send_tmux "$agent_session" "$message" || true
         fi
-        log "$task_id: 投递失败 -> ${agent_session} | state=${delivery_state} | $(truncate_utf8 "$output" 200)"
+        log "$task_id: 投递失败 -> ${agent_session}/${tmux_session} | state=${delivery_state} | $(truncate_utf8 "$output" 200)"
     fi
 
     record_dispatch_delivery_attempt "$task_dir" "$delivery_state" "$attempts" "$delivery_error" "$session_health"
@@ -995,37 +1073,11 @@ PY
 }
 
 list_dev_agents() {
-    python3 - "$CONFIG_PATH" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-agents = config.get('agents') or {}
-
-for agent_id, payload in agents.items():
-    role = str((payload or {}).get('role') or '').strip().lower()
-    if role == 'fullstack_dev' or agent_id.startswith('dev-'):
-        print(agent_id)
-PY
+    python3 "$AGENT_CONFIG_PY" list-dev-agent-ids --config "$CONFIG_PATH"
 }
 
 list_pool_agents() {
-    python3 - "$CONFIG_PATH" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-agents = config.get('agents') or {}
-
-for agent_id, payload in agents.items():
-    role = str((payload or {}).get('role') or '').strip().lower()
-    if role == 'pm' or agent_id.startswith('pm-'):
-        continue
-    if role in {'fullstack_dev', 'reviewer', 'qa', 'architect'} or agent_id.startswith(('dev-', 'review-', 'qa-', 'arch-')):
-        print(agent_id)
-PY
+    python3 "$AGENT_CONFIG_PY" list-pool-agent-ids --config "$CONFIG_PATH"
 }
 
 task_pool_bool() {
@@ -1272,12 +1324,16 @@ role_keys = {
     'reviewer': 'reviewer',
     'qa': 'qa',
     'architect': 'architect',
-    'pm': 'pm-chief',
+    'pm': 'pm',
 }
 role_key = role_keys.get(role)
 role_limit = wip_limits.get(agent_id)
 if role_limit in (None, '') and role_key:
     role_limit = wip_limits.get(role_key)
+if role_limit in (None, '') and role == 'pm':
+    root_pm = str((config.get('orchestration') or {}).get('root_pm') or '').strip()
+    if root_pm:
+        role_limit = wip_limits.get(root_pm)
 if role_limit not in (None, ''):
     working_limit = max(1, min(working_limit, as_int(role_limit, working_limit)))
 print(f'{working_limit} {reserved_limit} {working_limit + reserved_limit}')
@@ -1313,35 +1369,18 @@ PY
 
 task_claim_scope() {
     local task_dir="$1"
-    python3 - "$task_dir/task.json" "$CONFIG_PATH" <<'PY'
+    python3 - "$task_dir/task.json" "$CONFIG_PATH" "$AGENT_CONFIG_PY" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 task = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
 config = json.loads(Path(sys.argv[2]).read_text(encoding='utf-8'))
-scope = task.get('claim_scope')
-if isinstance(scope, list) and scope:
-    for item in scope:
-        value = str(item).strip()
-        if value:
-            print(value)
-    raise SystemExit(0)
+sys.path.insert(0, str(Path(sys.argv[3]).resolve().parent))
+from agent_config import default_claim_scope  # type: ignore
 
-task_type = str(task.get('task_type') or '').strip().lower()
-domain = str(task.get('domain') or '').strip().lower()
-agents = config.get('agents') or {}
-for agent_id, payload in agents.items():
-    role = str((payload or {}).get('role') or '').strip().lower()
-    if task_type in {'development', 'investigation'}:
-        if role == 'fullstack_dev' or agent_id.startswith('dev-'):
-            print(agent_id)
-    elif task_type == 'verification' or domain == 'quality':
-        if role == 'qa' or agent_id.startswith('qa-'):
-            print(agent_id)
-    elif task_type == 'design':
-        if role == 'architect' or agent_id == 'arch-1':
-            print(agent_id)
+for value in default_claim_scope(task, config):
+    print(value)
 PY
 }
 
@@ -1746,14 +1785,16 @@ reconcile_open_merge_gate() {
 
 is_idle_agent() {
     local agent_id="$1"
+    local tmux_session
     local active_count
     active_count=$(active_task_count_for_agent "$agent_id" 2>/dev/null || echo 0)
     if [ "${active_count:-0}" -gt 0 ]; then
         return 1
     fi
-    if tmux has-session -t "$agent_id" 2>/dev/null; then
+    tmux_session="$(resolve_agent_session "$agent_id")"
+    if tmux has-session -t "$tmux_session" 2>/dev/null; then
         local is_working
-        is_working=$(tmux capture-pane -t "$agent_id" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
+        is_working=$(tmux capture-pane -t "$tmux_session" -p 2>/dev/null | grep -c 'Working\|• Working' || true)
         [ "${is_working:-0}" -eq 0 ]
         return $?
     fi
@@ -2472,31 +2513,11 @@ resolve_merge_gate_state() {
 }
 
 list_review_agents() {
-    python3 - "$CONFIG_PATH" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-for agent_id, payload in (config.get('agents') or {}).items():
-    role = str((payload or {}).get('role') or '').strip().lower()
-    if role in {'reviewer', 'architect'}:
-        print(agent_id)
-PY
+    agent_config_value list-review-agent-ids || true
 }
 
 list_qa_agents() {
-    python3 - "$CONFIG_PATH" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
-for agent_id, payload in (config.get('agents') or {}).items():
-    role = str((payload or {}).get('role') or '').strip().lower()
-    if role == 'qa':
-        print(agent_id)
-PY
+    agent_config_value list-qa-agent-ids || true
 }
 
 queue_state_file() {
@@ -2833,10 +2854,13 @@ auto_dispatch_pending_arch() {
     local task_id="$2"
     local assigned_agent="$3"
     local task_level="$4"
-    local workspace_payload workspace_hint
+    local integration_owner workspace_payload workspace_hint
 
     [ "$ARCH_AUTO_DISPATCH" = "1" ] || return 1
-    [ "$assigned_agent" = "arch-1" ] || return 1
+    integration_owner="${INTEGRATION_OWNER_AGENT_ID:-}"
+    [ -n "$integration_owner" ] || integration_owner="$(agent_config_value integration-owner || true)"
+    [ -n "$integration_owner" ] || return 1
+    [ "$assigned_agent" = "$integration_owner" ] || return 1
     case "$task_level" in
         domain|epic) ;;
         *) return 1 ;;
@@ -2846,12 +2870,12 @@ auto_dispatch_pending_arch() {
         return 1
     fi
 
-    dispatch_task_to_agent "$task_dir" "arch-1" "watcher auto dispatch domain/epic task to arch-1"
+    dispatch_task_to_agent "$task_dir" "$integration_owner" "watcher auto dispatch domain/epic task to $integration_owner"
     workspace_payload=$(prepare_task_workspace_payload "$task_dir")
     workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
-    deliver_execution_instruction_and_record "$task_dir" "$task_id" "arch-1" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$integration_owner" "请读取 ${TASKS_ROOT}/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 自动派发，用于支持多 domain/epic 并行处理。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-dispatch-arch"
-    log "$task_id: 自动派发给 arch-1（domain/epic 并行）"
+    log "$task_id: 自动派发给 $integration_owner（domain/epic 并行）"
     return 0
 }
 
@@ -2902,6 +2926,10 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(sys.argv[4]).resolve() / 'scripts' / 'lib'))
+from agent_config import default_claim_scope  # type: ignore
+from task_pool_rules import pool_gate_blockers  # type: ignore
+
 
 def int_value(value, default):
     try:
@@ -2912,31 +2940,11 @@ def int_value(value, default):
         return default
 
 
-def default_claim_scope(task, agents):
-    task_type = str(task.get('task_type') or '').strip().lower()
-    domain = str(task.get('domain') or '').strip().lower()
-    output = []
-    for agent_id, payload in (agents or {}).items():
-        role = str((payload or {}).get('role') or '').strip().lower()
-        if task_type in {'development', 'investigation'}:
-            if role == 'fullstack_dev' or agent_id.startswith('dev-'):
-                output.append(agent_id)
-        elif task_type == 'verification' or domain == 'quality':
-            if role == 'qa' or agent_id.startswith('qa-'):
-                output.append(agent_id)
-        elif task_type == 'design':
-            if role == 'architect' or agent_id.startswith('arch-'):
-                output.append(agent_id)
-    return output
-
-
 task_dir = Path(sys.argv[1])
 task_id = sys.argv[2]
 config_path = Path(sys.argv[3])
 workspace_root = Path(sys.argv[4])
 auto_markers = {item.strip().lower() for item in sys.argv[5].split(',') if item.strip()}
-sys.path.insert(0, str(workspace_root / 'scripts' / 'lib'))
-from task_pool_rules import pool_gate_blockers  # type: ignore
 
 task_path = task_dir / 'task.json'
 task = json.loads(task_path.read_text(encoding='utf-8'))
@@ -2959,7 +2967,7 @@ task['assigned_agent'] = 'auto'
 claim_scope = task.get('claim_scope') if isinstance(task.get('claim_scope'), list) else []
 claim_scope = [str(item).strip() for item in claim_scope if str(item).strip()]
 if not claim_scope:
-    claim_scope = default_claim_scope(task, config.get('agents') or {})
+    claim_scope = default_claim_scope(task, config)
 task['claim_scope'] = claim_scope
 task['claim_policy'] = 'pull'
 task['claim_max_concurrency'] = int_value(task.get('claim_max_concurrency'), int_value(pool_config.get('default_claim_max_concurrency'), 1))
@@ -2997,7 +3005,7 @@ PY_POOL_PENDING
     rc=$?
     if [ "$rc" -eq 0 ]; then
         log "$task_id: pending pull/auto 任务已自动入池"
-        emit_system_chat_event watcher "$task_id" "pending pull/auto 任务已由 watcher 自动进入 pooled，等待认领/自动续推。" "$PM_SESSION" info task-pool >/dev/null 2>&1 || true
+        emit_system_chat_event watcher "$task_id" "pending pull/auto 任务已由 watcher 自动进入 pooled，等待认领/自动续推。" "$PM_AGENT_ID" info task-pool >/dev/null 2>&1 || true
         sync_task_board "$task_dir" "auto-pool-pending"
         return 0
     fi
@@ -3197,7 +3205,7 @@ PY
     if ! is_notified "$timeout_key" || ! is_notified "$timeout_push_key"; then
         if ! is_notified "$timeout_key"; then
             notify_pm "[task-watcher] $task_id 在任务池中等待已超 ${timeout_minutes} 分钟，请判断转派、拆分或提优先级。"
-            emit_system_chat_event watcher "$task_id" "pooled 超时，建议 PM 转派/拆小/提高优先级。" "$PM_SESSION" degraded notify
+            emit_system_chat_event watcher "$task_id" "pooled 超时，建议 PM 转派/拆小/提高优先级。" "$PM_AGENT_ID" degraded notify
             mark_notified "$timeout_key"
         fi
         push_task_event_with_retry "$timeout_push_key" "$task_dir/task.json" "【任务池超时】" "$task_id" "任务在 pooled 中等待超过 ${timeout_minutes} 分钟" "请 PM 判断转派、拆小或提高优先级" || true
@@ -3327,7 +3335,7 @@ reassign_dispatched_task() {
         workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
         deliver_execution_instruction_and_record "$task_dir" "$task_id" "$next_agent" "你已接手任务 ${task_id}。请读取 ${task_dir}/instruction.md，并在确认后写 ack.json 开始执行。${workspace_hint:+ ${workspace_hint}}" || true
         notify_pm "[task-watcher] $task_id 因连接/会话恢复已从 ${previous_agent} 转派给 ${next_agent}。"
-        emit_system_chat_event watcher "$task_id" "控制面恢复：已从 ${previous_agent} 转派给 ${next_agent}。" "$PM_SESSION" degraded notify
+        emit_system_chat_event watcher "$task_id" "控制面恢复：已从 ${previous_agent} 转派给 ${next_agent}。" "$PM_AGENT_ID" degraded notify
         sync_task_board "$task_dir" "control-plane-reassign"
         log "$task_id: 控制面恢复后已从 ${previous_agent} 转派给 ${next_agent}"
         return 0
@@ -3422,7 +3430,7 @@ auto_dispatch_review() {
     done <<< "$(task_reviewers "$task_dir")"
 
     if [ "$pushed" -eq 0 ]; then
-        emit_system_chat_event_once "${task_id}_review_queue_waiting_notice" watcher "$task_id" "任务已进入 review 队列，等待 reviewer 空闲后自动续推。" "$PM_SESSION" info notify
+        emit_system_chat_event_once "${task_id}_review_queue_waiting_notice" watcher "$task_id" "任务已进入 review 队列，等待 reviewer 空闲后自动续推。" "$PM_AGENT_ID" info notify
     fi
 }
 
@@ -3436,7 +3444,7 @@ auto_dispatch_qa() {
         fi
     done <<< "$(list_qa_agents)"
     if [ "$pushed" -eq 0 ]; then
-        emit_system_chat_event_once "${task_id}_qa_queue_waiting_notice" watcher "$task_id" "任务已进入 QA 队列，等待 QA 空闲后自动续推。" "$PM_SESSION" info notify
+        emit_system_chat_event_once "${task_id}_qa_queue_waiting_notice" watcher "$task_id" "任务已进入 QA 队列，等待 QA 空闲后自动续推。" "$PM_AGENT_ID" info notify
     fi
 }
 
@@ -3460,7 +3468,7 @@ auto_close_review_only_task() {
     if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after review pass without qa" >/dev/null 2>&1; then
         log "$task_id: 审查通过且无需 QA，已自动收口"
         notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，已自动收口。"
-        emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，已自动收口。" "$PM_SESSION" info notify
+        emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，已自动收口。" "$PM_AGENT_ID" info notify
         return 0
     fi
     log "$task_id: 审查通过自动收口失败"
@@ -3511,7 +3519,7 @@ notify_final_done_if_needed() {
             return 1
         }
     fi
-    emit_system_chat_event watcher "$task_id" "任务已进入 done 终态，已发送最终完成通知。" "$PM_SESSION" info notify
+    emit_system_chat_event watcher "$task_id" "任务已进入 done 终态，已发送最终完成通知。" "$PM_AGENT_ID" info notify
     mark_notified "$done_key"
 }
 
@@ -3532,7 +3540,7 @@ auto_close_task() {
     if "$CLOSE_TASK_SCRIPT" --task-dir "$task_dir" --summary "$result_summary" --reason "task-watcher auto close after qa verify pass" >/dev/null 2>&1; then
         log "$task_id: QA 通过，已自动收口"
         notify_pm "[task-watcher] $task_id QA 已通过并自动收口，请查看任务目录与 verify.json。" 
-        emit_system_chat_event watcher "$task_id" "QA 已通过并自动收口。" "$PM_SESSION" info notify
+        emit_system_chat_event watcher "$task_id" "QA 已通过并自动收口。" "$PM_AGENT_ID" info notify
         return 0
     fi
     log "$task_id: close-task.sh 执行失败，未自动收口"
@@ -3585,7 +3593,7 @@ run_task_watcher_loop() {
         elif [ "${invariant_notify:-0}" = "1" ] && [ "${invariant_count:-0}" -gt 0 ]; then
             invariant_summary=$(python3 -c 'import json,sys; payload=json.load(sys.stdin); print("；".join([item for item in payload.get("messages") or [] if item][:2]))' <<< "$invariant_report" 2>/dev/null || echo "")
             notify_pm "[task-watcher] $task_id 检测到状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}"
-            emit_system_chat_event watcher "$task_id" "状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}" "$PM_SESSION" degraded notify
+            emit_system_chat_event watcher "$task_id" "状态一致性异常：${invariant_summary:-请检查 state_invariant_violations。}" "$PM_AGENT_ID" degraded notify
         fi
 
         # 已关闭任务不再触发自动流转，但仍需在文件变更后同步到任务看板 SQLite
@@ -3663,9 +3671,9 @@ run_task_watcher_loop() {
             if returned_agent=$(return_reserved_to_pool_if_timed_out "$task_dir" "$task_id" 2>/dev/null); then
                 notify_pm "[task-watcher] $task_id 预留后超时未 ack，已回退到 pooled。"
                 if [ -n "$returned_agent" ]; then
-                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已从 ${returned_agent} 回退到 pooled。" "$PM_SESSION" degraded notify
+                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已从 ${returned_agent} 回退到 pooled。" "$PM_AGENT_ID" degraded notify
                 else
-                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已回退到 pooled。" "$PM_SESSION" degraded notify
+                    emit_system_chat_event watcher "$task_id" "预留任务超时未 ack，已回退到 pooled。" "$PM_AGENT_ID" degraded notify
                 fi
                 sync_task_board "$task_dir" "reserved-timeout-returned"
                 current_status="pooled"
@@ -3688,7 +3696,7 @@ run_task_watcher_loop() {
                         instruction="$task_dir/instruction.md"
                         if [ -f "$instruction" ]; then
                             deliver_execution_instruction_and_record "$task_dir" "$task_id" "$agent_session" "请重新读取 ${task_dir}/instruction.md 并继续执行，完成后写 ack.json / result.json。" || true
-                            emit_system_chat_event nudge "$task_id" "任务超时未确认，已触发控制面重试。" "${agent_session:-$PM_SESSION}" degraded nudge
+                            emit_system_chat_event nudge "$task_id" "任务超时未确认，已触发控制面重试。" "${agent_session:-$PM_AGENT_ID}" degraded nudge
                             log "$task_id: dispatched 超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 且无 ack/无 Working，已执行控制面重试"
                             push_task_event "【任务重发】" "$task_id" "超过 ${DISPATCH_RESEND_AFTER_SECONDS}s 未确认，已对 ${agent_session:-unknown} 执行重试" "等待 agent 写入 ack.json"
                             echo "$now" > "$STATE_DIR/$resend_key"
@@ -3706,7 +3714,7 @@ run_task_watcher_loop() {
                             fi
                             if previous_agent=$(requeue_dispatched_task_to_pool "$task_dir" "$task_id" "$threshold_reason" 2>/dev/null); then
                                 notify_pm "[task-watcher] $task_id 连续 ${DISPATCH_FAILURE_THRESHOLD} 次控制面恢复失败，已从 ${previous_agent:-unknown} 自动回收到 pooled。"
-                                emit_system_chat_event watcher "$task_id" "控制面恢复失败，已自动回收到 pooled。" "$PM_SESSION" degraded notify
+                                emit_system_chat_event watcher "$task_id" "控制面恢复失败，已自动回收到 pooled。" "$PM_AGENT_ID" degraded notify
                                 sync_task_board "$task_dir" "control-plane-requeue"
                                 current_status="pooled"
                                 continue
@@ -3729,13 +3737,13 @@ run_task_watcher_loop() {
             if [ "$ack_state" = "invalid" ]; then
                 if ! is_notified "$ack_invalid_key"; then
                     notify_pm "[task-watcher] $task_id 的 ack.json 非法，请修正后重试。"
-                    emit_system_chat_event watcher "$task_id" "ack.json 非法：${ack_errors:-unknown}" "$PM_SESSION" degraded notify
+                    emit_system_chat_event watcher "$task_id" "ack.json 非法：${ack_errors:-unknown}" "$PM_AGENT_ID" degraded notify
                     mark_notified "$ack_invalid_key"
                 fi
             elif [ "$ack_current_round" = "false" ]; then
                 if ! is_notified "$ack_stale_key"; then
                     notify_pm "[task-watcher] $task_id 恢复后仍存在旧 ack.json，请使用 resume-task 或让 agent 重新 ack。"
-                    emit_system_chat_event watcher "$task_id" "恢复后检测到旧 ack.json，已忽略当前轮次前的 ack。" "$PM_SESSION" degraded notify
+                    emit_system_chat_event watcher "$task_id" "恢复后检测到旧 ack.json，已忽略当前轮次前的 ack。" "$PM_AGENT_ID" degraded notify
                     mark_notified "$ack_stale_key"
                 fi
             else
@@ -3749,7 +3757,7 @@ run_task_watcher_loop() {
                     if ! is_notified "$_ack_capacity_key"; then
                         notify_agent "$assigned_agent_for_ack" "任务 ${task_id} 已预留，但你已有 working 任务。请先完成当前主线，再重新确认本任务。"
                         notify_pm "[task-watcher] $task_id 收到 ack，但 ${assigned_agent_for_ack} 已达到 working_limit=${_ack_working_limit}，已暂缓进入 working。"
-                        emit_system_chat_event watcher "$task_id" "ack 暂缓：${assigned_agent_for_ack} 已达到 working_limit=${_ack_working_limit}。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "ack 暂缓：${assigned_agent_for_ack} 已达到 working_limit=${_ack_working_limit}。" "$PM_AGENT_ID" degraded notify
                         mark_notified "$_ack_capacity_key"
                     fi
                     continue
@@ -3795,13 +3803,13 @@ run_task_watcher_loop() {
                 if [ "$result_status" = "invalid" ]; then
                     if ! is_notified "$result_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 result.json 非法，请修正后重试。"
-                        emit_system_chat_event watcher "$task_id" "result.json 非法：${result_errors:-unknown}" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "result.json 非法：${result_errors:-unknown}" "$PM_AGENT_ID" degraded notify
                         mark_notified "$result_invalid_key"
                     fi
                 elif [ "$result_current_round" = "false" ]; then
                     if ! is_notified "$result_stale_key"; then
                         notify_pm "[task-watcher] $task_id 恢复后仍存在旧 result.json，当前已忽略，请使用 resume-task 规范恢复。"
-                        emit_system_chat_event watcher "$task_id" "恢复后检测到旧 result.json，watcher 已忽略旧轮次产物。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "恢复后检测到旧 result.json，watcher 已忽略旧轮次产物。" "$PM_AGENT_ID" degraded notify
                         mark_notified "$result_stale_key"
                     fi
                 elif [ "$result_status" = "success" ]; then
@@ -3827,9 +3835,9 @@ run_task_watcher_loop() {
                         fi
                         set_task_gate_state "$task_dir" "$next_status" "watcher observed result.json status=success" "$gate_state" "" "watcher" "$gate_decision_at" "$review_subgate" "$qa_subgate"
                         current_status="$next_status"
-                        if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
+                        if is_integration_owner_planning_task "$assigned_agent" "$task_level"; then
                             notify_pm "[task-watcher] $task_id 技术方案已完成，请查看 result.json 并整理飞书确认。"
-                            emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_SESSION" info notify
+                            emit_system_chat_event watcher "$task_id" "技术方案已完成，等待 PM 汇总确认。" "$PM_AGENT_ID" info notify
                         elif [ "$gate_state" = "quality_pending" ]; then
                             auto_dispatch_review "$task_dir" "$task_id" "$review_level" "$summary"
                             auto_dispatch_qa "$task_id"
@@ -3845,7 +3853,7 @@ run_task_watcher_loop() {
                             auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                         else
                             notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
-                            emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_SESSION" info notify
+                            emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_AGENT_ID" info notify
                             auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                         fi
                     fi
@@ -3853,7 +3861,7 @@ run_task_watcher_loop() {
                     gate_state=$(task_json_pick "$task_dir" merge_gate_state)
                     result_push_title="【实现完成待验收】"
                     result_push_next="请 PM 决定是否最终收口"
-                    if [ "$assigned_agent" = "arch-1" ] && { [ "$task_level" = "domain" ] || [ "$task_level" = "epic" ]; }; then
+                    if is_integration_owner_planning_task "$assigned_agent" "$task_level"; then
                         result_push_title="【技术方案完成】"
                         result_push_next="请 PM 汇总并确认后续动作"
                     elif [ "$gate_state" = "quality_pending" ]; then
@@ -3875,7 +3883,7 @@ run_task_watcher_loop() {
                         set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=blocked" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id 已被标记为 blocked，请查看 result.json 处理阻塞。"
-                        emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "任务进入 blocked，需 PM 处理。" "$PM_AGENT_ID" degraded notify
                     fi
                     if [ "$result_push_pending" -eq 1 ]; then
                         push_task_event_with_retry "$result_push_key" "$task_dir/result.json" "【任务阻塞】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 介入处理阻塞原因" || log "$task_id: blocked 事件飞书补推待重试"
@@ -3886,7 +3894,7 @@ run_task_watcher_loop() {
                         set_task_gate_state "$task_dir" "blocked" "watcher observed result.json status=failed" "blocked" "execution" "${assigned_agent:-executor}" "$gate_decision_at"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id 执行失败，请查看 result.json 处理。"
-                        emit_system_chat_event watcher "$task_id" "任务执行失败，需 PM 判断补修、重试或关闭。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "任务执行失败，需 PM 判断补修、重试或关闭。" "$PM_AGENT_ID" degraded notify
                     fi
                     if [ "$result_push_pending" -eq 1 ]; then
                         push_task_event_with_retry "$result_push_key" "$task_dir/result.json" "【任务失败】" "$task_id" "$(truncate_utf8 "$summary" 300)" "请 PM 判断补修、重试或关闭" || log "$task_id: failed 事件飞书补推待重试"
@@ -3894,7 +3902,7 @@ run_task_watcher_loop() {
                 else
                     if [ "$result_route_pending" -eq 1 ]; then
                         notify_pm "[task-watcher] $task_id 产生了 result.json（status=$result_status），请查看任务目录。"
-                        emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_SESSION" info notify
+                        emit_system_chat_event watcher "$task_id" "任务产出 result.json，需 PM 查看。" "$PM_AGENT_ID" info notify
                     fi
                 fi
 
@@ -3924,9 +3932,9 @@ run_task_watcher_loop() {
                         fi
                         notify_pm "[task-watcher] $task_id ack 后 ${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800} 秒仍无实际进展，已回退到 pooled。"
                         if [ -n "$returned_agent" ]; then
-                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已从 ${returned_agent} 回退到 pooled。" "$PM_SESSION" degraded notify
+                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已从 ${returned_agent} 回退到 pooled。" "$PM_AGENT_ID" degraded notify
                         else
-                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已回退到 pooled。" "$PM_SESSION" degraded notify
+                            emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已回退到 pooled。" "$PM_AGENT_ID" degraded notify
                         fi
                         task_clear_working_timeout_state "$task_id"
                         sync_task_board "$task_dir" "working-no-progress-requeued"
@@ -3942,7 +3950,7 @@ run_task_watcher_loop() {
                 if ! is_notified "$working_timeout_key" || ! is_notified "$working_timeout_push_key"; then
                     if ! is_notified "$working_timeout_key"; then
                         notify_pm "[task-watcher] $task_id 持续 working 超时，请 PM 介入检查。"
-                        emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "任务 working 超时，需 PM 介入。" "$PM_AGENT_ID" degraded notify
                         log "$task_id: working 超时已通知 PM 介入，等待飞书送达"
                         mark_notified "$working_timeout_key"
                         mark_notified "$working_grace_key"
@@ -3978,7 +3986,7 @@ run_task_watcher_loop() {
                     review_invalid_key="${task_id}_artifact_invalid_review"
                     if ! is_notified "$review_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 review 机器产物非法，请修正 review.json 后重试。"
-                        emit_system_chat_event watcher "$task_id" "review.json 非法或缺关键字段，已停止自动推进。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "review.json 非法或缺关键字段，已停止自动推进。" "$PM_AGENT_ID" degraded notify
                         mark_notified "$review_invalid_key"
                     fi
                 elif [ "$state" = "pass" ]; then
@@ -3997,7 +4005,7 @@ run_task_watcher_loop() {
                                     set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel review pass with qa already passed" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "__KEEP__"
                                     current_status="ready_for_merge"
                                     notify_pm "[task-watcher] $task_id 审查与 QA 已通过，请查看任务目录并决定是否最终收口。"
-                                    emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                    emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_AGENT_ID" info notify
                                     log "$task_id: 并行质量闸门已全部完成，进入 PM 收口"
                                 else
                                     set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel review pass and waiting for qa" "quality_pending" "" "review" "$gate_decision_at" "approved" "__KEEP__"
@@ -4038,17 +4046,17 @@ run_task_watcher_loop() {
                                 set_task_gate_state "$task_dir" "blocked" "watcher observed review pass confirming verification fail" "blocked" "verification" "review" "$gate_decision_at" "approved" "skipped"
                                 current_status="blocked"
                                 notify_pm "[task-watcher] $task_id 复验结论未通过且审查已确认，请回退开发补修，不会自动收口。"
-                                emit_system_chat_event watcher "$task_id" "复验结论未通过且审查已确认，任务已回到 blocked，需继续开发补修。" "$PM_SESSION" degraded notify
+                                emit_system_chat_event watcher "$task_id" "复验结论未通过且审查已确认，任务已回到 blocked，需继续开发补修。" "$PM_AGENT_ID" degraded notify
                             else
                                 set_task_gate_state "$task_dir" "" "watcher observed review pass without qa" "pm_acceptance_pending" "" "review" "$gate_decision_at" "approved" "skipped"
                                 if [ "$auto_close_policy" = "review_pass_only" ]; then
                                     if ! auto_close_review_only_task "$task_dir" "$task_id"; then
                                         notify_pm "[task-watcher] $task_id 审查已通过且配置为自动收口，但 close-task 失败，请检查任务目录。"
-                                        emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_SESSION" degraded notify
+                                        emit_system_chat_event watcher "$task_id" "审查通过自动收口失败。" "$PM_AGENT_ID" degraded notify
                                     fi
                                 else
                                     notify_pm "[task-watcher] $task_id 审查已通过且无需 QA，请查看任务目录并决定是否收口。"
-                                    emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                    emit_system_chat_event watcher "$task_id" "审查通过且无需 QA，等待 PM 最终验收。" "$PM_AGENT_ID" info notify
                                 fi
                             fi
                         fi
@@ -4065,7 +4073,7 @@ run_task_watcher_loop() {
                         set_task_gate_state "$task_dir" "blocked" "watcher observed review fail" "review_rejected" "review" "review" "$gate_decision_at" "rejected" "__KEEP__"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id 审查未通过，请查看 review 产物并仲裁。"
-                        emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "审查未通过，需 PM 仲裁。" "$PM_AGENT_ID" degraded notify
                     fi
                     if [ "$review_push_pending" -eq 1 ]; then
                         push_task_event_with_signature_retry "$review_push_key" "$review_sig" "【审查未通过】" "$task_id" "$(truncate_utf8 "$(first_review_conclusion "$task_dir")" 300)" "请 PM 仲裁并决定是否补修" || log "$task_id: review fail 事件飞书补推待重试"
@@ -4098,7 +4106,7 @@ run_task_watcher_loop() {
                     verify_invalid_key="${task_id}_artifact_invalid_verify"
                     if ! is_notified "$verify_invalid_key"; then
                         notify_pm "[task-watcher] $task_id 的 verify.json 非法，请修正后重试。"
-                        emit_system_chat_event watcher "$task_id" "verify.json 非法或缺关键字段，已停止自动推进。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "verify.json 非法或缺关键字段，已停止自动推进。" "$PM_AGENT_ID" degraded notify
                         mark_notified "$verify_invalid_key"
                     fi
                 elif [ "$vstate" = "pass" ]; then
@@ -4117,7 +4125,7 @@ run_task_watcher_loop() {
                             if [ "$current_review_gate_state" = "approved" ]; then
                                 set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel qa pass with review already approved" "pm_acceptance_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
                                 notify_pm "[task-watcher] $task_id 审查与 QA 已通过，请查看任务目录并决定是否最终收口。"
-                                emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                                emit_system_chat_event watcher "$task_id" "审查与 QA 已全部通过，等待 PM 最终验收。" "$PM_AGENT_ID" info notify
                                 log "$task_id: QA 通过，并行质量闸门已全部完成"
                             else
                                 set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed parallel qa pass and waiting for review" "quality_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
@@ -4129,7 +4137,7 @@ run_task_watcher_loop() {
                         else
                             set_task_gate_state "$task_dir" "ready_for_merge" "watcher observed qa verify pass" "pm_acceptance_pending" "" "qa" "$gate_decision_at" "__KEEP__" "passed"
                             notify_pm "[task-watcher] $task_id QA 已通过，请查看任务目录并决定是否最终收口。"
-                            emit_system_chat_event watcher "$task_id" "QA 已通过，等待 PM 最终验收。" "$PM_SESSION" info notify
+                            emit_system_chat_event watcher "$task_id" "QA 已通过，等待 PM 最终验收。" "$PM_AGENT_ID" info notify
                             log "$task_id: QA 通过，进入 PM 收口"
                         fi
                     fi
@@ -4146,10 +4154,12 @@ run_task_watcher_loop() {
                     clear_qa_queue_state_for_task "$task_id"
                     if [ "$verify_route_pending" -eq 1 ]; then
                         gate_decision_at=$(now_iso)
-                        set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "qa-1" "$gate_decision_at" "__KEEP__" "failed"
+                        qa_actor=$(artifact_pick verify "$task_dir" agent 2>/dev/null || true)
+                        qa_actor="${qa_actor:-$(default_tester_agent "$task_dir")}"
+                        set_task_gate_state "$task_dir" "blocked" "watcher observed qa verify fail" "qa_failed" "qa" "${qa_actor:-qa}" "$gate_decision_at" "__KEEP__" "failed"
                         current_status="blocked"
                         notify_pm "[task-watcher] $task_id QA 未通过，请查看 verify.json 并仲裁。"
-                        emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_SESSION" degraded notify
+                        emit_system_chat_event watcher "$task_id" "QA 未通过，需 PM 仲裁。" "$PM_AGENT_ID" degraded notify
                     fi
                     if [ "$verify_push_pending" -eq 1 ]; then
                         push_task_event_with_retry "$verify_push_key" "$task_dir/verify.json" "【QA未通过】" "$task_id" "$(truncate_utf8 "$vsummary" 300)" "请 PM 仲裁并决定修复、回退或重新验证" || log "$task_id: QA fail 事件飞书补推待重试"

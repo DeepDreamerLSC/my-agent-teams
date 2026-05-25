@@ -4,10 +4,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+WORKSPACE_ROOT = SCRIPT_DIR.parent
+sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
+from agent_config import FALLBACK_AGENTS, load_config, root_pm  # type: ignore
+
+
+def pm_aliases(config_path: Path) -> set[str]:
+    config = load_config(config_path)
+    aliases = {root_pm(config)}
+    for agent_id, payload in (config.get('agents') or {}).items():
+        if isinstance(payload, dict) and str(payload.get('role') or '').strip().lower() == 'pm':
+            aliases.add(str(agent_id).strip())
+    for agent_id, payload in FALLBACK_AGENTS.items():
+        if str(payload.get('role') or '').strip().lower() == 'pm':
+            aliases.add(str(agent_id).strip())
+    return {item for item in aliases if item}
 
 
 def parse_dt(value: str | None) -> datetime | None:
@@ -50,7 +68,7 @@ def load_rows(chat_root: Path, cutoff: datetime) -> list[dict[str, Any]]:
     return rows
 
 
-def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize(rows: list[dict[str, Any]], pm_ids: set[str] | None = None) -> dict[str, Any]:
     counters = Counter()
     type_counter = Counter()
     severity_counter = Counter()
@@ -66,6 +84,9 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
     task_announce_rows = []
     nudge_by_task = Counter()
+
+    pm_ids = pm_ids or set()
+    pm_mentions = {f'@{agent_id}' for agent_id in pm_ids}
 
     for row in rows:
         msg = str(row.get('msg') or '')
@@ -88,7 +109,7 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
             counters['decision_count'] += 1
         if row_type == 'task_done':
             counters['task_done_count'] += 1
-        if '@pm-chief' in msg or row.get('to') == 'pm-chief':
+        if row.get('to') in pm_ids or any(marker in msg for marker in pm_mentions):
             counters['pm_mention_count'] += 1
         if row.get('priority') == 'critical':
             counters['critical_message_count'] += 1
@@ -138,14 +159,16 @@ def summarize(rows: list[dict[str, Any]]) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description='Collect Chat Hub validation metrics.')
     parser.add_argument('--chat-root', default=str(Path.home() / 'Desktop/work/my-agent-teams/chat'))
+    parser.add_argument('--config', default=str(WORKSPACE_ROOT / 'config.json'))
     parser.add_argument('--days', type=int, default=1)
     parser.add_argument('--json', action='store_true')
     args = parser.parse_args()
 
     chat_root = Path(args.chat_root).expanduser().resolve()
+    config_path = Path(args.config).expanduser().resolve()
     cutoff = datetime.now().astimezone() - timedelta(days=max(1, args.days))
     rows = load_rows(chat_root, cutoff)
-    payload = summarize(rows)
+    payload = summarize(rows, pm_aliases(config_path))
     payload['chat_root'] = str(chat_root)
     payload['days'] = max(1, args.days)
     payload['generated_at'] = datetime.now().astimezone().isoformat(timespec='seconds')

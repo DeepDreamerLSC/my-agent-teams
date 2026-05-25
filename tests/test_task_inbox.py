@@ -156,6 +156,83 @@ class TaskInboxTests(unittest.TestCase):
             self.assertEqual(items[0]['reason_type'], 'pool_starvation')
             self.assertIn('当前可认领任务为 0', items[0]['summary'])
 
+    def test_items_without_owner_use_configured_root_pm(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({
+                'orchestration': {'root_pm': 'lead-pm'},
+                'agents': {
+                    'lead-pm': {'role': 'pm'},
+                    'dev-a': {'role': 'fullstack_dev'},
+                },
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            task_dir = root / 'ownerless-timeout-task'
+            task_dir.mkdir()
+            (task_dir / 'task.json').write_text(json.dumps({
+                'id': 'ownerless-timeout-task',
+                'title': '无 owner 的超时任务',
+                'status': 'dispatched',
+                'priority': 'high',
+                'updated_at': '2026-05-18T10:00:00+08:00',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            now = datetime.fromisoformat('2026-05-18T10:20:00+08:00')
+            root_pm_id = task_inbox.configured_root_pm(config_path)
+            items = task_inbox.task_items(task_dir, now, dispatch_timeout_s=300, working_timeout_s=7200, root_pm_id=root_pm_id)
+
+        timeout_items = [item for item in items if item['reason_type'] == 'timeout']
+        self.assertEqual(timeout_items[0]['owner'], 'lead-pm')
+
+    def test_pool_starvation_item_uses_configured_root_pm(self):
+        task_inbox = load_task_inbox_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tasks_root = root / 'tasks'
+            tasks_root.mkdir()
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({
+                'orchestration': {'root_pm': 'lead-pm'},
+                'agents': {
+                    'lead-pm': {'role': 'pm'},
+                    'builder-a': {'role': 'fullstack_dev'},
+                    'builder-b': {'role': 'fullstack_dev'},
+                },
+                'task_pool': {'default_claim_max_concurrency': 1},
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            dep_dir = tasks_root / 'dep-task'
+            dep_dir.mkdir()
+            (dep_dir / 'task.json').write_text(json.dumps({
+                'id': 'dep-task',
+                'title': '前置任务',
+                'status': 'working',
+                'assigned_agent': 'builder-a',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            pooled_dir = tasks_root / 'pooled-waiting'
+            pooled_dir.mkdir()
+            (pooled_dir / 'task.json').write_text(json.dumps({
+                'id': 'pooled-waiting',
+                'title': '等待依赖的池任务',
+                'status': 'pooled',
+                'priority': 'high',
+                'claim_scope': ['builder-b'],
+                'depends_on': ['dep-task'],
+                'dependency_policy': 'done_only',
+                'pool_entered_at': '2026-05-09T10:00:00+08:00',
+                'task_type': 'development',
+                'domain': 'development',
+                'write_scope': ['/tmp/pooled-waiting'],
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+            now = datetime.fromisoformat('2026-05-09T11:00:00+08:00')
+            items = task_inbox.pool_starvation_items(tasks_root, config_path, now)
+
+        self.assertTrue(items)
+        self.assertEqual(items[0]['owner'], 'lead-pm')
+
 class TaskInboxStaleReviewTests(unittest.TestCase):
     def test_ready_for_merge_with_stale_rejected_review_is_not_pm_blocked(self):
         task_inbox = load_task_inbox_module()

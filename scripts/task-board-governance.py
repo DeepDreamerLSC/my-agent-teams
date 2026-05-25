@@ -13,9 +13,14 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB_PATH = WORKSPACE_ROOT / '.omx' / 'task-board' / 'task-board.sqlite3'
 DEFAULT_TASKS_ROOT = WORKSPACE_ROOT / 'tasks'
 DEFAULT_PM_INBOX_OUTPUT = WORKSPACE_ROOT / '.omx' / 'task-board' / 'pm-inbox-governance.json'
+DEFAULT_CONFIG_FILE = WORKSPACE_ROOT / 'config.json'
 DEFAULT_POOLED_SLA_MINUTES = 60
 SKIP_REVIEW_WAIT_ALERT_SECONDS = 3600
 TERMINAL_STATUSES = {'cancelled', 'failed', 'timeout'}
+
+import sys
+sys.path.insert(0, str(WORKSPACE_ROOT / 'scripts' / 'lib'))
+from agent_config import load_config, root_pm  # type: ignore
 
 
 def parse_iso(value: str | None) -> datetime | None:
@@ -47,7 +52,11 @@ def load_task_json(path: str | None) -> dict[str, Any]:
         return {}
 
 
-def make_item(*, task: sqlite3.Row, reason_type: str, severity: str, summary: str, recommended_action: str, now: datetime) -> dict[str, Any]:
+def configured_root_pm(config_path: Path = DEFAULT_CONFIG_FILE) -> str:
+    return root_pm(load_config(config_path))
+
+
+def make_item(*, task: sqlite3.Row, reason_type: str, severity: str, summary: str, recommended_action: str, now: datetime, root_pm_id: str | None = None) -> dict[str, Any]:
     task_id = str(task['task_id'])
     current_status_at = parse_iso(str(task['current_status_at'] or ''))
     updated_at = parse_iso(str(task['updated_at'] or ''))
@@ -63,7 +72,7 @@ def make_item(*, task: sqlite3.Row, reason_type: str, severity: str, summary: st
         'merge_gate_state': str(task['merge_gate_state'] or ''),
         'summary': summary,
         'recommended_action': recommended_action,
-        'owner': str(task['owner_pm'] or 'pm-chief'),
+        'owner': str(task['owner_pm'] or root_pm_id or configured_root_pm()),
         'first_seen_at': anchor.isoformat(timespec='seconds') if anchor else '',
         'last_seen_at': anchor.isoformat(timespec='seconds') if anchor else '',
         'age_minutes': age_minutes(anchor, now),
@@ -75,7 +84,7 @@ def make_item(*, task: sqlite3.Row, reason_type: str, severity: str, summary: st
     }
 
 
-def find_invalid_timeline_items(conn: sqlite3.Connection, now: datetime) -> list[dict[str, Any]]:
+def find_invalid_timeline_items(conn: sqlite3.Connection, now: datetime, root_pm_id: str | None = None) -> list[dict[str, Any]]:
     rows = conn.execute(
         '''
         SELECT t.*, d.result_to_review_seconds
@@ -121,11 +130,12 @@ def find_invalid_timeline_items(conn: sqlite3.Connection, now: datetime) -> list
                 summary='；'.join(issues),
                 recommended_action='核对阶段时间线并修正 task.json / 同步数据，避免甘特图误导',
                 now=now,
+                root_pm_id=root_pm_id,
             ))
     return items
 
 
-def find_stale_pooled_items(conn: sqlite3.Connection, now: datetime) -> list[dict[str, Any]]:
+def find_stale_pooled_items(conn: sqlite3.Connection, now: datetime, root_pm_id: str | None = None) -> list[dict[str, Any]]:
     rows = conn.execute("SELECT * FROM tasks WHERE current_status = 'pooled' ORDER BY task_id ASC").fetchall()
     items: list[dict[str, Any]] = []
     for row in rows:
@@ -144,11 +154,12 @@ def find_stale_pooled_items(conn: sqlite3.Connection, now: datetime) -> list[dic
             summary=f'pooled 等待 {age} 分钟，超过 SLA {timeout_minutes} 分钟',
             recommended_action='请 PM 判断转派、拆小任务或调整优先级',
             now=now,
+            root_pm_id=root_pm_id,
         ))
     return items
 
 
-def find_synthetic_backfill_items(conn: sqlite3.Connection, now: datetime) -> list[dict[str, Any]]:
+def find_synthetic_backfill_items(conn: sqlite3.Connection, now: datetime, root_pm_id: str | None = None) -> list[dict[str, Any]]:
     rows = conn.execute(
         '''
         SELECT *
@@ -172,6 +183,7 @@ def find_synthetic_backfill_items(conn: sqlite3.Connection, now: datetime) -> li
             summary=summary,
             recommended_action='回填或确认终态时间锚点，避免历史任务横轴被错误拉长',
             now=now,
+            root_pm_id=root_pm_id,
         ))
     return items
 
@@ -196,16 +208,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description='Task board data governance checks')
     parser.add_argument('--db-path', default=str(DEFAULT_DB_PATH))
     parser.add_argument('--pm-inbox-output', default=str(DEFAULT_PM_INBOX_OUTPUT))
+    parser.add_argument('--config', default=str(DEFAULT_CONFIG_FILE))
     parser.add_argument('--json', action='store_true')
     args = parser.parse_args()
 
     conn = sqlite3.connect(Path(args.db_path).expanduser())
     conn.row_factory = sqlite3.Row
     now = datetime.now().astimezone()
+    root_pm_id = configured_root_pm(Path(args.config).expanduser())
     items = [
-        *find_invalid_timeline_items(conn, now),
-        *find_stale_pooled_items(conn, now),
-        *find_synthetic_backfill_items(conn, now),
+        *find_invalid_timeline_items(conn, now, root_pm_id=root_pm_id),
+        *find_stale_pooled_items(conn, now, root_pm_id=root_pm_id),
+        *find_synthetic_backfill_items(conn, now, root_pm_id=root_pm_id),
     ]
     items.sort(key=sort_key)
     write_pm_inbox(items, Path(args.pm_inbox_output).expanduser())

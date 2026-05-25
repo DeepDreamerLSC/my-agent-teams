@@ -6,6 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="${FEISHU_CONFIG_PATH:-$WORKSPACE_ROOT/config.local.json}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 REPORTS_DIR="$WORKSPACE_ROOT/reports"
 DASHBOARD_URL="${REPORT_DASHBOARD_URL:-http://127.0.0.1:5001/api/gantt}"
 
@@ -73,9 +75,29 @@ python3 "$SCRIPT_DIR/_gen_report.py" "$MODE" "$TYPE" "$LABEL" "$TODAY" "$NOW" "$
 
 echo "[report] 已生成: $OUTFILE"
 
-DONE_COUNT=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); core={'pm-chief','arch-1','dev-1','dev-2','qa-1','review-1'}; items=[i for i in d.get('items',[]) if i.get('assigned_agent') in core]; print(sum(1 for i in items if i.get('board_status')=='done'))" "$DATA_FILE")
-TOTAL_COUNT=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); core={'pm-chief','arch-1','dev-1','dev-2','qa-1','review-1'}; print(sum(1 for i in d.get('items',[]) if i.get('assigned_agent') in core))" "$DATA_FILE")
-BLOCKED=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); core={'pm-chief','arch-1','dev-1','dev-2','qa-1','review-1'}; print(sum(1 for i in d.get('items',[]) if i.get('assigned_agent') in core and i.get('board_status')=='blocked'))" "$DATA_FILE")
+SUMMARY_COUNTS=$(python3 - "$DATA_FILE" "$CONFIG_PATH" "$AGENT_CONFIG_PY" <<'PYSUMMARY_COUNTS'
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+data_path = Path(sys.argv[1])
+config_path = Path(sys.argv[2])
+agent_config_path = Path(sys.argv[3])
+spec = importlib.util.spec_from_file_location("agent_config", agent_config_path)
+agent_config = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(agent_config)
+config = agent_config.load_config(config_path)
+core = set(agent_config.agent_metadata(config))
+data = json.loads(data_path.read_text(encoding="utf-8"))
+items = [item for item in data.get("items", []) if item.get("assigned_agent") in core]
+done = sum(1 for item in items if item.get("board_status") == "done")
+blocked = sum(1 for item in items if item.get("board_status") == "blocked")
+print(f"{done}\t{len(items)}\t{blocked}")
+PYSUMMARY_COUNTS
+)
+IFS=$'\t' read -r DONE_COUNT TOTAL_COUNT BLOCKED <<< "$SUMMARY_COUNTS"
 
 DOC_URL=""
 if command -v lark-cli >/dev/null 2>&1; then

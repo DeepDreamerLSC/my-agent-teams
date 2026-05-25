@@ -48,6 +48,7 @@ config_path = Path(sys.argv[5])
 workspace_root = Path(sys.argv[6])
 script_dir = Path(sys.argv[7])
 sys.path.insert(0, str(script_dir / 'lib'))
+from agent_config import default_claim_scope, root_pm  # type: ignore
 from task_pool_rules import pool_gate_blockers  # type: ignore
 
 task_path = task_dir / 'task.json'
@@ -59,7 +60,7 @@ ROLE_WIP_KEYS = {
     'reviewer': 'reviewer',
     'qa': 'qa',
     'architect': 'architect',
-    'pm': 'pm-chief',
+    'pm': 'pm',
 }
 
 status = str(task.get('status') or '')
@@ -76,20 +77,7 @@ target_environment = str(task.get('target_environment') or '').strip().lower()
 if task_type in {'deployment', 'integration'} or execution_mode == 'deploy' or target_environment == 'prod':
     raise SystemExit('deployment/integration/prod tasks must not be claimed from the general pool')
 
-claim_scope = [str(item).strip() for item in (task.get('claim_scope') or []) if str(item).strip()]
-if not claim_scope:
-    domain = str(task.get('domain') or '').strip().lower()
-    for candidate_agent_id, payload in (config.get('agents') or {}).items():
-        role = str((payload or {}).get('role') or '').strip().lower()
-        if task_type in {'development', 'investigation'}:
-            if role == 'fullstack_dev' or candidate_agent_id.startswith('dev-'):
-                claim_scope.append(candidate_agent_id)
-        elif task_type == 'verification' or domain == 'quality':
-            if role == 'qa' or candidate_agent_id.startswith('qa-'):
-                claim_scope.append(candidate_agent_id)
-        elif task_type == 'design':
-            if role == 'architect' or candidate_agent_id == 'arch-1':
-                claim_scope.append(candidate_agent_id)
+claim_scope = default_claim_scope(task, config)
 if claim_scope and agent_id not in claim_scope:
     raise SystemExit(f'agent {agent_id} is not in claim_scope: {claim_scope}')
 
@@ -106,6 +94,7 @@ pool_config = config.get('task_pool') or {}
 wip_limits = config.get('wip_limits') or {}
 agent_role = str(((config.get('agents') or {}).get(agent_id) or {}).get('role') or '').strip().lower()
 wip_key = ROLE_WIP_KEYS.get(agent_role)
+root_pm_id = root_pm(config)
 
 def project_roots(payload):
     project = str(payload.get('project') or '').strip()
@@ -192,6 +181,8 @@ def assert_capacity_and_conflicts(current_task):
     role_limit = wip_limits.get(agent_id)
     if role_limit in (None, '') and wip_key:
         role_limit = wip_limits.get(wip_key)
+    if role_limit in (None, '') and agent_role == 'pm' and root_pm_id:
+        role_limit = wip_limits.get(root_pm_id)
     working_limit = max(1, int_value(pool_config.get('default_working_limit'), 1))
     reserved_limit = max(1, int_value(pool_config.get('default_reserved_limit'), 1))
     if role_limit not in (None, ''):

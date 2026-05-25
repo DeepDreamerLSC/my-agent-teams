@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
 BOARD_SYNC_SCRIPT="${BOARD_SYNC_SCRIPT:-$WORKSPACE_ROOT/scripts/task-board-sync.py}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+LIB_DIR="${LIB_DIR:-$SCRIPT_DIR/lib}"
 
 usage() {
   cat <<'EOF'
@@ -26,7 +28,7 @@ if [ -z "$TASK_DIR" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$TASKS_ROOT" "$BOARD_SYNC_SCRIPT" <<'PY'
+python3 - "$TASK_DIR" "$TASKS_ROOT" "$BOARD_SYNC_SCRIPT" "$CONFIG_PATH" "$LIB_DIR" <<'PY'
 import json
 import os
 import shutil
@@ -51,6 +53,12 @@ def atomic_write(path: Path, payload: dict) -> None:
 task_dir = Path(sys.argv[1]).expanduser().resolve()
 tasks_root = Path(sys.argv[2]).expanduser().resolve()
 board_sync_script = Path(sys.argv[3]).expanduser().resolve()
+config_path = Path(sys.argv[4]).expanduser().resolve()
+lib_dir = Path(sys.argv[5]).expanduser().resolve()
+sys.path.insert(0, str(lib_dir))
+from agent_config import load_config, root_pm  # type: ignore
+
+root_pm_id = root_pm(load_config(config_path))
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
 if not task_path.exists():
@@ -74,7 +82,7 @@ if archive_dir.exists():
 old_status = status
 task['status'] = 'archived'
 task['updated_at'] = now_iso
-task['last_gate_actor'] = task.get('last_gate_actor') or 'pm-chief'
+task['last_gate_actor'] = task.get('last_gate_actor') or root_pm_id
 task['last_gate_decision_at'] = task.get('last_gate_decision_at') or now_iso
 atomic_write(task_path, task)
 with transitions_path.open('a', encoding='utf-8') as fp:

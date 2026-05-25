@@ -8,6 +8,8 @@ KEEP_RESULT_HISTORY=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+LIB_DIR="${LIB_DIR:-$SCRIPT_DIR/lib}"
 
 usage() {
   cat <<'EOF'
@@ -31,7 +33,7 @@ if [ -z "$TASK_DIR" ] || [ -z "$AGENT_ID" ] || [ -z "$REASON" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$STATE_DIR" "$KEEP_RESULT_HISTORY" <<'PY'
+python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$STATE_DIR" "$KEEP_RESULT_HISTORY" "$CONFIG_PATH" "$LIB_DIR" <<'PY'
 import json
 import os
 import shutil
@@ -57,6 +59,13 @@ agent_id = sys.argv[2]
 reason = sys.argv[3].strip()
 state_dir = Path(sys.argv[4]).expanduser().resolve()
 keep_result_history = sys.argv[5] == '1'
+config_path = Path(sys.argv[6]).expanduser().resolve()
+lib_dir = Path(sys.argv[7]).expanduser().resolve()
+sys.path.insert(0, str(lib_dir))
+from agent_config import load_config, root_pm  # type: ignore
+
+config = load_config(config_path)
+root_pm_id = root_pm(config)
 
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
@@ -77,7 +86,7 @@ history_dir.mkdir(parents=True, exist_ok=True)
 resume_record = {
     'task_id': str(task.get('id') or task_dir.name),
     'resumed_at': now_iso,
-    'resumed_by': 'pm-chief',
+    'resumed_by': root_pm_id,
     'assigned_agent': agent_id,
     'reason': reason,
     'archived_files': [],
@@ -145,12 +154,12 @@ task['assigned_agent'] = agent_id
 task['updated_at'] = now_iso
 task['merge_gate_state'] = None
 task['rework_reason'] = reason
-task['last_gate_actor'] = 'pm-chief'
+task['last_gate_actor'] = root_pm_id
 task['last_gate_decision_at'] = now_iso
 task['resume_round'] = resume_round
 task['last_resumed_at'] = now_iso
-task['last_resumed_by'] = 'pm-chief'
-task['lease_owner'] = task.get('owner_pm') or 'pm-chief'
+task['last_resumed_by'] = root_pm_id
+task['lease_owner'] = task.get('owner_pm') or root_pm_id
 task['lease_acquired_at'] = now_iso
 task['lease_expires_at'] = now_iso
 task['dispatch_delivery_attempt_count'] = 0
@@ -173,7 +182,7 @@ with transitions_path.open('a', encoding='utf-8') as fp:
         'to': 'dispatched',
         'at': now_iso,
         'reason': f'resume-task: {reason}',
-        'actor': 'pm-chief',
+        'actor': root_pm_id,
     }, ensure_ascii=False) + '\n')
 
 print(json.dumps({'task_id': resume_record['task_id'], 'resume_round': resume_round, 'archived_files': resume_record['archived_files']}, ensure_ascii=False))

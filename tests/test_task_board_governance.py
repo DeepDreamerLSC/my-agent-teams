@@ -110,6 +110,39 @@ class GovernanceScriptTests(unittest.TestCase):
         self.assertEqual(items[0]['reason_type'], 'invalid_timeline')
         self.assertIn('skip review', items[0]['summary'])
 
+    def test_ownerless_governance_item_uses_configured_root_pm(self):
+        mod = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            db_path = root / 'task-board.sqlite3'
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({
+                'orchestration': {'root_pm': 'lead-pm'},
+                'agents': {'lead-pm': {'role': 'pm'}},
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            conn = connect_db(db_path, initialize=True)
+            with conn:
+                upsert_task(conn, _task_record(
+                    task_id='task-ownerless',
+                    owner_pm='',
+                    review_required=0,
+                    review_level='skip',
+                    review_completed_at='2026-05-04T03:00:00+08:00',
+                ))
+                conn.execute(
+                    '''
+                    INSERT OR REPLACE INTO task_stage_durations (
+                        task_id, result_to_review_seconds, updated_at
+                    ) VALUES (?, ?, ?)
+                    ''',
+                    ('task-ownerless', 7200, '2026-05-04T05:00:00+08:00'),
+                )
+            root_pm_id = mod.configured_root_pm(config_path)
+            items = mod.find_invalid_timeline_items(conn, mod.datetime.now().astimezone(), root_pm_id=root_pm_id)
+            conn.close()
+
+        self.assertEqual(items[0]['owner'], 'lead-pm')
+
 
 if __name__ == '__main__':
     unittest.main()

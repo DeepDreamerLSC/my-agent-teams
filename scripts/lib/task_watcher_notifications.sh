@@ -2,13 +2,13 @@
 # task_watcher_notifications.sh - task-watcher 通知与系统聊天事件模块。
 #
 # 本文件由 scripts/task-watcher.sh source，不单独执行。
-# 依赖主脚本已定义的变量/函数：PM_SESSION、PUSH_SCRIPT、USER_ID、
+# 依赖主脚本已定义的变量/函数：PM_AGENT_ID、PUSH_SCRIPT、USER_ID、
 # SEND_CHAT_SCRIPT、TASKS_ROOT、send_session_message、log、truncate_utf8、
 # is_notified、mark_notified。
 
 notify_pm() {
     local msg="$1"
-    send_session_message "$PM_SESSION" "$msg"
+    send_session_message "$PM_AGENT_ID" "$msg"
 }
 
 notify_agent() {
@@ -98,7 +98,7 @@ emit_system_chat_event() {
         --source-type system \
         --source-name "$source_name" >/dev/null 2>&1 || return 1
 
-    if [ "$channel" = "watcher" ] && [ "$to_actor" = "$PM_SESSION" ] && [ "$severity" != "info" ]; then
+    if [ "$channel" = "watcher" ] && [ "$to_actor" = "$PM_AGENT_ID" ] && [ "$severity" != "info" ]; then
         TASKS_ROOT="$TASKS_ROOT" "$SEND_CHAT_SCRIPT" task "$task_id" "$msg" \
             --to "$to_actor" \
             --type "$event_type" \

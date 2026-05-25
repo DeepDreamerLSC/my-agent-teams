@@ -13,6 +13,7 @@ WORKSPACE_ROOT = SCRIPT_DIR.parent
 DEFAULT_GOVERNANCE_FILE = WORKSPACE_ROOT / '.omx' / 'task-board' / 'pm-inbox-governance.json'
 DEFAULT_CONFIG_FILE = WORKSPACE_ROOT / 'config.json'
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
+from agent_config import load_config, root_pm  # type: ignore
 import task_artifacts  # type: ignore
 
 SEVERITY_RANK = {'L3': 3, 'L2': 2, 'L1': 1}
@@ -84,7 +85,11 @@ def recommended_action(reason_type: str, gate: str, status: str) -> str:
     return '查看任务详情并决定下一步'
 
 
-def make_global_item(reason_type: str, severity: str, summary: str, now: datetime, *, priority: str = 'medium', links: dict | None = None, age_minutes_value: int = 0) -> dict:
+def configured_root_pm(config_path: Path = DEFAULT_CONFIG_FILE) -> str:
+    return root_pm(load_config(config_path))
+
+
+def make_global_item(reason_type: str, severity: str, summary: str, now: datetime, *, priority: str = 'medium', links: dict | None = None, age_minutes_value: int = 0, owner: str | None = None) -> dict:
     first_seen = now.isoformat(timespec='seconds')
     return {
         'item_id': f'__global__:{reason_type}',
@@ -97,7 +102,7 @@ def make_global_item(reason_type: str, severity: str, summary: str, now: datetim
         'merge_gate_state': '',
         'summary': summary,
         'recommended_action': recommended_action(reason_type, '', ''),
-        'owner': 'pm-chief',
+        'owner': owner or configured_root_pm(),
         'first_seen_at': first_seen,
         'last_seen_at': first_seen,
         'age_minutes': age_minutes_value,
@@ -105,7 +110,7 @@ def make_global_item(reason_type: str, severity: str, summary: str, now: datetim
     }
 
 
-def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now: datetime, *, anchor_dt: datetime | None = None) -> dict:
+def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now: datetime, *, anchor_dt: datetime | None = None, root_pm_id: str | None = None) -> dict:
     task = task_artifacts.parse_task(task_dir)['task']
     task_id = str(task.get('id') or task_dir.name)
     title = str(task.get('title') or task_id)
@@ -125,7 +130,7 @@ def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now
         'merge_gate_state': gate,
         'summary': summary,
         'recommended_action': recommended_action(reason_type, gate, status),
-        'owner': str(task.get('owner_pm') or 'pm-chief'),
+        'owner': str(task.get('owner_pm') or root_pm_id or configured_root_pm()),
         'first_seen_at': effective_anchor.isoformat(timespec='seconds') if effective_anchor else '',
         'last_seen_at': effective_anchor.isoformat(timespec='seconds') if effective_anchor else '',
         'age_minutes': age_minutes(effective_anchor, now),
@@ -136,7 +141,7 @@ def make_item(task_dir: Path, reason_type: str, severity: str, summary: str, now
     }
 
 
-def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_timeout_s: int) -> list[dict]:
+def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_timeout_s: int, root_pm_id: str | None = None) -> list[dict]:
     task_payload = task_artifacts.parse_task(task_dir)['task']
     status = str(task_payload.get('status') or '')
     gate = str(task_payload.get('merge_gate_state') or '')
@@ -145,6 +150,9 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     if status in {'done', 'cancelled', 'archived'}:
         return items
 
+    def item(reason_type: str, severity: str, summary: str, *, anchor_dt: datetime | None = None) -> dict:
+        return make_item(task_dir, reason_type, severity, summary, now, anchor_dt=anchor_dt, root_pm_id=root_pm_id)
+
     result_info = task_artifacts.parse_result(task_dir)
     review_info = task_artifacts.parse_review(task_dir)
     verify_info = task_artifacts.parse_verify(task_dir)
@@ -152,7 +160,7 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
 
     if status == 'blocked' or gate in {'review_rejected', 'qa_failed', 'blocked'}:
         if not (status == 'ready_for_merge' and gate == 'review_rejected' and result_info.get('normalized_status') == 'success' and review_info.get('source') == 'stale_json'):
-            items.append(make_item(task_dir, 'blocked', 'L3', f'任务处于 {status} / {gate or "无 gate"} 状态，需要 PM 仲裁', now))
+            items.append(item('blocked', 'L3', f'任务处于 {status} / {gate or "无 gate"} 状态，需要 PM 仲裁'))
             return items
 
     control_state = str(task_payload.get('control_plane_state') or '').strip().lower()
@@ -161,54 +169,54 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
     workspace_error = str(task_payload.get('workspace_error') or '').strip()
     if control_state == 'delivery_failed':
         detail = last_delivery_error or 'send-to-agent 未确认送达'
-        items.append(make_item(task_dir, 'delivery_failed', 'L2', f'控制面投递失败：{detail}', now))
+        items.append(item('delivery_failed', 'L2', f'控制面投递失败：{detail}'))
     elif control_state == 'session_unhealthy':
         detail = last_delivery_error or '目标 agent 会话不健康或缺失'
-        items.append(make_item(task_dir, 'session_unhealthy', 'L2', f'控制面会话异常：{detail}', now))
+        items.append(item('session_unhealthy', 'L2', f'控制面会话异常：{detail}'))
     if workspace_status == 'error':
         detail = workspace_error or 'worktree/workspace 准备失败'
-        items.append(make_item(task_dir, 'workspace_error', 'L2', f'独立工作区异常：{detail}', now))
+        items.append(item('workspace_error', 'L2', f'独立工作区异常：{detail}'))
     if control_state == 'auto_requeue':
         detail = str(task_payload.get('last_auto_requeue_reason') or last_delivery_error or '控制面恢复失败后自动回池').strip()
-        items.append(make_item(task_dir, 'auto_requeue', 'L2', f'任务已自动回收到 pooled：{detail}', now))
+        items.append(item('auto_requeue', 'L2', f'任务已自动回收到 pooled：{detail}'))
     elif control_state == 'reassigned':
         detail = str(task_payload.get('last_reassigned_reason') or '连接/会话恢复触发转派').strip()
-        items.append(make_item(task_dir, 'reassigned', 'L2', f'任务已自动转派：{detail}', now))
+        items.append(item('reassigned', 'L2', f'任务已自动转派：{detail}'))
 
     invariant_violations = task_payload.get('state_invariant_violations')
     if isinstance(invariant_violations, list) and invariant_violations:
         messages = [str(item.get('message') or '') for item in invariant_violations if isinstance(item, dict)]
         summary = '；'.join([item for item in messages if item][:2]) or '任务状态一致性异常，请检查 state_invariant_violations'
-        items.append(make_item(task_dir, 'state_invariant_violation', 'L3', summary, now))
+        items.append(item('state_invariant_violation', 'L3', summary))
 
     acceptance_anchor = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
     if gate == 'pm_acceptance_pending':
-        items.append(make_item(task_dir, 'acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', now, anchor_dt=acceptance_anchor))
+        items.append(item('acceptance', 'L2', 'review/QA 已满足，等待 PM 最终收口', anchor_dt=acceptance_anchor))
 
     for kind, info in [('result', result_info), ('review', review_info), ('verify', verify_info), ('ack', ack_info)]:
         if info.get('valid') is False and info.get('errors'):
             detail = ','.join(info.get('errors') or ['unknown'])
-            items.append(make_item(task_dir, 'artifact_invalid', 'L2', f'{kind} 产物非法：{detail}', now))
+            items.append(item('artifact_invalid', 'L2', f'{kind} 产物非法：{detail}'))
 
     if status in {'dispatched', 'working'}:
         if ack_info.get('exists') and not ack_info.get('is_current_round', True):
-            items.append(make_item(task_dir, 'stale_resume', 'L2', '恢复后仍存在旧 ack.json，可能干扰新一轮执行', now))
+            items.append(item('stale_resume', 'L2', '恢复后仍存在旧 ack.json，可能干扰新一轮执行'))
         if result_info.get('exists') and not result_info.get('is_current_round', True):
-            items.append(make_item(task_dir, 'stale_resume', 'L2', '恢复后仍存在旧 result.json，可能干扰新一轮执行', now))
+            items.append(item('stale_resume', 'L2', '恢复后仍存在旧 result.json，可能干扰新一轮执行'))
 
     now_epoch = int(now.timestamp())
     dispatch_ref = task_artifacts.iso_to_epoch(task_payload.get('lease_acquired_at') or task_payload.get('updated_at'))
     if status == 'dispatched' and not ack_info.get('exists') and dispatch_ref and now_epoch - dispatch_ref > dispatch_timeout_s:
-        items.append(make_item(task_dir, 'timeout', 'L2', f'dispatched 超过 {dispatch_timeout_s // 60 or 1} 分钟仍无 ack', now, anchor_dt=epoch_to_local_dt(dispatch_ref, now)))
+        items.append(item('timeout', 'L2', f'dispatched 超过 {dispatch_timeout_s // 60 or 1} 分钟仍无 ack', anchor_dt=epoch_to_local_dt(dispatch_ref, now)))
     if status == 'working':
         working_ref = ack_info.get('mtime_epoch') or task_artifacts.iso_to_epoch(task_payload.get('updated_at'))
         if working_ref and now_epoch - working_ref > working_timeout_s:
-            items.append(make_item(task_dir, 'timeout', 'L3', f'working 超过 {working_timeout_s // 60} 分钟仍无新结果', now, anchor_dt=epoch_to_local_dt(working_ref, now)))
+            items.append(item('timeout', 'L3', f'working 超过 {working_timeout_s // 60} 分钟仍无新结果', anchor_dt=epoch_to_local_dt(working_ref, now)))
     if status == 'pooled':
         pool_entered_at = parse_iso(str(task_payload.get('pool_entered_at') or ''))
         timeout_minutes = int(task_payload.get('pool_timeout_minutes') or 0)
         if pool_entered_at and timeout_minutes > 0 and age_minutes(pool_entered_at, now) > timeout_minutes:
-            items.append(make_item(task_dir, 'timeout', 'L2', f'pooled 超过 {timeout_minutes} 分钟仍未认领', now, anchor_dt=pool_entered_at))
+            items.append(item('timeout', 'L2', f'pooled 超过 {timeout_minutes} 分钟仍未认领', anchor_dt=pool_entered_at))
     if status == 'ready_for_merge':
         gate_changed_at = parse_iso(str(task_payload.get('last_gate_decision_at') or task_payload.get('updated_at') or ''))
         gate_wait_minutes = age_minutes(gate_changed_at, now)
@@ -218,11 +226,11 @@ def task_items(task_dir: Path, now: datetime, dispatch_timeout_s: int, working_t
         has_artifact_invalid = any(item['reason_type'] == 'artifact_invalid' for item in items)
         if gate == 'review_pending' and not has_artifact_invalid:
             if review_deadline and now > review_deadline:
-                items.append(make_item(task_dir, 'timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', now, anchor_dt=review_deadline))
+                items.append(item('timeout', 'L2', 'review_deadline 已过，review_pending 仍未收敛', anchor_dt=review_deadline))
             elif gate_wait_minutes > review_timeout_minutes:
-                items.append(make_item(task_dir, 'timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', now, anchor_dt=gate_changed_at))
+                items.append(item('timeout', 'L2', f'review_pending 超过 {review_timeout_minutes} 分钟仍未收敛', anchor_dt=gate_changed_at))
         if gate == 'qa_pending' and not has_artifact_invalid and gate_wait_minutes > qa_timeout_minutes:
-            items.append(make_item(task_dir, 'timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', now, anchor_dt=gate_changed_at))
+            items.append(item('timeout', 'L2', f'qa_pending 超过 {qa_timeout_minutes} 分钟仍未收敛', anchor_dt=gate_changed_at))
 
     return items
 
@@ -260,13 +268,13 @@ def pool_starvation_items(tasks_root: Path, config_path: Path, now: datetime) ->
         config = pool_view.load_json(config_path)
         agents = config.get('agents') or {}
         default_concurrency = int((config.get('task_pool') or {}).get('default_claim_max_concurrency', 1))
-        wip_limits = config.get('wip_limits') or {}
         active_by_agent = pool_view.active_tasks_by_agent(tasks_root)
+        pool_agents = sorted(agent_id for agent_id, payload in agents.items() if pool_view.is_pool_agent(agent_id, payload or {}))
+        busy_map = {agent_id: pool_view.load_agent_busy_diagnostic(agent_id, tasks_root, config_path) for agent_id in pool_agents}
         rows = []
         for task_dir, task in pool_view.pooled_tasks(tasks_root):
-            task['__wip_limits__'] = wip_limits
-            rows.append(pool_view.build_row(task_dir, task, agents, active_by_agent, tasks_root, default_concurrency, now, config))
-        summary = pool_view.build_summary(rows, agents, active_by_agent, tasks_root)
+            rows.append(pool_view.build_row(task_dir, task, agents, active_by_agent, busy_map, tasks_root, default_concurrency, now, config))
+        summary = pool_view.build_summary(rows, agents, active_by_agent, tasks_root, busy_map)
     except Exception:
         return []
 
@@ -296,6 +304,7 @@ def pool_starvation_items(tasks_root: Path, config_path: Path, now: datetime) ->
         priority='high',
         age_minutes_value=int(summary.get('oldest_pool_wait_minutes') or 0),
         links={'tasks_root': str(tasks_root), 'config': str(config_path)},
+        owner=configured_root_pm(config_path),
     )]
 
 
@@ -331,11 +340,12 @@ def main() -> int:
         os.environ['TASK_CONTROL_CONFIG_PATH'] = str(Path(args.control_config).expanduser().resolve())
 
     tasks_root = Path(args.tasks_root).expanduser().resolve()
+    config_path = Path(args.control_config).expanduser().resolve() if args.control_config else DEFAULT_CONFIG_FILE
+    root_pm_id = configured_root_pm(config_path)
     now = datetime.now().astimezone()
     items: list[dict] = []
     for task_path in sorted(tasks_root.glob('*/task.json')):
-        items.extend(task_items(task_path.parent, now, args.dispatch_timeout_seconds, args.working_timeout_seconds))
-    config_path = Path(args.control_config).expanduser().resolve() if args.control_config else DEFAULT_CONFIG_FILE
+        items.extend(task_items(task_path.parent, now, args.dispatch_timeout_seconds, args.working_timeout_seconds, root_pm_id=root_pm_id))
     items.extend(pool_starvation_items(tasks_root, config_path, now))
     items.extend(load_governance_items(Path(args.governance_file).expanduser()))
 

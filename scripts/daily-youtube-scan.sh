@@ -3,17 +3,30 @@
 set -euo pipefail
 
 SKILL_DIR="$HOME/.openclaw/skills/youtube-summarizer"
-SCRIPT_DIR="$HOME/Desktop/work/my-agent-teams/scripts"
-CONFIG="$HOME/Desktop/work/my-agent-teams/config/youtube-channels.json"
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$HOME/Desktop/work/my-agent-teams}"
+SCRIPT_DIR="$WORKSPACE_ROOT/scripts"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
+CONFIG="$WORKSPACE_ROOT/config/youtube-channels.json"
 OUTPUT="/tmp/youtube_daily_$(date +%Y%m%d).json"
 LOG="/tmp/youtube-daily.log"
+YOUTUBE_API_KEY_AGENT="${YOUTUBE_API_KEY_AGENT:-}"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
 
 log "=== 每日 YouTube 扫描 ==="
 
 # 1. 获取 API key
-KEY=$(tmux show-environment -t arch-1 2>/dev/null | grep '^OPENAI_API_KEY=' | head -1 | cut -d= -f2-)
+if [ -z "$YOUTUBE_API_KEY_AGENT" ] && [ -r "$AGENT_CONFIG_PY" ]; then
+  YOUTUBE_API_KEY_AGENT="$(python3 "$AGENT_CONFIG_PY" integration-owner --config "$CONFIG_PATH" 2>/dev/null || true)"
+fi
+YOUTUBE_API_KEY_AGENT="${YOUTUBE_API_KEY_AGENT:-integration-owner}"
+
+API_KEY_SESSION="$YOUTUBE_API_KEY_AGENT"
+if [ -r "$AGENT_CONFIG_PY" ]; then
+  API_KEY_SESSION="$(python3 "$AGENT_CONFIG_PY" resolve-session "$YOUTUBE_API_KEY_AGENT" --config "$CONFIG_PATH" 2>/dev/null || printf '%s\n' "$YOUTUBE_API_KEY_AGENT")"
+fi
+KEY=$(tmux show-environment -t "$API_KEY_SESSION" 2>/dev/null | grep '^OPENAI_API_KEY=' | head -1 | cut -d= -f2-)
 if [ -z "$KEY" ]; then
   KEY="${OPENAI_API_KEY:-}"
 fi

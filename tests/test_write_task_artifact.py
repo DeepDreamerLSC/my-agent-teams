@@ -52,6 +52,42 @@ class WriteTaskArtifactTests(unittest.TestCase):
         subprocess.run(["git", "add", "."], cwd=str(path), check=True)
         subprocess.run(["git", "commit", "-m", "init"], cwd=str(path), check=True, capture_output=True, text=True)
 
+    def test_review_and_verify_default_actors_use_configured_role_defaults(self):
+        config_path = Path(self.tmpdir.name) / "config.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "domain_policies": {
+                        "development": {
+                            "default_reviewer": "quality-reviewer",
+                            "default_tester": "release-qa",
+                        }
+                    },
+                    "agents": {
+                        "quality-reviewer": {"role": "reviewer"},
+                        "release-qa": {"role": "qa"},
+                    },
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        task = json.loads((self.task_dir / "task.json").read_text(encoding="utf-8"))
+        task["domain"] = "development"
+        task.pop("reviewer", None)
+        task.pop("tester", None)
+        (self.task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        self._run("write-review.sh", "--config", str(config_path), "--status", "approve", "--summary", "默认审查")
+        self._run("write-verify.sh", "--config", str(config_path), "--status", "pass", "--summary", "默认验证")
+
+        review_payload = json.loads((self.task_dir / "review.json").read_text(encoding="utf-8"))
+        verify_payload = json.loads((self.task_dir / "verify.json").read_text(encoding="utf-8"))
+        self.assertEqual(review_payload["reviewer"], "quality-reviewer")
+        self.assertEqual(verify_payload["tester"], "release-qa")
+
     def test_wrappers_write_valid_artifacts_with_current_round(self):
         self._run("write-ack.sh", "--agent", "dev-1", "--summary", "已接单")
         self._run("write-result.sh", "--agent", "dev-1", "--status", "done", "--summary", "已完成")

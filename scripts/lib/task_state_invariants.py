@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from agent_config import default_claim_scope
 from task_artifacts import parse_ack
 from task_quality_rules import validate_task_type_gate_template
 
@@ -23,28 +24,7 @@ def _parse_bool(value: Any) -> bool:
 
 
 def _normalized_claim_scope(task: dict[str, Any], config: dict[str, Any]) -> list[str]:
-    scope = task.get("claim_scope")
-    if isinstance(scope, list):
-        normalized = [str(item).strip() for item in scope if str(item).strip()]
-        if normalized:
-            return normalized
-
-    task_type = str(task.get("task_type") or "").strip().lower()
-    domain = str(task.get("domain") or "").strip().lower()
-    agents = config.get("agents") or {}
-    resolved: list[str] = []
-    for agent_id, payload in agents.items():
-        role = str((payload or {}).get("role") or "").strip().lower()
-        if task_type in {"development", "investigation"}:
-            if role == "fullstack_dev" or str(agent_id).startswith("dev-"):
-                resolved.append(str(agent_id))
-        elif task_type == "verification" or domain == "quality":
-            if role == "qa" or str(agent_id).startswith("qa-"):
-                resolved.append(str(agent_id))
-        elif task_type == "design":
-            if role == "architect" or str(agent_id) == "arch-1":
-                resolved.append(str(agent_id))
-    return resolved
+    return default_claim_scope(task, config)
 
 
 def _is_pull_task(task: dict[str, Any]) -> bool:

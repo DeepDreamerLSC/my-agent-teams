@@ -647,7 +647,7 @@ watch -n 600 ./scripts/sync-gantt-to-feishu.sh
 dashboard :5001/api/gantt → 按 agent 聚合 → lark-cli base upsert → 飞书 Base
 ```
 
-脚本读取 dashboard 的甘特图 API，按 pm-chief / arch-1 / dev-1 / dev-2 / qa-1 / review-1 六个角色聚合任务数、完成数、阻塞数、待合入数和负载率，通过 `lark-cli base +record-upsert` 逐条更新飞书 Base 中的记录。
+脚本读取 dashboard 的甘特图 API，默认按 `config.json` 中当前团队的 agent 列表聚合任务数、完成数、阻塞数、待合入数和负载率，通过 `lark-cli base +record-upsert` 逐条更新飞书 Base 中的记录；如需覆盖同步范围，可设置 `GANTT_FEISHU_AGENTS`。
 
 也可以把飞书对象 ID 放在本机未入库的 `config.local.json`：
 

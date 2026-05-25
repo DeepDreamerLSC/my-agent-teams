@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Generate daily/weekly report from dashboard Gantt data."""
-import json, sys
+import importlib.util
+import json, os, sys
 from datetime import datetime
+from pathlib import Path
 
 mode = sys.argv[1]
 type_label = sys.argv[2]
@@ -14,10 +16,27 @@ datafile = sys.argv[7]
 with open(datafile) as f:
     gantt = json.load(f)
 
+def load_agent_config_module():
+    module_path = Path(os.environ.get("AGENT_CONFIG_PY", Path(__file__).resolve().parent / "lib" / "agent_config.py")).expanduser()
+    spec = importlib.util.spec_from_file_location("agent_config", module_path)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"cannot load agent config helper: {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_agent_metadata(agent_config):
+    config_path = Path(os.environ.get("CONFIG_PATH", Path(__file__).resolve().parents[1] / "config.json")).expanduser()
+    config = agent_config.load_config(config_path)
+    return config, agent_config.agent_metadata(config)
+
 items = gantt.get("items", [])
-core = {"pm-chief", "arch-1", "dev-1", "dev-2", "qa-1", "review-1"}
-role_map = {"pm-chief": "PM", "arch-1": "架构师", "dev-1": "开发者",
-            "dev-2": "开发者", "qa-1": "测试", "review-1": "审查"}
+agent_config = load_agent_config_module()
+config, agent_metadata = load_agent_metadata(agent_config)
+agent_order = list(agent_metadata)
+core = set(agent_order)
+role_map = agent_config.role_labels(config)
 
 agents = {}
 for i in items:
@@ -58,7 +77,7 @@ lines.append("## 各角色负载")
 lines.append("")
 lines.append("| 角色 | 总 | 完成 | 阻塞 | 待合入 | 负载 |")
 lines.append("|------|-----|------|------|--------|------|")
-for a in ["pm-chief", "arch-1", "dev-1", "dev-2", "qa-1", "review-1"]:
+for a in agent_order:
     d = agents.get(a, {})
     t = d.get("total", 0)
     dn = d.get("done", 0)

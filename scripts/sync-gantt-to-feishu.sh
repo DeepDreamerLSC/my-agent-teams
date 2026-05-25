@@ -19,6 +19,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_FILE="${FEISHU_CONFIG_PATH:-$WORKSPACE_ROOT/config.local.json}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 DASHBOARD_URL="${GANTT_DASHBOARD_URL:-http://127.0.0.1:5001/api/gantt}"
 
 RED='\033[0;31m'
@@ -58,12 +60,20 @@ config_default() {
   load_config_value "$config_key" 2>/dev/null || true
 }
 
+load_agent_ids_from_config() {
+  if [ -r "$AGENT_CONFIG_PY" ]; then
+    python3 "$AGENT_CONFIG_PY" list-agent-ids --config "$CONFIG_PATH" 2>/dev/null || true
+  fi
+}
+
 BASE_TOKEN="$(config_default GANTT_FEISHU_BASE_TOKEN base_token)"
 AGGREGATE_TABLE="$(config_default GANTT_FEISHU_TABLE_ID table_id)"
 TREND_TABLE="$(config_default GANTT_FEISHU_TREND_TABLE_ID trend_table_id)"
 AGENTS_CSV="$(config_default GANTT_FEISHU_AGENTS agents)"
 RECORD_IDS_CSV="$(config_default GANTT_FEISHU_RECORD_IDS record_ids)"
-AGENTS_CSV="${AGENTS_CSV:-pm-chief,arch-1,dev-1,dev-2,qa-1,review-1}"
+if [ -z "$AGENTS_CSV" ]; then
+  AGENTS_CSV="$(load_agent_ids_from_config)"
+fi
 
 require_value() {
   local value="$1" label="$2"
@@ -75,6 +85,7 @@ require_value() {
 
 require_value "$BASE_TOKEN" "GANTT_FEISHU_BASE_TOKEN"
 require_value "$AGGREGATE_TABLE" "GANTT_FEISHU_TABLE_ID"
+require_value "$AGENTS_CSV" "GANTT_FEISHU_AGENTS 或 config.json agents"
 require_value "$RECORD_IDS_CSV" "GANTT_FEISHU_RECORD_IDS"
 
 if ! command -v lark-cli >/dev/null 2>&1; then
@@ -306,7 +317,9 @@ log "趋势同步完成"
 echo ""
 log "同步任务详情（甘特图）..."
 
+export CONFIG_PATH AGENT_CONFIG_PY
 python3 << 'TDEOF'
+import importlib.util
 import json, urllib.request, subprocess, sys, os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -315,6 +328,8 @@ BASE_TOKEN = os.environ.get("GANTT_FEISHU_BASE_TOKEN", "E77KbiM18aIhvlsKnTTcYI4d
 TASK_TABLE = os.environ.get("GANTT_FEISHU_TASK_TABLE", "tbl1TLcoNzlgzTve")
 DASHBOARD_URL = os.environ.get("GANTT_DASHBOARD_URL", "http://127.0.0.1:5001/api/gantt")
 TMP_DIR = Path(os.environ.get("GANTT_TMP_DIR", "/tmp/osrt-gantt"))
+CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "config.json")).expanduser()
+AGENT_CONFIG_PY = Path(os.environ.get("AGENT_CONFIG_PY", "scripts/lib/agent_config.py")).expanduser()
 
 def run_lark(cmd_list, cwd=None):
     try:
@@ -358,8 +373,18 @@ if all_rids:
 resp = urllib.request.urlopen(DASHBOARD_URL)
 data = json.loads(resp.read())
 items = data.get("items", [])
-CORE_AGENTS = {"pm-chief", "arch-1", "dev-1", "dev-2", "qa-1", "review-1"}
-AGENT_ROLES = {"pm-chief":"PM","arch-1":"架构师","dev-1":"开发者","dev-2":"开发者","qa-1":"测试","review-1":"审查"}
+
+def load_agent_metadata():
+    spec = importlib.util.spec_from_file_location("agent_config", AGENT_CONFIG_PY)
+    if not spec or not spec.loader:
+        raise RuntimeError(f"cannot load agent config helper: {AGENT_CONFIG_PY}")
+    agent_config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent_config)
+    config = agent_config.load_config(CONFIG_PATH)
+    metadata = agent_config.agent_metadata(config)
+    return set(metadata), agent_config.role_labels(config)
+
+CORE_AGENTS, AGENT_ROLES = load_agent_metadata()
 
 rows = []
 for item in items:

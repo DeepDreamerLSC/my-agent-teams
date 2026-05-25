@@ -111,6 +111,28 @@ class PoolTaskGateTests(unittest.TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("owner_approval_pending", completed.stderr)
 
+    def test_pool_task_defaults_development_claim_scope_from_config(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["agents"]["dev-3"] = {"role": "fullstack_dev"}
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        task_dir = self._write_task("dev-scope-from-config", {
+            "claim_scope": [],
+        })
+
+        completed = subprocess.run(
+            [str(POOL_SCRIPT), str(task_dir / "task.json")],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        self.assertIn("pooled dev-scope-from-config", completed.stdout)
+        task = json.loads((task_dir / "task.json").read_text(encoding="utf-8"))
+        self.assertEqual(task["status"], "pooled")
+        self.assertEqual(task["claim_scope"], ["dev-1", "dev-2", "dev-3"])
+
     def test_pool_task_allows_read_only_verification_without_write_scope(self):
         task_dir = self._write_task("verify-no-scope", {
             "task_type": "verification",

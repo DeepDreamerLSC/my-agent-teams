@@ -22,13 +22,16 @@ _agent_availability_eval() {
     local tasks_root="${3:-$(agent_availability_tasks_root)}"
     local config_path="${4:-$(agent_availability_config_path)}"
 
-    python3 - "$tasks_root" "$config_path" "$agent_id" "$output_format" <<'PY'
+    python3 - "$tasks_root" "$config_path" "$agent_id" "$output_format" "$_AGENT_AVAILABILITY_LIB_DIR" <<'PY'
 import json
 import os
 import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, sys.argv[5])
+from agent_config import root_pm  # type: ignore
 
 
 def clean(value):
@@ -140,7 +143,7 @@ def pm_matches(task, agent_id, agent_role, sole_pm):
     ) if item]
     if explicit:
         return agent_id in explicit
-    return bool(agent_role in {'pm', 'pm-chief'} and sole_pm and agent_id == sole_pm)
+    return bool(agent_role == 'pm' and sole_pm and agent_id == sole_pm)
 
 
 def capacity_limits(config, agent_id):
@@ -164,13 +167,15 @@ def capacity_limits(config, agent_id):
         'reviewer': 'reviewer',
         'qa': 'qa',
         'architect': 'architect',
-        'pm': 'pm-chief',
-        'pm-chief': 'pm-chief',
+        'pm': 'pm',
     }
     role_key = role_keys.get(role)
+    root_pm_id = root_pm(config)
     role_limit = wip_limits.get(agent_id)
     if role_limit in (None, '') and role_key:
         role_limit = wip_limits.get(role_key)
+    if role_limit in (None, '') and role == 'pm' and root_pm_id:
+        role_limit = wip_limits.get(root_pm_id)
     if role_limit not in (None, ''):
         working_limit = max(1, min(working_limit, as_int(role_limit, working_limit)))
     return {
@@ -291,7 +296,7 @@ agent_role = pick_role(config, agent_id)
 role_map = role_members(config)
 sole_reviewer = first_or_empty(role_map.get('reviewer', []))
 sole_qa = first_or_empty(role_map.get('qa', []))
-sole_pm = first_or_empty(role_map.get('pm', []) or role_map.get('pm-chief', []))
+sole_pm = root_pm(config)
 
 now = parse_iso(os.environ.get('AGENT_AVAILABILITY_NOW'))
 if now is None:

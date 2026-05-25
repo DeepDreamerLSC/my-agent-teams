@@ -13,6 +13,7 @@ from task_quality_rules import (  # type: ignore
     resolve_gate_flags_for_create,
     validate_task_type_gate_template,
 )
+from agent_config import default_claim_scope, default_reviewer, default_reviewers, integration_owner, root_pm  # type: ignore
 
 cfg_path = Path(sys.argv[1])
 (
@@ -106,29 +107,6 @@ def normalize_task_type(raw: str, *, execution_mode: str, target_environment: st
     return None
 
 
-def derive_claim_scope(*, agents: dict, task_type: Optional[str], domain: str, task_level: str, execution_mode: str, target_environment: str, assigned_agent_is_auto: bool) -> list[str]:
-    if not assigned_agent_is_auto:
-        return []
-    if execution_mode != 'dev' or target_environment != 'dev':
-        return []
-    if task_level not in {'execution', 'review'}:
-        return []
-    candidates: list[str] = []
-    normalized_type = (task_type or '').strip().lower()
-    for agent_id, payload in (agents or {}).items():
-        role = str((payload or {}).get('role') or '').strip().lower()
-        if normalized_type in {'development', 'investigation'}:
-            if role == 'fullstack_dev' or agent_id.startswith('dev-'):
-                candidates.append(agent_id)
-        elif normalized_type == 'verification' or domain == 'quality':
-            if role == 'qa' or agent_id.startswith('qa-'):
-                candidates.append(agent_id)
-        elif normalized_type == 'design':
-            if role == 'architect' or agent_id == 'arch-1':
-                candidates.append(agent_id)
-    return dedupe(candidates)
-
-
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
         path.relative_to(other)
@@ -141,7 +119,7 @@ def scopes_overlap(path_a: Path, path_b: Path) -> bool:
     return path_a == path_b or is_relative_to(path_a, path_b) or is_relative_to(path_b, path_a)
 
 
-def validate_and_resolve_scope(raw_paths: list[str], *, dev_root: Path, prod_root: Optional[Path], target_environment: str, assigned_agent: str) -> list[tuple[str, Path]]:
+def validate_and_resolve_scope(raw_paths: list[str], *, dev_root: Path, prod_root: Optional[Path], target_environment: str, assigned_agent: str, prod_write_owner: str) -> list[tuple[str, Path]]:
     resolved_scope: list[tuple[str, Path]] = []
     for raw_path in raw_paths:
         p = Path(raw_path).expanduser()
@@ -151,8 +129,8 @@ def validate_and_resolve_scope(raw_paths: list[str], *, dev_root: Path, prod_roo
             base = prod_root if target_environment == 'prod' and prod_root is not None else dev_root
             resolved = (base / p).resolve()
         if prod_root is not None and str(resolved).startswith(str(prod_root)):
-            if assigned_agent != 'pm-chief':
-                raise SystemExit(f'prod write_scope requires pm-chief: {raw_path}')
+            if assigned_agent != prod_write_owner:
+                raise SystemExit(f'prod write_scope requires {prod_write_owner}: {raw_path}')
         elif not str(resolved).startswith(str(dev_root)):
             raise SystemExit(f'write_scope outside project dev_root: {raw_path}')
         resolved_scope.append((raw_path, resolved))
@@ -180,6 +158,7 @@ def find_scope_conflicts(tasks_root: Path, current_task_id: str, candidate_scope
             prod_root=prod_root,
             target_environment=str(task_data.get('target_environment') or 'dev'),
             assigned_agent=str(task_data.get('assigned_agent') or ''),
+            prod_write_owner=root_pm_id,
         )
         for raw_a, resolved_a in candidate_scope:
             for raw_b, resolved_b in other_resolved_scope:
@@ -205,6 +184,8 @@ if not re.search(r'[\u4e00-\u9fff]', task_id):
     )
 
 cfg = json.loads(cfg_path.read_text(encoding='utf-8'))
+root_pm_id = root_pm(cfg)
+integration_owner_id = integration_owner(cfg)
 review_authority = review_authority if review_authority in {'reviewer', 'owner'} else 'reviewer'
 execution_mode = execution_mode if execution_mode in {'dev', 'deploy'} else 'dev'
 target_environment = target_environment if target_environment in {'dev', 'prod'} else 'dev'
@@ -230,14 +211,14 @@ prod_root = Path(prod_root_raw).expanduser().resolve() if prod_root_raw else Non
 if execution_mode == 'dev' and target_environment != 'dev':
     raise SystemExit('execution_mode=dev requires target_environment=dev')
 
-if execution_mode == 'deploy' and assigned_agent != 'arch-1':
-    raise SystemExit('deploy tasks can only be assigned to arch-1')
+if execution_mode == 'deploy' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'deploy tasks can only be assigned to {integration_owner_id}')
 
-if target_environment == 'prod' and assigned_agent != 'arch-1':
-    raise SystemExit('prod tasks can only be assigned to arch-1')
+if target_environment == 'prod' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'prod tasks can only be assigned to {integration_owner_id}')
 
-if normalized_task_level == 'integration' and assigned_agent != 'arch-1':
-    raise SystemExit('integration tasks must be assigned to arch-1')
+if normalized_task_level == 'integration' and assigned_agent != integration_owner_id:
+    raise SystemExit(f'integration tasks must be assigned to {integration_owner_id}')
 
 resolved_scope = validate_and_resolve_scope(
     write_scope,
@@ -245,6 +226,7 @@ resolved_scope = validate_and_resolve_scope(
     prod_root=prod_root,
     target_environment=target_environment,
     assigned_agent=assigned_agent,
+    prod_write_owner=root_pm_id,
 )
 
 task_type = normalize_task_type(
@@ -268,11 +250,7 @@ review_level = review_level_raw.strip().lower() if review_level_raw.strip() else
 if review_level not in {'skip', 'standard', 'complex'}:
     review_level = 'standard' if review_required else 'skip'
 review_required = review_level != 'skip'
-domain_policies = cfg.get('domain_policies', {})
-reviewer = (
-    domain_policies.get(domain, {}).get('default_reviewer')
-    or domain_policies.get('development', {}).get('default_reviewer')
-) if review_required else None
+reviewer = default_reviewer(cfg, domain) if review_required else None
 
 explicit_reviewers = dedupe([item.strip() for item in reviewers_csv.split(',') if item.strip()]) if reviewers_csv.strip() else []
 for reviewer_id in explicit_reviewers:
@@ -282,12 +260,7 @@ for reviewer_id in explicit_reviewers:
 if explicit_reviewers:
     reviewers = explicit_reviewers
 else:
-    if review_level == 'complex':
-        reviewers = dedupe([reviewer or 'review-1', 'arch-1'])
-    elif review_level == 'standard':
-        reviewers = [reviewer] if reviewer else []
-    else:
-        reviewers = []
+    reviewers = default_reviewers(cfg, domain, review_level) if review_level in {'standard', 'complex'} else []
 
 if review_level == 'skip':
     reviewers = []
@@ -314,14 +287,13 @@ template_errors = validate_task_type_gate_template(
 )
 if template_errors:
     raise SystemExit('; '.join(template_errors))
-claim_scope = derive_claim_scope(
-    agents=agents,
-    task_type=task_type,
-    domain=domain,
-    task_level=normalized_task_level,
-    execution_mode=execution_mode,
-    target_environment=target_environment,
-    assigned_agent_is_auto=assigned_agent_is_auto,
+claim_scope = (
+    default_claim_scope({'task_type': task_type, 'domain': domain}, cfg)
+    if assigned_agent_is_auto
+    and execution_mode == 'dev'
+    and target_environment == 'dev'
+    and normalized_task_level in {'execution', 'review'}
+    else []
 )
 conflicts = find_scope_conflicts(Path(task_dir).parent, task_id, resolved_scope)
 if conflicts:
@@ -349,7 +321,7 @@ obj = {
     'test_required': test_required,
     'status': 'pending',
     'task_level': normalized_task_level,
-    'owner_pm': cfg.get('orchestration', {}).get('root_pm', 'pm-chief'),
+    'owner_pm': root_pm_id,
     'domain': domain,
     'task_type': task_type,
     'read_only': read_only,
@@ -373,10 +345,10 @@ obj = {
     ],
     'root_request_id': task_id,
     'parent_task_id': None,
-    'integration_owner': cfg.get('orchestration', {}).get('integration_owner'),
+    'integration_owner': integration_owner_id,
     'priority': 'medium',
     'timeout_minutes': cfg.get('defaults', {}).get('timeout_minutes', 30),
-    'lease_owner': cfg.get('orchestration', {}).get('root_pm', 'pm-chief'),
+    'lease_owner': root_pm_id,
     'lease_acquired_at': created_at,
     'lease_expires_at': created_at,
     'workspace_mode': cfg.get('defaults', {}).get('workspace_mode', 'main'),

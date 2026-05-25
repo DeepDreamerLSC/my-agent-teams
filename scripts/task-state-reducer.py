@@ -10,6 +10,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / 'lib'))
 import task_artifacts  # type: ignore
+from agent_config import default_reviewer, default_tester, load_config, root_pm  # type: ignore
 
 
 def boolish(value) -> bool:
@@ -51,7 +52,41 @@ def _qa_gate_state_from_artifact(verify: dict) -> str:
     return 'pending'
 
 
-def reduce_task_state(task_dir: Path) -> dict:
+def _domain(task: dict) -> str:
+    return str(task.get('domain') or '').strip()
+
+
+def _review_target(task: dict, config: dict) -> str:
+    reviewers = task.get('reviewers') if isinstance(task.get('reviewers'), list) else []
+    reviewers = [str(item).strip() for item in reviewers if str(item).strip()]
+    if reviewers:
+        return reviewers[0]
+    reviewer = str(task.get('reviewer') or '').strip()
+    return reviewer or default_reviewer(config, _domain(task))
+
+
+def _qa_target(task: dict, config: dict) -> str:
+    return str(task.get('tester') or '').strip() or default_tester(config, _domain(task))
+
+
+def _pm_target(task: dict, config: dict) -> str:
+    return str(task.get('owner_pm') or '').strip() or root_pm(config)
+
+
+def _dispatch_review_action(task: dict, config: dict) -> dict:
+    return {'type': 'dispatch_review', 'to': _review_target(task, config)}
+
+
+def _dispatch_qa_action(task: dict, config: dict) -> dict:
+    return {'type': 'dispatch_qa', 'to': _qa_target(task, config)}
+
+
+def _notify_pm_action(task: dict, config: dict) -> dict:
+    return {'type': 'notify_pm_acceptance', 'to': _pm_target(task, config)}
+
+
+def reduce_task_state(task_dir: Path, config_path: Path | None = None) -> dict:
+    config = load_config(config_path or (SCRIPT_DIR.parent / 'config.json'))
     task_info = task_artifacts.parse_task(task_dir)
     task = task_info['task']
     task_id = str(task.get('id') or task_dir.name)
@@ -107,26 +142,26 @@ def reduce_task_state(task_dir: Path) -> dict:
             patches['merge_gate_state'] = 'quality_pending'
             patches['review_gate_state'] = 'pending'
             patches['qa_gate_state'] = 'pending'
-            actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
-            actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+            actions.append(_dispatch_review_action(task, config))
+            actions.append(_dispatch_qa_action(task, config))
             reason = 'result.success + quality_pending'
         elif review_required:
             patches['merge_gate_state'] = 'review_pending'
             patches['review_gate_state'] = 'pending'
             patches['qa_gate_state'] = 'pending' if test_required else 'skipped'
-            actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+            actions.append(_dispatch_review_action(task, config))
             reason = 'result.success + review_required'
         elif test_required:
             patches['merge_gate_state'] = 'qa_pending'
             patches['review_gate_state'] = 'skipped'
             patches['qa_gate_state'] = 'pending'
-            actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+            actions.append(_dispatch_qa_action(task, config))
             reason = 'result.success + qa_required'
         else:
             patches['merge_gate_state'] = 'pm_acceptance_pending'
             patches['review_gate_state'] = 'skipped'
             patches['qa_gate_state'] = 'skipped'
-            actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+            actions.append(_notify_pm_action(task, config))
             reason = 'result.success + pm_acceptance'
         if assigned_agent:
             actions.append({'type': 'maybe_push_next_execution', 'to': assigned_agent})
@@ -175,54 +210,54 @@ def reduce_task_state(task_dir: Path) -> dict:
         elif review_required and test_required and quality_gate_mode == 'parallel':
             if review_gate_state == 'approved' and qa_gate_state == 'passed':
                 patches['merge_gate_state'] = 'pm_acceptance_pending'
-                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                actions.append(_notify_pm_action(task, config))
                 reason = 'quality_gates_complete'
             else:
                 patches['merge_gate_state'] = 'quality_pending'
                 if review_gate_state == 'pending':
-                    actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+                    actions.append(_dispatch_review_action(task, config))
                 if qa_gate_state == 'pending':
-                    actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+                    actions.append(_dispatch_qa_action(task, config))
                 reason = 'quality_pending'
         elif review_required and test_required:
             if review_gate_state == 'approved' and qa_gate_state == 'passed':
                 patches['merge_gate_state'] = 'pm_acceptance_pending'
-                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                actions.append(_notify_pm_action(task, config))
                 reason = 'serial_quality_gates_complete'
             elif review_gate_state == 'approved':
                 patches['merge_gate_state'] = 'qa_pending'
                 patches['qa_gate_state'] = 'pending'
-                actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+                actions.append(_dispatch_qa_action(task, config))
                 reason = 'serial_qa_pending'
             else:
                 patches['merge_gate_state'] = 'review_pending'
-                actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+                actions.append(_dispatch_review_action(task, config))
                 reason = 'review_pending'
         elif not test_required and review_gate_state == 'approved':
             patches['merge_gate_state'] = 'pm_acceptance_pending'
-            actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+            actions.append(_notify_pm_action(task, config))
             reason = 'review_only_complete'
         elif review_required and review_gate_state == 'pending':
             patches['merge_gate_state'] = 'review_pending'
-            actions.append({'type': 'dispatch_review', 'to': task.get('reviewer') or 'review-1'})
+            actions.append(_dispatch_review_action(task, config))
             reason = 'review_pending'
         elif review_required and not test_required and review_state == 'approve':
             patches['merge_gate_state'] = 'pm_acceptance_pending'
             patches['review_gate_state'] = 'approved'
             patches['qa_gate_state'] = 'skipped'
-            actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+            actions.append(_notify_pm_action(task, config))
             reason = 'review_only_complete'
         elif test_required and not review_required:
             if qa_gate_state == 'passed':
                 patches['merge_gate_state'] = 'pm_acceptance_pending'
                 patches['review_gate_state'] = 'skipped'
-                actions.append({'type': 'notify_pm_acceptance', 'to': task.get('owner_pm') or 'pm-chief'})
+                actions.append(_notify_pm_action(task, config))
                 reason = 'qa_only_complete'
             else:
                 patches['merge_gate_state'] = 'qa_pending'
                 patches['review_gate_state'] = 'skipped'
                 patches['qa_gate_state'] = 'pending'
-                actions.append({'type': 'dispatch_qa', 'to': 'qa-1'})
+                actions.append(_dispatch_qa_action(task, config))
                 reason = 'qa_pending'
 
     return {
@@ -244,8 +279,12 @@ def reduce_task_state(task_dir: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description='Pure task state reducer over task facts')
     parser.add_argument('--task-dir', required=True)
+    parser.add_argument('--config', default=str(SCRIPT_DIR.parent / 'config.json'))
     args = parser.parse_args()
-    payload = reduce_task_state(Path(args.task_dir).expanduser().resolve())
+    payload = reduce_task_state(
+        Path(args.task_dir).expanduser().resolve(),
+        Path(args.config).expanduser().resolve(),
+    )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 

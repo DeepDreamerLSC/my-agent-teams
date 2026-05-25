@@ -8,6 +8,8 @@ KEEP_RESULT_HISTORY=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 STATE_DIR="${STATE_DIR:-$WORKSPACE_ROOT/.runtime/state/task-watcher}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+LIB_DIR="${LIB_DIR:-$SCRIPT_DIR/lib}"
 
 usage() {
   cat <<'EOF'
@@ -31,7 +33,7 @@ if [ -z "$TASK_DIR" ] || [ -z "$AGENT_ID" ] || [ -z "$REASON" ]; then
   exit 2
 fi
 
-python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$STATE_DIR" "$KEEP_RESULT_HISTORY" <<'PY'
+python3 - "$TASK_DIR" "$AGENT_ID" "$REASON" "$STATE_DIR" "$KEEP_RESULT_HISTORY" "$CONFIG_PATH" "$LIB_DIR" <<'PY'
 import json
 import os
 import shutil
@@ -57,6 +59,13 @@ agent_id = sys.argv[2]
 reason = sys.argv[3].strip()
 state_dir = Path(sys.argv[4]).expanduser().resolve()
 keep_result_history = sys.argv[5] == '1'
+config_path = Path(sys.argv[6]).expanduser().resolve()
+lib_dir = Path(sys.argv[7]).expanduser().resolve()
+sys.path.insert(0, str(lib_dir))
+from agent_config import load_config, root_pm  # type: ignore
+
+config = load_config(config_path)
+root_pm_id = root_pm(config)
 
 task_path = task_dir / 'task.json'
 transitions_path = task_dir / 'transitions.jsonl'
@@ -170,7 +179,7 @@ task['last_reassigned_by'] = 'task-watcher'
 task['last_reassigned_from'] = previous_agent
 task['last_reassigned_reason'] = reason
 task['reassign_count'] = reassign_count
-task['lease_owner'] = task.get('owner_pm') or 'pm-chief'
+task['lease_owner'] = task.get('owner_pm') or root_pm_id
 task['lease_acquired_at'] = now_iso
 task['lease_expires_at'] = now_iso
 task['dispatch_delivery_attempt_count'] = 0

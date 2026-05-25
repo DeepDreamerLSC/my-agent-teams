@@ -13,15 +13,43 @@ REDUCER = REPO_ROOT / 'scripts' / 'task-state-reducer.py'
 FIXTURE_ROOT = REPO_ROOT / 'tests' / 'fixtures' / 'task-state'
 
 
-def run_reducer(task_dir: Path) -> dict:
+def run_reducer(task_dir: Path, config_path: Path | None = None) -> dict:
+    command = ['python3', str(REDUCER), '--task-dir', str(task_dir)]
+    if config_path is not None:
+        command.extend(['--config', str(config_path)])
     completed = subprocess.run(
-        ['python3', str(REDUCER), '--task-dir', str(task_dir)],
+        command,
         cwd=str(REPO_ROOT),
         capture_output=True,
         text=True,
         check=True,
     )
     return json.loads(completed.stdout)
+
+
+def write_custom_role_config(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                'orchestration': {'root_pm': 'lead-pm'},
+                'domain_policies': {
+                    'development': {
+                        'default_reviewer': 'quality-reviewer',
+                        'default_tester': 'release-qa',
+                    }
+                },
+                'agents': {
+                    'lead-pm': {'role': 'pm'},
+                    'quality-reviewer': {'role': 'reviewer'},
+                    'release-qa': {'role': 'qa'},
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + '\n',
+        encoding='utf-8',
+    )
 
 
 class TaskStateReducerFixtureTests(unittest.TestCase):
@@ -53,6 +81,47 @@ class TaskStateReducerFixtureTests(unittest.TestCase):
         self.assertEqual(payload['patches']['review_gate_state'], 'pending')
         self.assertEqual(payload['patches']['qa_gate_state'], 'pending')
         self.assertEqual([action['type'] for action in payload['actions'][:2]], ['dispatch_review', 'dispatch_qa'])
+
+    def test_result_success_uses_configured_default_review_and_qa_agents(self):
+        task_dir = self._copy_fixture('result-success-review-pending')
+        config_path = task_dir.parent / 'config.json'
+        write_custom_role_config(config_path)
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task.update({
+            'domain': 'development',
+            'quality_gate_mode': 'parallel',
+        })
+        task.pop('owner_pm', None)
+        task.pop('reviewer', None)
+        task.pop('reviewers', None)
+        task.pop('tester', None)
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir, config_path)
+
+        self.assertEqual(payload['patches']['merge_gate_state'], 'quality_pending')
+        self.assertIn({'type': 'dispatch_review', 'to': 'quality-reviewer'}, payload['actions'])
+        self.assertIn({'type': 'dispatch_qa', 'to': 'release-qa'}, payload['actions'])
+
+    def test_result_success_uses_configured_root_pm_for_acceptance(self):
+        task_dir = self._copy_fixture('result-success-review-pending')
+        config_path = task_dir.parent / 'config.json'
+        write_custom_role_config(config_path)
+        task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+        task.update({
+            'domain': 'development',
+            'review_required': False,
+            'test_required': False,
+        })
+        task.pop('owner_pm', None)
+        task.pop('reviewer', None)
+        task.pop('reviewers', None)
+        (task_dir / 'task.json').write_text(json.dumps(task, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+        payload = run_reducer(task_dir, config_path)
+
+        self.assertEqual(payload['patches']['merge_gate_state'], 'pm_acceptance_pending')
+        self.assertIn({'type': 'notify_pm_acceptance', 'to': 'lead-pm'}, payload['actions'])
 
     def test_review_rejected_routes_to_blocked(self):
         task_dir = self._copy_fixture('review-rejected')

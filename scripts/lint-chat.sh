@@ -8,11 +8,14 @@ CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 TARGET="${1:-$CHAT_ROOT}"
 STRICT_SCHEMA="${STRICT_SCHEMA:-0}"
 
-python3 - "$TARGET" "$CONFIG_PATH" "$STRICT_SCHEMA" <<'PY'
+python3 - "$TARGET" "$CONFIG_PATH" "$STRICT_SCHEMA" "$SCRIPT_DIR/lib" <<'PY'
 import json
 import sys
 from datetime import datetime
 from pathlib import Path
+
+sys.path.insert(0, sys.argv[4])
+from agent_config import FALLBACK_AGENTS  # type: ignore
 
 ALLOWED_TYPES = {'text', 'task_announce', 'task_done', 'question', 'answer', 'decision', 'notify', 'dispatch', 'nudge'}
 ALLOWED_SOURCE_TYPES = {'human', 'system'}
@@ -25,7 +28,8 @@ SYSTEM_ACTORS = {'system', 'task-watcher', 'dispatch-task', 'send-to-agent', 'ch
 root = Path(sys.argv[1]).resolve()
 config_path = Path(sys.argv[2]).resolve()
 strict_schema = str(sys.argv[3]).strip() in {'1', 'true', 'yes'}
-agent_ids = {'pm-chief', 'all', 'kael', 'linsceo'}
+agent_ids = {'all', 'kael', 'linsceo'}
+agent_ids.update(FALLBACK_AGENTS.keys())
 if config_path.exists():
     cfg = json.loads(config_path.read_text(encoding='utf-8'))
     agent_ids.update((cfg.get('agents') or {}).keys())

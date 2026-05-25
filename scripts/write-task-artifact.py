@@ -16,6 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import task_artifacts  # type: ignore
+from agent_config import default_reviewer, default_tester, load_config  # type: ignore
 
 ARTIFACT_FILES = {
     "ack": "ack.json",
@@ -81,14 +82,18 @@ def _resolve_task_dir(task_ref: str, tasks_root: Path) -> Path:
     return (tasks_root / task_ref).resolve()
 
 
-def _resolve_actor(artifact: str, task: dict[str, Any], args: argparse.Namespace) -> str:
+def _task_domain(task: dict[str, Any]) -> str:
+    return str(task.get("domain") or "").strip()
+
+
+def _resolve_actor(artifact: str, task: dict[str, Any], args: argparse.Namespace, config: dict[str, Any]) -> str:
     explicit = args.agent or args.reviewer or args.tester
     if explicit:
         return explicit
     if artifact == "review":
-        return str(task.get("reviewer") or _agent_from_cwd() or "review-1")
+        return str(task.get("reviewer") or _agent_from_cwd() or default_reviewer(config, _task_domain(task)))
     if artifact == "verify":
-        return str(_agent_from_cwd() or task.get("tester") or "qa-1")
+        return str(_agent_from_cwd() or task.get("tester") or default_tester(config, _task_domain(task)))
     return str(task.get("assigned_agent") or _agent_from_cwd() or "")
 
 
@@ -215,7 +220,7 @@ def _persist_result_metadata(task_path: Path, task: dict[str, Any], payload: dic
     _atomic_write_json(task_path, updated)
 
 
-def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace, config: dict[str, Any]) -> dict[str, Any]:
     status = (args.status or DEFAULT_STATUS[artifact]).strip()
     if status not in STATUS_CHOICES[artifact]:
         allowed = ", ".join(sorted(STATUS_CHOICES[artifact]))
@@ -225,7 +230,7 @@ def _build_payload(artifact: str, task: dict[str, Any], args: argparse.Namespace
     summary = args.summary or ""
     now = _now_iso()
     round_value = _task_round(task)
-    actor = _resolve_actor(artifact, task, args)
+    actor = _resolve_actor(artifact, task, args, config)
     payload: dict[str, Any] = {
         "task_id": task_id,
         "status": status,
@@ -340,6 +345,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agent", default="")
     parser.add_argument("--reviewer", default="")
     parser.add_argument("--tester", default="")
+    parser.add_argument("--config", default=os.environ.get("CONFIG_PATH", str(WORKSPACE_ROOT / "config.json")))
     parser.add_argument("--branch", default="")
     parser.add_argument("--patch-path", default="")
     parser.add_argument("--worktree-path", default="")
@@ -356,7 +362,8 @@ def main() -> int:
         raise SystemExit(f"task not found: {task_path}")
 
     task = _load_json(task_path)
-    payload = _build_payload(args.artifact, task, args)
+    config = load_config(Path(args.config).expanduser().resolve())
+    payload = _build_payload(args.artifact, task, args, config)
     if args.artifact == "result":
         patch_created, patch_error = _capture_patch(task, payload)
         if patch_created:

@@ -11,6 +11,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import task_artifacts  # type: ignore
+from agent_config import default_claim_scope, root_pm  # type: ignore
 from task_pool_rules import pool_gate_blockers  # type: ignore
 
 PRIORITY_RANK = {"critical": 4, "urgent": 4, "high": 3, "medium": 2, "low": 1}
@@ -110,27 +111,6 @@ def load_task_records(tasks_root: Path) -> list[tuple[Path, dict]]:
     return records
 
 
-def default_claim_scope(task: dict, agents: dict[str, dict]) -> list[str]:
-    claim_scope = task.get("claim_scope")
-    if isinstance(claim_scope, list) and claim_scope:
-        return [str(item).strip() for item in claim_scope if str(item).strip()]
-    task_type = str(task.get("task_type") or "").strip().lower()
-    domain = str(task.get("domain") or "").strip().lower()
-    output: list[str] = []
-    for agent_id, payload in agents.items():
-        role = str((payload or {}).get("role") or "").strip().lower()
-        if task_type in {"development", "investigation"}:
-            if role == "fullstack_dev" or agent_id.startswith("dev-"):
-                output.append(agent_id)
-        elif task_type == "verification" or domain == "quality":
-            if role == "qa" or agent_id.startswith("qa-"):
-                output.append(agent_id)
-        elif task_type == "design":
-            if role == "architect" or agent_id == "arch-1":
-                output.append(agent_id)
-    return output
-
-
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
         path.relative_to(other)
@@ -203,13 +183,17 @@ def capacity_limits(agent_id: str, agents: dict[str, dict], config: dict) -> tup
         "reviewer": "reviewer",
         "qa": "qa",
         "architect": "architect",
-        "pm": "pm-chief",
+        "pm": "pm",
     }
     wip_limits = config.get("wip_limits") or {}
     mapped = role_limits.get(role, agent_id if agent_id in wip_limits else "")
     role_limit = wip_limits.get(agent_id)
     if role_limit is None and mapped:
         role_limit = wip_limits.get(mapped)
+    if role_limit is None and role == "pm":
+        root_pm_id = root_pm(config)
+        if root_pm_id:
+            role_limit = wip_limits.get(root_pm_id)
     if role_limit not in (None, ""):
         working_limit = max(1, min(working_limit, _int_value(role_limit, working_limit)))
     return working_limit, reserved_limit, working_limit + reserved_limit
@@ -265,7 +249,7 @@ def scope_conflicts(task: dict, agent_id: str, active_by_agent: dict[str, list[d
 def agent_acceptance(task: dict, task_dir: Path, agent_id: str, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], tasks_root: Path, default_concurrency: int, config: dict) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     reasons.extend(pool_gate_blockers(task, task_dir))
-    claim_scope = default_claim_scope(task, agents)
+    claim_scope = default_claim_scope(task, config)
     if claim_scope and agent_id not in claim_scope:
         reasons.append("not_in_claim_scope")
     reasons.extend(dependency_blockers(task, tasks_root))
@@ -405,7 +389,7 @@ def build_summary(rows: list[dict], agents: dict[str, dict], active_by_agent: di
 
 
 def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_agent: dict[str, list[dict]], busy_map: dict[str, dict], tasks_root: Path, default_concurrency: int, now: datetime, config: dict) -> dict:
-    scope = default_claim_scope(task, agents)
+    scope = default_claim_scope(task, config)
     by_agent = []
     eligible = []
     blocked_reasons: set[str] = set()

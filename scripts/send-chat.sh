@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CHAT_ROOT="${CHAT_ROOT:-$WORKSPACE_ROOT/chat}"
 TASKS_ROOT="${TASKS_ROOT:-$WORKSPACE_ROOT/tasks}"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 
 CHANNEL="${1:-}"
 if [ -z "$CHANNEL" ]; then
@@ -175,7 +177,8 @@ if [ -z "$FROM_ID" ]; then
           FROM_ID="$(basename "$PWD")"
           ;;
         *)
-          FROM_ID="pm-chief"
+          FROM_ID="$(python3 "$AGENT_CONFIG_PY" root-pm --config "$CONFIG_PATH" 2>/dev/null || true)"
+          FROM_ID="${FROM_ID:-pm}"
           ;;
       esac
       ;;

@@ -7,6 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TASKS_ROOT="$WORKSPACE_ROOT/tasks"
+CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 CONFIG_FILE="${FEISHU_CONFIG_PATH:-$WORKSPACE_ROOT/config.local.json}"
 
 load_push_script_from_config() {
@@ -33,26 +35,32 @@ fi
 PUSH_SCRIPT="${PUSH_SCRIPT:-$SCRIPT_DIR/alert-card.sh}"
 TODAY=$(date +%F)
 
-REPORT=$(python3 << 'PYREPORT'
+REPORT=$(TASKS_ROOT="$TASKS_ROOT" CONFIG_PATH="$CONFIG_PATH" AGENT_CONFIG_PY="$AGENT_CONFIG_PY" python3 << 'PYREPORT'
+import importlib.util
 import json
+import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-tasks_root = Path("/Users/linsuchang/Desktop/work/my-agent-teams/tasks")
+tasks_root = Path(os.environ.get("TASKS_ROOT") or "/Users/linsuchang/Desktop/work/my-agent-teams/tasks")
+config_path = Path(os.environ.get("CONFIG_PATH") or "/Users/linsuchang/Desktop/work/my-agent-teams/config.json")
+agent_config_path = Path(os.environ.get("AGENT_CONFIG_PY") or "/Users/linsuchang/Desktop/work/my-agent-teams/scripts/lib/agent_config.py")
 tz = timezone(timedelta(hours=8))
 now = datetime.now(tz)
 today = now.strftime("%Y-%m-%d")
 yesterday = (now - timedelta(days=1)).strftime("%Y-%m-%d")
 
-# Agent 角色
-AGENT_ORDER = ["pm-chief", "arch-1", "dev-1", "dev-2", "qa-1", "review-1"]
-AGENT_ROLES = {
-    "pm-chief": "🤵 PM",
-    "arch-1": "🏗  架构",
-    "dev-1": "💻 开发①",
-    "dev-2": "💻 开发②",
-    "qa-1": "🧪 测试",
-    "review-1": "🔍 审查",
+spec = importlib.util.spec_from_file_location("agent_config", agent_config_path)
+agent_config = importlib.util.module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(agent_config)
+config = agent_config.load_config(config_path)
+agents = agent_config.agent_metadata(config)
+AGENT_ORDER = list(agents)
+AGENT_ROLES = agent_config.role_labels(config, style="daily", include_id=True)
+agent_session_map = {
+    agent_id: str((payload or {}).get("tmux_session") or agent_id)
+    for agent_id, payload in agents.items()
 }
 
 lines = []
@@ -129,14 +137,6 @@ except:
     pass
 
 lines.append("━━━ 🤖 Agent 状态 ━━━")
-agent_session_map = {
-    "pm-chief": "pm-chief",
-    "arch-1": "arch-1",
-    "dev-1": "dev-1-2",
-    "dev-2": "dev-2",
-    "qa-1": "qa-1",
-    "review-1": "review-1",
-}
 for aid in AGENT_ORDER:
     sname = agent_session_map.get(aid, aid)
     alive = "🟢 在线" if sname in tmux_sessions else "⚫ 离线"
@@ -149,7 +149,7 @@ done_count = sum(len(items) for items in today_done.values())
 lines.append("")
 lines.append("━━━ 📊 今日统计 ━━━")
 lines.append(f"  完成: {done_count} | 在途: {active_count}")
-lines.append(f"  在线 Agent: {sum(1 for _, s in agent_session_map.items() if s in tmux_sessions)}/6")
+lines.append(f"  在线 Agent: {sum(1 for _, s in agent_session_map.items() if s in tmux_sessions)}/{len(agent_session_map)}")
 
 # 生成纯文本（飞书 text 消息用 \n）
 print("\n".join(lines))

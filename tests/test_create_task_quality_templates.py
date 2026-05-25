@@ -77,6 +77,38 @@ class CreateTaskQualityTemplateTests(unittest.TestCase):
     def _load_task(self, task_id: str) -> dict:
         return json.loads((self.tasks_root / task_id / "task.json").read_text(encoding="utf-8"))
 
+    def test_auto_development_task_claim_scope_uses_configured_dev_agents(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["agents"]["dev-2"] = {"role": "fullstack_dev"}
+        config["agents"]["dev-3"] = {"role": "fullstack_dev"}
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        completed = self._run_create(
+            "自动开发认领范围",
+            "自动开发认领范围",
+            "auto",
+            "development",
+            "demo",
+            "src/auto.py",
+            "",
+            "",
+            "reviewer",
+            "dev",
+            "dev",
+            "",
+            "execution",
+            "",
+            "",
+            "development",
+            "false",
+            "review",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        task = self._load_task("自动开发认领范围")
+        self.assertEqual(task["claim_policy"], "pull")
+        self.assertEqual(task["claim_scope"], ["dev-1", "dev-2", "dev-3"])
+
     def test_development_defaults_to_review_and_qa(self):
         completed = self._run_create(
             "开发默认模板",

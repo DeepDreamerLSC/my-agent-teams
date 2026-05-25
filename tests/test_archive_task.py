@@ -128,6 +128,45 @@ class ArchiveTaskScriptTests(unittest.TestCase):
             index_path = tasks_root / '_index' / 'archived-tasks.jsonl'
             self.assertTrue(index_path.exists())
 
+    def test_archive_task_uses_configured_root_pm_when_gate_actor_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            tasks_root = root / 'tasks'
+            task_dir = tasks_root / 'task-custom-pm'
+            task_dir.mkdir(parents=True)
+            config_path = root / 'config.json'
+            config_path.write_text(json.dumps({
+                'orchestration': {'root_pm': 'lead-pm'},
+                'agents': {'lead-pm': {'role': 'pm'}},
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            (task_dir / 'task.json').write_text(json.dumps({
+                'id': 'task-custom-pm',
+                'title': '自定义 PM 归档',
+                'status': 'done',
+                'result_summary': 'finished',
+            }, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+            (task_dir / 'instruction.md').write_text('demo', encoding='utf-8')
+            (task_dir / 'transitions.jsonl').write_text('', encoding='utf-8')
+            completed = subprocess.run(
+                ['bash', str(ARCHIVE_SCRIPT), '--task-dir', str(task_dir)],
+                cwd=str(REPO_ROOT),
+                env={
+                    **__import__('os').environ,
+                    'TASKS_ROOT': str(tasks_root),
+                    'WORKSPACE_ROOT': str(root),
+                    'CONFIG_PATH': str(config_path),
+                    'BOARD_SYNC_SCRIPT': str(root / 'missing-board-sync.py'),
+                },
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+
+            payload = json.loads(completed.stdout)
+            archived_task = json.loads((Path(payload['archive_path']) / 'task.json').read_text(encoding='utf-8'))
+
+        self.assertEqual(archived_task['last_gate_actor'], 'lead-pm')
+
 
 if __name__ == '__main__':
     unittest.main()
