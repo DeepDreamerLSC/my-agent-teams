@@ -168,6 +168,26 @@ def assert_dependencies_ready(current_task):
             raise SystemExit(f'dependency not ready: {dep_path.parent.name}={dep_payload.get("status")}')
 
 
+def no_progress_repool_cooldown_reason(current_task):
+    if str(current_task.get('status') or '') != 'pooled':
+        return None
+    if str(current_task.get('last_no_progress_repool_agent') or '').strip() != agent_id:
+        return None
+    until_raw = str(current_task.get('no_progress_repool_until') or '').strip()
+    if not until_raw:
+        return None
+    try:
+        until = datetime.fromisoformat(until_raw.replace('Z', '+00:00'))
+    except Exception:
+        return None
+    now = datetime.now().astimezone()
+    if until.tzinfo is None:
+        until = until.astimezone()
+    if now < until:
+        return f'no_progress_cooldown_until:{until_raw}'
+    return None
+
+
 def assert_capacity_and_conflicts(current_task):
     role_limit = wip_limits.get(agent_id)
     if role_limit in (None, '') and wip_key:
@@ -247,6 +267,10 @@ try:
     gate_blockers = pool_gate_blockers(task, task_dir)
     if gate_blockers:
         raise SystemExit('pool gate not satisfied: ' + ', '.join(gate_blockers))
+
+    cooldown_reason = no_progress_repool_cooldown_reason(task)
+    if cooldown_reason:
+        raise SystemExit(f'task still cooling down after no-progress requeue: {cooldown_reason}')
 
     assert_dependencies_ready(task)
     assert_capacity_and_conflicts(task)

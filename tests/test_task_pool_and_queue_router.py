@@ -108,6 +108,26 @@ class TaskPoolAndQueueRouterTests(unittest.TestCase):
         self.assertEqual(router_payload['next_task_remind_route'], 'queue_only')
         self.assertEqual(router_payload['next_task_preheat_route'], 'queue_only')
 
+    def test_pool_view_marks_no_progress_requeue_cooldown_for_same_agent(self):
+        self._write_task('cooldown-task', {
+            'id': 'cooldown-task', 'title': '回池冷却', 'status': 'pooled', 'priority': 'high',
+            'claim_scope': ['dev-1'], 'pool_entered_at': '2026-05-09T10:00:00+08:00',
+            'task_type': 'development', 'domain': 'development', 'write_scope': ['/tmp/cooldown'],
+            'last_no_progress_repool_agent': 'dev-1',
+            'no_progress_repool_until': '2099-01-01T00:00:00+08:00',
+        })
+        completed = subprocess.run(
+            ['python3', str(POOL_VIEW), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--json'],
+            cwd=str(REPO_ROOT), capture_output=True, text=True, check=True,
+        )
+        payload = json.loads(completed.stdout)
+        row = next(item for item in payload if item['task_id'] == 'cooldown-task')
+        agent_view = next(item for item in row['by_agent'] if item['agent_id'] == 'dev-1')
+        self.assertFalse(agent_view['can_claim'])
+        self.assertIn('no_progress_cooldown_until:', agent_view['reasons'][0])
+        self.assertEqual(row['gate_stage'], 'claim_cooldown')
+        self.assertEqual(row['eligible_agents'], [])
+
     def test_pool_router_selects_next_task_for_agent(self):
         completed = subprocess.run(
             ['python3', str(POOL_ROUTER), '--tasks-root', str(self.tasks_root), '--config', str(self.config), '--agent', 'dev-1', '--next'],

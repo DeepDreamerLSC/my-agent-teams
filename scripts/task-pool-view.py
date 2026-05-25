@@ -233,6 +233,20 @@ def dependency_blockers(task: dict, tasks_root: Path) -> list[str]:
     return blockers
 
 
+def no_progress_repool_blockers(task: dict, agent_id: str, now: datetime) -> list[str]:
+    blockers: list[str] = []
+    if str(task.get("status") or "") != "pooled":
+        return blockers
+    if str(task.get("last_no_progress_repool_agent") or "").strip() != agent_id:
+        return blockers
+    until = parse_iso(str(task.get("no_progress_repool_until") or "").strip())
+    if not until:
+        return blockers
+    if now < until:
+        blockers.append(f"no_progress_cooldown_until:{until.isoformat(timespec='seconds')}")
+    return blockers
+
+
 def scope_conflicts(task: dict, agent_id: str, active_by_agent: dict[str, list[dict]], config: dict) -> list[str]:
     resolved_target = resolve_scope_paths(task, config)
     if not resolved_target:
@@ -255,6 +269,7 @@ def agent_acceptance(task: dict, task_dir: Path, agent_id: str, agents: dict[str
     if claim_scope and agent_id not in claim_scope:
         reasons.append("not_in_claim_scope")
     reasons.extend(dependency_blockers(task, tasks_root))
+    reasons.extend(no_progress_repool_blockers(task, agent_id, datetime.now().astimezone()))
     reasons.extend(scope_conflicts(task, agent_id, active_by_agent, config))
     active = active_by_agent.get(agent_id, [])
     working_count = sum(1 for item in active if str(item["task"].get("status") or "") == "working")
@@ -456,6 +471,8 @@ def build_row(task_dir: Path, task: dict, agents: dict[str, dict], active_by_age
         next_action = "不可认领，需处理：" + ",".join(sorted(blocked_reasons))
         if any(str(reason).startswith("dependency_") for reason in blocked_reasons):
             gate_stage = "dependency"
+        elif any(str(reason).startswith("no_progress_cooldown_until:") for reason in blocked_reasons):
+            gate_stage = "claim_cooldown"
         elif any("write_scope_conflict" in str(reason) for reason in blocked_reasons):
             gate_stage = "scope_conflict"
         else:

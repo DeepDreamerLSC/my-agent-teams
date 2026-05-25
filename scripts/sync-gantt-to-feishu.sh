@@ -324,25 +324,35 @@ def run_lark(cmd_list, cwd=None):
     except:
         return None
 
-# Step 1: Delete all existing records in task detail table
-result = run_lark(["lark-cli", "base", "+record-list",
-    "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
-    "--as", "user", "--limit", "500", "--format", "json"])
+# Step 1: Delete all existing records in task detail table (with full pagination)
+TMP_DIR.mkdir(parents=True, exist_ok=True)
+offset = 0
+all_rids = []
+while True:
+    result = run_lark(["lark-cli", "base", "+record-list",
+        "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+        "--as", "user", "--limit", "200", "--offset", str(offset), "--format", "json"])
+    if not (result and result.get("ok")):
+        break
+    rids = result["data"].get("record_id_list", [])
+    if not rids:
+        break
+    all_rids.extend(rids)
+    if not result["data"].get("has_more", False):
+        break
+    offset += 200
 
-if result and result.get("ok"):
-    rids = result["data"]["record_id_list"]
-    if rids:
-        for i in range(0, len(rids), 200):
-            batch = rids[i:i+200]
-            payload = {"record_id_list": batch}
-            tmp = TMP_DIR / f"task_del_{i}.json"
-            TMP_DIR.mkdir(parents=True, exist_ok=True)
-            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            run_lark(["lark-cli", "base", "+record-delete",
-                "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
-                "--as", "user", "--yes", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
-            tmp.unlink()
-        print(f"[task-detail] 已清除 {len(rids)} 条旧记录", file=sys.stderr)
+if all_rids:
+    for i in range(0, len(all_rids), 200):
+        batch = all_rids[i:i+200]
+        payload = {"record_id_list": batch}
+        tmp = TMP_DIR / f"task_del_{i}.json"
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        run_lark(["lark-cli", "base", "+record-delete",
+            "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+            "--as", "user", "--yes", "--json", f"@{tmp.name}"], cwd=str(TMP_DIR))
+        tmp.unlink()
+    print(f"[task-detail] 已清除 {len(all_rids)} 条旧记录", file=sys.stderr)
 
 # Step 2: Get fresh Dashboard data
 resp = urllib.request.urlopen(DASHBOARD_URL)

@@ -284,6 +284,27 @@ class ClaimTaskReservedTests(unittest.TestCase):
         self.assertNotEqual(completed.returncode, 0)
         self.assertIn("reserved_limit", completed.stderr)
 
+    def test_claim_rejects_task_during_no_progress_cooldown(self):
+        self._write_task("cooldown-task", {
+            "status": "pooled",
+            "assigned_agent": "auto",
+            "claim_scope": ["dev-1"],
+            "last_no_progress_repool_agent": "dev-1",
+            "no_progress_repool_until": "2099-01-01T00:00:00+08:00",
+            "write_scope": ["src/cooldown"],
+        })
+
+        completed = subprocess.run(
+            [str(CLAIM_SCRIPT), "cooldown-task"],
+            cwd=str(REPO_ROOT),
+            env=self._env(),
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("no_progress_cooldown_until", completed.stderr)
+
     def test_claim_records_dependencies_ready_at_when_dependencies_are_done(self):
         self._write_task("dep-task", {
             "status": "done",
@@ -400,11 +421,9 @@ class ClaimTaskReservedTests(unittest.TestCase):
             "write_scope": ["src/next"],
         })
 
-        send_log = self.root / "send.log"
         send_script = self.scripts_root / "send-to-agent.sh"
         send_script.write_text(
             "#!/bin/bash\n"
-            f"printf '%s' \"$2\" > '{send_log}'\n"
             "echo \"delivered to $1 (runtime=codex, attempt=1)\"\n",
             encoding="utf-8",
         )
@@ -431,13 +450,12 @@ class ClaimTaskReservedTests(unittest.TestCase):
         )
 
         task = json.loads((target_dir / "task.json").read_text(encoding="utf-8"))
-        message = send_log.read_text(encoding="utf-8")
         self.assertEqual(task["status"], "dispatched")
         self.assertEqual(task["reserved_by"], "dev-1")
         self.assertEqual(task["workspace_status"], "prepared")
         self.assertTrue(Path(task["worktree_path"]).exists())
-        self.assertIn("当前任务完成前不要写该任务 ack", message)
-        self.assertIn("请在", message)
+        self.assertEqual(task["delivery_deferred_until"], "agent_idle")
+        self.assertIn("watcher auto-reserved", task["delivery_deferred_reason"])
 
 
 if __name__ == "__main__":

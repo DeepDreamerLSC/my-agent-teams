@@ -21,6 +21,10 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
     log_dir = workspace_root / ".runtime" / "logs"
     workspace_root.mkdir(parents=True, exist_ok=True)
     (workspace_root / "config.json").write_text("{}", encoding="utf-8")
+    send_script = workspace_root / "scripts" / "send-to-agent.sh"
+    send_script.parent.mkdir(parents=True, exist_ok=True)
+    send_script.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+    send_script.chmod(0o755)
     env.update(
         {
             "WORKSPACE_ROOT": str(workspace_root),
@@ -32,6 +36,7 @@ def _base_env(tmp_path: Path) -> dict[str, str]:
             "CONFIG_PATH": str(workspace_root / "config.json"),
             "NOTIFY_RETRY_COOLDOWN_SECONDS": "0",
             "RESEND_COOLDOWN_SECONDS": "0",
+            "SEND_SCRIPT": str(send_script),
         }
     )
     return env
@@ -115,6 +120,106 @@ assert values[0] == values[1], values
 assert values[0] != values[2], values
 assert all(re.fullmatch(r'[0-9a-f]{{64}}', item) for item in values), values
 PY
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_working_no_progress_reminder_marks_state(tmp_path: Path):
+    env = _base_env(tmp_path)
+    task_dir = tmp_path / "tasks" / "task-1"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    workspace = tmp_path / "workspace" / "repo"
+    workspace.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(workspace), check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(workspace), check=True)
+    (workspace / "src").mkdir()
+    (workspace / "src" / "base.txt").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    (task_dir / "task.json").write_text(
+        json.dumps({
+            "id": "task-1",
+            "status": "working",
+            "assigned_agent": "dev-1",
+            "workspace_path": str(workspace),
+            "worktree_path": str(workspace),
+        }, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (task_dir / "ack.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+    old_ts = 1_700_000_000
+    os.utime(task_dir / "ack.json", (old_ts, old_ts))
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+notify_working_no_progress_if_needed '{task_dir}' 'task-1' 'dev-1' '{old_ts}'
+test -f "$STATE_DIR/task-1_working_no_progress_reminder"
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
+def test_working_no_progress_repool_returns_task_to_pool_and_clears_state(tmp_path: Path):
+    env = _base_env(tmp_path)
+    task_dir = tmp_path / "tasks" / "task-1"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    workspace = tmp_path / "workspace" / "repo"
+    workspace.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(workspace), check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(workspace), check=True)
+    (workspace / "src").mkdir()
+    (workspace / "src" / "base.txt").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    (task_dir / "task.json").write_text(
+        json.dumps({
+            "id": "task-1",
+            "status": "working",
+            "assigned_agent": "dev-1",
+            "pre_claim_assigned_agent": "auto",
+            "workspace_path": str(workspace),
+            "worktree_path": str(workspace),
+        }, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (task_dir / "ack.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+    (task_dir / "claim.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+    old_ts = 1_700_000_000
+    os.utime(task_dir / "ack.json", (old_ts, old_ts))
+    os.utime(task_dir / "claim.json", (old_ts, old_ts))
+    state_dir = Path(env["STATE_DIR"])
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "task-1_working_timeout_notice").write_text("1", encoding="utf-8")
+    (state_dir / "task-1_working_timeout_push").write_text("1", encoding="utf-8")
+    (state_dir / "task-1_working_no_progress_reminder").write_text("1", encoding="utf-8")
+    (state_dir / "task-1_working_timeout_push.retry").write_text(str(old_ts), encoding="utf-8")
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+returned_agent="$(requeue_working_task_to_pool_if_no_progress '{task_dir}' 'task-1' '{old_ts}' 'ack 后无实际进展')"
+test "$returned_agent" = "dev-1"
+task_clear_working_timeout_state 'task-1'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task_dir = Path(r'{task_dir}')
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'pooled', task
+assert task['assigned_agent'] == 'auto', task
+assert task['last_no_progress_repool_agent'] == 'dev-1', task
+assert task['no_progress_repool_until'], task
+assert task['pool_entered_at'], task
+assert not (task_dir / 'ack.json').exists()
+assert not (task_dir / 'claim.json').exists()
+assert any(p.name.startswith('ack.requeued.') for p in task_dir.iterdir()), list(p.name for p in task_dir.iterdir())
+PY
+test ! -f "$STATE_DIR/task-1_working_timeout_notice"
+test ! -f "$STATE_DIR/task-1_working_timeout_push"
+test ! -f "$STATE_DIR/task-1_working_timeout_push.retry"
+test ! -f "$STATE_DIR/task-1_working_no_progress_reminder"
 """
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 

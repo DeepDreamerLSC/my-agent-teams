@@ -20,6 +20,7 @@ config.local.json
 
 # Agent task symlinks (point to shared tasks/)
 agents/*/tasks
+agents/*/.work/
 # Runtime task data
 tasks/T-*/
 tasks/修复*/
