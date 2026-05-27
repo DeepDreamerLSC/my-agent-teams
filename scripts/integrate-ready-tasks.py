@@ -54,7 +54,7 @@ def classify_task(task_dir: Path, task: dict[str, Any], target_override: str) ->
     task_id = str(task.get("id") or task_dir.name)
     status = str(task.get("status") or "").strip()
     gate = str(task.get("merge_gate_state") or "").strip()
-    target_branch = target_override or str(queue_item.get("target_branch") or "").strip()
+    target_branch = target_override or str(queue_item.get("target_branch") or "main").strip()
 
     reason = ""
     if status != "ready_for_merge":
@@ -126,7 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks-root", default=os.environ.get("TASKS_ROOT", str(WORKSPACE_ROOT / "tasks")))
     parser.add_argument("--config", default=os.environ.get("CONFIG_PATH", str(WORKSPACE_ROOT / "config.json")))
     parser.add_argument("--strategy", choices=["auto", "branch", "patch"], default="auto")
-    parser.add_argument("--target-branch", default="")
+    parser.add_argument("--target-branch", default="main")
     parser.add_argument("--actor", default="integrator")
     parser.add_argument("--test-cmd", action="append", default=[])
     parser.add_argument("--dry-run", action="store_true")

@@ -417,7 +417,7 @@ def integrate(args: argparse.Namespace) -> dict[str, Any]:
     actor = str(args.actor or "integrator").strip() or "integrator"
 
     task_ready_for_integration(task_dir, task)
-    target_branch = str(args.target_branch or task.get("integration_target_branch") or task.get("target_branch") or "").strip()
+    target_branch = str(args.target_branch or task.get("integration_target_branch") or task.get("target_branch") or "main").strip()
     source: dict[str, str] = {}
     repo: Path | None = None
     worktree: Path | None = None
