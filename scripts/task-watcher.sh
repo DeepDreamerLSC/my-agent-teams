@@ -70,6 +70,7 @@ WORKING_TIMEOUT_SECONDS="${WORKING_TIMEOUT_SECONDS:-1800}"
 WORKING_REASSIGN_GRACE_SECONDS="${WORKING_REASSIGN_GRACE_SECONDS:-900}"
 ACK_NO_PROGRESS_REMINDER_SECONDS="${ACK_NO_PROGRESS_REMINDER_SECONDS:-900}"
 ACK_NO_PROGRESS_REPOOL_SECONDS="${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}"
+ACK_NO_PROGRESS_REPOOL_SECONDS_DEVELOPMENT="${ACK_NO_PROGRESS_REPOOL_SECONDS_DEVELOPMENT:-3600}"
 ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS="${ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS:-1800}"
 TASK_WATCHER_TEST_MODE="${TASK_WATCHER_TEST_MODE:-0}"
 NOTIFY_RETRY_COOLDOWN_SECONDS="${NOTIFY_RETRY_COOLDOWN_SECONDS:-$RESEND_COOLDOWN_SECONDS}"
@@ -421,6 +422,20 @@ raise SystemExit(1)
 PY
 }
 
+task_ack_no_progress_repool_seconds() {
+    local task_dir="$1"
+    local task_type
+    task_type=$(task_json_pick "$task_dir" task_type 2>/dev/null || true)
+    case "$(printf '%s' "${task_type:-}" | tr '[:upper:]' '[:lower:]')" in
+        development|develop|开发)
+            printf '%s\n' "${ACK_NO_PROGRESS_REPOOL_SECONDS_DEVELOPMENT:-3600}"
+            ;;
+        *)
+            printf '%s\n' "${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}"
+            ;;
+    esac
+}
+
 notify_working_no_progress_if_needed() {
     local task_dir="$1"
     local task_id="$2"
@@ -449,11 +464,13 @@ requeue_working_task_to_pool_if_no_progress() {
     local task_id="$2"
     local working_since="$3"
     local reason="${4:-ack 后无实际进展}"
-    local now
+    local now repool_seconds
 
     [ -n "$working_since" ] && [ "$working_since" -gt 0 ] || return 1
+    repool_seconds=$(task_ack_no_progress_repool_seconds "$task_dir")
+    [ -n "$repool_seconds" ] || repool_seconds="${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}"
     now=$(date +%s)
-    [ $(( now - working_since )) -ge "${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}" ] || return 1
+    [ $(( now - working_since )) -ge "$repool_seconds" ] || return 1
 
     python3 - "$task_dir" "$task_id" "$reason" "$ACK_NO_PROGRESS_REPOOL_COOLDOWN_SECONDS" <<'PY'
 import json
@@ -3957,18 +3974,20 @@ run_task_watcher_loop() {
             now=$(date +%s)
             if [ -n "$working_since" ] && [ "$working_since" -gt 0 ] && ! task_has_effective_progress "$task_dir" "$working_since"; then
                 elapsed_since_ack=$(( now - working_since ))
+                ack_no_progress_repool_seconds=$(task_ack_no_progress_repool_seconds "$task_dir")
+                [ -n "$ack_no_progress_repool_seconds" ] || ack_no_progress_repool_seconds="${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}"
                 if [ "$elapsed_since_ack" -ge "${ACK_NO_PROGRESS_REMINDER_SECONDS:-900}" ]; then
                     no_progress_reminder_key="${task_id}_working_no_progress_reminder"
                     if ! is_notified "$no_progress_reminder_key" || ! is_file_newer_than_notified "$no_progress_reminder_key" "$task_dir/ack.json"; then
                         notify_working_no_progress_if_needed "$task_dir" "$task_id" "$assigned_agent" "$working_since" || true
                     fi
                 fi
-                if [ "$elapsed_since_ack" -ge "${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800}" ]; then
+                if [ "$elapsed_since_ack" -ge "$ack_no_progress_repool_seconds" ]; then
                     if returned_agent=$(requeue_working_task_to_pool_if_no_progress "$task_dir" "$task_id" "$working_since" 2>/dev/null); then
                         if [ -n "$returned_agent" ]; then
-                            notify_agent "$returned_agent" "任务 ${task_id} 已 ack 超过 ${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800} 秒且未发现实际进展，现已自动回池。"
+                            notify_agent "$returned_agent" "任务 ${task_id} 已 ack 超过 ${ack_no_progress_repool_seconds} 秒且未发现实际进展，现已自动回池。"
                         fi
-                        notify_pm "[task-watcher] $task_id ack 后 ${ACK_NO_PROGRESS_REPOOL_SECONDS:-1800} 秒仍无实际进展，已回退到 pooled。"
+                        notify_pm "[task-watcher] $task_id ack 后 ${ack_no_progress_repool_seconds} 秒仍无实际进展，已回退到 pooled。"
                         if [ -n "$returned_agent" ]; then
                             emit_system_chat_event watcher "$task_id" "ack 后无实际进展，已从 ${returned_agent} 回退到 pooled。" "$PM_AGENT_ID" degraded notify
                         else
