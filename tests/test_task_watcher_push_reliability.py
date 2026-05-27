@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -434,10 +435,79 @@ def test_watchdog_grace_period_prevents_immediate_restart_on_heartbeat_pid_misma
     workspace_root = Path(env["WORKSPACE_ROOT"])
     state_dir = workspace_root / ".runtime" / "state" / "task-watcher"
     state_dir.mkdir(parents=True, exist_ok=True)
-    grace = state_dir / 'task-watcher-watchdog-grace-heartbeat_pid_mismatch.json'
-    grace.write_text(json.dumps({'reason': 'heartbeat_pid_mismatch', 'started_at': 1}, ensure_ascii=False) + '\n', encoding='utf-8')
-    self = None
-    assert grace.exists()
+    fake_script = tmp_path / "task-watcher.sh"
+    fake_script.write_text(
+        """#!/bin/bash
+if [ "${FAKE_WATCHER_MODE:-}" != "manual" ]; then
+  printf '%s\\n' "$$" >> "$STATE_DIR/restarts.log"
+fi
+sleep 30
+""",
+        encoding="utf-8",
+    )
+    fake_script.chmod(0o755)
+
+    watchdog_env = {
+        **env,
+        "TASK_WATCHER_SCRIPT": str(fake_script),
+        "WATCHDOG_RUN_ONCE": "1",
+        "WATCHDOG_INTERVAL": "1",
+        "HEARTBEAT_PID_MISMATCH_GRACE_SECONDS": "600",
+    }
+    grace = state_dir / "task-watcher-watchdog-grace-heartbeat_pid_mismatch.json"
+    restarts = state_dir / "restarts.log"
+    started: list[subprocess.Popen] = []
+
+    def start_manual_watcher() -> subprocess.Popen:
+        proc = subprocess.Popen(
+            [str(fake_script)],
+            env={**watchdog_env, "FAKE_WATCHER_MODE": "manual"},
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        started.append(proc)
+        time.sleep(0.2)
+        return proc
+
+    try:
+        first = start_manual_watcher()
+        (state_dir / "task-watcher.pid").write_text(f"{first.pid}\n", encoding="utf-8")
+        (state_dir / "task-watcher-heartbeat.json").write_text(
+            json.dumps({"pid": first.pid + 1, "updated_ts": int(time.time())}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        subprocess.run([str(WATCHDOG)], env=watchdog_env, cwd=str(REPO_ROOT), check=True)
+
+        assert grace.exists()
+        payload = json.loads(grace.read_text(encoding="utf-8"))
+        assert payload["reason"] == "heartbeat_pid_mismatch"
+        assert restarts.exists()
+        assert len(restarts.read_text(encoding="utf-8").splitlines()) == 1
+
+        second = start_manual_watcher()
+        (state_dir / "task-watcher.pid").write_text(f"{second.pid}\n", encoding="utf-8")
+        (state_dir / "task-watcher-heartbeat.json").write_text(
+            json.dumps({"pid": second.pid + 1, "updated_ts": int(time.time())}, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+
+        subprocess.run([str(WATCHDOG)], env=watchdog_env, cwd=str(REPO_ROOT), check=True)
+
+        assert second.poll() is None
+        assert len(restarts.read_text(encoding="utf-8").splitlines()) == 1
+    finally:
+        for proc in started:
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+        if restarts.exists():
+            for raw_pid in restarts.read_text(encoding="utf-8").splitlines():
+                if raw_pid.strip().isdigit():
+                    subprocess.run(["kill", raw_pid.strip()], check=False)
 
 
 def test_working_timeout_observation_helper_ignores_stale_progress_artifact(tmp_path: Path):

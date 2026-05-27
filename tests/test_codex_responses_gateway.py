@@ -200,3 +200,57 @@ def test_render_local_config_team_profiles(tmp_path):
     assert large['orchestration']['domains']['development'] == [
         'dev-1', 'dev-2', 'dev-3', 'dev-4', 'dev-5', 'dev-6'
     ]
+
+
+def test_teamctl_start_agents_preserves_runtime_command_arguments(tmp_path):
+    workspace = tmp_path / 'workspace'
+    agents_root = workspace / 'agents'
+    workspace.mkdir()
+    config_path = workspace / 'config.json'
+    config_path.write_text(json.dumps({
+        'agents': {
+            'dev-1': {
+                'role': 'fullstack_dev',
+                'runtime': 'codex',
+                'tmux_session': 'codex-custom',
+                'workdir': str(agents_root / 'dev-1'),
+            },
+        },
+    }), encoding='utf-8')
+
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    tmux_log = tmp_path / 'tmux.log'
+    tmux = bin_dir / 'tmux'
+    tmux.write_text(
+        f"""#!/bin/bash
+printf '%s\\n' "$*" >> '{tmux_log}'
+case "$1" in
+  has-session) exit 1 ;;
+  new-session) exit 0 ;;
+  *) exit 0 ;;
+esac
+""",
+        encoding='utf-8',
+    )
+    tmux.chmod(0o755)
+    codex = bin_dir / 'codex'
+    codex.write_text("#!/bin/bash\nexit 0\n", encoding='utf-8')
+    codex.chmod(0o755)
+
+    subprocess.run([
+        str(TEAMCTL),
+        'start-agents',
+    ], cwd=str(REPO_ROOT), env={
+        **os.environ,
+        'PATH': f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+        'WORKSPACE_ROOT': str(workspace),
+        'CONFIG_PATH': str(config_path),
+        'AGENTS_ROOT': str(agents_root),
+        'CODEX_CMD': 'codex -p dev-team',
+    }, capture_output=True, text=True, check=True)
+
+    calls = tmux_log.read_text(encoding='utf-8')
+    assert 'has-session -t codex-custom' in calls
+    assert 'new-session -d -s codex-custom' in calls
+    assert 'exec codex -p dev-team' in calls

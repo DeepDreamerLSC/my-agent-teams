@@ -166,21 +166,72 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+infer_chat_from_pwd() {
+  python3 - "$PWD" "$CONFIG_PATH" "$WORKSPACE_ROOT" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+cwd = Path(sys.argv[1]).expanduser().resolve()
+config_path = Path(sys.argv[2]).expanduser()
+workspace = Path(sys.argv[3]).expanduser().resolve()
+
+def maybe_print(agent_id: str) -> bool:
+    agent_id = str(agent_id).strip()
+    if not agent_id:
+        return False
+    print(agent_id)
+    return True
+
+try:
+    config = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+except Exception:
+    config = {}
+
+for agent_id, payload in (config.get("agents") or {}).items():
+    if not isinstance(payload, dict):
+        continue
+    raw_workdir = str(payload.get("workdir") or "").strip()
+    if not raw_workdir:
+        continue
+    workdir = Path(raw_workdir).expanduser()
+    if not workdir.is_absolute():
+        workdir = workspace / workdir
+    try:
+        resolved = workdir.resolve()
+    except Exception:
+        resolved = workdir
+    try:
+        if cwd == resolved or cwd.is_relative_to(resolved):
+            raise SystemExit(0 if maybe_print(agent_id) else 1)
+    except AttributeError:
+        try:
+            cwd.relative_to(resolved)
+            raise SystemExit(0 if maybe_print(agent_id) else 1)
+        except ValueError:
+            pass
+    except ValueError:
+        pass
+
+parts = cwd.parts
+for idx, part in enumerate(parts[:-1]):
+    if part == "agents":
+        raise SystemExit(0 if maybe_print(parts[idx + 1]) else 1)
+raise SystemExit(1)
+PY
+}
+
 if [ -z "$FROM_ID" ]; then
   case "$SOURCE_TYPE" in
     system)
       FROM_ID="${SOURCE_NAME:-system}"
       ;;
     *)
-      case "$PWD" in
-        */agents/*)
-          FROM_ID="$(basename "$PWD")"
-          ;;
-        *)
-          FROM_ID="$(python3 "$AGENT_CONFIG_PY" root-pm --config "$CONFIG_PATH" 2>/dev/null || true)"
-          FROM_ID="${FROM_ID:-pm}"
-          ;;
-      esac
+      FROM_ID="$(infer_chat_from_pwd 2>/dev/null || true)"
+      if [ -z "$FROM_ID" ]; then
+        FROM_ID="$(python3 "$AGENT_CONFIG_PY" root-pm --config "$CONFIG_PATH" 2>/dev/null || true)"
+        FROM_ID="${FROM_ID:-pm}"
+      fi
       ;;
   esac
 fi

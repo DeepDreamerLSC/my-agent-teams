@@ -1076,6 +1076,12 @@ list_dev_agents() {
     python3 "$AGENT_CONFIG_PY" list-dev-agent-ids --config "$CONFIG_PATH"
 }
 
+is_development_agent() {
+    local agent_id="$1"
+    [ -n "$agent_id" ] || return 1
+    list_dev_agents | grep -Fx -- "$agent_id" >/dev/null 2>&1
+}
+
 list_pool_agents() {
     python3 "$AGENT_CONFIG_PY" list-pool-agent-ids --config "$CONFIG_PATH"
 }
@@ -2896,7 +2902,7 @@ auto_claim_pending_dev() {
     local target_agent=""
     if matches_auto_assign_marker "$assigned_agent"; then
         target_agent=$(select_idle_dev_agent 2>/dev/null || true)
-    elif [[ "$assigned_agent" == dev-* ]] && is_idle_agent "$assigned_agent"; then
+    elif is_development_agent "$assigned_agent" && is_idle_agent "$assigned_agent"; then
         target_agent="$assigned_agent"
     fi
 
@@ -2905,7 +2911,7 @@ auto_claim_pending_dev() {
     dispatch_task_to_agent "$task_dir" "$target_agent" "watcher auto-claimed pending execution task"
     workspace_payload=$(prepare_task_workspace_payload "$task_dir")
     workspace_hint=$(workspace_hint_from_payload "$workspace_payload")
-    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$target_agent" "请读取 /Users/linsuchang/Desktop/work/my-agent-teams/tasks/${task_id}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
+    deliver_execution_instruction_and_record "$task_dir" "$task_id" "$target_agent" "请读取 ${task_dir}/instruction.md 并开始执行任务。该任务由 task-watcher 在你空闲时自动认领/派发。${workspace_hint:+ ${workspace_hint}} 完成后写 ack.json 和 result.json。" || true
     sync_task_board "$task_dir" "auto-claim-dev"
     log "$task_id: 自动认领并派发给 $target_agent"
     return 0

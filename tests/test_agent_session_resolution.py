@@ -403,6 +403,114 @@ is_integration_owner_planning_task principal-architect domain
     subprocess.run(["bash", "-c", script], cwd=str(REPO_ROOT), env=env, check=True)
 
 
+def test_send_chat_infers_agent_from_configured_workdir_subdirectory(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    agent_src = workspace / "agents" / "dev-1" / "src"
+    agent_src.mkdir(parents=True)
+    chat_root = workspace / "chat"
+    config_path = workspace / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "orchestration": {"root_pm": "pm-chief"},
+                "agents": {
+                    "pm-chief": {"role": "pm", "workdir": "agents/pm-chief"},
+                    "dev-1": {"role": "fullstack_dev", "workdir": "agents/dev-1"},
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(
+        [str(SEND_CHAT), "general", "hello from src"],
+        cwd=str(agent_src),
+        env={
+            **os.environ,
+            "WORKSPACE_ROOT": str(workspace),
+            "CHAT_ROOT": str(chat_root),
+            "CONFIG_PATH": str(config_path),
+            "AGENT_CONFIG_PY": str(AGENT_CONFIG),
+        },
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    messages = [
+        json.loads(line)
+        for line in next((chat_root / "general").glob("*.jsonl")).read_text(encoding="utf-8").splitlines()
+    ]
+    assert messages[-1]["from"] == "dev-1"
+
+
+def test_task_watcher_auto_claims_configured_dev_agent_without_dev_prefix(tmp_path: Path):
+    config_path = tmp_path / "config.json"
+    _write_custom_role_defaults_config(config_path)
+    workspace = tmp_path / "workspace"
+    task_dir = tmp_path / "tasks" / "custom-dev-task"
+    delivery_log = tmp_path / "delivery.log"
+    workspace.mkdir()
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.json").write_text(
+        json.dumps(
+            {
+                "id": "custom-dev-task",
+                "title": "自定义开发者任务",
+                "status": "pending",
+                "assigned_agent": "builder-a",
+                "task_level": "execution",
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (task_dir / "transitions.jsonl").write_text("", encoding="utf-8")
+    env = {
+        **os.environ,
+        "WORKSPACE_ROOT": str(workspace),
+        "CONFIG_PATH": str(config_path),
+        "AGENT_CONFIG_PY": str(AGENT_CONFIG),
+        "TASK_WATCHER_TEST_MODE": "1",
+        "STATE_DIR": str(workspace / ".runtime" / "state" / "task-watcher"),
+        "LOG_DIR": str(workspace / ".runtime" / "logs"),
+        "LOG_FILE": str(workspace / ".runtime" / "logs" / "task-watcher.log"),
+        "WATCHER_STDOUT_LOG": str(workspace / ".runtime" / "logs" / "task-watcher.log"),
+        "DELIVERY_LOG": str(delivery_log),
+    }
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+dependencies_ready() {{ return 0; }}
+is_idle_agent() {{ [ "$1" = "builder-a" ]; }}
+prepare_task_workspace_payload() {{ printf '{{}}'; }}
+workspace_hint_from_payload() {{ return 0; }}
+sync_task_board() {{ return 0; }}
+deliver_execution_instruction_and_record() {{
+  printf '%s\\t%s\\t%s\\t%s\\n' "$1" "$2" "$3" "$4" >> "$DELIVERY_LOG"
+}}
+auto_claim_pending_dev '{task_dir}' 'custom-dev-task' 'builder-a' 'execution'
+python3 - <<'PY'
+import json
+from pathlib import Path
+task_dir = Path(r'{task_dir}')
+task = json.loads((task_dir / 'task.json').read_text(encoding='utf-8'))
+assert task['status'] == 'dispatched', task
+assert task['assigned_agent'] == 'builder-a', task
+delivery = Path(r'{delivery_log}').read_text(encoding='utf-8')
+assert str(task_dir / 'instruction.md') in delivery, delivery
+assert '/Users/linsuchang/Desktop/work/my-agent-teams/tasks/custom-dev-task/instruction.md' not in delivery, delivery
+PY
+"""
+
+    subprocess.run(["bash", "-c", script], cwd=str(REPO_ROOT), env=env, check=True)
+
+
 def test_task_state_invariants_design_claim_scope_uses_configured_architect(tmp_path: Path):
     config_path = tmp_path / "config.json"
     _write_custom_role_defaults_config(config_path)

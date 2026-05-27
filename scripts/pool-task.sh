@@ -5,7 +5,7 @@ TASK_FILE="${1:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
-AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$WORKSPACE_ROOT/scripts/lib/agent_config.py}"
+AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 SEND_CHAT_SCRIPT="${SEND_CHAT_SCRIPT:-$WORKSPACE_ROOT/scripts/send-chat.sh}"
 SEND_SCRIPT="${SEND_SCRIPT:-$WORKSPACE_ROOT/scripts/send-to-agent.sh}"
 FORCE_RESET_ACTIVE="${FORCE_RESET_ACTIVE:-0}"
@@ -15,7 +15,7 @@ if [ -z "$TASK_FILE" ]; then
   exit 2
 fi
 
-POOL_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$FORCE_RESET_ACTIVE" "$WORKSPACE_ROOT" <<'PY'
+POOL_OUTPUT=$(python3 - "$TASK_FILE" "$CONFIG_PATH" "$FORCE_RESET_ACTIVE" "$WORKSPACE_ROOT" "$SCRIPT_DIR" <<'PY'
 import json
 import os
 import sys
@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 AUTO_ASSIGNED = {'auto', 'auto-dev', 'unassigned'}
-sys.path.insert(0, str(Path(sys.argv[4]).resolve() / 'scripts' / 'lib'))
+sys.path.insert(0, str(Path(sys.argv[5]).resolve() / 'lib'))
 from agent_config import default_claim_scope  # type: ignore
 from task_pool_rules import pool_gate_blockers  # type: ignore
 

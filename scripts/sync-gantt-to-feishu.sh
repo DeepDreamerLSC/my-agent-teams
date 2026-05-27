@@ -10,9 +10,11 @@
 #   GANTT_FEISHU_BASE_TOKEN       飞书 Base Token（必填）
 #   GANTT_FEISHU_TABLE_ID         人力总览表 ID（必填）
 #   GANTT_FEISHU_TREND_TABLE_ID   完成趋势表 ID（可选，空则跳过趋势同步）
+#   GANTT_FEISHU_TASK_TABLE_ID    任务详情表 ID（必填；旧变量 GANTT_FEISHU_TASK_TABLE 仍兼容）
 #   GANTT_FEISHU_AGENTS           逗号分隔 agent 列表
 #   GANTT_FEISHU_RECORD_IDS       与 agent 一一对应的 record_id 逗号列表（必填）
 #   GANTT_DASHBOARD_URL           dashboard Gantt API URL
+#   GANTT_DRY_RUN=1               只计算并打印，不写入或删除飞书记录
 
 set -euo pipefail
 
@@ -22,6 +24,7 @@ CONFIG_FILE="${FEISHU_CONFIG_PATH:-$WORKSPACE_ROOT/config.local.json}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE_ROOT/config.json}"
 AGENT_CONFIG_PY="${AGENT_CONFIG_PY:-$SCRIPT_DIR/lib/agent_config.py}"
 DASHBOARD_URL="${GANTT_DASHBOARD_URL:-http://127.0.0.1:5001/api/gantt}"
+DRY_RUN="${GANTT_DRY_RUN:-0}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -31,6 +34,34 @@ NC='\033[0m'
 log()  { echo "[sync-gantt] $*"; }
 warn() { echo -e "${YELLOW}[sync-gantt][WARN]${NC} $*" >&2; }
 err()  { echo -e "${RED}[sync-gantt][ERROR]${NC} $*" >&2; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    -h|--help)
+      cat <<'EOF_USAGE'
+usage: scripts/sync-gantt-to-feishu.sh [--dry-run]
+
+Required config:
+  GANTT_FEISHU_BASE_TOKEN / notifications.gantt.base_token
+  GANTT_FEISHU_TABLE_ID / notifications.gantt.table_id
+  GANTT_FEISHU_TASK_TABLE_ID / notifications.gantt.task_table_id
+  GANTT_FEISHU_RECORD_IDS / notifications.gantt.record_ids
+
+Optional:
+  GANTT_FEISHU_TREND_TABLE_ID, GANTT_FEISHU_AGENTS, GANTT_DASHBOARD_URL
+EOF_USAGE
+      exit 0
+      ;;
+    *)
+      err "unknown option: $1"
+      exit 2
+      ;;
+  esac
+done
 
 load_config_value() {
   local key="$1"
@@ -52,7 +83,9 @@ PYCONFIG
 }
 
 config_default() {
-  local env_name="$1" config_key="$2" current="${!env_name:-}"
+  local env_name="$1"
+  local config_key="$2"
+  local current="${!env_name:-}"
   if [ -n "$current" ]; then
     printf '%s' "$current"
     return
@@ -69,6 +102,10 @@ load_agent_ids_from_config() {
 BASE_TOKEN="$(config_default GANTT_FEISHU_BASE_TOKEN base_token)"
 AGGREGATE_TABLE="$(config_default GANTT_FEISHU_TABLE_ID table_id)"
 TREND_TABLE="$(config_default GANTT_FEISHU_TREND_TABLE_ID trend_table_id)"
+TASK_DETAIL_TABLE="$(config_default GANTT_FEISHU_TASK_TABLE_ID task_table_id)"
+if [ -z "$TASK_DETAIL_TABLE" ]; then
+  TASK_DETAIL_TABLE="$(config_default GANTT_FEISHU_TASK_TABLE task_table)"
+fi
 AGENTS_CSV="$(config_default GANTT_FEISHU_AGENTS agents)"
 RECORD_IDS_CSV="$(config_default GANTT_FEISHU_RECORD_IDS record_ids)"
 if [ -z "$AGENTS_CSV" ]; then
@@ -76,19 +113,21 @@ if [ -z "$AGENTS_CSV" ]; then
 fi
 
 require_value() {
-  local value="$1" label="$2"
+  local value="$1"
+  local label="$2"
   if [ -z "$value" ]; then
-    err "缺少配置：$label。请设置环境变量或写入 config.local.json notifications.gantt。"
+    err "缺少配置：${label}。请设置环境变量或写入 config.local.json notifications.gantt。"
     exit 1
   fi
 }
 
 require_value "$BASE_TOKEN" "GANTT_FEISHU_BASE_TOKEN"
 require_value "$AGGREGATE_TABLE" "GANTT_FEISHU_TABLE_ID"
+require_value "$TASK_DETAIL_TABLE" "GANTT_FEISHU_TASK_TABLE_ID"
 require_value "$AGENTS_CSV" "GANTT_FEISHU_AGENTS 或 config.json agents"
 require_value "$RECORD_IDS_CSV" "GANTT_FEISHU_RECORD_IDS"
 
-if ! command -v lark-cli >/dev/null 2>&1; then
+if [ "$DRY_RUN" != "1" ] && ! command -v lark-cli >/dev/null 2>&1; then
   err "lark-cli 未安装，请先执行: npm install -g @larksuite/cli"
   exit 1
 fi
@@ -170,11 +209,14 @@ print(json.dumps({
 PYJSON
 )
 
-  if result=$(lark-cli base +record-upsert \
-    --base-token "$BASE_TOKEN" \
-    --table-id "$AGGREGATE_TABLE" \
-    --record-id "$rid" \
-    --json "$payload" 2>&1); then
+  if [ "$DRY_RUN" = "1" ]; then
+    log "[dry-run] 将更新人力总览 $agent record=$rid payload=$payload"
+    UPDATED=$((UPDATED + 1))
+  elif result=$(lark-cli base +record-upsert \
+      --base-token "$BASE_TOKEN" \
+      --table-id "$AGGREGATE_TABLE" \
+      --record-id "$rid" \
+      --json "$payload" 2>&1); then
     UPDATED=$((UPDATED + 1))
   else
     err "更新 $agent 失败: $(echo "$result" | head -3)"
@@ -182,7 +224,11 @@ PYJSON
   fi
 done
 
-echo -e "${GREEN}同步完成${NC}: $UPDATED/${#AGENTS[@]} 个角色更新"
+if [ "$DRY_RUN" = "1" ]; then
+  echo -e "${GREEN}dry-run 完成${NC}: $UPDATED/${#AGENTS[@]} 个角色已计算，未写入飞书"
+else
+  echo -e "${GREEN}同步完成${NC}: $UPDATED/${#AGENTS[@]} 个角色更新"
+fi
 for i in "${!AGENTS[@]}"; do
   agent="${AGENTS[$i]}"
   total=${AGENT_TOTAL[$i]}
@@ -194,18 +240,18 @@ for i in "${!AGENTS[@]}"; do
     "$agent" "$total" "$done_count" "$blocked" "$merge" "$load"
 done
 
+TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gantt-sync.XXXXXX")
+trap 'rm -rf "$TMP_DIR"' EXIT
+
 if [ -z "$TREND_TABLE" ]; then
   warn "未配置 GANTT_FEISHU_TREND_TABLE_ID，跳过任务完成趋势同步"
-  exit "$ERRORS"
-fi
+else
 
-echo ""
-log "同步任务完成趋势..."
-TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/gantt-trend.XXXXXX")
-trap 'rm -rf "$TMP_DIR"' EXIT
-export BASE_TOKEN TREND_TABLE DASHBOARD_URL TMP_DIR
+  echo ""
+  log "同步任务完成趋势..."
+  export BASE_TOKEN TREND_TABLE DASHBOARD_URL TMP_DIR DRY_RUN
 
-python3 << 'PYEOF'
+  python3 << 'PYEOF'
 import json, urllib.request, subprocess, os, sys
 from datetime import datetime, timedelta
 from collections import defaultdict
@@ -215,8 +261,12 @@ BASE_TOKEN = os.environ["BASE_TOKEN"]
 TREND_TABLE = os.environ["TREND_TABLE"]
 DASHBOARD_URL = os.environ["DASHBOARD_URL"]
 TMP_DIR = Path(os.environ["TMP_DIR"])
+DRY_RUN = os.environ.get("DRY_RUN") == "1"
 
 def run_lark(cmd_list, input_data=None, cwd=None):
+    if DRY_RUN:
+        print(f"[trend][dry-run] skip lark-cli: {' '.join(cmd_list[:4])}", file=sys.stderr)
+        return None
     try:
         r = subprocess.run(cmd_list, capture_output=True, text=True, timeout=15, input=input_data, cwd=cwd)
         if r.returncode != 0:
@@ -227,24 +277,27 @@ def run_lark(cmd_list, input_data=None, cwd=None):
         print(f"[WARN] lark-cli error: {e}", file=sys.stderr)
         return None
 
-existing = run_lark([
-    "lark-cli", "base", "+record-list",
-    "--base-token", BASE_TOKEN,
-    "--table-id", TREND_TABLE,
-    "--as", "user",
-    "--limit", "200",
-    "--format", "json",
-])
-
 date_to_rid = {}
-if existing and existing.get("ok"):
-    data = existing.get("data", {})
-    record_ids = data.get("record_id_list", [])
-    records = data.get("data", [])
-    for i, rid in enumerate(record_ids):
-        if i < len(records) and len(records[i]) >= 3:
-            date_to_rid[records[i][2]] = rid
-    print(f"[trend] 已有 {len(date_to_rid)} 条趋势记录", file=sys.stderr)
+if not DRY_RUN:
+    existing = run_lark([
+        "lark-cli", "base", "+record-list",
+        "--base-token", BASE_TOKEN,
+        "--table-id", TREND_TABLE,
+        "--as", "user",
+        "--limit", "200",
+        "--format", "json",
+    ])
+    if existing and existing.get("ok"):
+        data = existing.get("data", {})
+        record_ids = data.get("record_id_list", [])
+        records = data.get("data", [])
+        for i, rid in enumerate(record_ids):
+            if i < len(records) and len(records[i]) >= 3:
+                date_to_rid[records[i][2]] = rid
+        print(f"[trend] 已有 {len(date_to_rid)} 条趋势记录", file=sys.stderr)
+    else:
+        print("[ERROR] 无法读取趋势表现有记录，停止趋势同步以避免重复写入", file=sys.stderr)
+        raise SystemExit(1)
 
 resp = urllib.request.urlopen(DASHBOARD_URL, timeout=10)
 dashboard_data = json.loads(resp.read())
@@ -270,6 +323,10 @@ for item in dashboard_data.get("items", []):
 
 sorted_dates = sorted(daily.items(), key=lambda x: x[0])
 print(f"[trend] Dashboard 计算: {len(sorted_dates)} 天", file=sys.stderr)
+
+if DRY_RUN:
+    print(f"[trend][dry-run] 将同步 {len(sorted_dates)} 天趋势数据", file=sys.stderr)
+    raise SystemExit(0)
 
 new_dates = []
 for date_str, count in sorted_dates:
@@ -310,52 +367,65 @@ else:
 print(f"[trend] 同步完成: {len(sorted_dates)} 天", file=sys.stderr)
 PYEOF
 
-log "趋势同步完成"
+  log "趋势同步完成"
+fi
 
 
 # --------------- 任务详情同步（甘特图数据）---------------
 echo ""
 log "同步任务详情（甘特图）..."
 
-export CONFIG_PATH AGENT_CONFIG_PY
+export BASE_TOKEN TASK_DETAIL_TABLE DASHBOARD_URL TMP_DIR CONFIG_PATH AGENT_CONFIG_PY DRY_RUN
 python3 << 'TDEOF'
 import importlib.util
 import json, urllib.request, subprocess, sys, os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-BASE_TOKEN = os.environ.get("GANTT_FEISHU_BASE_TOKEN", "E77KbiM18aIhvlsKnTTcYI4dnQF")
-TASK_TABLE = os.environ.get("GANTT_FEISHU_TASK_TABLE", "tbl1TLcoNzlgzTve")
-DASHBOARD_URL = os.environ.get("GANTT_DASHBOARD_URL", "http://127.0.0.1:5001/api/gantt")
-TMP_DIR = Path(os.environ.get("GANTT_TMP_DIR", "/tmp/osrt-gantt"))
+BASE_TOKEN = os.environ["BASE_TOKEN"]
+TASK_TABLE = os.environ["TASK_DETAIL_TABLE"]
+DASHBOARD_URL = os.environ["DASHBOARD_URL"]
+TMP_DIR = Path(os.environ["TMP_DIR"])
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "config.json")).expanduser()
 AGENT_CONFIG_PY = Path(os.environ.get("AGENT_CONFIG_PY", "scripts/lib/agent_config.py")).expanduser()
+DRY_RUN = os.environ.get("DRY_RUN") == "1"
 
 def run_lark(cmd_list, cwd=None):
+    if DRY_RUN:
+        print(f"[task-detail][dry-run] skip lark-cli: {' '.join(cmd_list[:4])}", file=sys.stderr)
+        return None
     try:
         r = subprocess.run(cmd_list, capture_output=True, text=True, timeout=30, cwd=cwd)
+        if r.returncode != 0:
+            print(f"[ERROR] lark-cli failed: {r.stderr[:200]}", file=sys.stderr)
+            return None
         idx = r.stdout.find("{")
         return json.loads(r.stdout[idx:]) if idx >= 0 else None
-    except:
+    except Exception as exc:
+        print(f"[ERROR] lark-cli error: {exc}", file=sys.stderr)
         return None
 
 # Step 1: Delete all existing records in task detail table (with full pagination)
 TMP_DIR.mkdir(parents=True, exist_ok=True)
 offset = 0
 all_rids = []
-while True:
-    result = run_lark(["lark-cli", "base", "+record-list",
-        "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
-        "--as", "user", "--limit", "200", "--offset", str(offset), "--format", "json"])
-    if not (result and result.get("ok")):
-        break
-    rids = result["data"].get("record_id_list", [])
-    if not rids:
-        break
-    all_rids.extend(rids)
-    if not result["data"].get("has_more", False):
-        break
-    offset += 200
+if DRY_RUN:
+    print("[task-detail][dry-run] 跳过旧记录删除", file=sys.stderr)
+else:
+    while True:
+        result = run_lark(["lark-cli", "base", "+record-list",
+            "--base-token", BASE_TOKEN, "--table-id", TASK_TABLE,
+            "--as", "user", "--limit", "200", "--offset", str(offset), "--format", "json"])
+        if not (result and result.get("ok")):
+            print("[ERROR] 无法读取任务详情表现有记录，停止同步以避免重复写入", file=sys.stderr)
+            raise SystemExit(1)
+        rids = result["data"].get("record_id_list", [])
+        if not rids:
+            break
+        all_rids.extend(rids)
+        if not result["data"].get("has_more", False):
+            break
+        offset += 200
 
 if all_rids:
     for i in range(0, len(all_rids), 200):
@@ -406,7 +476,9 @@ for item in items:
     role = AGENT_ROLES.get(agent, agent)
     rows.append([title, role, status, start_dt, end_dt, str(duration_h)])
 
-if rows:
+if DRY_RUN:
+    print(f"[task-detail][dry-run] 将同步 {len(rows)} 条任务详情", file=sys.stderr)
+elif rows:
     FIELDS = ["任务名称", "负责人", "状态", "开始时间", "结束时间", "持续时长h"]
     BATCH_SIZE = 200
     total_synced = 0

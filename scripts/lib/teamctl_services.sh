@@ -16,6 +16,20 @@ runtime_command() {
   esac
 }
 
+runtime_command_executable() {
+  local command_line="$1"
+  python3 - "$command_line" <<'PY'
+import shlex
+import sys
+
+try:
+    parts = shlex.split(sys.argv[1])
+except ValueError:
+    parts = []
+print(parts[0] if parts else "")
+PY
+}
+
 pid_command() {
   local pid="$1"
   ps -p "$pid" -o command= 2>/dev/null || true
@@ -109,6 +123,8 @@ confirm_restart_agents() {
 }
 
 start_agents() {
+  local cmd=""
+  local cmd_exec=""
   if [ "$START_FORCE" = "1" ]; then
     err "start-agents --force 会重建全部 tmux agent session；请改用 scripts/teamctl.sh restart-agents，并在交互式终端完成人工确认"
     return 1
@@ -121,11 +137,12 @@ start_agents() {
       continue
     fi
     cmd="$(runtime_command "$runtime")"
-    if ! need_cmd "$cmd"; then
+    cmd_exec="$(runtime_command_executable "$cmd")"
+    if [ -z "$cmd_exec" ] || ! need_cmd "$cmd_exec"; then
       warn "command not found for $agent_id runtime=$runtime: $cmd; creating shell session only"
       tmux new-session -d -s "$session" -c "$workdir"
     else
-      tmux new-session -d -s "$session" -c "$workdir" "$cmd"
+      tmux new-session -d -s "$session" -c "$workdir" "exec $cmd"
     fi
     log "started $agent_id session=$session runtime=$runtime workdir=$workdir"
   done

@@ -353,15 +353,17 @@ mark_task_watcher_grace() {
     local reason="$1"
     local grace_file
     grace_file="$(task_watcher_grace_file "$reason")"
-    python3 - "$grace_file" <<'PY'
+    python3 - "$grace_file" "$reason" <<'PY'
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-path = Path(os.environ["GRACE_FILE"]).expanduser()
+path = Path(sys.argv[1]).expanduser()
+reason = sys.argv[2]
 payload = {
-    "reason": path.stem,
+    "reason": reason,
     "started_at": int(datetime.now(timezone.utc).timestamp()),
     "started_at_iso": datetime.now(timezone.utc).isoformat(timespec="seconds"),
 }
