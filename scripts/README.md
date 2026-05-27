@@ -12,6 +12,7 @@
 - `claim-task.sh` / `pool-task.sh` / `queue-task.sh` / `resume-task.sh`：任务池、预留、认领与恢复。
 - `close-task.sh` / `archive-task.sh` / `reassign-task.sh`：收口、归档、改派。
 - `write-ack.sh` / `write-result.sh` / `write-review.sh` / `write-verify.sh`：标准任务产物写入封装。
+- `integrate-task.py` / `integrate-ready-tasks.py`：把已通过 gate 的任务 branch/patch 串行合入目标分支；默认不推远端。
 
 ### Watcher 与运行时控制面
 
@@ -33,6 +34,24 @@
 - `build-agent-files.sh`：根据模板生成 agent 角色文件。
 - `ensure-task-workspace.py`：确保任务 worktree/工作区存在。
 - `install-codex-gateway-profile.py` / `codex-responses-gateway.py`：Codex gateway 相关工具。
+
+### 集成队列入口
+
+任务执行完成后，`patch_path` 是交付证据，不代表代码已经进入主线。集成由 integrator 串行执行：
+
+```bash
+scripts/integrate-ready-tasks.py --dry-run
+scripts/integrate-ready-tasks.py --test-cmd 'scripts/teamctl.sh smoke'
+```
+
+单任务可用：
+
+```bash
+scripts/integrate-task.py --task-dir tasks/<任务ID> --dry-run
+scripts/integrate-task.py --task-dir tasks/<任务ID> --test-cmd 'scripts/teamctl.sh smoke'
+```
+
+脚本只处理 `ready_for_merge + merge_gate_state=pm_acceptance_pending` 的任务。合入成功写 `integration.json(status=pass)` 并把任务收口为 `done + closed`；冲突或测试失败写 `integration.json(status=fail)` 并把任务转 `blocked`。需要推远端时显式加 `--push`。
 
 ### 报告、诊断与外部资料
 

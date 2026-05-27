@@ -53,6 +53,23 @@ scripts/teamctl.sh init --team large
   scripts/teamctl.sh attach dev-1
   ```
 
+任务完成后的代码合入走集成队列，patch 只作为审计和失败回放证据：
+
+```bash
+# 先看哪些任务可以合入，不改任务、不改分支
+scripts/integrate-ready-tasks.py --dry-run
+
+# 串行合入所有已通过 review/QA/PM acceptance 的 ready_for_merge 任务
+scripts/integrate-ready-tasks.py --test-cmd 'scripts/teamctl.sh smoke'
+```
+
+集成队列默认只更新本地目标分支；需要推远端时显式追加 `--push`。如只处理单个任务：
+
+```bash
+scripts/integrate-task.py --task-dir tasks/<任务ID> --dry-run
+scripts/integrate-task.py --task-dir tasks/<任务ID> --test-cmd 'scripts/teamctl.sh smoke'
+```
+
 如果你准备让 Codex 走本仓库自带的 Responses Gateway，先在 `up` 之前额外执行：
 
 ```bash
@@ -712,7 +729,7 @@ python3 -m dashboard.app
 ## 任务生命周期
 
 ```
-pending → dispatched → working → ready_for_merge → merged → archived
+pending → dispatched → working → ready_for_merge → done → archived
                                 ↓
                            failed / blocked / cancelled / timeout
 ```
@@ -722,8 +739,9 @@ pending → dispatched → working → ready_for_merge → merged → archived
 | pending | PM / 开罗尔 | 任务已创建 |
 | dispatched | dispatch-task.sh | 已通过 tmux 发送给 agent |
 | working | watcher | 检测到 ack.json |
-| ready_for_merge | watcher | 检测到 result.json，进入待审 / 待验阶段 |
-| merged | PM / integrator | 代码已合入集成分支 |
+| ready_for_merge | watcher | 检测到 result.json，进入 review / QA / PM acceptance 和集成队列 |
+| done | PM / integrator | 代码已通过集成队列进入目标分支并收口 |
+| merged | legacy | 旧字段口径；新流程使用 `done + merge_gate_state=closed` |
 | failed | agent / watcher | 执行失败 |
 | blocked | agent | 上游依赖未满足 |
 | timeout | watcher | 超过 timeout_minutes 未 ack |
