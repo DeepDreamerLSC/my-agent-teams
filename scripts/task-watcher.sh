@@ -3660,6 +3660,26 @@ run_task_watcher_loop() {
 
         if [ "$current_status" = "ready_for_merge" ]; then
             reconcile_open_merge_gate "$task_dir" "$task_id" "$current_status" || true
+            # 自动集成：ready_for_merge + pm_acceptance_pending → 触发集成队列合入
+            integrate_flag="${task_id}_auto_integrate"
+            current_gate=$(task_json_pick "$task_dir" merge_gate_state)
+            if [ "$current_gate" = "pm_acceptance_pending" ] && ! is_notified "$integrate_flag"; then
+                mark_notified "$integrate_flag"
+                (
+                    cd "$WORKSPACE_ROOT"
+                    log "$task_id: 触发自动集成队列"
+                    integrate_out=$(python3 scripts/integrate-ready-tasks.py --continue-on-error 2>&1) || true
+                    echo "$integrate_out" | while IFS= read -r line; do
+                        log "integrate: $line"
+                    done
+                    last_lines=$(echo "$integrate_out" | tail -5)
+                    if echo "$last_lines" | grep -qiE 'fail|error|conflict'; then
+                        notify_pm "[task-watcher] 集成合入存在冲突/失败，请查看仓库状态。"
+                    elif echo "$integrate_out" | grep -qi 'integrated.*task\|task.*done'; then
+                        notify_pm "[task-watcher] 集成队列已自动合入就绪任务。"
+                    fi
+                ) &
+            fi
         fi
 
         # 兜底：dispatched 状态超 3 分钟无 ack 且无明确进展工件/Working 信号 → 重新发送指令
@@ -3858,9 +3878,21 @@ run_task_watcher_loop() {
                             log "$task_id: 已进入 QA 队列"
                             auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
                         else
-                            notify_pm "[task-watcher] $task_id 已提交实现结果，请查看任务目录并决定是否最终收口。"
-                            emit_system_chat_event watcher "$task_id" "任务实现结果已提交，当前进入 PM 最终验收队列。" "$PM_AGENT_ID" info notify
+                            notify_pm "[task-watcher] $task_id 已提交实现结果，正在自动合入集成队列。"
+                            emit_system_chat_event watcher "$task_id" "任务实现结果已提交，正在自动合入集成队列。" "$PM_AGENT_ID" info notify
                             auto_push_next_task_for_agent "$assigned_agent" "$task_id" || true
+                            # 自动调用集成队列：串行合入所有已就绪的 ready_for_merge 任务
+                            (
+                                cd "$WORKSPACE_ROOT"
+                                integrate_log=$(python3 scripts/integrate-ready-tasks.py --continue-on-error 2>&1) || true
+                                echo "$integrate_log" | while IFS= read -r line; do
+                                    log "integrate-ready-tasks: $line"
+                                done
+                                result=$(echo "$integrate_log" | tail -5)
+                                if echo "$result" | grep -qiE 'fail|error|conflict'; then
+                                    notify_pm "[task-watcher] 集成合入结果：部分任务存在冲突或失败，请查看仓库状态。"
+                                fi
+                            ) &
                         fi
                     fi
 
