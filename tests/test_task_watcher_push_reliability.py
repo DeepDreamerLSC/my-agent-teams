@@ -161,6 +161,45 @@ test -f "$STATE_DIR/task-1_working_no_progress_reminder"
     subprocess.run(["bash", "-lc", script], check=True, env=env)
 
 
+def test_working_no_progress_reminder_waits_until_1800_seconds(tmp_path: Path):
+    env = _base_env(tmp_path)
+    task_dir = tmp_path / "tasks" / "task-1"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    workspace = tmp_path / "workspace" / "repo"
+    workspace.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=str(workspace), check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=str(workspace), check=True)
+    (workspace / "src").mkdir()
+    (workspace / "src" / "base.txt").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(workspace), check=True, capture_output=True, text=True)
+    subprocess.run(["git", "commit", "-m", "init"], cwd=str(workspace), check=True, capture_output=True, text=True)
+    (task_dir / "task.json").write_text(
+        json.dumps({
+            "id": "task-1",
+            "status": "working",
+            "assigned_agent": "dev-1",
+            "workspace_path": str(workspace),
+            "worktree_path": str(workspace),
+        }, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (task_dir / "ack.json").write_text('{"agent":"dev-1"}\n', encoding="utf-8")
+    old_ts = int(time.time()) - 1200
+    os.utime(task_dir / "ack.json", (old_ts, old_ts))
+
+    script = f"""
+set -e
+source '{TASK_WATCHER}'
+if notify_working_no_progress_if_needed '{task_dir}' 'task-1' 'dev-1' '{old_ts}'; then
+  echo 'reminder should not trigger before 1800 seconds' >&2
+  exit 1
+fi
+test ! -f "$STATE_DIR/task-1_working_no_progress_reminder"
+"""
+    subprocess.run(["bash", "-lc", script], check=True, env=env)
+
+
 def test_working_no_progress_repool_returns_task_to_pool_and_clears_state(tmp_path: Path):
     env = _base_env(tmp_path)
     task_dir = tmp_path / "tasks" / "task-1"
