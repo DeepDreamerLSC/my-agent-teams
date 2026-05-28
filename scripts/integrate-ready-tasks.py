@@ -49,12 +49,12 @@ def queue_sort_key(item: dict[str, Any]) -> tuple[str, str]:
     return (entered_at or "9999-12-31T23:59:59", task_id)
 
 
-def classify_task(task_dir: Path, task: dict[str, Any], target_override: str) -> dict[str, Any]:
-    queue_item = task_workspace.derive_integration_queue_item(task)
+def classify_task(task_dir: Path, task: dict[str, Any], config: dict[str, Any], target_override: str) -> dict[str, Any]:
+    queue_item = task_workspace.derive_integration_queue_item(task, config)
     task_id = str(task.get("id") or task_dir.name)
     status = str(task.get("status") or "").strip()
     gate = str(task.get("merge_gate_state") or "").strip()
-    target_branch = target_override or str(queue_item.get("target_branch") or "main").strip()
+    target_branch = target_override or str(queue_item.get("target_branch") or "").strip()
 
     reason = ""
     if status != "ready_for_merge":
@@ -126,7 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tasks-root", default=os.environ.get("TASKS_ROOT", str(WORKSPACE_ROOT / "tasks")))
     parser.add_argument("--config", default=os.environ.get("CONFIG_PATH", str(WORKSPACE_ROOT / "config.json")))
     parser.add_argument("--strategy", choices=["auto", "branch", "patch"], default="auto")
-    parser.add_argument("--target-branch", default="main")
+    parser.add_argument("--target-branch", default="")
     parser.add_argument("--actor", default="integrator")
     parser.add_argument("--test-cmd", action="append", default=[])
     parser.add_argument("--dry-run", action="store_true")
@@ -139,13 +139,15 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = build_parser().parse_args()
     tasks_root = Path(args.tasks_root).expanduser().resolve()
+    config_path = Path(args.config).expanduser().resolve()
+    config = load_json(config_path) if config_path.exists() else {}
     scanned: list[dict[str, Any]] = []
     selected: list[dict[str, Any]] = []
 
     for task_dir in discover_task_dirs(tasks_root):
         try:
             task = load_json(task_dir / "task.json")
-            item = classify_task(task_dir, task, str(args.target_branch or "").strip())
+            item = classify_task(task_dir, task, config, str(args.target_branch or "").strip())
         except Exception as exc:
             item = {
                 "task_id": task_dir.name,

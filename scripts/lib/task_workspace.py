@@ -41,6 +41,24 @@ def _workspace_root(config: dict[str, Any], config_path: Path) -> Path:
     return config_path.resolve().parent
 
 
+def resolve_target_branch(task: dict[str, Any], config: dict[str, Any] | None = None) -> str | None:
+    cfg = config or {}
+    project = str(task.get("project") or "").strip()
+    project_cfg = ((cfg.get("projects") or {}).get(project) or {}) if project else {}
+    defaults = cfg.get("defaults") or {}
+    for candidate in (
+        task.get("integration_target_branch"),
+        task.get("integration_branch"),
+        task.get("target_branch"),
+        project_cfg.get("target_branch"),
+        defaults.get("target_branch"),
+    ):
+        value = str(candidate or "").strip()
+        if value:
+            return value
+    return None
+
+
 def _task_slug(task_id: str) -> str:
     normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", str(task_id or "").strip()).strip("-._")
     digest = hashlib.sha1(str(task_id or "task").encode("utf-8")).hexdigest()[:8]
@@ -174,7 +192,7 @@ def derive_workspace_plan(task: dict[str, Any], *, task_dir: Path, config: dict[
     project_cfg = projects[project]
     dev_root = Path(project_cfg["dev_root"]).expanduser().resolve()
     workspace_mode = str(task.get("workspace_mode") or (config.get("defaults") or {}).get("workspace_mode") or "main").strip().lower()
-    target_branch = str(task.get("target_branch") or (config.get("defaults") or {}).get("target_branch") or "").strip() or None
+    target_branch = resolve_target_branch(task, config)
     task_id = str(task.get("id") or task_dir.name)
 
     if not task_requires_worktree(task):
@@ -320,7 +338,7 @@ def ensure_task_workspace(task_dir: Path, config_path: Path) -> dict[str, Any]:
     }
 
 
-def derive_integration_queue_item(task: dict[str, Any]) -> dict[str, Any]:
+def derive_integration_queue_item(task: dict[str, Any], config: dict[str, Any] | None = None) -> dict[str, Any]:
     current_status = str(task.get("current_status") or task.get("status") or "").strip()
     read_only = parse_bool(task.get("read_only"))
     workspace_status = str(task.get("workspace_status") or "").strip()
@@ -328,7 +346,7 @@ def derive_integration_queue_item(task: dict[str, Any]) -> dict[str, Any]:
     patch_path = str(task.get("patch_path") or "").strip()
     patch_exists = bool(patch_path and Path(patch_path).exists())
     worktree_path = str(task.get("worktree_path") or task.get("workspace_path") or "").strip()
-    target_branch = str(task.get("integration_target_branch") or task.get("target_branch") or "").strip()
+    target_branch = str(resolve_target_branch(task, config) or "").strip()
     control_plane_state = str(task.get("control_plane_state") or "").strip()
 
     if read_only:

@@ -201,6 +201,41 @@ class IntegrateTaskTests(unittest.TestCase):
         self.assertEqual(self.branch_file("integration", "a.txt"), "a\n")
         self.assertEqual(self.branch_file("integration", "b.txt"), "b\n")
 
+    def test_ready_queue_uses_project_target_branch_when_task_metadata_omits_it(self):
+        self.git("branch", "master")
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["projects"]["demo"]["target_branch"] = "master"
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        self.create_branch("task/master-queue", {"master.txt": "master\n"})
+        task_dir = self.create_task("项目默认目标分支", "task/master-queue")
+        task = json.loads((task_dir / "task.json").read_text(encoding="utf-8"))
+        task.pop("integration_target_branch", None)
+        task.pop("target_branch", None)
+        (task_dir / "task.json").write_text(json.dumps(task, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(INTEGRATE_READY),
+                "--tasks-root",
+                str(self.tasks_root),
+                "--config",
+                str(self.config_path),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            self.fail(f"integrate-ready-tasks failed\nstdout={completed.stdout}\nstderr={completed.stderr}")
+
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["processed_count"], 1)
+        self.assertEqual(payload["failed_count"], 0)
+        self.assertEqual(self.branch_file("master", "master.txt"), "master\n")
+
 
 if __name__ == "__main__":
     unittest.main()

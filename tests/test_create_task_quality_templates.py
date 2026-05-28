@@ -245,6 +245,38 @@ class CreateTaskQualityTemplateTests(unittest.TestCase):
         self.assertEqual(task["review_level"], "standard")
         self.assertEqual(task["quality_gate_mode"], "serial")
 
+    def test_project_target_branch_overrides_global_default(self):
+        config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        config["defaults"]["target_branch"] = "integration"
+        config["projects"]["demo"]["target_branch"] = "master"
+        self.config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+        completed = self._run_create(
+            "项目目标分支",
+            "项目目标分支",
+            "dev-1",
+            "development",
+            "demo",
+            "src/master.py",
+            "",
+            "",
+            "reviewer",
+            "dev",
+            "dev",
+            "",
+            "execution",
+            "",
+            "",
+            "development",
+            "false",
+            "review",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        task = self._load_task("项目目标分支")
+        self.assertEqual(task["target_branch"], "master")
+        self.assertEqual(task["integration_target_branch"], "master")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 WORKSPACE_ROOT = SCRIPT_DIR.parent
 sys.path.insert(0, str(SCRIPT_DIR / "lib"))
 import task_artifacts  # type: ignore
+import task_workspace  # type: ignore
 
 
 class IntegrationError(RuntimeError):
@@ -417,7 +418,7 @@ def integrate(args: argparse.Namespace) -> dict[str, Any]:
     actor = str(args.actor or "integrator").strip() or "integrator"
 
     task_ready_for_integration(task_dir, task)
-    target_branch = str(args.target_branch or task.get("integration_target_branch") or task.get("target_branch") or "main").strip()
+    target_branch = str(args.target_branch or task_workspace.resolve_target_branch(task, config) or "").strip()
     source: dict[str, str] = {}
     repo: Path | None = None
     worktree: Path | None = None

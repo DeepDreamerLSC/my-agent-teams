@@ -234,12 +234,14 @@
     "chiralium": {
       "dev_root": "/Users/linsuchang/Desktop/work/chiralium",
       "prod_root": "/Users/linsuchang/Desktop/prod/chiralium",
-      "deploy_script": "/Users/linsuchang/Desktop/work/chiralium/scripts/deploy.sh"
+      "deploy_script": "/Users/linsuchang/Desktop/work/chiralium/scripts/deploy.sh",
+      "target_branch": "master"
     },
     "my-agent-teams": {
       "dev_root": "/Users/linsuchang/Desktop/work/my-agent-teams",
       "prod_root": "/Users/linsuchang/Desktop/prod/my-agent-teams",
-      "deploy_script": null
+      "deploy_script": null,
+      "target_branch": "integration"
     }
   },
   "agents_root": "/Users/linsuchang/Desktop/work/my-agent-teams/agents",

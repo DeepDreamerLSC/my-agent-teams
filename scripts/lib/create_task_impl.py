@@ -107,6 +107,18 @@ def normalize_task_type(raw: str, *, execution_mode: str, target_environment: st
     return None
 
 
+def resolve_target_branch(project_cfg: dict, defaults: dict) -> str:
+    for candidate in (
+        project_cfg.get('target_branch'),
+        defaults.get('target_branch'),
+        'integration',
+    ):
+        value = str(candidate or '').strip()
+        if value:
+            return value
+    return 'integration'
+
+
 def is_relative_to(path: Path, other: Path) -> bool:
     try:
         path.relative_to(other)
@@ -204,9 +216,11 @@ projects = cfg.get('projects', {})
 if project not in projects:
     raise SystemExit(f'unknown project: {project}')
 project_cfg = projects[project]
+defaults_cfg = cfg.get('defaults', {})
 dev_root = Path(project_cfg['dev_root']).expanduser().resolve()
 prod_root_raw = project_cfg.get('prod_root')
 prod_root = Path(prod_root_raw).expanduser().resolve() if prod_root_raw else None
+target_branch = resolve_target_branch(project_cfg, defaults_cfg)
 
 if execution_mode == 'dev' and target_environment != 'dev':
     raise SystemExit('execution_mode=dev requires target_environment=dev')
@@ -347,11 +361,11 @@ obj = {
     'parent_task_id': None,
     'integration_owner': integration_owner_id,
     'priority': 'medium',
-    'timeout_minutes': cfg.get('defaults', {}).get('timeout_minutes', 30),
+    'timeout_minutes': defaults_cfg.get('timeout_minutes', 30),
     'lease_owner': root_pm_id,
     'lease_acquired_at': created_at,
     'lease_expires_at': created_at,
-    'workspace_mode': cfg.get('defaults', {}).get('workspace_mode', 'main'),
+    'workspace_mode': defaults_cfg.get('workspace_mode', 'main'),
     'workspace_status': 'pending',
     'workspace_path': None,
     'worktree_path': None,
@@ -359,8 +373,8 @@ obj = {
     'workspace_base_ref': None,
     'workspace_error': None,
     'workspace_prepared_at': None,
-    'target_branch': cfg.get('defaults', {}).get('target_branch', 'integration'),
-    'integration_target_branch': cfg.get('defaults', {}).get('target_branch', 'integration'),
+    'target_branch': target_branch,
+    'integration_target_branch': target_branch,
     'integration_queue_entered_at': None,
     'patch_path': None,
     'patch_capture_error': None,
