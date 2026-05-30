@@ -110,6 +110,10 @@ EOF
   - `notes/dev.md / arch.md / qa.md`
 - 当你发送 `decision / answer / task_done` 这类关键消息时，应视为“需要回写上下文”的强提醒，而不是单纯聊天记录
 - 生产故障或 `priority=critical` 事项，仍然以 `send-to-agent.sh` 强制唤醒为准，不能只靠 chat
+- **`send-chat.sh` / Chat Hub 只负责写入聊天记录，不负责把消息送达目标 agent 的 tmux / Codex / Claude 会话。**
+- 对任何要求某个 agent **立即执行、返工、补写工件、切换优先级、纠偏当前动作** 的定向消息，必须使用 `send-to-agent.sh` 直发目标会话；如需留痕，再补一条 `send-chat.sh task ...`。
+- 只有在 `send-to-agent.sh` 返回 `delivered`，或通过 pane capture、agent 新 ack、工件更新时间等取得等价送达证据后，才能把“已通知 agent”当作事实。
+- 如果只是把消息写进 `chat/tasks/*.jsonl`，但没有完成会话投递，这个状态必须视为 **未送达**；发送者必须继续重试、复核 tmux 或升级处理，不能把 chat 留痕误当成催办完成。
 
 ### 任务池认领（Phase B/C）
 
