@@ -32,6 +32,9 @@ class TmuxBackend:
     def register(self, session: Mapping[str, Any]) -> Mapping[str, Any]:
         return {"backend": self.name, "registered": True, "capabilities": dict(self.capabilities())}
 
+    def create(self, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {"created": False, "status": "unsupported", "reason": "tmux creation remains a compatibility path; use teamctl"}
+
     def disconnect(self, session: Mapping[str, Any]) -> Mapping[str, Any]:
         return {"backend": self.name, "disconnected": True}
 

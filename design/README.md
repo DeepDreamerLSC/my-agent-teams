@@ -1,7 +1,7 @@
 # my-agent-teams 文档索引
 
-> 更新时间：2026-05-12
-> 范围：多智能体协作框架、任务管理、Chat Hub、任务看板、agent 配置。
+> 更新时间：2026-08-13
+> 范围：跨项目 Codex 交付控制面、任务管理、Chat Hub、任务看板、agent 配置。
 > 规则：`tasks/` 是任务事实记录，`.omx/` 是运行态，二者不纳入正式设计文档整理。
 
 ## 当前优先阅读
@@ -22,6 +22,11 @@
 > `agents/<agent-id>/AGENT.md` 与 `agents/<agent-id>/CLAUDE.md` 由这些模板生成；不要把旧 `prompts/` 当作当前角色源。
 
 ### 协作架构与任务池
+- `control-plane/architecture.md` — 控制面/执行面分离、统一 backend、会话事件和阶段门禁。
+- `control-plane/gap-analysis.md` — 现状审计与已有/部分/缺失/废弃差距表。
+- `control-plane/migration.md` — 控制面 schema 迁移、旧项目导入和回滚。
+- `control-plane/integration-guide.md` — 外部项目注册、bootstrap/check/uninstall 和会话绑定。
+- `control-plane/operations.md` — 日常检查、失联/阻塞/乱序事件和恢复规则。
 - `collaboration/control-plane-and-task-pool.md` — 当前最新综合方案：任务事实层、编排执行层、通信时间线层、只读视图层，以及任务池优化。
 - `collaboration/task-pool-claiming.md` — 任务池认领机制专项方案。
 - `collaboration/parallelism-task-pool-and-gantt-optimization.md` — 并行度、任务池默认使用、watcher 续推与 Gantt 真实性优化方案。

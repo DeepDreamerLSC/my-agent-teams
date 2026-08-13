@@ -863,9 +863,10 @@ function renderControlPlaneView(payload) {
   const projectBody = document.querySelector('#control-plane-project-table tbody')
   const sessionBody = document.querySelector('#control-plane-session-table tbody')
   const ownerBody = document.querySelector('#control-plane-owner-table tbody')
+  const evidenceBody = document.querySelector('#control-plane-evidence-table tbody')
   if (!payload) {
     if (status) status.textContent = '控制面数据加载失败'
-    ;[projectBody, sessionBody, ownerBody].forEach(body => { if (body) body.innerHTML = '<tr><td colspan="6" class="empty-state small">加载失败，请刷新</td></tr>' })
+    ;[projectBody, sessionBody, ownerBody, evidenceBody].forEach(body => { if (body) body.innerHTML = '<tr><td colspan="6" class="empty-state small">加载失败，请刷新</td></tr>' })
     return
   }
   const projects = payload.projects || []
@@ -873,6 +874,11 @@ function renderControlPlaneView(payload) {
   const tasks = payload.tasks || []
   const sessions = payload.sessions || []
   const decisions = payload.owner_decisions || []
+  const artifacts = payload.artifacts || []
+  const gates = payload.gates || []
+  const timelines = payload.timelines || {}
+  const delivery = payload.delivery || {}
+  const deliverySummary = delivery.summary || {}
   if (status) status.textContent = `最近更新：${formatTime(payload.generated_at)} · 数据来自控制面数据库`
   renderSummaryCards(summary, [
     { label: '已注册项目', value: projects.length },
@@ -882,13 +888,28 @@ function renderControlPlaneView(payload) {
     { label: '在线', value: sessions.filter(item => item.health === 'online').length },
     { label: '失联/未知', value: sessions.filter(item => ['offline', 'unknown', 'unsupported'].includes(item.health)).length },
     { label: 'Owner 待决策', value: decisions.length },
+    { label: '执行中', value: deliverySummary.working_count || 0 },
+    { label: '依赖边', value: deliverySummary.dependency_edges || 0 },
+    { label: '甘特任务', value: deliverySummary.gantt_item_count || 0 },
   ])
   if (projectBody) projectBody.innerHTML = projects.length ? projects.map(project => {
     const reqs = requirements.filter(item => item.project_id === project.project_id)
-    return reqs.length ? reqs.map(req => `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td>${esc(req.title)}</td><td>${esc(req.status)}</td><td>${esc(req.current_stage)}</td></tr>`).join('') : `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td colspan="3">暂无需求 · 任务 ${tasks.filter(item => item.project === project.project_id).length} 个</td></tr>`
+    const projectDelivery = (delivery.by_project || []).find(item => item.project === project.project_id)
+    const deliveryHint = projectDelivery ? `任务 ${projectDelivery.task_count} · 执行中 ${projectDelivery.working_count} · 依赖边 ${projectDelivery.dependency_edges}` : `任务 ${tasks.filter(item => item.project === project.project_id).length} 个`
+    return reqs.length ? reqs.map(req => `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td>${esc(req.title)}<br><small>${esc(deliveryHint)}</small></td><td>${esc(req.status)}</td><td>${esc(req.current_stage)}</td></tr>`).join('') : `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td colspan="3">暂无需求 · ${esc(deliveryHint)}</td></tr>`
   }).join('') : '<tr><td colspan="5" class="empty-state small">暂无已注册项目</td></tr>'
   if (sessionBody) sessionBody.innerHTML = sessions.length ? sessions.map(item => `<tr><td><span class="backend-badge backend-${esc(item.execution_backend)}">${esc(item.execution_backend)}</span></td><td>${esc(item.role)}</td><td>${esc(item.thread_id || item.external_ref || '-')}</td><td class="health-${esc(item.health)}">${esc(item.health || 'unknown')}<br><small>${esc(item.health_reason || '')}</small></td><td>${esc(formatTime(item.last_seen_at))}</td><td>${esc(item.current_gate || '-')}</td></tr>`).join('') : '<tr><td colspan="6" class="empty-state small">暂无会话；无数据不代表在线</td></tr>'
   if (ownerBody) ownerBody.innerHTML = decisions.length ? decisions.map(item => `<tr><td>${esc(item.category)}</td><td>${esc(item.summary)}</td><td>${esc(item.impact || '-')}</td><td>${esc(item.recommendation || '-')}</td><td>${esc(formatTime(item.due_at))}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state small">暂无需要 Owner 决策的例外</td></tr>'
+  if (evidenceBody) evidenceBody.innerHTML = requirements.length ? requirements.map(req => {
+    const reqGates = gates.filter(item => item.requirement_id === req.requirement_id)
+    const reqArtifacts = artifacts.filter(item => item.requirement_id === req.requirement_id)
+    const timeline = timelines[req.requirement_id] || []
+    const latestGate = reqGates[reqGates.length - 1]
+    const gateLabel = latestGate ? `${latestGate.stage} / ${latestGate.round}` : '尚无门禁记录'
+    const gateStatus = latestGate ? latestGate.status : 'pending'
+    const evidenceKinds = [...new Set(reqArtifacts.map(item => item.kind).filter(Boolean))]
+    return `<tr><td>${esc(req.title)}</td><td>${esc(gateLabel)}</td><td>${esc(gateStatus)}</td><td>${esc(evidenceKinds.join(', ') || '暂无证据')}</td><td>${esc(`${timeline.length} 条状态记录${timeline.length ? ` · ${formatTime(timeline[timeline.length - 1].occurred_at)}` : ''}`)}</td></tr>`
+  }).join('') : '<tr><td colspan="5" class="empty-state small">暂无交付证据</td></tr>'
 }
 
 // --- Analytics Data Layer ---

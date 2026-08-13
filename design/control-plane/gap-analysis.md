@@ -40,3 +40,7 @@
 | D | dashboard API 与关键视图 | API/前端契约、空/失败/失联状态测试 | Lore commit |
 | E | 外部项目 bootstrap/check/uninstall 与 demo | 临时 Git 项目端到端演示 | Lore commit |
 | F | README、架构、接入、运维/恢复、迁移文档 | 文档命令 smoke + 全量回归 | Lore commit |
+
+## 完成审计
+
+截至 2026-08-13，A-F 均已实现并完成独立验证：控制面 schema 与旧任务兼容、tmux/Codex/fake backend、会话注册绑定和幂等事件、PM 阶段门禁与独立审查、dashboard API/视图、外部项目 bootstrap/check/uninstall、临时 Git 项目全流程演示及接入/迁移/运维文档均已落地。Codex Desktop 的真实 App Server bridge 仍是可选部署项，未配置时按设计显示 `unsupported`。

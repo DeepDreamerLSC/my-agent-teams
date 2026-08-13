@@ -53,6 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
     project_sub.add_parser("list")
     check = project_sub.add_parser("check")
     check.add_argument("project_id")
+    scope = project_sub.add_parser("scope-check")
+    scope.add_argument("project_id")
+    scope.add_argument("--path", action="append", required=True)
+    scope.add_argument("--environment", default="dev")
     import_legacy = project_sub.add_parser("import-legacy")
     import_legacy.add_argument("--config", required=True)
     bootstrap = project_sub.add_parser("bootstrap")
@@ -102,6 +106,17 @@ def build_parser() -> argparse.ArgumentParser:
     session_register.add_argument("--gate", dest="current_gate")
     session_register.add_argument("--capabilities-json", default="{}")
     session_register.add_argument("--external-ref")
+    session_create = session_sub.add_parser("create")
+    session_create.add_argument("--project-id", required=True)
+    session_create.add_argument("--requirement-id")
+    session_create.add_argument("--task-id")
+    session_create.add_argument("--role", required=True)
+    session_create.add_argument("--backend", required=True, dest="execution_backend")
+    session_create.add_argument("--parent-thread-id")
+    session_create.add_argument("--cwd")
+    session_create.add_argument("--environment")
+    session_create.add_argument("--worktree")
+    session_create.add_argument("--branch")
     session_list = session_sub.add_parser("list")
     session_list.add_argument("--project-id")
     session_list.add_argument("--requirement-id")
@@ -148,6 +163,13 @@ def build_parser() -> argparse.ArgumentParser:
     decide.add_argument("--round", type=int, dest="round_number")
     gates = gate_sub.add_parser("list")
     gates.add_argument("requirement_id")
+
+    workflow = sub.add_parser("workflow")
+    workflow_sub = workflow.add_subparsers(dest="workflow_command", required=True)
+    advance = workflow_sub.add_parser("advance")
+    advance.add_argument("requirement_id")
+    advance.add_argument("--actor", default="pm")
+    advance.add_argument("--task-id")
 
     owner = sub.add_parser("owner")
     owner_sub = owner.add_subparsers(dest="owner_command", required=True)
@@ -218,6 +240,8 @@ def run(args: argparse.Namespace) -> Any:
                     return service.list_projects()
                 if args.project_command == "check":
                     return service.check_project(args.project_id)
+                if args.project_command == "scope-check":
+                    return service.validate_write_scope(args.project_id, args.path, environment=args.environment)
                 if args.project_command == "import-legacy":
                     config = json.loads(Path(args.config).expanduser().read_text(encoding="utf-8"))
                     return service.import_legacy_projects(config)
@@ -233,6 +257,19 @@ def run(args: argparse.Namespace) -> Any:
                     )
                 return service.list_requirements(project_id=args.project_id, status=args.status)
             if args.command == "session":
+                if args.session_command == "create":
+                    return service.create_session(
+                        project_id=args.project_id,
+                        role=args.role,
+                        execution_backend=BackendRegistry().get(args.execution_backend),
+                        requirement_id=args.requirement_id,
+                        task_id=args.task_id,
+                        parent_thread_id=args.parent_thread_id,
+                        cwd=args.cwd,
+                        environment=args.environment,
+                        worktree=args.worktree,
+                        branch=args.branch,
+                    )
                 if args.session_command == "register":
                     return service.register_session(
                         project_id=args.project_id,
@@ -294,6 +331,12 @@ def run(args: argparse.Namespace) -> Any:
                         round_number=args.round_number,
                     )
                 return service.list_gates(args.requirement_id)
+            if args.command == "workflow" and args.workflow_command == "advance":
+                return service.advance_workflow(
+                    args.requirement_id,
+                    actor=args.actor,
+                    task_id=args.task_id,
+                )
             if args.command == "owner":
                 if args.owner_command == "list":
                     return service.list_owner_decisions(status=args.status, project_id=args.project_id)

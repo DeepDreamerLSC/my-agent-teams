@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -93,6 +94,44 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertEqual(len(payload["sessions"]), 1)
         self.assertEqual(len(payload["owner_decisions"]), 1)
 
+    def test_http_can_create_fake_backend_session_and_expose_evidence(self) -> None:
+        project = self.client.post(
+            "/api/control-plane/projects",
+            json={"project_id": "external", "name": "External", "repo_root": str(self.project_root)},
+        )
+        self.assertEqual(project.status_code, 201)
+        requirement = self.client.post(
+            "/api/control-plane/requirements",
+            json={"project_id": "external", "title": "Evidence", "acceptance": ["pass"]},
+        ).get_json()
+        created = self.client.post(
+            "/api/control-plane/sessions/create",
+            json={
+                "project_id": "external",
+                "requirement_id": requirement["requirement_id"],
+                "role": "developer",
+                "execution_backend": "fake",
+                "cwd": str(self.project_root),
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertTrue(created.get_json()["created"])
+        artifact = self.client.post(
+            "/api/control-plane/artifacts",
+            json={
+                "project_id": "external",
+                "requirement_id": requirement["requirement_id"],
+                "kind": "test_evidence",
+                "uri": str(self.project_root / "tests.json"),
+            },
+        )
+        self.assertEqual(artifact.status_code, 201)
+        overview = self.client.get("/api/control-plane/overview").get_json()
+        self.assertEqual(overview["artifacts"][0]["kind"], "test_evidence")
+        self.assertIn(requirement["requirement_id"], overview["timelines"])
+        self.assertIn("delivery", overview)
+        self.assertIn("gantt", overview["delivery"])
+
     def test_http_returns_structured_error_for_unsafe_project(self) -> None:
         response = self.client.post(
             "/api/control-plane/projects",
@@ -100,6 +139,29 @@ class ControlPlaneApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.get_json()["error"]["code"], "unsafe_path")
+
+    def test_event_endpoint_requires_configured_bearer_token(self) -> None:
+        previous = os.environ.get("MY_AGENT_TEAMS_CONTROL_PLANE_TOKEN")
+        os.environ["MY_AGENT_TEAMS_CONTROL_PLANE_TOKEN"] = "test-token"
+        try:
+            denied = self.client.post("/api/control-plane/events", json={})
+            self.assertEqual(denied.status_code, 401)
+            accepted = self.client.post(
+                "/api/control-plane/events",
+                json={
+                    "session_id": "missing-session",
+                    "event_type": "status",
+                    "idempotency_key": "auth-test-event",
+                },
+                headers={"Authorization": "Bearer test-token"},
+            )
+            self.assertEqual(accepted.status_code, 400)
+            self.assertEqual(accepted.get_json()["error"]["code"], "session_not_found")
+        finally:
+            if previous is None:
+                os.environ.pop("MY_AGENT_TEAMS_CONTROL_PLANE_TOKEN", None)
+            else:
+                os.environ["MY_AGENT_TEAMS_CONTROL_PLANE_TOKEN"] = previous
 
 
 if __name__ == "__main__":

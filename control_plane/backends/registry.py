@@ -4,12 +4,16 @@ from typing import Mapping
 
 from .base import ExecutionBackend
 from .codex import CodexAppServerBackend
+from .fake import FakeBackend
 from .tmux import TmuxBackend
 
 
 class BackendRegistry:
     def __init__(self, backends: Mapping[str, ExecutionBackend] | None = None) -> None:
-        self.backends = dict(backends or {"tmux": TmuxBackend(), "codex": CodexAppServerBackend()})
+        self.backends = dict(
+            backends
+            or {"tmux": TmuxBackend(), "codex": CodexAppServerBackend(), "fake": FakeBackend()}
+        )
 
     def get(self, name: str) -> ExecutionBackend:
         try:

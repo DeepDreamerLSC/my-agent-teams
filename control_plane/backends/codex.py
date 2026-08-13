@@ -19,6 +19,9 @@ class CodexThreadClient(Protocol):
     def register(self, *, thread_id: str, cwd: str | None = None) -> Mapping[str, Any]:
         ...
 
+    def create(self, *, cwd: str | None = None, parent_thread_id: str | None = None) -> Mapping[str, Any]:
+        ...
+
     def disconnect(self, *, thread_id: str) -> Mapping[str, Any]:
         ...
 
@@ -32,6 +35,9 @@ class UnsupportedCodexClient:
 
     def register(self, *, thread_id: str, cwd: str | None = None) -> Mapping[str, Any]:
         return {"registered": False, "status": "unsupported", "reason": self.reason}
+
+    def create(self, *, cwd: str | None = None, parent_thread_id: str | None = None) -> Mapping[str, Any]:
+        return {"created": False, "status": "unsupported", "reason": self.reason}
 
     def disconnect(self, *, thread_id: str) -> Mapping[str, Any]:
         return {"disconnected": False, "status": "unsupported", "reason": self.reason}
@@ -84,6 +90,9 @@ class JsonCommandCodexClient:
     def register(self, *, thread_id: str, cwd: str | None = None) -> Mapping[str, Any]:
         return self._call("register", thread_id=thread_id, cwd=cwd)
 
+    def create(self, *, cwd: str | None = None, parent_thread_id: str | None = None) -> Mapping[str, Any]:
+        return self._call("create", cwd=cwd, parent_thread_id=parent_thread_id)
+
     def disconnect(self, *, thread_id: str) -> Mapping[str, Any]:
         return self._call("disconnect", thread_id=thread_id)
 
@@ -111,6 +120,9 @@ class CodexAppServerBackend:
         if not thread_id:
             return {"registered": False, "status": "unknown", "reason": "thread_id is missing"}
         return self.client.register(thread_id=thread_id, cwd=session.get("cwd"))
+
+    def create(self, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        return self.client.create(cwd=request.get("cwd"), parent_thread_id=request.get("parent_thread_id"))
 
     def disconnect(self, session: Mapping[str, Any]) -> Mapping[str, Any]:
         thread_id = str(session.get("thread_id") or "").strip()

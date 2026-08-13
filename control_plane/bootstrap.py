@@ -15,6 +15,7 @@ MANIFEST_NAME = "control-plane.json"
 AGENTS_REFERENCE = "AGENTS.control-plane.md"
 HOOK_NAME = "control-plane-event.py"
 SKILL_NAME = "delivery-control-plane"
+ROLES_NAME = "roles.json"
 BEGIN_MARKER = "<!-- BEGIN my-agent-teams control-plane reference -->"
 END_MARKER = "<!-- END my-agent-teams control-plane reference -->"
 
@@ -44,6 +45,7 @@ def _render_manifest(*, project_id: str, root: Path, control_plane_url: str, rol
         "managed_paths": [
             f"{MANAGED_DIR}/{MANIFEST_NAME}",
             f"{MANAGED_DIR}/{AGENTS_REFERENCE}",
+            f"{MANAGED_DIR}/{ROLES_NAME}",
             f"{MANAGED_DIR}/hooks/{HOOK_NAME}",
             f"{MANAGED_DIR}/skills/{SKILL_NAME}/SKILL.md",
         ],
@@ -71,6 +73,19 @@ def _render_skill() -> str:
         "Use the registered project manifest as the source of truth for project_id and control-plane URL.\n"
         "Report only metadata, summaries, and artifact references. Never copy full transcripts or business source.\n"
     )
+
+
+def _render_roles(roles: Iterable[str]) -> dict[str, Any]:
+    role_names = list(dict.fromkeys(str(role) for role in roles if str(role).strip()))
+    return {
+        "schema_version": 1,
+        "roles": [
+            {"id": role, "session_status_source": "control_plane_event", "write_scope_source": "project_task"}
+            for role in role_names
+        ],
+        "review_independence_required": True,
+        "owner_decision_categories": ["scope_conflict", "resource_conflict", "production_release", "security_compliance", "repeated_gate_failure"],
+    }
 
 
 def _render_hook() -> str:
@@ -122,7 +137,7 @@ def _agents_block(manifest: dict[str, Any]) -> str:
 
 
 def _inspect_agents(root: Path, agents_file: str, manifest: dict[str, Any]) -> dict[str, Any]:
-    path = root / agents_file
+    path = _resolve_agents_path(root, agents_file)
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     has_begin = BEGIN_MARKER in existing
     has_end = END_MARKER in existing
@@ -152,13 +167,22 @@ def check_bootstrap(*, repo_root: str, agents_file: str = "AGENTS.md") -> dict[s
     else:
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except ValueError:
+        except (OSError, ValueError):
             errors.append("manifest_invalid_json")
+    if manifest:
+        if manifest.get("project_id") in (None, ""):
+            errors.append("manifest_project_id_missing")
+        if resolve_path(str(manifest.get("repo_root") or root)) != root:
+            errors.append("manifest_repo_root_mismatch")
+        parsed_url = urlparse(str(manifest.get("control_plane_url") or ""))
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+            errors.append("manifest_control_plane_url_invalid")
     files = {
         str(path.relative_to(root)): path.exists()
         for path in (
             manifest_path,
             managed / AGENTS_REFERENCE,
+            managed / ROLES_NAME,
             managed / "hooks" / HOOK_NAME,
             managed / "skills" / SKILL_NAME / "SKILL.md",
         )
@@ -196,10 +220,31 @@ def bootstrap_project(
     parsed_url = urlparse(control_plane_url)
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
         raise ControlPlaneError("control_plane_url must be an http(s) URL")
-    manifest = _render_manifest(project_id=project_id, root=root, control_plane_url=control_plane_url, roles=roles)
+    role_names = list(dict.fromkeys(str(role) for role in roles if str(role).strip()))
+    manifest = _render_manifest(project_id=project_id, root=root, control_plane_url=control_plane_url, roles=role_names)
     managed = root / MANAGED_DIR
     agent_check = _inspect_agents(root, agents_file, manifest)
     conflicts = list(agent_check["conflicts"])
+    existing_manifest_path = managed / MANIFEST_NAME
+    if existing_manifest_path.exists():
+        try:
+            existing_manifest = json.loads(existing_manifest_path.read_text(encoding="utf-8"))
+        except ValueError:
+            conflicts.append("managed manifest is invalid JSON")
+        else:
+            if existing_manifest.get("project_id") != project_id:
+                conflicts.append("managed manifest belongs to another project")
+            if resolve_path(str(existing_manifest.get("repo_root") or root)) != root:
+                conflicts.append("managed manifest repo_root does not match target")
+    elif managed.exists():
+        partial_paths = [
+            managed / AGENTS_REFERENCE,
+            managed / ROLES_NAME,
+            managed / "hooks" / HOOK_NAME,
+            managed / "skills" / SKILL_NAME / "SKILL.md",
+        ]
+        if any(path.exists() for path in partial_paths):
+            conflicts.append("managed files exist without a valid manifest")
     preview = {
         "repo_root": str(root),
         "apply": apply,
@@ -207,6 +252,7 @@ def bootstrap_project(
         "files_to_create": [
             f"{MANAGED_DIR}/{MANIFEST_NAME}",
             f"{MANAGED_DIR}/{AGENTS_REFERENCE}",
+            f"{MANAGED_DIR}/{ROLES_NAME}",
             f"{MANAGED_DIR}/hooks/{HOOK_NAME}",
             f"{MANAGED_DIR}/skills/{SKILL_NAME}/SKILL.md",
         ],
@@ -223,6 +269,7 @@ def bootstrap_project(
     skill_dir.mkdir(parents=True, exist_ok=True)
     (managed / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (managed / AGENTS_REFERENCE).write_text(_render_agents_reference(), encoding="utf-8")
+    (managed / ROLES_NAME).write_text(json.dumps(_render_roles(role_names), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     hook = managed / "hooks" / HOOK_NAME
     hook.write_text(_render_hook(), encoding="utf-8")
     hook.chmod(0o755)
@@ -241,6 +288,7 @@ def uninstall_project(*, repo_root: str, apply: bool = False, agents_file: str =
     targets = [
         managed / MANIFEST_NAME,
         managed / AGENTS_REFERENCE,
+        managed / ROLES_NAME,
         managed / "hooks" / HOOK_NAME,
         managed / "skills" / SKILL_NAME / "SKILL.md",
     ]

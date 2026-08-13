@@ -58,6 +58,30 @@ class BootstrapTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("other-project", (self.root / "AGENTS.md").read_text(encoding="utf-8"))
 
+    def test_existing_manifest_for_another_project_is_a_conflict(self) -> None:
+        bootstrap_project(
+            repo_root=str(self.root), project_id="other-project", control_plane_url="http://127.0.0.1:5001", apply=True
+        )
+        result = bootstrap_project(
+            repo_root=str(self.root), project_id="external-demo", control_plane_url="http://127.0.0.1:5001", apply=False
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("managed manifest belongs to another project", result["conflicts"])
+
+    def test_partial_managed_files_are_not_overwritten(self) -> None:
+        partial = self.root / ".my-agent-teams" / "roles.json"
+        partial.parent.mkdir()
+        partial.write_text("user-owned\n", encoding="utf-8")
+        result = bootstrap_project(
+            repo_root=str(self.root),
+            project_id="external-demo",
+            control_plane_url="http://127.0.0.1:5001",
+            apply=True,
+        )
+        self.assertFalse(result["ok"])
+        self.assertIn("managed files exist without a valid manifest", result["conflicts"])
+        self.assertEqual(partial.read_text(encoding="utf-8"), "user-owned\n")
+
 
 if __name__ == "__main__":
     unittest.main()

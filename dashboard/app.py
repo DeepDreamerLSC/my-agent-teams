@@ -30,6 +30,7 @@ from .query import (
     build_task_aggregate_payload,
 )
 from control_plane.bootstrap import bootstrap_project, check_bootstrap, uninstall_project
+from control_plane.backends.registry import BackendRegistry
 from control_plane.errors import ControlPlaneError
 from control_plane.service import ControlPlaneService
 
@@ -366,6 +367,16 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     def api_control_plane_check_project(project_id: str):
         return _control_plane_call(lambda service: service.check_project(project_id))
 
+    @app.post('/api/control-plane/projects/<project_id>/scope-check')
+    def api_control_plane_scope_check(project_id: str):
+        body = _json_body()
+        paths = body.get('paths') if isinstance(body.get('paths'), list) else []
+        return _control_plane_call(
+            lambda service: service.validate_write_scope(
+                project_id, [str(path) for path in paths], environment=str(body.get('environment') or 'dev')
+            )
+        )
+
     @app.get('/api/control-plane/projects/<project_id>/bootstrap-check')
     def api_control_plane_bootstrap_check(project_id: str):
         def check(_service):
@@ -434,6 +445,30 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
             success_status=201,
         )
 
+    @app.post('/api/control-plane/sessions/create')
+    def api_control_plane_create_session():
+        body = _json_body()
+        try:
+            backend = BackendRegistry().get(str(body.get('execution_backend') or ''))
+        except KeyError as exc:
+            return jsonify({'error': {'code': 'unsupported_backend', 'message': str(exc)}}), 400
+        return _control_plane_call(
+            lambda service: service.create_session(
+                project_id=str(body.get('project_id') or ''),
+                requirement_id=body.get('requirement_id'),
+                task_id=body.get('task_id'),
+                role=str(body.get('role') or ''),
+                execution_backend=backend,
+                parent_thread_id=body.get('parent_thread_id'),
+                cwd=body.get('cwd'),
+                environment=body.get('environment'),
+                worktree=body.get('worktree'),
+                branch=body.get('branch'),
+                actor=str(body.get('actor') or 'pm'),
+            ),
+            success_status=201,
+        )
+
     @app.post('/api/control-plane/sessions/<session_id>/bind')
     def api_control_plane_bind_session(session_id: str):
         body = _json_body()
@@ -475,6 +510,7 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
                 session_id=str(body.get('session_id') or ''),
                 event_type=str(body.get('event_type') or ''),
                 idempotency_key=str(body.get('idempotency_key') or ''),
+                project_id=body.get('project_id'),
                 event_id=body.get('event_id'),
                 event_at=body.get('event_at'),
                 sequence=body.get('sequence'),
@@ -491,6 +527,10 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     def api_control_plane_gates(requirement_id: str):
         return _control_plane_call(lambda service: service.list_gates(requirement_id))
 
+    @app.get('/api/control-plane/requirements/<requirement_id>/timeline')
+    def api_control_plane_requirement_timeline(requirement_id: str):
+        return _control_plane_call(lambda service: service.requirement_timeline(requirement_id))
+
     @app.post('/api/control-plane/gates')
     def api_control_plane_decide_gate():
         body = _json_body()
@@ -504,6 +544,17 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
                 rejection_reason=body.get('rejection_reason'),
                 task_id=body.get('task_id'),
                 round_number=body.get('round'),
+            )
+        )
+
+    @app.post('/api/control-plane/workflow/advance')
+    def api_control_plane_advance_workflow():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.advance_workflow(
+                str(body.get('requirement_id') or ''),
+                actor=str(body.get('actor') or 'pm'),
+                task_id=body.get('task_id'),
             )
         )
 
@@ -554,6 +605,7 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
                 requirement_id=body.get('requirement_id'),
                 task_id=body.get('task_id'),
                 session_id=body.get('session_id'),
+                environment=str(body.get('environment') or 'dev'),
                 kind=str(body.get('kind') or ''),
                 uri=str(body.get('uri') or ''),
                 checksum=body.get('checksum'),

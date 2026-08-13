@@ -1,7 +1,9 @@
 # my-agent-teams
 
-> 基于 OpenClaw + tmux 的多智能体协作框架
-> 通过文件系统做状态管理，tmux 做消息通道，watcher 做状态监控，实现 AI agent 之间的任务派发、执行、审查和集成。
+> 面向多个业务项目的 Codex 交付控制面
+> 控制面负责项目组合、需求、PM/架构/审查/开发/QA 门禁、外部会话纳管、交付证据和 Owner 例外；业务代码继续在各自项目的 Local、Worktree 或 Cloud 执行面中运行。
+
+现有 `tasks/`、`transitions.jsonl`、watcher、独立 worktree、dashboard 和 tmux 路径继续兼容。tmux 是兼容执行 backend，不再是管理层唯一会话抽象；Codex backend 通过可替换的官方线程/App Server bridge 接入。
 
 ## 5 分钟开始
 
@@ -85,15 +87,43 @@ export CODEX_CMD='codex -p dev-team'
 
 一个让多个 AI agent（Claude Code / Codex）协同完成开发任务的框架。
 
-不依赖 WebSocket、HTTP API 或消息队列——只用 **tmux session + 文件系统 + shell 脚本** 就能让 agent 之间可靠协作。
+控制面提供 SQLite 元数据、CLI 和 dashboard API；旧任务事实仍由文件系统维护，执行面由 tmux 或外部 Codex 会话承担。控制面只保存元数据、摘要和交付物引用，不读取 Codex Desktop 私有数据库、transcript 文件或复制业务源代码。
 
 ### 核心理念
 
 ```
-Agent 之间不直接对话。
-所有通信通过文件中介和 tmux send-keys。
-状态变更通过 watcher 脚本自动检测和通知。
+Owner -> PM -> Architect -> independent Critic -> task plan
+     -> Developer(worktree) -> independent Reviewer -> QA -> PM summary
+     -> release-ready 或 Owner 例外决策
 ```
+
+## 跨项目控制面快速开始
+
+```bash
+# 迁移现有 config.json.projects 到控制面登记表（幂等，不覆盖旧配置）
+python3 scripts/control-plane.py project import-legacy --config config.json
+
+# 注册外部 Git 项目并检查根目录
+python3 scripts/control-plane.py project register --id billing-service \
+  --name billing-service --repo-root /path/to/billing-service \
+  --branch main --control-plane-url http://127.0.0.1:5001
+python3 scripts/control-plane.py project check billing-service
+
+# 预览、应用和检查最小接入层
+python3 scripts/control-plane.py project bootstrap --project-id billing-service \
+  --repo-root /path/to/billing-service --control-plane-url http://127.0.0.1:5001
+python3 scripts/control-plane.py project bootstrap --project-id billing-service \
+  --repo-root /path/to/billing-service --control-plane-url http://127.0.0.1:5001 --apply
+python3 scripts/control-plane.py project bootstrap-check --repo-root /path/to/billing-service
+
+# 查看跨项目真实状态
+python3 scripts/control-plane.py overview
+
+# 在临时外部 Git 项目上演示：注册 -> 架构/Critic -> 开发 -> Review -> QA -> release-ready
+python3 scripts/demo-control-plane.py
+```
+
+完整接入说明见 [`design/control-plane/integration-guide.md`](design/control-plane/integration-guide.md)，架构、迁移和恢复见 `design/control-plane/`。
 
 ### 团队拓扑
 
