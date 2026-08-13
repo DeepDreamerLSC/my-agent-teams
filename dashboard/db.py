@@ -6,6 +6,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from control_plane.schema import initialize_control_plane_schema
+
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = WORKSPACE_ROOT / '.omx' / 'task-board' / 'task-board.sqlite3'
 SCHEMA_VERSION = 6
@@ -355,6 +357,7 @@ def initialize_db(conn: sqlite3.Connection) -> None:
         "INSERT INTO metadata(key, value) VALUES('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         (str(SCHEMA_VERSION),),
     )
+    initialize_control_plane_schema(conn)
 
 
 def _build_upsert_sql(table: str, columns: list[str], conflict_key: str) -> str:
