@@ -504,6 +504,17 @@ body::before {
   border-bottom-color: rgba(125,211,252,0.10);
 }
 .panel-table tbody tr:hover { background: rgba(34,211,238,0.06); }
+.control-plane-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.control-plane-toolbar h2 { font-size: 18px; margin-bottom: 4px; }
+.panel-hint { color: var(--ops-muted); font-size: 12px; }
+.control-plane-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+.control-plane-section > h3 { color: #e2f3ff; font-size: 14px; margin: 0 0 10px; }
+.backend-badge { display: inline-block; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
+.backend-tmux { color: var(--ops-cyan); }
+.backend-codex { color: var(--ops-violet); }
+.health-online { color: var(--ops-green); }
+.health-offline, .health-error { color: var(--ops-red); }
+.health-unknown, .health-unsupported, .health-waiting_approval { color: var(--ops-amber); }
 .empty-state { color: var(--ops-muted); }
 
 .detail-backdrop { background: rgba(2, 6, 23, 0.72); backdrop-filter: blur(6px); }
@@ -534,4 +545,5 @@ body::before {
   .header { margin: 0; border-radius: 0 0 18px 18px; }
   .tabs { margin-left: 10px; margin-right: 10px; overflow-x: auto; }
   .tab { white-space: nowrap; }
+  .control-plane-grid { grid-template-columns: 1fr; }
 }

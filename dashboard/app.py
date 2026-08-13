@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import json
+import sqlite3
 import subprocess
 import sys
 from contextlib import closing
@@ -28,6 +29,9 @@ from .query import (
     build_daily_metrics_payload,
     build_task_aggregate_payload,
 )
+from control_plane.bootstrap import bootstrap_project, check_bootstrap, uninstall_project
+from control_plane.errors import ControlPlaneError
+from control_plane.service import ControlPlaneService
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_TASKS_ROOT = WORKSPACE_ROOT / 'tasks'
@@ -54,9 +58,44 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     with closing(connect_db(resolved_db_path, initialize=True)):
         pass
 
+    # Existing config projects are imported conservatively into the control
+    # plane. Missing or non-Git roots remain skipped/unknown; no project is
+    # reported online merely because it appears in config.json.
+    try:
+        legacy_config = json.loads(Path(app.config['TASK_CONTROL_CONFIG_PATH']).read_text(encoding='utf-8'))
+        with closing(connect_db(resolved_db_path, initialize=False)) as conn:
+            with conn:
+                ControlPlaneService(conn).import_legacy_projects(legacy_config, actor='dashboard_startup')
+    except (OSError, json.JSONDecodeError, ControlPlaneError):
+        pass
+
     def _with_connection(callback):
         with closing(connect_db(app.config['TASK_BOARD_DB_PATH'], initialize=False)) as conn:
             return callback(conn)
+
+    def _control_plane_call(callback, *, success_status=200):
+        try:
+            with closing(connect_db(app.config['TASK_BOARD_DB_PATH'], initialize=False)) as conn:
+                with conn:
+                    payload = callback(ControlPlaneService(conn))
+            return jsonify(payload), success_status
+        except ControlPlaneError as exc:
+            return jsonify({'error': {'code': exc.code, 'message': str(exc)}}), 400
+        except sqlite3.IntegrityError as exc:
+            return jsonify({'error': {'code': 'integrity_error', 'message': str(exc)}}), 409
+
+    def _json_body():
+        payload = request.get_json(silent=True)
+        return payload if isinstance(payload, dict) else {}
+
+    def _check_event_token():
+        expected = os.getenv('MY_AGENT_TEAMS_CONTROL_PLANE_TOKEN', '').strip()
+        if not expected:
+            return None
+        authorization = request.headers.get('Authorization', '')
+        if authorization != f'Bearer {expected}':
+            return jsonify({'error': {'code': 'unauthorized', 'message': 'control-plane event token is invalid'}}), 401
+        return None
 
     def _run_control_script(script_name: str, *args: str):
         script_path = WORKSPACE_ROOT / 'scripts' / script_name
@@ -285,6 +324,245 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
             compat_agent['total_work_seconds'] = agent_payload.get('total_tracked_work_seconds', 0)
             agents.append(compat_agent)
         return jsonify(agents)
+
+    # Cross-project control-plane API. These endpoints only expose metadata,
+    # summaries, and artifact references; they never read full transcripts.
+    @app.get('/api/control-plane/overview')
+    def api_control_plane_overview():
+        return _control_plane_call(
+            lambda service: service.overview(project_id=request.args.get('project'))
+        )
+
+    @app.get('/api/control-plane/projects')
+    def api_control_plane_projects():
+        return _control_plane_call(
+            lambda service: service.list_projects(status=request.args.get('status'))
+        )
+
+    @app.post('/api/control-plane/projects')
+    def api_control_plane_register_project():
+        body = _json_body()
+        metadata = body.get('metadata') if isinstance(body.get('metadata'), dict) else {}
+        if body.get('allowed_roots'):
+            metadata['allowed_roots'] = body['allowed_roots']
+        return _control_plane_call(
+            lambda service: service.register_project(
+                project_id=str(body.get('project_id') or ''),
+                name=str(body.get('name') or body.get('project_id') or ''),
+                repo_root=str(body.get('repo_root') or ''),
+                prod_root=body.get('prod_root'),
+                default_branch=str(body.get('default_branch') or 'main'),
+                control_plane_url=body.get('control_plane_url'),
+                capabilities=body.get('capabilities') if isinstance(body.get('capabilities'), dict) else {},
+                metadata=metadata,
+                status=str(body.get('status') or 'active'),
+                actor=str(body.get('actor') or 'api'),
+                source='dashboard_api',
+            ),
+            success_status=201,
+        )
+
+    @app.get('/api/control-plane/projects/<project_id>/check')
+    def api_control_plane_check_project(project_id: str):
+        return _control_plane_call(lambda service: service.check_project(project_id))
+
+    @app.get('/api/control-plane/projects/<project_id>/bootstrap-check')
+    def api_control_plane_bootstrap_check(project_id: str):
+        def check(_service):
+            project = _service.get_project(project_id)
+            return check_bootstrap(repo_root=project['repo_root'])
+        return _control_plane_call(check)
+
+    @app.get('/api/control-plane/requirements')
+    def api_control_plane_requirements():
+        return _control_plane_call(
+            lambda service: service.list_requirements(
+                project_id=request.args.get('project'), status=request.args.get('status')
+            )
+        )
+
+    @app.post('/api/control-plane/requirements')
+    def api_control_plane_create_requirement():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.create_requirement(
+                project_id=str(body.get('project_id') or ''),
+                title=str(body.get('title') or ''),
+                description=str(body.get('description') or ''),
+                acceptance=body.get('acceptance') if isinstance(body.get('acceptance'), list) else [],
+                priority=str(body.get('priority') or 'medium'),
+                owner_id=body.get('owner_id'),
+                requirement_id=body.get('requirement_id'),
+                actor=str(body.get('actor') or 'api'),
+            ),
+            success_status=201,
+        )
+
+    @app.get('/api/control-plane/sessions')
+    def api_control_plane_sessions():
+        return _control_plane_call(
+            lambda service: service.list_sessions(
+                project_id=request.args.get('project'),
+                requirement_id=request.args.get('requirement'),
+                task_id=request.args.get('task'),
+            )
+        )
+
+    @app.post('/api/control-plane/sessions')
+    def api_control_plane_register_session():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.register_session(
+                project_id=str(body.get('project_id') or ''),
+                session_id=body.get('session_id'),
+                requirement_id=body.get('requirement_id'),
+                task_id=body.get('task_id'),
+                thread_id=body.get('thread_id'),
+                parent_thread_id=body.get('parent_thread_id'),
+                role=str(body.get('role') or ''),
+                execution_backend=str(body.get('execution_backend') or ''),
+                cwd=body.get('cwd'),
+                environment=body.get('environment'),
+                worktree=body.get('worktree'),
+                branch=body.get('branch'),
+                session_status=str(body.get('session_status') or 'unknown'),
+                current_gate=body.get('current_gate'),
+                capabilities=body.get('capabilities') if isinstance(body.get('capabilities'), dict) else {},
+                external_ref=body.get('external_ref'),
+                actor=str(body.get('actor') or 'api'),
+            ),
+            success_status=201,
+        )
+
+    @app.post('/api/control-plane/sessions/<session_id>/bind')
+    def api_control_plane_bind_session(session_id: str):
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.bind_session(
+                session_id,
+                requirement_id=body.get('requirement_id'),
+                task_id=body.get('task_id'),
+                actor=str(body.get('actor') or 'api'),
+            )
+        )
+
+    @app.get('/api/control-plane/sessions/<session_id>/events')
+    def api_control_plane_session_events(session_id: str):
+        return _control_plane_call(lambda service: service.list_session_events(session_id))
+
+    @app.post('/api/control-plane/sessions/<session_id>/heartbeat')
+    def api_control_plane_heartbeat(session_id: str):
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.heartbeat(
+                session_id,
+                idempotency_key=str(body.get('idempotency_key') or ''),
+                sequence=body.get('sequence'),
+                status=body.get('status'),
+                capabilities=body.get('capabilities') if isinstance(body.get('capabilities'), dict) else {},
+                source=str(body.get('source') or 'dashboard_api'),
+            )
+        )
+
+    @app.post('/api/control-plane/events')
+    def api_control_plane_event():
+        denied = _check_event_token()
+        if denied:
+            return denied
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.record_session_event(
+                session_id=str(body.get('session_id') or ''),
+                event_type=str(body.get('event_type') or ''),
+                idempotency_key=str(body.get('idempotency_key') or ''),
+                event_id=body.get('event_id'),
+                event_at=body.get('event_at'),
+                sequence=body.get('sequence'),
+                status=body.get('status'),
+                current_gate=body.get('current_gate'),
+                last_error=body.get('last_error'),
+                payload=body.get('payload') if isinstance(body.get('payload'), dict) else {},
+                source=str(body.get('source') or 'dashboard_api'),
+                actor=str(body.get('actor') or 'system'),
+            )
+        )
+
+    @app.get('/api/control-plane/requirements/<requirement_id>/gates')
+    def api_control_plane_gates(requirement_id: str):
+        return _control_plane_call(lambda service: service.list_gates(requirement_id))
+
+    @app.post('/api/control-plane/gates')
+    def api_control_plane_decide_gate():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.decide_gate(
+                requirement_id=str(body.get('requirement_id') or ''),
+                stage=str(body.get('stage') or ''),
+                status=str(body.get('status') or ''),
+                actor=str(body.get('actor') or ''),
+                output=body.get('output') if isinstance(body.get('output'), dict) else {},
+                rejection_reason=body.get('rejection_reason'),
+                task_id=body.get('task_id'),
+                round_number=body.get('round'),
+            )
+        )
+
+    @app.get('/api/control-plane/owner-decisions')
+    def api_control_plane_owner_decisions():
+        return _control_plane_call(
+            lambda service: service.list_owner_decisions(
+                status=request.args.get('status', 'open'), project_id=request.args.get('project')
+            )
+        )
+
+    @app.post('/api/control-plane/owner-decisions')
+    def api_control_plane_open_owner_decision():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.create_owner_decision(
+                project_id=str(body.get('project_id') or ''),
+                category=str(body.get('category') or ''),
+                summary=str(body.get('summary') or ''),
+                options=body.get('options') if isinstance(body.get('options'), list) else [],
+                impact=str(body.get('impact') or ''),
+                recommendation=str(body.get('recommendation') or ''),
+                due_at=body.get('due_at'),
+                requirement_id=body.get('requirement_id'),
+                task_id=body.get('task_id'),
+                actor=str(body.get('actor') or 'pm'),
+            ),
+            success_status=201,
+        )
+
+    @app.post('/api/control-plane/owner-decisions/<decision_id>/resolve')
+    def api_control_plane_resolve_owner_decision(decision_id: str):
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.resolve_owner_decision(
+                decision_id,
+                decision=body.get('decision') if isinstance(body.get('decision'), dict) else {},
+                actor=str(body.get('actor') or 'owner'),
+            )
+        )
+
+    @app.post('/api/control-plane/artifacts')
+    def api_control_plane_artifact():
+        body = _json_body()
+        return _control_plane_call(
+            lambda service: service.attach_artifact(
+                project_id=str(body.get('project_id') or ''),
+                requirement_id=body.get('requirement_id'),
+                task_id=body.get('task_id'),
+                session_id=body.get('session_id'),
+                kind=str(body.get('kind') or ''),
+                uri=str(body.get('uri') or ''),
+                checksum=body.get('checksum'),
+                summary=str(body.get('summary') or ''),
+                metadata=body.get('metadata') if isinstance(body.get('metadata'), dict) else {},
+                actor=str(body.get('actor') or 'system'),
+            ),
+            success_status=201,
+        )
 
     return app
 

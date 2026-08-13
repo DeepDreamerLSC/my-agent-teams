@@ -24,6 +24,7 @@
     <button class="tab" data-tab="pool">任务池</button>
     <button class="tab" data-tab="integration-queue">集成队列</button>
     <button class="tab" data-tab="pm-inbox">PM Inbox</button>
+    <button class="tab" data-tab="control-plane">控制面</button>
   </nav>
 
   <main>
@@ -147,6 +148,46 @@
           <tbody></tbody>
         </table>
       </div>
+    </section>
+
+    <section id="control-plane" class="view">
+      <div class="control-plane-toolbar">
+        <div>
+          <h2>跨项目交付控制面</h2>
+          <p id="control-plane-status" class="panel-hint">加载中...</p>
+        </div>
+        <button id="control-plane-refresh" type="button" class="filter-reset">刷新</button>
+      </div>
+      <div class="panel-summary" id="control-plane-summary"></div>
+      <div class="control-plane-grid">
+        <section class="control-plane-section">
+          <h3>项目组合与需求阶段</h3>
+          <div class="panel-table-wrap">
+            <table class="panel-table" id="control-plane-project-table">
+              <thead><tr><th>项目</th><th>仓库</th><th>需求</th><th>状态</th><th>当前阶段</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="control-plane-section">
+          <h3>会话健康</h3>
+          <div class="panel-table-wrap">
+            <table class="panel-table" id="control-plane-session-table">
+              <thead><tr><th>后端</th><th>角色</th><th>线程</th><th>健康</th><th>最后活动</th><th>门禁</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <section class="control-plane-section">
+        <h3>Owner 决策收件箱</h3>
+        <div class="panel-table-wrap">
+          <table class="panel-table" id="control-plane-owner-table">
+            <thead><tr><th>类别</th><th>决策摘要</th><th>影响</th><th>推荐</th><th>截止时间</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
   </main>

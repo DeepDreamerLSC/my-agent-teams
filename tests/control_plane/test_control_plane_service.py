@@ -8,6 +8,7 @@ from pathlib import Path
 
 from control_plane.backends.codex import CodexAppServerBackend, UnsupportedCodexClient
 from control_plane.backends.fake import FakeBackend
+from control_plane.backends.registry import BackendRegistry
 from control_plane.errors import ControlPlaneError, UnsafePath
 from control_plane.service import ControlPlaneService
 from dashboard.db import connect_db
@@ -178,6 +179,25 @@ class BackendContractTests(unittest.TestCase):
         health = codex.health({"thread_id": "thread-1"})
         self.assertEqual(health.status, "unsupported")
         self.assertEqual(health.capabilities["status"], "unsupported")
+
+    def test_backend_probe_persists_unsupported_without_faking_online(self) -> None:
+        root = Path(tempfile.mkdtemp())
+        try:
+            (root / ".git").mkdir()
+            db = connect_db(root / "probe.sqlite3")
+            service = ControlPlaneService(db)
+            with db:
+                service.register_project(project_id="probe", name="Probe", repo_root=str(root))
+                session = service.register_session(
+                    project_id="probe", role="developer", execution_backend="codex", thread_id="t-1"
+                )
+                result = service.probe_session(session["session_id"], BackendRegistry().get("codex"))
+                self.assertEqual(result["session"]["health"], "unsupported")
+                self.assertEqual(result["session"]["session_status"], "unsupported")
+            db.close()
+        finally:
+            import shutil
+            shutil.rmtree(root)
 
 
 if __name__ == "__main__":

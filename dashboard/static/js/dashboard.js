@@ -101,6 +101,7 @@ const ganttRangeButtons = docRef ? Array.from(docRef.querySelectorAll('[data-gan
 const ganttStartDate = docRef ? docRef.getElementById('gantt-start-date') : null
 const ganttEndDate = docRef ? docRef.getElementById('gantt-end-date') : null
 const ganttFilterHint = docRef ? docRef.getElementById('gantt-filter-hint') : null
+const controlPlaneRefresh = docRef ? docRef.getElementById('control-plane-refresh') : null
 
 let currentDetailTaskId = null
 let latestBoardPayload = null
@@ -162,6 +163,10 @@ async function fetchIntegrationQueue() {
 
 async function fetchPmInbox() {
   return fetchJson(`${API_BASE}/pm-inbox`)
+}
+
+async function fetchControlPlaneOverview() {
+  return fetchJson(`${API_BASE}/control-plane/overview`)
 }
 
 async function fetchTaskDetail(taskId) {
@@ -852,6 +857,40 @@ function renderPmInboxView(payload) {
   `).join('') : '<tr><td colspan="6" class="empty-state small">暂无待 PM 处理事项</td></tr>'
 }
 
+function renderControlPlaneView(payload) {
+  const status = document.getElementById('control-plane-status')
+  const summary = document.getElementById('control-plane-summary')
+  const projectBody = document.querySelector('#control-plane-project-table tbody')
+  const sessionBody = document.querySelector('#control-plane-session-table tbody')
+  const ownerBody = document.querySelector('#control-plane-owner-table tbody')
+  if (!payload) {
+    if (status) status.textContent = '控制面数据加载失败'
+    ;[projectBody, sessionBody, ownerBody].forEach(body => { if (body) body.innerHTML = '<tr><td colspan="6" class="empty-state small">加载失败，请刷新</td></tr>' })
+    return
+  }
+  const projects = payload.projects || []
+  const requirements = payload.requirements || []
+  const tasks = payload.tasks || []
+  const sessions = payload.sessions || []
+  const decisions = payload.owner_decisions || []
+  if (status) status.textContent = `最近更新：${formatTime(payload.generated_at)} · 数据来自控制面数据库`
+  renderSummaryCards(summary, [
+    { label: '已注册项目', value: projects.length },
+    { label: '需求', value: requirements.length },
+    { label: '任务', value: tasks.length },
+    { label: '会话', value: sessions.length },
+    { label: '在线', value: sessions.filter(item => item.health === 'online').length },
+    { label: '失联/未知', value: sessions.filter(item => ['offline', 'unknown', 'unsupported'].includes(item.health)).length },
+    { label: 'Owner 待决策', value: decisions.length },
+  ])
+  if (projectBody) projectBody.innerHTML = projects.length ? projects.map(project => {
+    const reqs = requirements.filter(item => item.project_id === project.project_id)
+    return reqs.length ? reqs.map(req => `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td>${esc(req.title)}</td><td>${esc(req.status)}</td><td>${esc(req.current_stage)}</td></tr>`).join('') : `<tr><td>${esc(project.name || project.project_id)}</td><td>${esc(project.repo_root)}</td><td colspan="3">暂无需求 · 任务 ${tasks.filter(item => item.project === project.project_id).length} 个</td></tr>`
+  }).join('') : '<tr><td colspan="5" class="empty-state small">暂无已注册项目</td></tr>'
+  if (sessionBody) sessionBody.innerHTML = sessions.length ? sessions.map(item => `<tr><td><span class="backend-badge backend-${esc(item.execution_backend)}">${esc(item.execution_backend)}</span></td><td>${esc(item.role)}</td><td>${esc(item.thread_id || item.external_ref || '-')}</td><td class="health-${esc(item.health)}">${esc(item.health || 'unknown')}<br><small>${esc(item.health_reason || '')}</small></td><td>${esc(formatTime(item.last_seen_at))}</td><td>${esc(item.current_gate || '-')}</td></tr>`).join('') : '<tr><td colspan="6" class="empty-state small">暂无会话；无数据不代表在线</td></tr>'
+  if (ownerBody) ownerBody.innerHTML = decisions.length ? decisions.map(item => `<tr><td>${esc(item.category)}</td><td>${esc(item.summary)}</td><td>${esc(item.impact || '-')}</td><td>${esc(item.recommendation || '-')}</td><td>${esc(formatTime(item.due_at))}</td></tr>`).join('') : '<tr><td colspan="5" class="empty-state small">暂无需要 Owner 决策的例外</td></tr>'
+}
+
 // --- Analytics Data Layer ---
 async function fetchAggregate() {
   return fetchJson(`${API_BASE}/tasks/aggregate`)
@@ -1020,7 +1059,7 @@ function renderRoleEfficiencyChart(agentEff) {
 
 // --- Init ---
 async function init() {
-  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload, poolPayload, integrationQueuePayload, pmInboxPayload] = await Promise.all([
+  const [boardPayload, ganttPayload, agentsPayload, aggregatePayload, dailyPayload, poolPayload, integrationQueuePayload, pmInboxPayload, controlPlanePayload] = await Promise.all([
     fetchBoard(),
     fetchGantt(),
     fetchAgents(),
@@ -1029,6 +1068,7 @@ async function init() {
     fetchPool(),
     fetchIntegrationQueue(),
     fetchPmInbox(),
+    fetchControlPlaneOverview(),
   ])
 
   document.getElementById('last-update').textContent = `更新: ${new Date().toLocaleTimeString()}`
@@ -1040,11 +1080,13 @@ async function init() {
   renderPoolView(poolPayload)
   renderIntegrationQueueView(integrationQueuePayload)
   renderPmInboxView(pmInboxPayload)
+  renderControlPlaneView(controlPlanePayload)
 }
 
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   bindGanttFilters()
   init()
+  if (controlPlaneRefresh) controlPlaneRefresh.addEventListener('click', () => fetchControlPlaneOverview().then(renderControlPlaneView))
 }
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -1070,6 +1112,7 @@ if (typeof module !== 'undefined' && module.exports) {
     renderPoolView,
     renderIntegrationQueueView,
     renderPmInboxView,
+    renderControlPlaneView,
   }
 }
 })()

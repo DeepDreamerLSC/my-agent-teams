@@ -16,6 +16,7 @@ from .errors import (
     SessionNotFound,
     UnsafePath,
 )
+from .backends.base import ExecutionBackend
 from .models import (
     EVENT_TYPES,
     SESSION_STATUSES,
@@ -274,6 +275,25 @@ class ControlPlaneService:
             f"SELECT * FROM control_plane_requirements{where} ORDER BY updated_at DESC", args
         )
         return [self._requirement(row) for row in rows]
+
+    def list_tasks(self, *, project_id: str | None = None) -> list[dict[str, Any]]:
+        """Expose the existing task read model without replacing its facts."""
+        clauses: list[str] = []
+        args: list[Any] = []
+        if project_id:
+            clauses.append("project = ?")
+            args.append(project_id)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        try:
+            rows = self._fetchall(
+                "SELECT task_id, title, project, current_status, board_status, merge_gate_state, "
+                "assigned_agent, reviewer, owner_pm, updated_at, task_dir, task_json_path "
+                f"FROM tasks{where} ORDER BY updated_at DESC, task_id",
+                args,
+            )
+        except sqlite3.OperationalError:
+            return []
+        return [dict(row) for row in rows]
 
     # ---- sessions and events ----------------------------------------
     def register_session(
@@ -549,9 +569,28 @@ class ControlPlaneService:
             event_type="heartbeat",
             idempotency_key=idempotency_key,
             sequence=sequence,
-            status=status,
+            status=status or "online",
             payload={"capabilities": dict(capabilities or {})},
             source=source,
+        )
+
+    def probe_session(
+        self, session_id: str, backend: ExecutionBackend, *, actor: str = "system"
+    ) -> dict[str, Any]:
+        """Persist a backend probe without claiming more than it knows."""
+        row = self._session_row(session_id)
+        session = self._session(row)
+        health = backend.health(session)
+        status = health.status if health.status in SESSION_STATUSES else "unknown"
+        return self.record_session_event(
+            session_id=session_id,
+            event_type="status",
+            idempotency_key=f"probe:{session_id}:{now_iso()}",
+            status=status,
+            last_error=health.reason,
+            payload={"probe": True, "backend": backend.name, "capabilities": dict(health.capabilities)},
+            source=backend.name,
+            actor=actor,
         )
 
     def session_health(self, session_id: str, *, now: str | None = None) -> dict[str, Any]:
@@ -845,6 +884,7 @@ class ControlPlaneService:
         if project_id:
             projects = [project for project in projects if project["project_id"] == project_id]
         requirements = self.list_requirements(project_id=project_id)
+        tasks = self.list_tasks(project_id=project_id)
         sessions = self.list_sessions(project_id=project_id)
         healthy_sessions = [self._health_for_row(self._session_row(item["session_id"])) for item in sessions]
         health_by_status: dict[str, int] = {}
@@ -855,6 +895,7 @@ class ControlPlaneService:
             "generated_at": now_iso(),
             "projects": projects,
             "requirements": requirements,
+            "tasks": tasks,
             "sessions": [dict(item, **health) for item, health in zip(sessions, healthy_sessions)],
             "session_health": health_by_status,
             "owner_decisions": self.list_owner_decisions(project_id=project_id),
@@ -964,6 +1005,8 @@ class ControlPlaneService:
         current = str(row["session_status"] or "unknown")
         if current == "unsupported":
             return {"health": "unsupported", "health_reason": "backend capability unavailable", "age_seconds": None}
+        if current == "unknown":
+            return {"health": "unknown", "health_reason": row["last_error"] or "backend state is unknown", "age_seconds": None}
         last_seen = row["last_seen_at"]
         if not last_seen:
             return {"health": "unknown", "health_reason": "no accepted heartbeat", "age_seconds": None}
