@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 
 from control_plane.bootstrap import bootstrap_project, check_bootstrap, uninstall_project
 from control_plane.backends.registry import BackendRegistry
+from control_plane.cli_artifacts import add_artifact_parser, run_artifact_command
 from control_plane.errors import ControlPlaneError
 from control_plane.service import ControlPlaneService
 from dashboard.db import connect_db, resolve_db_path
@@ -149,6 +150,8 @@ def build_parser() -> argparse.ArgumentParser:
     event.add_argument("--last-error")
     event.add_argument("--payload-json", default="{}")
     event.add_argument("--source", default="cli")
+
+    add_artifact_parser(sub)
 
     gate = sub.add_parser("gate")
     gate_sub = gate.add_subparsers(dest="gate_command", required=True)
@@ -318,6 +321,8 @@ def run(args: argparse.Namespace) -> Any:
                     payload=_load_json(args.payload_json, expected=dict),
                     source=args.source,
                 )
+            if args.command == "artifact":
+                return run_artifact_command(args, service)
             if args.command == "gate":
                 if args.gate_command == "decide":
                     return service.decide_gate(

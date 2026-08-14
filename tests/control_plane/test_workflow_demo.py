@@ -10,6 +10,28 @@ from control_plane.service import ControlPlaneService
 from dashboard.db import connect_db
 
 
+def quality_report() -> dict:
+    return {
+        "schema_version": "quality_gate_report/v2",
+        "scenario": "pr",
+        "passed": True,
+        "results": [
+            {
+                "name": "code_quality_delta",
+                "status": "passed",
+                "blocking": True,
+                "owner": "engineering",
+                "details": {
+                    "findings": [],
+                    "debt_summary": {"added": 0, "reduced": 1, "unchanged": 2},
+                    "active_waivers": [],
+                    "expired_waivers": [],
+                },
+            }
+        ],
+    }
+
+
 class WorkflowDemoTests(unittest.TestCase):
     def test_temporary_external_git_project_runs_full_delivery_workflow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -26,6 +48,7 @@ class WorkflowDemoTests(unittest.TestCase):
                 ("task_decomposition", "pm", "task_plan", "task plan"),
                 ("development", "developer", "implementation", "implementation"),
                 ("development", "developer", "test_evidence", "tests"),
+                ("quality_gate", "developer", "quality_report", "automated quality passed"),
                 ("review", "reviewer", "review", "review passed"),
                 ("qa", "qa", "qa", "qa passed"),
                 ("delivery_summary", "pm", "delivery_summary", "delivery summary"),
@@ -48,6 +71,20 @@ class WorkflowDemoTests(unittest.TestCase):
                     service.attach_artifact(
                         project_id="external-demo", requirement_id=requirement["requirement_id"], kind=kind,
                         uri=str(external / "src" / f"{index}-{kind}.json"), summary=summary,
+                        metadata=(
+                            quality_report()
+                            if kind == "quality_report"
+                            else {
+                                "quality_summary": {
+                                    "debt_added": 0,
+                                    "debt_reduced": 1,
+                                    "active_waivers": [],
+                                    "residual_risks": [],
+                                }
+                            }
+                            if kind == "delivery_summary"
+                            else None
+                        ),
                     )
                     if stage == "development":
                         if kind == "implementation":
@@ -55,7 +92,12 @@ class WorkflowDemoTests(unittest.TestCase):
                     if stage in {"architecture", "critic_review", "review", "qa"}:
                         result = service.decide_gate(
                             requirement_id=requirement["requirement_id"], stage=stage, status="passed",
-                            actor=role, output={"verdict": "pass", "summary": summary},
+                            actor=role,
+                            output={
+                                "verdict": "pass",
+                                "summary": summary,
+                                **({"findings": []} if stage == "review" else {}),
+                            },
                         )
                         result = {"advanced": True, **result}
                     else:

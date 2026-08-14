@@ -16,6 +16,46 @@ from control_plane.service import ControlPlaneService
 from dashboard.db import connect_db
 
 
+def quality_report(
+    *,
+    passed: bool,
+    status: str = "passed",
+    findings: list[dict] | None = None,
+    expired_waivers: list[dict] | None = None,
+) -> dict:
+    return {
+        "schema_version": "quality_gate_report/v2",
+        "scenario": "pr",
+        "passed": passed,
+        "results": [
+            {
+                "name": "code_quality_delta",
+                "kind": "code_quality_delta",
+                "status": status,
+                "blocking": True,
+                "owner": "engineering",
+                "message": "quality evidence",
+                "details": {
+                    "findings": findings or [],
+                    "expired_waivers": expired_waivers or [],
+                    "debt_summary": {"added": len(findings or []), "reduced": 0, "unchanged": 0},
+                },
+            }
+        ],
+    }
+
+
+def delivery_quality_summary() -> dict:
+    return {
+        "quality_summary": {
+            "debt_added": 0,
+            "debt_reduced": 0,
+            "active_waivers": [],
+            "residual_risks": [],
+        }
+    }
+
+
 class ControlPlaneServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
@@ -311,6 +351,7 @@ class ControlPlaneServiceTests(unittest.TestCase):
                 ("task_decomposition", "pm", "task_plan"),
                 ("development", "developer", "implementation"),
                 ("development", "developer", "test_evidence"),
+                ("quality_gate", "developer", "quality_report"),
                 ("review", "reviewer", "review"),
                 ("qa", "qa", "qa"),
                 ("delivery_summary", "pm", "delivery_summary"),
@@ -322,11 +363,16 @@ class ControlPlaneServiceTests(unittest.TestCase):
                 self.service.attach_artifact(
                     project_id="demo", requirement_id=requirement["requirement_id"], kind=kind,
                     uri=str(self.project_root / f"{kind}.json"),
+                    metadata=(
+                        quality_report(passed=True)
+                        if kind == "quality_report"
+                        else delivery_quality_summary() if kind == "delivery_summary" else None
+                    ),
                 )
                 if stage in {"critic_review", "review", "qa"}:
                     self.service.decide_gate(
                         requirement_id=requirement["requirement_id"], stage=stage, status="passed", actor=role,
-                        output={"verdict": "pass"},
+                        output={"verdict": "pass", **({"findings": []} if stage == "review" else {})},
                     )
                 elif kind != "implementation":
                     self.service.advance_workflow(requirement["requirement_id"])

@@ -27,11 +27,19 @@ from .models import (
     resolve_path,
     row_to_dict,
 )
+from .quality_workflow import (
+    advance_quality_workflow_stage,
+    current_stage_artifacts,
+    gate_rejection_target,
+    summarize_requirement_quality,
+    validate_artifact_metadata,
+    validate_gate_contract,
+    validate_passing_quality_gate,
+)
 from .workflow import (
     EXPLICIT_VERDICT_STAGES,
     INDEPENDENT_REVIEW_ROLES,
     OWNER_DECISION_CATEGORIES,
-    STAGE_BY_NAME,
     stage_definition,
 )
 
@@ -836,7 +844,7 @@ class ControlPlaneService:
                 str(uri),
                 checksum,
                 str(summary or ""),
-                json_dumps(dict(metadata or {})),
+                json_dumps(validate_artifact_metadata(kind, metadata)),
                 now,
             ),
         )
@@ -864,7 +872,7 @@ class ControlPlaneService:
                 args.append(value)
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         return [row_to_dict(row) or {} for row in self._fetchall(
-            f"SELECT * FROM control_plane_artifacts{where} ORDER BY created_at DESC", args
+            f"SELECT * FROM control_plane_artifacts{where} ORDER BY created_at DESC, rowid DESC", args
         )]
 
     def decide_gate(
@@ -889,6 +897,7 @@ class ControlPlaneService:
             )
         if status == "passed" and not isinstance(output, Mapping):
             raise GateConflict("a passed gate requires structured output")
+        validate_gate_contract(stage, status, output, rejection_reason)
         if status == "passed":
             missing_artifacts, missing_role = self._gate_prerequisites(requirement, definition)
             if stage == "pm_clarification":
@@ -901,6 +910,7 @@ class ControlPlaneService:
                 raise GateConflict(f"{stage} requires an independent session")
             if missing_artifacts:
                 raise GateConflict("required artifacts missing: " + ", ".join(missing_artifacts))
+            validate_passing_quality_gate(self, requirement, stage, output)
             if stage in EXPLICIT_VERDICT_STAGES and str(output.get("verdict") or "").lower() not in {
                 "pass", "passed", "approve", "approved"
             }:
@@ -953,8 +963,8 @@ class ControlPlaneService:
             )
         elif status == "rejected":
             self.conn.execute(
-                "UPDATE control_plane_requirements SET status = 'rework_required', updated_at = ?, last_error = ? WHERE requirement_id = ?",
-                (now, rejection_reason, requirement_id),
+                "UPDATE control_plane_requirements SET current_stage = ?, status = 'rework_required', updated_at = ?, last_error = ? WHERE requirement_id = ?",
+                (gate_rejection_target(stage, definition), now, rejection_reason, requirement_id),
             )
             if round_number >= 3:
                 open_decision = self._fetchone(
@@ -1063,6 +1073,11 @@ class ControlPlaneService:
             }
         if stage == "pm_clarification" and not requirement["acceptance"]:
             return {"advanced": False, "reason": "acceptance_criteria_missing", "requirement": requirement}
+        quality_transition = advance_quality_workflow_stage(
+            self, requirement, stage, actor=actor, task_id=task_id
+        )
+        if quality_transition is not None:
+            return quality_transition
         if stage in EXPLICIT_VERDICT_STAGES:
             return {
                 "advanced": False,
@@ -1095,6 +1110,9 @@ class ControlPlaneService:
         artifacts = self.list_artifacts(
             project_id=str(requirement["project_id"]),
             requirement_id=str(requirement["requirement_id"]),
+        )
+        artifacts = current_stage_artifacts(
+            self.conn, requirement, str(definition.get("name") or ""), artifacts
         )
         required = set(definition.get("artifact_kinds") or ())
         present = {str(item.get("kind")) for item in artifacts}
@@ -1262,6 +1280,8 @@ class ControlPlaneService:
             for requirement in requirements
             for gate in self.list_gates(requirement["requirement_id"])
         ]
+        artifacts = self.list_artifacts(project_id=project_id)
+        quality = summarize_requirement_quality(self.conn, requirements, artifacts)
         health_by_status: dict[str, int] = {}
         for health in healthy_sessions:
             key = str(health["health"])
@@ -1274,8 +1294,9 @@ class ControlPlaneService:
             "sessions": [dict(item, **health) for item, health in zip(sessions, healthy_sessions)],
             "session_health": health_by_status,
             "owner_decisions": self.list_owner_decisions(project_id=project_id),
-            "artifacts": self.list_artifacts(project_id=project_id),
+            "artifacts": artifacts,
             "gates": gates,
+            "quality": quality,
             "delivery": self.task_delivery_overview(project_id=project_id),
             "timelines": {
                 item["requirement_id"]: self.requirement_timeline(item["requirement_id"])

@@ -876,6 +876,7 @@ function renderControlPlaneView(payload) {
   const decisions = payload.owner_decisions || []
   const artifacts = payload.artifacts || []
   const gates = payload.gates || []
+  const quality = payload.quality || {}
   const timelines = payload.timelines || {}
   const delivery = payload.delivery || {}
   const deliverySummary = delivery.summary || {}
@@ -908,7 +909,10 @@ function renderControlPlaneView(payload) {
     const gateLabel = latestGate ? `${latestGate.stage} / ${latestGate.round}` : '尚无门禁记录'
     const gateStatus = latestGate ? latestGate.status : 'pending'
     const evidenceKinds = [...new Set(reqArtifacts.map(item => item.kind).filter(Boolean))]
-    return `<tr><td>${esc(req.title)}</td><td>${esc(gateLabel)}</td><td>${esc(gateStatus)}</td><td>${esc(evidenceKinds.join(', ') || '暂无证据')}</td><td>${esc(`${timeline.length} 条状态记录${timeline.length ? ` · ${formatTime(timeline[timeline.length - 1].occurred_at)}` : ''}`)}</td></tr>`
+    const qualityState = quality[req.requirement_id]
+    const qualityLabel = qualityState ? `质量：${qualityState.passed ? '通过' : qualityState.failure_category || '未通过'} · 债务 +${qualityState.debt_summary?.added || 0}/-${qualityState.debt_summary?.reduced || 0}` : '质量：尚无报告'
+    const evidenceLabel = `${evidenceKinds.join(', ') || '暂无证据'} · ${qualityLabel}`
+    return `<tr><td>${esc(req.title)}</td><td>${esc(gateLabel)}</td><td>${esc(gateStatus)}</td><td>${esc(evidenceLabel)}</td><td>${esc(`${timeline.length} 条状态记录${timeline.length ? ` · ${formatTime(timeline[timeline.length - 1].occurred_at)}` : ''}`)}</td></tr>`
   }).join('') : '<tr><td colspan="5" class="empty-state small">暂无交付证据</td></tr>'
 }
 

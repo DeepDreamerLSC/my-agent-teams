@@ -166,6 +166,148 @@
       "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/dev-2/AGENT.md"
     }
   },
+  "project_agents": {
+    "edu-agent": {
+      "edu-pm-1": {
+        "name": "EduAgent PM",
+        "role": "pm",
+        "control_plane_role": "pm",
+        "execution_surface": "codex_app",
+        "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-pm-1",
+        "runtime": "codex",
+        "guidance_file": "AGENT.md",
+        "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-pm-1/AGENT.md",
+        "wip_limit": 5,
+        "borrow_policy": "project_only",
+        "primary_capabilities": [
+          "requirement_analysis",
+          "priority_management",
+          "task_decomposition",
+          "delivery_coordination"
+        ],
+        "secondary_capabilities": [
+          "release_readiness",
+          "stakeholder_reporting"
+        ],
+        "implementation_write_allowed": false
+      },
+      "edu-arch-1": {
+        "name": "EduAgent Architect",
+        "role": "architect",
+        "control_plane_role": "architect",
+        "execution_surface": "codex_app",
+        "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-arch-1",
+        "runtime": "codex",
+        "guidance_file": "AGENT.md",
+        "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-arch-1/AGENT.md",
+        "wip_limit": 1,
+        "borrow_policy": "project_only",
+        "primary_capabilities": [
+          "system_design",
+          "interface_contracts",
+          "risk_analysis",
+          "acceptance_design"
+        ],
+        "secondary_capabilities": [
+          "integration_planning",
+          "release_architecture"
+        ],
+        "implementation_write_allowed": false,
+        "independence_exclusions": [
+          "critic"
+        ]
+      },
+      "edu-critic-1": {
+        "name": "EduAgent Architecture Critic",
+        "role": "critic",
+        "control_plane_role": "critic",
+        "execution_surface": "codex_app",
+        "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-critic-1",
+        "runtime": "codex",
+        "guidance_file": "AGENT.md",
+        "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-critic-1/AGENT.md",
+        "wip_limit": 1,
+        "borrow_policy": "critic_only",
+        "primary_capabilities": [
+          "adversarial_design_review",
+          "assumption_challenge",
+          "risk_discovery",
+          "testability_review"
+        ],
+        "secondary_capabilities": [
+          "security_review",
+          "operability_review"
+        ],
+        "implementation_write_allowed": false,
+        "independent_review": true,
+        "independence_exclusions": [
+          "architect",
+          "developer",
+          "reviewer",
+          "qa"
+        ]
+      },
+      "edu-qa-software-1": {
+        "name": "EduAgent Software QA",
+        "role": "software_qa",
+        "control_plane_role": "qa",
+        "execution_surface": "codex_app",
+        "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-qa-software-1",
+        "runtime": "codex",
+        "guidance_file": "AGENT.md",
+        "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-qa-software-1/AGENT.md",
+        "wip_limit": 1,
+        "borrow_policy": "quality_only",
+        "primary_capabilities": [
+          "functional_testing",
+          "integration_testing",
+          "regression_testing",
+          "release_validation"
+        ],
+        "secondary_capabilities": [
+          "performance_testing",
+          "security_testing",
+          "test_automation"
+        ],
+        "implementation_write_allowed": false,
+        "independent_review": true,
+        "independence_exclusions": [
+          "developer",
+          "reviewer"
+        ]
+      },
+      "edu-qa-education-1": {
+        "name": "EduAgent Education Quality QA",
+        "role": "education_qa",
+        "control_plane_role": "education_qa",
+        "execution_surface": "codex_app",
+        "workdir": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-qa-education-1",
+        "runtime": "codex",
+        "guidance_file": "AGENT.md",
+        "guidance_path": "/Users/linsuchang/Desktop/work/my-agent-teams/agents/edu-qa-education-1/AGENT.md",
+        "wip_limit": 1,
+        "borrow_policy": "education_quality_only",
+        "primary_capabilities": [
+          "pedagogical_quality",
+          "task_alignment",
+          "answer_leakage",
+          "multi_turn_evaluation"
+        ],
+        "secondary_capabilities": [
+          "prompt_lab",
+          "real_model_evaluation",
+          "student_safety"
+        ],
+        "implementation_write_allowed": false,
+        "independent_review": true,
+        "independence_exclusions": [
+          "developer",
+          "reviewer",
+          "software_qa"
+        ]
+      }
+    }
+  },
   "defaults": {
     "timeout_minutes": 30,
     "workspace_mode": "worktree",
@@ -242,6 +384,12 @@
       "prod_root": "/Users/linsuchang/Desktop/prod/my-agent-teams",
       "deploy_script": null,
       "target_branch": "integration"
+    },
+    "edu-agent": {
+      "dev_root": "/Users/linsuchang/Desktop/work/edu-agent",
+      "prod_root": "/Users/linsuchang/Desktop/prod/edu-agent",
+      "deploy_script": null,
+      "target_branch": "main"
     }
   },
   "agents_root": "/Users/linsuchang/Desktop/work/my-agent-teams/agents",

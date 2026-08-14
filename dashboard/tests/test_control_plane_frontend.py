@@ -10,6 +10,8 @@ def test_control_plane_view_surfaces_real_delivery_evidence_and_empty_states():
     assert 'id="control-plane"' in html
     assert 'id="control-plane-evidence-table"' in html
     assert "payload.artifacts" in script
+    assert "payload.quality" in script
+    assert "qualityState.passed" in script
     assert "payload.gates" in script
     assert "payload.timelines" in script
     assert "payload.delivery" in script

@@ -9,6 +9,7 @@ WORKSPACE="${WORKSPACE_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 CONFIG_PATH="${CONFIG_PATH:-$WORKSPACE/config.json}"
 TEMPLATES="${AGENT_TEMPLATES_DIR:-$WORKSPACE/design/agent-templates}"
 BASE_MD="$TEMPLATES/base.md"
+OVERLAYS_DIR="$TEMPLATES/overlays"
 AGENTS_DIR="${AGENTS_DIR:-$WORKSPACE/agents}"
 
 DRY_RUN=""
@@ -25,72 +26,97 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [[ ! -f "$BASE_MD" ]]; then
-  echo "❌ base.md not found: $BASE_MD"
-  exit 1
-fi
+for required in "$BASE_MD" "$OVERLAYS_DIR/tmux.md" "$OVERLAYS_DIR/codex_app.md"; do
+  if [[ ! -f "$required" ]]; then
+    echo "missing required template: $required" >&2
+    exit 1
+  fi
+done
 
 count=0
 
-build_agent() {
+render_agent_file() {
   local agent_id="$1"
-  local role_template="$2"
-  local agent_file="$3"
+  local role_templates="$2"
+  local overlay_name="$3"
+  local project_id="${4:-}"
+  local overlay_file="$OVERLAYS_DIR/$overlay_name.md"
+  local template_label="${role_templates//,/ + }"
+  local -a template_names=()
+  local role_template=""
 
-  local template_file="$TEMPLATES/$role_template.md"
-  local target_dir="$AGENTS_DIR/$agent_id"
-  local target_file="$target_dir/$agent_file"
-
-  if [[ ! -f "$template_file" ]]; then
-    echo "⚠️  Template not found for $agent_id: $template_file (skipped)"
-    return
+  IFS=',' read -r -a template_names <<< "$role_templates"
+  for role_template in "${template_names[@]}"; do
+    if [[ ! -f "$TEMPLATES/$role_template.md" ]]; then
+      echo "template not found for $agent_id: $TEMPLATES/$role_template.md" >&2
+      exit 1
+    fi
+  done
+  if [[ ! -f "$overlay_file" ]]; then
+    echo "overlay not found for $agent_id: $overlay_file" >&2
+    exit 1
   fi
 
-  if [[ -n "$DRY_RUN" ]]; then
-    echo "📝 [DRY-RUN] Would generate: $target_file"
-    count=$((count + 1))
-    return
-  fi
-
-  mkdir -p "$target_dir"
   {
-    echo "# ${agent_id} - ${agent_file}"
+    echo "# ${agent_id} - Role Contract"
     echo "> ⚠️ 本文件由 build-agent-files.sh 自动生成，请勿手动编辑。"
-    echo "> 通用规则来自 design/agent-templates/base.md"
-    echo "> 角色规则来自 design/agent-templates/${role_template}.md"
-    echo "> 如需修改，请编辑模板文件后重新运行构建脚本。"
-    echo "> 同一 agent 同时生成 AGENT.md 与 CLAUDE.md，林总工可按运行时规划选择 Codex 或 Claude Code。"
+    echo "> Core 来源: design/agent-templates/base.md"
+    for role_template in "${template_names[@]}"; do
+      echo "> 角色来源: design/agent-templates/${role_template}.md"
+    done
+    echo "> Overlay 来源: design/agent-templates/overlays/${overlay_name}.md"
+    echo "> 同一 agent 的 AGENT.md 与 CLAUDE.md 内容保持一致；运行时差异只来自 overlay。"
     echo ""
-    echo "你是 \`${agent_id}\`（${role_template} 角色）。你的角色身份由本文件确定，不依赖 tmux session 名，也不从 instruction.md 推断。"
-    echo ""
-    echo "## 启动后立即执行"
-    echo "1. 读取并遵守根共享规则：\`${WORKSPACE}/AGENTS.md\` 与 \`${WORKSPACE}/CLAUDE.md\`（按当前运行时读取对应文件）"
-    echo "2. 当前工作目录固定为：\`${target_dir}\`"
-    echo "3. 所有共享资源都用绝对路径访问"
+    echo "你是 \`${agent_id}\`（${template_label} 角色）。角色身份以本文件为准，不从任务描述、会话名称或历史习惯推断。"
+    if [[ -n "$project_id" ]]; then
+      echo "长期项目绑定：\`${project_id}\`。当前任务边界、授权和优先级仍以任务工件为准。"
+    fi
     echo ""
     echo "---"
-    echo "## 通用行为准则"
+    echo "## 共享核心契约"
     echo ""
     cat "$BASE_MD"
     echo ""
     echo "---"
-    echo "## ${role_template} 角色规则"
+    for role_template in "${template_names[@]}"; do
+      echo "## ${role_template} 角色契约"
+      echo ""
+      cat "$TEMPLATES/$role_template.md"
+      echo ""
+      echo "---"
+    done
+    echo "## 运行时 Overlay"
     echo ""
-    cat "$template_file"
-  } > "$target_file"
-
-  echo "✅ Generated: $target_file"
-  count=$((count + 1))
+    cat "$overlay_file"
+  }
 }
 
 build_agent_pair() {
   local agent_id="$1"
-  local role_template="$2"
-  if [ -n "$AGENT_FILTER" ] && [ "$AGENT_FILTER" != "$agent_id" ]; then
+  local role_templates="$2"
+  local overlay_name="$3"
+  local project_id="${4:-}"
+  local target_dir="$AGENTS_DIR/$agent_id"
+  local target_content=""
+
+  if [[ -n "$AGENT_FILTER" && "$AGENT_FILTER" != "$agent_id" ]]; then
     return
   fi
-  build_agent "$agent_id" "$role_template" "AGENT.md"
-  build_agent "$agent_id" "$role_template" "CLAUDE.md"
+
+  if [[ -n "$DRY_RUN" ]]; then
+    echo "📝 [DRY-RUN] Would generate: $target_dir/AGENT.md"
+    echo "📝 [DRY-RUN] Would generate: $target_dir/CLAUDE.md"
+    count=$((count + 2))
+    return
+  fi
+
+  mkdir -p "$target_dir"
+  target_content="$(render_agent_file "$agent_id" "$role_templates" "$overlay_name" "$project_id")"
+  printf '%s\n' "$target_content" > "$target_dir/AGENT.md"
+  printf '%s\n' "$target_content" > "$target_dir/CLAUDE.md"
+  echo "✅ Generated: $target_dir/AGENT.md"
+  echo "✅ Generated: $target_dir/CLAUDE.md"
+  count=$((count + 2))
 }
 
 load_agents_from_config() {
@@ -100,40 +126,65 @@ import sys
 from pathlib import Path
 
 role_map = {
-    "pm": "pm",
-    "architect": "architect",
-    "fullstack_dev": "developer",
-    "developer": "developer",
-    "qa": "qa",
-    "reviewer": "reviewer",
+    "pm": ("pm",),
+    "architect": ("architect",),
+    "critic": ("critic",),
+    "fullstack_dev": ("developer",),
+    "developer": ("developer",),
+    "qa": ("qa",),
+    "software_qa": ("qa", "software-qa"),
+    "education_qa": ("qa", "education-qa"),
+    "reviewer": ("reviewer",),
 }
+
+
+def resolve_overlay(payload: dict, source: str, agent_id: str) -> str:
+    surface = str((payload or {}).get("execution_surface") or "").strip()
+    runtime = str((payload or {}).get("runtime") or "").strip()
+    if surface:
+        if surface in {"tmux", "codex_app"}:
+            return surface
+        raise SystemExit(
+            f"Unsupported execution_surface '{surface}' for {source}:{agent_id}"
+        )
+    if runtime in {"codex", "claude_code"}:
+        return "tmux"
+    raise SystemExit(
+        f"Unable to resolve execution surface for {source}:{agent_id}; "
+        "set execution_surface or a supported runtime"
+    )
+
+
 config_path = Path(sys.argv[1]).expanduser()
 if not config_path.exists():
     raise SystemExit(1)
 config = json.loads(config_path.read_text(encoding="utf-8"))
-for agent_id, payload in (config.get("agents") or {}).items():
+seen = set()
+
+
+def emit(agent_id: str, payload: dict, source: str, project_id: str = "") -> None:
     role = str((payload or {}).get("role") or "").strip()
-    template = role_map.get(role)
-    if template:
-        print(f"{agent_id}\t{template}")
+    templates = role_map.get(role)
+    if not templates or agent_id in seen:
+        return
+    overlay = resolve_overlay(payload or {}, source, agent_id)
+    seen.add(agent_id)
+    print(f"{agent_id}\t{','.join(templates)}\t{overlay}\t{project_id}")
+
+
+for agent_id, payload in (config.get("agents") or {}).items():
+    emit(agent_id, payload, "agents")
+for project_id, project_agents in (config.get("project_agents") or {}).items():
+    for agent_id, payload in (project_agents or {}).items():
+        emit(agent_id, payload, f"project_agents.{project_id}", str(project_id))
 PY
 }
 
-AGENT_LINES="$(load_agents_from_config || true)"
-if [ -n "$AGENT_LINES" ]; then
-  while IFS=$'\t' read -r agent_id role_template; do
-    [ -n "$agent_id" ] || continue
-    build_agent_pair "$agent_id" "$role_template"
-  done <<< "$AGENT_LINES"
-else
-  echo "⚠️  Could not load agents from $CONFIG_PATH; using built-in fallback" >&2
-  build_agent_pair "pm-chief" "pm"
-  build_agent_pair "arch-1" "architect"
-  build_agent_pair "dev-1" "developer"
-  build_agent_pair "dev-2" "developer"
-  build_agent_pair "qa-1" "qa"
-  build_agent_pair "review-1" "reviewer"
-fi
+AGENT_LINES="$(load_agents_from_config)"
+while IFS=$'\t' read -r agent_id role_templates overlay_name project_id; do
+  [[ -n "$agent_id" ]] || continue
+  build_agent_pair "$agent_id" "$role_templates" "$overlay_name" "$project_id"
+done <<< "$AGENT_LINES"
 
 echo ""
 echo "Done. $count agent file(s) generated."

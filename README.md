@@ -93,7 +93,8 @@ export CODEX_CMD='codex -p dev-team'
 
 ```
 Owner -> PM -> Architect -> independent Critic -> task plan
-     -> Developer(worktree) -> independent Reviewer -> QA -> PM summary
+     -> Developer(worktree) -> automated quality gate -> independent Reviewer
+     -> Software QA -> PM summary
      -> release-ready 或 Owner 例外决策
 ```
 
@@ -124,6 +125,21 @@ python3 scripts/demo-control-plane.py
 ```
 
 完整接入说明见 [`design/control-plane/integration-guide.md`](design/control-plane/integration-guide.md)，架构、迁移和恢复见 `design/control-plane/`。
+
+### 代码质量闭环
+
+Development 结束后必须挂接业务仓库生成的 `quality_report` artifact。控制面读取
+artifact metadata 中完整的 `quality_gate_report/v*` 报告，并按以下规则推进：
+
+- 报告缺失、存在 blocking 失败或过期豁免：不得进入 Review。
+- `infra_error` / timeout：停在 `quality_gate`，标记基础设施阻塞，不伪装成代码失败。
+- 代码质量失败：退回 `development`，旧实现、测试和质量证据不能重复使用。
+- Reviewer `request_changes`：必须携带结构化 findings，并退回 `development`。
+- 同一门禁连续三次驳回：自动创建 `repeated_gate_failure` Owner 决策。
+- PM 的 `delivery_summary` metadata 必须包含新增债务、消减债务、有效豁免和残余风险。
+
+artifact metadata 直接使用质量门禁 JSON，不要只传一句“已通过”。完整契约、返工示例和
+角色分工见 [`design/代码质量治理闭环.md`](design/代码质量治理闭环.md)。
 
 ### 团队拓扑
 
@@ -848,6 +864,7 @@ my-agent-teams/
 
 - `config.json.projects` 明确定义每个项目的 `dev_root` / `prod_root`
 - `config.json.agents[*].workdir` 定义每个 agent 的独立启动目录
+- `config.json.project_agents.<project-id>` 定义绑定到具体项目的 Codex App 角色席位；它们会生成角色文件并注册控制面，但不会被 `teamctl up` 当作 tmux agent 重复启动
 - `task.json` 需声明：`project`、`execution_mode`、`target_environment`
 - `create-task.sh` 和 `dispatch-task.sh` 都会做前置校验：
   - 开发任务只能落在 `project.dev_root`
@@ -858,6 +875,10 @@ my-agent-teams/
 ### config.json
 
 全局配置，定义团队拓扑和规则：
+
+- `agents`：由 `teamctl` 管理的共享 tmux agent。
+- `project_agents`：按项目长期绑定的 Codex App 角色配置；这里只保存稳定身份、能力和工作目录，运行时 `thread_id` 由控制面登记。
+- 两类 agent 都由 `scripts/build-agent-files.sh` 生成 `AGENT.md` / `CLAUDE.md`，但只有 `agents` 参与 `teamctl up`。
 
 ```json
 {
@@ -926,12 +947,16 @@ my-agent-teams/
 
 ```
 design/agent-templates/
-├── base.md          # 通用行为准则（行动优先、飞书通知、问题分级、生产部署、Scratchpad）
-├── pm.md            # PM 特化（任务拆解、审查分级、配置门禁、决策规则）
-├── architect.md     # 架构师特化（方案输出、集成职责、部署职责、故障排查）
-├── developer.md     # 开发特化（工作方式、角色边界、write_scope）
-├── qa.md            # QA 特化（verify.json 规范、测试流程）
-└── reviewer.md      # 审查特化（审查流程、角色边界）
+├── base.md          # 与项目路径、agent ID 和运行时无关的共享契约
+├── pm.md            # PM 特化（任务编排、结构化门禁、返工与升级）
+├── architect.md     # 架构师特化（边界、依赖方向、状态所有权、精简 ADR）
+├── critic.md        # 独立对抗审查（假设挑战、风险发现、可验证性审查）
+├── developer.md     # 开发特化（write_scope、自检、quality_report）
+├── qa.md            # QA 通用验证契约
+├── software-qa.md   # 软件质量 QA（功能、集成、回归与发布验证）
+├── education-qa.md  # 教育质量 QA（任务对齐、教学行为与泄题评测）
+├── reviewer.md      # 独立代码审查与结构化 finding
+└── overlays/        # tmux / Codex App 运行时差异
 ```
 
 ### 修改规则的流程
@@ -949,9 +974,10 @@ bash scripts/build-agent-files.sh --dry-run
 
 ### 通用规则 vs 角色规则
 
-- **base.md**：所有 agent 共享的行为准则（工作方法论、飞书通知、问题分级等）
+- **base.md**：所有 agent 共享且与运行时无关的行为契约
 - **{role}.md**：角色特化规则（PM 的任务拆解、开发的工作方式等）
-- agent 文件 = 启动信息 + base.md + {role}.md，由构建脚本自动合并
+- **overlays/{surface}.md**：仅承载 tmux / Codex App 的送达和启动差异
+- agent 文件 = 身份 + base.md + 一个或多个角色模板 + runtime overlay
 
 - **保护路径**：agent 不能修改 `tasks/`、`scripts/`、`prompts/`、`config.json`；角色规则请改 `design/agent-templates/` 后重新生成
 - **write_scope**：agent 只能修改 task.json 中声明的文件范围

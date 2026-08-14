@@ -1,6 +1,6 @@
 # my-agent-teams 文档索引
 
-> 更新时间：2026-08-13
+> 更新时间：2026-08-14
 > 范围：跨项目 Codex 交付控制面、任务管理、Chat Hub、任务看板、agent 配置。
 > 规则：`tasks/` 是任务事实记录，`.omx/` 是运行态，二者不纳入正式设计文档整理。
 
@@ -14,10 +14,16 @@
 ### Agent 配置与模板
 - `agent-templates/base.md` — 所有 agent 通用行为准则，模板唯一真相源。
 - `agent-templates/pm.md` — PM 角色模板。
-- `agent-templates/architect.md` — 架构师/集成者/部署者模板。
+- `agent-templates/architect.md` — 架构边界、依赖方向、状态所有权与 ADR 模板。
+- `agent-templates/critic.md` — 独立对抗审查角色模板。
 - `agent-templates/developer.md` — 开发角色模板。
-- `agent-templates/qa.md` — QA 角色模板。
+- `agent-templates/qa.md` — QA 通用流程模板。
+- `agent-templates/software-qa.md` — 软件质量 QA 特化模板。
+- `agent-templates/education-qa.md` — 教育质量 QA 特化模板。
 - `agent-templates/reviewer.md` — 审查角色模板。
+- `agent-templates/overlays/tmux.md` — tmux 运行时交付约定。
+- `agent-templates/overlays/codex_app.md` — Codex App 运行时交付约定。
+- `代码质量治理闭环.md` — quality report、自动门禁、返工、Owner 升级与交付摘要契约。
 
 > `agents/<agent-id>/AGENT.md` 与 `agents/<agent-id>/CLAUDE.md` 由这些模板生成；不要把旧 `prompts/` 当作当前角色源。
 
