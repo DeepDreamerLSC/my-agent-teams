@@ -29,6 +29,7 @@ FORBIDDEN_CORE_TERMS = [
     "A-Lite",
     "飞书",
     "codex_app",
+    "edu-agent-grill",
 ]
 
 
@@ -97,6 +98,7 @@ def test_project_agents_generate_overlay_and_role_composition(tmp_path: Path) ->
     assert "Overlay 来源: design/agent-templates/overlays/codex_app.md" in codex_app_agent
     assert "tmux 指令" not in codex_app_agent
     assert "长期项目绑定：`edu-agent`" in codex_app_agent
+    assert "Owner 的单一需求质询入口" in codex_app_agent
 
     assert "design/agent-templates/critic.md" in critic
     assert "过度设计" in critic
@@ -185,3 +187,17 @@ def test_quality_evidence_contract_present_for_core_roles() -> None:
     for filename, marker in expected.items():
         text = (template_dir / filename).read_text(encoding="utf-8")
         assert marker in text
+
+
+def test_decision_interview_contract_preserves_role_and_project_boundaries() -> None:
+    template_dir = REPO_ROOT / "design" / "agent-templates"
+    base = (template_dir / "base.md").read_text(encoding="utf-8")
+    pm = (template_dir / "pm.md").read_text(encoding="utf-8")
+    architect = (template_dir / "architect.md").read_text(encoding="utf-8")
+    critic = (template_dir / "critic.md").read_text(encoding="utf-8")
+
+    assert "可检索事实、角色授权内决策、需要 Owner 的决策或外部待验证事实" in base
+    assert "不能扩大任务授权" in base
+    assert "PM 默认是 Owner 的单一需求质询入口" in pm
+    assert "可逆、局部且不改变业务边界的技术选择" in architect
+    assert "不直接发起 Owner 质询" in critic
