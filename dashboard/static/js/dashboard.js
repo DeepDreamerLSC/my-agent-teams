@@ -122,6 +122,11 @@ if (docRef) {
       document.querySelectorAll('.view').forEach(v => v.classList.remove('active'))
       btn.classList.add('active')
       document.getElementById(btn.dataset.tab).classList.add('active')
+      const taskCount = document.getElementById('task-count')
+      const scopedCount = btn.dataset.tab === 'collaboration'
+        ? taskCount?.dataset.collaborationCount
+        : taskCount?.dataset.boardCount
+      if (taskCount && scopedCount != null) taskCount.textContent = `共 ${scopedCount} 个任务`
       window.dispatchEvent(new Event('resize'))
     })
   })
@@ -285,7 +290,11 @@ function renderKanban(boardPayload) {
     board.appendChild(col)
   })
 
-  document.getElementById('task-count').textContent = `共 ${totalTasks} 个任务`
+  const taskCount = document.getElementById('task-count')
+  taskCount.dataset.boardCount = String(totalTasks)
+  if (!document.getElementById('collaboration')?.classList.contains('active')) {
+    taskCount.textContent = `共 ${totalTasks} 个任务`
+  }
 }
 
 // --- Gantt View ---

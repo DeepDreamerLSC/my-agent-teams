@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover - exercised only when Flask is absent.
     request = None
 
 from .db import connect_db, resolve_db_path, utcnow_iso
+from .collaboration import create_collaboration_blueprint
 from .query import (
     build_agent_stats_payload,
     build_board_payload,
@@ -53,11 +54,12 @@ def create_app(db_path: str | None = None, *, tasks_root: str | None = None, con
     app.config['TASK_BOARD_DB_PATH'] = resolved_db_path
     app.config['TASKS_ROOT'] = str(Path(tasks_root).expanduser().resolve()) if tasks_root else str(DEFAULT_TASKS_ROOT)
     app.config['TASK_CONTROL_CONFIG_PATH'] = str(Path(control_config_path).expanduser().resolve()) if control_config_path else str(DEFAULT_CONFIG_PATH)
+    app.register_blueprint(create_collaboration_blueprint())
 
     # Initialize the schema once at startup. Request handlers should use
     # read-only style connections that do not rewrite metadata on every GET.
-    with closing(connect_db(resolved_db_path, initialize=True)):
-        pass
+    with closing(connect_db(resolved_db_path, initialize=True)) as startup_conn:
+        startup_conn.commit()
 
     # Existing config projects are imported conservatively into the control
     # plane. Missing or non-Git roots remain skipped/unknown; no project is
