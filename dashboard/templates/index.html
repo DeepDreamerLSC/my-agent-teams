@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>任务看板 - my-agent-teams</title>
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/collaboration.css">
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 </head>
 <body>
@@ -17,7 +18,8 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="kanban">看板</button>
+    <button class="tab active" data-tab="collaboration">协作看板</button>
+    <button class="tab" data-tab="kanban">任务看板</button>
     <button class="tab" data-tab="gantt">甘特图</button>
     <button class="tab" data-tab="agents">Agent 统计</button>
     <button class="tab" data-tab="analytics">分析</button>
@@ -28,8 +30,116 @@
   </nav>
 
   <main>
+    <section id="collaboration" class="view active collaboration-view">
+      <div class="collab-hero">
+        <div>
+          <p class="collab-eyebrow">SQLITE CONTROL PLANE · READ MODEL</p>
+          <h2>统一 Agent 协作看板</h2>
+          <p class="collab-subtitle">任务、独立审查、Local CI、merge-gate、消息 ACK 与分层授权共用同一事实源。</p>
+        </div>
+        <div class="collab-live-area">
+          <span id="collab-live" class="collab-live is-connecting">正在连接实时事件</span>
+          <button id="collab-refresh" type="button" class="filter-reset">立即刷新</button>
+        </div>
+      </div>
+      <div class="collab-boundary">
+        看板主体只读，不执行合并、部署、删除或自动重试。仅“分层授权”区域可记录人工授权决定；请求只展示摘要、精确目标与引用。
+      </div>
+      <div id="collab-summary" class="collab-summary" aria-label="协作状态总览"></div>
+      <div class="filters-bar collab-filters" aria-label="协作看板筛选">
+        <select id="collab-filter-project"><option value="">全部项目</option></select>
+        <select id="collab-filter-role"><option value="">全部角色</option></select>
+        <select id="collab-filter-status"><option value="">全部状态</option></select>
+        <select id="collab-filter-pr">
+          <option value="">全部 PR</option><option value="has_pr">有 PR</option><option value="open">PR Open</option><option value="mergeable">可合入</option><option value="missing">无 PR</option>
+        </select>
+        <select id="collab-filter-risk"><option value="">全部风险</option></select>
+        <button id="collab-filter-reset" type="button" class="filter-reset">重置筛选</button>
+      </div>
+
+      <div id="collab-alert" class="collab-alert hidden" role="status"></div>
+      <section class="collab-panel">
+        <div class="collab-panel-heading">
+          <div><p class="collab-kicker">FLOW</p><h3>开发 → 审查 → 修复 → 复审 → Merge Gate</h3></div>
+          <span id="collab-source-freshness" class="collab-muted">暂无事件</span>
+        </div>
+        <div id="collab-board" class="collab-board"></div>
+      </section>
+
+      <div class="collab-two-column">
+        <section class="collab-panel">
+          <div class="collab-panel-heading"><div><p class="collab-kicker">DAG</p><h3>项目、需求、任务与 Agent 路由</h3></div></div>
+          <div id="collab-topology" class="collab-chart"></div>
+        </section>
+        <section class="collab-panel">
+          <div class="collab-panel-heading"><div><p class="collab-kicker">TIMELINE</p><h3>并行执行与等待区间</h3></div></div>
+          <div id="collab-timeline" class="collab-chart"></div>
+        </section>
+      </div>
+
+      <div class="collab-two-column collab-lower-grid">
+        <section class="collab-panel">
+          <div class="collab-panel-heading"><div><p class="collab-kicker">BOTTLENECK</p><h3>卡住任务与事实依据</h3></div></div>
+          <div id="collab-bottlenecks"></div>
+        </section>
+        <section class="collab-panel">
+          <div class="collab-panel-heading"><div><p class="collab-kicker">EVENTS</p><h3>安全投影事件流</h3></div><span class="collab-muted">不展示完整正文或工具载荷</span></div>
+          <div id="collab-events" class="collab-event-list"></div>
+        </section>
+      </div>
+
+      <div class="collab-two-column collab-lower-grid">
+        <section class="collab-panel">
+          <div class="collab-panel-heading">
+            <div><p class="collab-kicker">INBOX</p><h3>专注租约、待排空事件与自动转发</h3></div>
+            <span class="collab-muted">普通协作事件先沉到控制面，只升级真正需要人工决策的事项</span>
+          </div>
+          <div id="collab-focus" class="collab-focus"></div>
+          <div id="collab-inbox-summary" class="collab-inbox-summary"></div>
+          <div class="collab-inbox-grid">
+            <section>
+              <h4>待人工决定</h4>
+              <div id="collab-human-decisions" class="collab-event-list"></div>
+            </section>
+            <section>
+              <h4>已自动转发</h4>
+              <div id="collab-auto-forwarded" class="collab-event-list"></div>
+            </section>
+          </div>
+        </section>
+        <section class="collab-panel">
+          <div class="collab-panel-heading">
+            <div><p class="collab-kicker">AUDIT</p><h3>Inbox 审计轨迹</h3></div>
+            <span class="collab-muted">RECEIVED → VALIDATED → DEDUPED → ROUTED / ACKED / ESCALATED</span>
+          </div>
+          <div id="collab-inbox-trace" class="collab-event-list"></div>
+        </section>
+      </div>
+
+      <section class="collab-panel collab-auth-panel">
+        <div class="collab-panel-heading">
+          <div><p class="collab-kicker">DELEGATED AUTHORIZATION</p><h3>L0 自动 · L1 Reviewer/Coordinator · L2 Owner</h3></div>
+          <div class="collab-operator">
+            <label>审批人 <input id="collab-approver-id" value="owner" aria-label="审批人 ID"></label>
+            <label>角色 <select id="collab-approver-role"><option value="owner">Owner</option><option value="reviewer">Reviewer</option><option value="coordinator">Coordinator</option></select></label>
+          </div>
+        </div>
+        <p id="collab-auth-note" class="collab-muted">未知或信息不完整请求默认 fail-closed 到 L2 Owner；授权一次性、可过期、绑定精确目标/环境/HEAD。</p>
+        <div class="panel-table-wrap">
+          <table class="panel-table collab-auth-table">
+            <thead><tr><th>层级 / 状态</th><th>请求</th><th>环境与精确目标</th><th>归层原因</th><th>操作</th></tr></thead>
+            <tbody id="collab-auth-body"></tbody>
+          </table>
+        </div>
+        <details class="collab-policy">
+          <summary>版本化授权策略（仅启停内置显式规则）</summary>
+          <div id="collab-policy-rules" class="collab-policy-rules"></div>
+        </details>
+      </section>
+    </section>
+
     <!-- Kanban View -->
-    <section id="kanban" class="view active">
+    <section id="kanban" class="view">
       <div class="filters-bar" id="kanban-filters">
         <select id="filter-project"><option value="">全部项目</option></select>
         <select id="filter-domain"><option value="">全部领域</option></select>
@@ -215,7 +325,17 @@
     </div>
   </aside>
 
+  <div id="collab-detail-backdrop" class="detail-backdrop hidden"></div>
+  <aside id="collab-detail-drawer" class="task-detail-drawer collab-detail-drawer hidden" aria-hidden="true">
+    <div class="drawer-header">
+      <div><p class="collab-kicker">TASK TRACE</p><h2 id="collab-detail-title">协作任务详情</h2><div id="collab-detail-subtitle" class="drawer-subtitle"></div></div>
+      <button id="collab-detail-close" class="drawer-close" type="button">关闭</button>
+    </div>
+    <div id="collab-detail-body" class="drawer-body"><div class="empty-state">请选择任务查看详情</div></div>
+  </aside>
+
   <script src="/static/js/helpers.js"></script>
   <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/collaboration.js"></script>
 </body>
 </html>
